@@ -4,11 +4,49 @@ exec tclsh "$0" "$@"
 
 package require tcltest 2.2
 eval tcltest::configure $argv
-package require ral
+load [file join .. src libral[info sharedlibextension]]
 
 namespace eval ::ral::test {
     namespace import ::tcltest::*
     namespace import ::ral::*
+
+    proc createPartsDB {} {
+	relvar create ::S\
+	    {{S# string} {SNAME string} {STATUS int} {CITY string}}\
+	    S#\
+	    {S# S1 SNAME Smith STATUS 20 CITY London}\
+	    {S# S2 SNAME Jones STATUS 10 CITY Paris}\
+	    {S# S3 SNAME Blake STATUS 30 CITY Paris}\
+	    {S# S4 SNAME Clark STATUS 20 CITY London}\
+	    {S# S5 SNAME Adams STATUS 30 CITY Athens}
+
+	relvar create ::P\
+	    {{P# string} {PNAME string} {COLOR string} {WEIGHT double}\
+		{CITY string}}\
+	    P#\
+	    {P# P1 PNAME Nut COLOR Red WEIGHT 12.0 CITY London}\
+	    {P# P2 PNAME Bolt COLOR Green WEIGHT 17.0 CITY Paris}\
+	    {P# P3 PNAME Screw COLOR Blue WEIGHT 17.0 CITY Oslo}\
+	    {P# P4 PNAME Screw COLOR Red WEIGHT 14.0 CITY London}\
+	    {P# P5 PNAME Cam COLOR Blue WEIGHT 12.0 CITY Paris}\
+	    {P# P6 PNAME Cog COLOR Red WEIGHT 19.0 CITY London}
+
+	relvar create ::SP\
+	    {{S# string} {P# string} {QTY int}}\
+	    {{S# P#}}\
+	    {S# S1 P# P1 QTY 300}\
+	    {S# S1 P# P2 QTY 200}\
+	    {S# S1 P# P3 QTY 400}\
+	    {S# S1 P# P4 QTY 200}\
+	    {S# S1 P# P5 QTY 100}\
+	    {S# S1 P# P6 QTY 100}\
+	    {S# S2 P# P1 QTY 300}\
+	    {S# S2 P# P2 QTY 400}\
+	    {S# S3 P# P2 QTY 200}\
+	    {S# S4 P# P2 QTY 200}\
+	    {S# S4 P# P4 QTY 300}\
+	    {S# S4 P# P5 QTY 400}
+    }
 
     # Tuple Tests
 
@@ -515,6 +553,107 @@ namespace eval ::ral::test {
     } -result {identifier, "Name, Age", is not irreducible with\
 	respect to least one other indentifier}\
     -returnCodes error
+
+    test relvar-create-13.0 {tuple type attribute} -body {
+	relvar create N\
+	    {Name {Address {Tuple {{Number int} Street}}}}\
+	    Name\
+	    {Name Fred Address {Number 500 Street Main}}\
+	    {Address {Number 600 Street Elm} Name Alice}
+    } -cleanup {
+	relvar destroy N
+    } -result {Relation {{{Name string} {Address {Tuple {{Number int} {Street string}}}}} Name} {{Name Fred Address {Number 500 Street Main}} {Name Alice Address {Number 600 Street Elm}}}}
+
+    test relvar-create-14.0 {relation type attribute} -body {
+	relvar create N\
+	    {Name {Dog {Relation {{DogName Breed} DogName}}}}\
+	    Name\
+	    {Name Fred Dog {\
+		{DogName Rover Breed Terrier}\
+		{DogName Missy Breed Poodle}}}\
+	    {Name Alice Dog {\
+		{DogName Tiger Breed Setter}}}
+    } -cleanup {
+	relvar destroy N
+    } -result {Relation {{{Name string} {Dog {Relation {{{DogName string} {Breed string}} DogName}}}} Name} {{Name Fred Dog {{DogName Rover Breed Terrier} {DogName Missy Breed Poodle}}} {Name Alice Dog {{DogName Tiger Breed Setter}}}}}
+
+    # Relation Tests
+    createPartsDB
+
+    # relation cardinality subcommand
+    test relation-cardinality-1.0 {dum relation} -body {
+	relation cardinality {Relation {{} {}} {}}
+    } -result 0
+
+    test relation-cardinality-2.0 {dee relation} -body {
+	relation cardinality {Relation {{} {}} {{}}}
+    } -result 1
+
+    test relation-cardinality-3.0 {multiple body tuples} -body {
+	relation cardinality $S
+    } -result 5
+
+    # relation degree subcommand
+    test relation-degree-1.0 {dum relation} -body {
+	relation degree {Relation {{} {}} {}}
+    } -result 0
+
+    test relation-degree-2.0 {single attribute} -body {
+	relation degree {Relation {Name Name} {}}
+    } -result 1
+
+    test relation-degree-3.0 {multiple attributes} -body {
+	relation degree $S
+    } -result 4
+
+    # relation empty subcommand
+    test relation-empty-1.0 {dum relation} -body {
+	relation empty {Relation {{} {}} {}}
+    } -result 1
+
+    test relation-empty-2.0 {dee relation} -body {
+	relation empty {Relation {{} {}} {{}}}
+    } -result 0
+
+    test relation-empty-3.0 {multiple body tuples} -body {
+	relation empty $P
+    } -result 0
+
+    # relation tuple subcommand
+    test relation-tuple-1.0 {single attribute} -body {
+	set t [relation tuple {Relation {Name Name} {{Name Andrew}}}]
+	tuple equal $t {Tuple {{Name string}} {Name Andrew}}
+    } -result 1
+
+    test relation-tuple-2.0 {multiple attributes} -body {
+	set r {Relation {{Name {Age int}} Name} {{Name Andrew Age 20}}}
+	set t [relation tuple $r]
+	tuple equal $t {Tuple {{Name string} {Age int}} {Name Andrew Age 20}}
+    } -result 1
+
+    test relation-tuple-3.0 {body too long} -body {
+	set r {Relation {{Name {Age int}} Name}\
+	    {{Name Andrew Age 20}\
+	     {Name George Age 20}}}
+	relation tuple $r
+    } -result {relation must have cardinality of one} -returnCodes error
+
+    # relation typeof subcommand
+    test relation-typeof-1.0 {dum relation} -body {
+	relation typeof {Relation {{} {}} {}}
+    } -result {Relation {{} {}}}
+
+    test relation-typeof-2.0 {dee relation} -body {
+	relation typeof {Relation {{} {}} {{}}}
+    } -result {Relation {{} {}}}
+
+    test relation-typeof-3.0 {single attribute} -body {
+	relation typeof {Relation {Name Name} {{Name Andrew}}}
+    } -result {Relation {{{Name string}} Name}}
+
+    test relation-typeof-4.0 {multiple attributes} -body {
+	relation typeof $SP
+    } -result {Relation {{{S# string} {P# string} {QTY int}} {{S# P#}}}}
 
     cleanupTests
 }
