@@ -45,10 +45,16 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral.c,v $
-$Revision: 1.14 $
-$Date: 2004/07/24 20:17:32 $
+$Revision: 1.15 $
+$Date: 2004/07/24 21:10:19 $
  *--
  */
+
+static char ral_id[] = "$Id: ral.c,v 1.15 2004/07/24 21:10:19 mangoa01 Exp $" ;
+static char ral_copyright[] =
+    "This software is copyrighted 2004 by G. Andrew Mangogna."
+    "Terms and conditions for use are distributed with the source code."
+    ;
 
 /*
 PRAGMAS
@@ -73,6 +79,14 @@ MACRO DEFINITIONS
 /*
 TYPE DEFINITIONS
 */
+/*
+ * Used in the various command functions to map subcommand names
+ * to the corresponding functions that implement the subcommands.
+ */
+struct cmdMap {
+    const char *cmdName ;
+    int (*const cmdFunc)(Tcl_Interp *, int, Tcl_Obj *const*) ;
+} ;
 
 /*
  * There are a number of places where fixed sized integer vectors
@@ -325,7 +339,7 @@ EXTERNAL DATA REFERENCES
 /*
 STATIC DATA ALLOCATION
 */
-static char rcsid[] = "@(#) $RCSfile: ral.c,v $ $Revision: 1.14 $" ;
+static char rcsid[] = "@(#) $RCSfile: ral.c,v $ $Revision: 1.15 $" ;
 
 static Tcl_ObjType Ral_TupleType = {
     "Tuple",
@@ -4285,38 +4299,22 @@ tupleCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
-    enum TupleSubCmds {
-	TUPLE_ASSIGN,
-	TUPLE_CREATE,
-	TUPLE_DEGREE,
-	TUPLE_ELIMINATE,
-	TUPLE_EQUAL,
-	TUPLE_EXTEND,
-	TUPLE_EXTRACT,
-	TUPLE_GET,
-	TUPLE_HEADING,
-	TUPLE_PROJECT,
-	TUPLE_RENAME,
-	TUPLE_UNWRAP,
-	TUPLE_UPDATE,
-	TUPLE_WRAP
-    } ;
-    static const char *subCmds[] = {
-	"assign",
-	"create",
-	"degree",
-	"eliminate",
-	"equal",
-	"extend",
-	"extract",
-	"get",
-	"heading",
-	"project",
-	"rename",
-	"unwrap",
-	"update",
-	"wrap",
-	NULL
+    static struct cmdMap cmdTable[] = {
+	{"assign", TupleAssignCmd},
+	{"create", TupleCreateCmd},
+	{"degree", TupleDegreeCmd},
+	{"eliminate", TupleEliminateCmd},
+	{"equal", TupleEqualCmd},
+	{"extend", TupleExtendCmd},
+	{"extract", TupleExtractCmd},
+	{"get", TupleGetCmd},
+	{"heading", TupleHeadingCmd},
+	{"project", TupleProjectCmd},
+	{"rename", TupleRenameCmd},
+	{"unwrap", TupleUnwrapCmd},
+	{"update", TupleUpdateCmd},
+	{"wrap", TupleWrapCmd},
+	{NULL, NULL},
     } ;
 
     int index ;
@@ -4326,62 +4324,12 @@ tupleCmd(
 	return TCL_ERROR ;
     }
 
-    if (Tcl_GetIndexFromObj(interp, *(objv + 1), subCmds, "subcommand", 0,
-	&index) != TCL_OK) {
+    if (Tcl_GetIndexFromObjStruct(interp, *(objv + 1), cmdTable,
+	sizeof(struct cmdMap), "subcommand", 0, &index) != TCL_OK) {
 	return TCL_ERROR ;
     }
 
-    switch ((enum TupleSubCmds)index) {
-    case TUPLE_ASSIGN:
-	return TupleAssignCmd(interp, objc, objv) ;
-
-    case TUPLE_CREATE:
-	return TupleCreateCmd(interp, objc, objv) ;
-
-    case TUPLE_DEGREE:
-	return TupleDegreeCmd(interp, objc, objv) ;
-
-    case TUPLE_ELIMINATE:
-	return TupleEliminateCmd(interp, objc, objv) ;
-
-    case TUPLE_EQUAL:
-	return TupleEqualCmd(interp, objc, objv) ;
-
-    case TUPLE_EXTEND:
-	return TupleExtendCmd(interp, objc, objv) ;
-
-    case TUPLE_EXTRACT:
-	return TupleExtractCmd(interp, objc, objv) ;
-
-    case TUPLE_GET:
-	return TupleGetCmd(interp, objc, objv) ;
-
-    case TUPLE_HEADING:
-	return TupleHeadingCmd(interp, objc, objv) ;
-
-    case TUPLE_PROJECT:
-	return TupleProjectCmd(interp, objc, objv) ;
-
-    case TUPLE_RENAME:
-	return TupleRenameCmd(interp, objc, objv) ;
-
-    case TUPLE_UNWRAP:
-	return TupleUnwrapCmd(interp, objc, objv) ;
-
-    case TUPLE_UPDATE:
-	return TupleUpdateCmd(interp, objc, objv) ;
-
-    case TUPLE_WRAP:
-	return TupleWrapCmd(interp, objc, objv) ;
-
-    default:
-	Tcl_Panic("tuple: unexpected tuple subcommand value") ;
-    }
-
-    /*
-     * NOT REACHED
-     */
-    return TCL_ERROR ;
+    return cmdTable[index].cmdFunc(interp, objc, objv) ;
 }
 
 /*
@@ -4988,28 +4936,17 @@ relvarCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
-    enum RelvarSubCmds {
-	RELVAR_CREATE,
-	RELVAR_DELETE,
-	RELVAR_DESTROY,
-	RELVAR_DUMP,
-	RELVAR_INSERT,
-	RELVAR_NAMES,
-	RELVAR_SET,
-	RELVAR_UPDATE
+    static struct cmdMap cmdTable[] = {
+	{"create", RelvarCreateCmd},
+	{"delete", RelvarDeleteCmd},
+	{"destroy", RelvarDestroyCmd},
+	{"dump", RelvarDumpCmd},
+	{"insert", RelvarInsertCmd},
+	{"names", RelvarNamesCmd},
+	{"set", RelvarSetCmd},
+	{"update", RelvarUpdateCmd},
+	{NULL, NULL},
     } ;
-    static const char *subCmds[] = {
-	"create",
-	"delete",
-	"destroy",
-	"dump",
-	"insert",
-	"names",
-	"set",
-	"update",
-	NULL
-    } ;
-
     int index ;
 
     if (objc < 2) {
@@ -5017,44 +4954,12 @@ relvarCmd(
 	return TCL_ERROR ;
     }
 
-    if (Tcl_GetIndexFromObj(interp, *(objv + 1), subCmds, "subcommand", 0,
-	&index) != TCL_OK) {
+    if (Tcl_GetIndexFromObjStruct(interp, *(objv + 1), cmdTable,
+	sizeof(struct cmdMap), "subcommand", 0, &index) != TCL_OK) {
 	return TCL_ERROR ;
     }
 
-    switch ((enum RelvarSubCmds)index) {
-    case RELVAR_CREATE:
-	return RelvarCreateCmd(interp, objc, objv) ;
-
-    case RELVAR_DELETE:
-	return RelvarDeleteCmd(interp, objc, objv) ;
-
-    case RELVAR_DESTROY:
-	return RelvarDestroyCmd(interp, objc, objv) ;
-
-    case RELVAR_DUMP:
-	return RelvarDumpCmd(interp, objc, objv) ;
-
-    case RELVAR_INSERT:
-	return RelvarInsertCmd(interp, objc, objv) ;
-
-    case RELVAR_NAMES:
-	return RelvarNamesCmd(interp, objc, objv) ;
-
-    case RELVAR_SET:
-	return RelvarSetCmd(interp, objc, objv) ;
-
-    case RELVAR_UPDATE:
-	return RelvarUpdateCmd(interp, objc, objv) ;
-
-    default:
-	Tcl_Panic("relvar: unexpected relvar subcommand value") ;
-    }
-
-    /*
-     * NOT REACHED
-     */
-    return TCL_ERROR ;
+    return cmdTable[index].cmdFunc(interp, objc, objv) ;
 }
 
 /*
@@ -7277,64 +7182,35 @@ static int relationCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
-    enum RelationSubCmds {
-	RELATION_CARDINALITY,
-	RELATION_DEGREE,
-	RELATION_DIVIDE,
-	RELATION_ELIMINATE,
-	RELATION_EMPTYOF,
-	RELATION_EXTEND,
-	RELATION_FOREACH,
-	RELATION_GROUP,
-	RELATION_HEADING,
-	RELATION_IDENTIFIERS,
-	RELATION_INTERSECT,
-	RELATION_IS,
-	RELATION_ISEMPTY,
-	RELATION_ISNOTEMPTY,
-	RELATION_JOIN,
-	RELATION_LIST,
-	RELATION_MINUS,
-	RELATION_PROJECT,
-	RELATION_RENAME,
-	RELATION_RESTRICT,
-	RELATION_SEMIJOIN,
-	RELATION_SEMIMINUS,
-	RELATION_SUMMARIZE,
-	RELATION_TIMES,
-	RELATION_TUPLE,
-	RELATION_UNGROUP,
-	RELATION_UNION,
-    } ;
-    static const char *subCmds[] = {
-	"cardinality",
-	"degree",
-	"divide",
-	"eliminate",
-	"emptyof",
-	"extend",
-	"foreach",
-	"group",
-	"heading",
-	"identifiers",
-	"intersect",
-	"is",
-	"isempty",
-	"isnotempty",
-	"join",
-	"list",
-	"minus",
-	"project",
-	"rename",
-	"restrict",
-	"semijoin",
-	"semiminus",
-	"summarize",
-	"times",
-	"tuple",
-	"ungroup",
-	"union",
-	NULL
+    static struct cmdMap cmdTable[] = {
+	{"cardinality", RelationCardinalityCmd},
+	{"degree", RelationDegreeCmd},
+	{"divide", RelationDivideCmd},
+	{"eliminate", RelationEliminateCmd},
+	{"emptyof", RelationEmptyofCmd},
+	{"extend", RelationExtendCmd},
+	{"foreach", RelationForeachCmd},
+	{"group", RelationGroupCmd},
+	{"heading", RelationHeadingCmd},
+	{"identifiers", RelationIdentifiersCmd},
+	{"intersect", RelationIntersectCmd},
+	{"is", RelationIsCmd},
+	{"isempty", RelationIsemptyCmd},
+	{"isnotempty", RelationIsnotemptyCmd},
+	{"join", RelationJoinCmd},
+	{"list", RelationListCmd},
+	{"minus", RelationMinusCmd},
+	{"project", RelationProjectCmd},
+	{"rename", RelationRenameCmd},
+	{"restrict", RelationRestrictCmd},
+	{"semijoin", RelationSemijoinCmd},
+	{"semiminus", RelationSemiminusCmd},
+	{"summarize", RelationSummarizeCmd},
+	{"times", RelationTimesCmd},
+	{"tuple", RelationTupleCmd},
+	{"ungroup", RelationUngroupCmd},
+	{"union", RelationUnionCmd},
+	{NULL, NULL},
     } ;
 
     int index ;
@@ -7344,101 +7220,12 @@ static int relationCmd(
 	return TCL_ERROR ;
     }
 
-    if (Tcl_GetIndexFromObj(interp, *(objv + 1), subCmds, "subcommand", 0,
-	&index) != TCL_OK) {
+    if (Tcl_GetIndexFromObjStruct(interp, *(objv + 1), cmdTable,
+	sizeof(struct cmdMap), "subcommand", 0, &index) != TCL_OK) {
 	return TCL_ERROR ;
     }
 
-    switch ((enum RelationSubCmds)index) {
-    case RELATION_CARDINALITY:
-	return RelationCardinalityCmd(interp, objc, objv) ;
-
-    case RELATION_DEGREE:
-	return RelationDegreeCmd(interp, objc, objv) ;
-
-    case RELATION_DIVIDE:
-	return RelationDivideCmd(interp, objc, objv) ;
-
-    case RELATION_ELIMINATE:
-	return RelationEliminateCmd(interp, objc, objv) ;
-
-    case RELATION_EMPTYOF:
-	return RelationEmptyofCmd(interp, objc, objv) ;
-
-    case RELATION_EXTEND:
-	return RelationExtendCmd(interp, objc, objv) ;
-
-    case RELATION_FOREACH:
-	return RelationForeachCmd(interp, objc, objv) ;
-
-    case RELATION_GROUP:
-	return RelationGroupCmd(interp, objc, objv) ;
-
-    case RELATION_HEADING:
-	return RelationHeadingCmd(interp, objc, objv) ;
-
-    case RELATION_IDENTIFIERS:
-	return RelationIdentifiersCmd(interp, objc, objv) ;
-
-    case RELATION_INTERSECT:
-	return RelationIntersectCmd(interp, objc, objv) ;
-
-    case RELATION_IS:
-	return RelationIsCmd(interp, objc, objv) ;
-
-    case RELATION_ISEMPTY:
-	return RelationIsemptyCmd(interp, objc, objv) ;
-
-    case RELATION_ISNOTEMPTY:
-	return RelationIsnotemptyCmd(interp, objc, objv) ;
-
-    case RELATION_JOIN:
-	return RelationJoinCmd(interp, objc, objv) ;
-
-    case RELATION_LIST:
-	return RelationListCmd(interp, objc, objv) ;
-
-    case RELATION_MINUS:
-	return RelationMinusCmd(interp, objc, objv) ;
-
-    case RELATION_PROJECT:
-	return RelationProjectCmd(interp, objc, objv) ;
-
-    case RELATION_RENAME:
-	return RelationRenameCmd(interp, objc, objv) ;
-
-    case RELATION_RESTRICT:
-	return RelationRestrictCmd(interp, objc, objv) ;
-
-    case RELATION_SEMIJOIN:
-	return RelationSemijoinCmd(interp, objc, objv) ;
-
-    case RELATION_SEMIMINUS:
-	return RelationSemiminusCmd(interp, objc, objv) ;
-
-    case RELATION_SUMMARIZE:
-	return RelationSummarizeCmd(interp, objc, objv) ;
-
-    case RELATION_TIMES:
-	return RelationTimesCmd(interp, objc, objv) ;
-
-    case RELATION_TUPLE:
-	return RelationTupleCmd(interp, objc, objv) ;
-
-    case RELATION_UNGROUP:
-	return RelationUngroupCmd(interp, objc, objv) ;
-
-    case RELATION_UNION:
-	return RelationUnionCmd(interp, objc, objv) ;
-
-    default:
-	Tcl_Panic("relation: unexpected relation subcommand value") ;
-    }
-
-    /*
-     * NOT REACHED
-     */
-    return TCL_ERROR ;
+    return cmdTable[index].cmdFunc(interp, objc, objv) ;
 }
 
 /*
