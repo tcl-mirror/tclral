@@ -44,8 +44,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.10 $
-# $Date: 2004/12/25 23:06:07 $
+# $Revision: 1.11 $
+# $Date: 2004/12/25 23:36:45 $
 #  *--
 }]
 [manpage_begin relation n 0.7]
@@ -120,12 +120,12 @@ It is the same form as a tuple heading.
 The identifiers (candidate keys) of a relation are specified as a list.
 Each identifer list element is in turn a list containing the attribute
 names that constitute the identifier.
-Every relation must have at least on identifier.
+Every relation must have at least one identifier.
 [para]
 The body of a relation consists of a list of tuples.
-Each tuple in the body is in the form a list with an
-even number of elements consisting
-alternately of an attribute name and an attribute value.
+Each tuple in the body is in a list containing an even number of elements
+consisting alternately of an
+attribute name and an attribute value.
 [para]
 The following is a literal string representation of a relation with
 one tuple in its body.
@@ -506,10 +506,12 @@ OwnerName  DogName  Acquired      Breed
 The [cmd list] subcommand returns the body of [arg relationValue] as
 a proper Tcl list.
 [arg RelationValue] must be of degree one or an error is returned.
-The [cmd list] subcommand complementary to the [cmd tuple] subcommand
+The [cmd list] subcommand is complementary to the [cmd tuple] subcommand
 in the sense that it provides proper Tcl list for a relation of degree one where
 the [cmd tuple] subcommand provides a single tuple for a relation of
 cardinality one.
+Note also that the list returned by the [cmd list] subcommand is a
+proper set since there are not duplicates in a relation.
 
 [example {
 % relation list [relation project [relvar set OWNERSHIP] Acquired]]
@@ -530,7 +532,7 @@ arguments is significant to the result.
     [opt "attr1 attr2 ..."]]
 
 The [cmd project] subcommand returns a relation whose heading consists of
-only those attributes listed in the [arg attr] arguments.
+only those attributes listed in the [arg attrN] arguments.
 The body of the result consists of tuples the corresponding tuples from
 [arg relationValue], removing any duplicates created by considering only
 a subset of the attributes.
