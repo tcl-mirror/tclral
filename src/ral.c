@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral.c,v $
-$Revision: 1.2 $
-$Date: 2004/04/24 06:25:46 $
+$Revision: 1.3 $
+$Date: 2004/04/26 04:13:08 $
  *--
  */
 
@@ -274,7 +274,7 @@ EXTERNAL DATA REFERENCES
 /*
 STATIC DATA ALLOCATION
 */
-static char rcsid[] = "@(#) $RCSfile: ral.c,v $ $Revision: 1.2 $" ;
+static char rcsid[] = "@(#) $RCSfile: ral.c,v $ $Revision: 1.3 $" ;
 
 static Tcl_ObjType Ral_TupleType = {
     "Tuple",
@@ -698,7 +698,7 @@ attributeValueToString(
 	 */
 	Ral_Tuple *tuple ;
 
-	if (attributeConvertValue(interp, attr, valuePtr) != TCL_OK) {
+	if (Tcl_ConvertToType(interp, valuePtr, &Ral_TupleType) != TCL_OK) {
 	    return TCL_ERROR ;
 	}
 	tuple = valuePtr->internalRep.otherValuePtr ;
@@ -715,7 +715,7 @@ attributeValueToString(
 	 */
 	Ral_Relation *relation ;
 
-	if (attributeConvertValue(interp, attr, valuePtr) != TCL_OK) {
+	if (Tcl_ConvertToType(interp, valuePtr, &Ral_RelationType) != TCL_OK) {
 	    return TCL_ERROR ;
 	}
 	relation = valuePtr->internalRep.otherValuePtr ;
@@ -1437,6 +1437,59 @@ tupleCopyAttribute(
     return TCL_OK ;
 }
 
+static int
+tupleObjUpdateValues(
+    Tcl_Interp *interp,
+    Tcl_Obj *tupleObj,
+    Tcl_Obj *nvList)
+{
+    int elemc ;
+    Tcl_Obj **elemv ;
+    Ral_Tuple *tuple ;
+    Ral_TupleHeading *heading ;
+
+    if (Tcl_ListObjGetElements(interp, nvList, &elemc, &elemv) != TCL_OK)
+	return TCL_ERROR ;
+    if (elemc % 2 != 0) {
+	Tcl_SetStringObj(Tcl_GetObjResult(interp),
+	    "list must have an even number of elements", -1) ;
+	return TCL_ERROR ;
+    }
+
+    if (Tcl_IsShared(tupleObj)) {
+	Tcl_Panic("tupleObjUpdateValues called with a shared tuple") ;
+    }
+    tuple = tupleObj->internalRep.otherValuePtr ;
+    heading = tuple->heading ;
+
+    for ( ; elemc > 0 ; elemc -= 2, elemv += 2) {
+	Ral_Attribute *attr ;
+	int attrIndex ;
+
+	/*
+	 * Find the entry name.
+	 */
+	attr = tupleHeadingFindAttribute(interp, heading, *elemv, &attrIndex) ;
+	if (attr == NULL) {
+	    return TCL_ERROR ;
+	}
+	/*
+	 * Force the new value to be of the correct type.
+	 */
+	if (attributeConvertValue(interp, attr, elemv[1]) != TCL_OK) {
+	    return TCL_ERROR ;
+	}
+	/*
+	 * Replace the new value.
+	 */
+	Tcl_DecrRefCount(tuple->values[attrIndex]) ;
+	Tcl_IncrRefCount(tuple->values[attrIndex] = elemv[1]) ;
+    }
+
+    Tcl_InvalidateStringRep(tupleObj) ;
+    return TCL_OK ;
+}
+
 /*
  * ======================================================================
  * Functions to Support the Tcl type
@@ -1478,9 +1531,6 @@ UpdateStringOfTuple(
     Ral_TupleHeading *heading ;
     Tcl_Obj *resultObj ;
     Tcl_Obj *valueList ;
-    Ral_Attribute *attr ;
-    Ral_Attribute *last ;
-    Tcl_Obj **values ;
     char *strRep ;
     int repLen ;
 
@@ -1488,18 +1538,7 @@ UpdateStringOfTuple(
     heading = tuple->heading ;
 
     resultObj = tupleHeadingObjNew(NULL, heading) ;
-
-    valueList = Tcl_NewListObj(0, NULL) ;
-    last = heading->attrVector + heading->degree ;
-    values = tuple->values ;
-    for (attr = heading->attrVector ; attr != last ; ++attr) {
-	Tcl_Obj *valueResult ;
-	Tcl_ListObjAppendElement(NULL, valueList, attr->name) ;
-	if (attributeValueToString(NULL, attr, *values++, &valueResult)
-	    == TCL_OK) {
-	    Tcl_ListObjAppendElement(NULL, valueList, valueResult) ;
-	}
-    }
+    valueList = tupleNameValueList(NULL, tuple) ;
     Tcl_ListObjAppendElement(NULL, resultObj, valueList) ;
 
     strRep = Tcl_GetStringFromObj(resultObj, &repLen) ;
@@ -2045,6 +2084,31 @@ relationHeadingNewFromString(
 }
 
 static Tcl_Obj *
+relationHeadingIdsToList(
+    Tcl_Interp *interp,
+    Ral_RelationHeading *heading)
+{
+    Tcl_Obj *idObj ;
+    int idCount ;
+    Ral_RelId *idVector ;
+
+    idObj = Tcl_NewListObj(0, NULL) ;
+    for (idCount = heading->idCount, idVector = heading->idVector ;
+	idCount > 0 ; --idCount, ++idVector) {
+	Tcl_Obj *idAttrList ;
+
+	idAttrList = relIdAttrsToList(interp, idVector, heading->tupleHeading) ;
+	if (idAttrList == NULL || Tcl_ListObjAppendElement(interp, idObj,
+	    idAttrList) != TCL_OK) {
+	    Tcl_DecrRefCount(idObj) ;
+	    return NULL ;
+	}
+    }
+
+    return idObj ;
+}
+
+static Tcl_Obj *
 relationHeadingObjNew(
     Tcl_Interp *interp,
     Ral_RelationHeading *heading)
@@ -2058,19 +2122,10 @@ relationHeadingObjNew(
     if (!headElems[0]) {
 	return NULL ;
     }
-
-    headElems[1] = Tcl_NewListObj(0, NULL) ;
-    for (idCount = heading->idCount, idVector = heading->idVector ;
-	idCount > 0 ; --idCount, ++idVector) {
-	Tcl_Obj *idAttrList ;
-
-	idAttrList = relIdAttrsToList(interp, idVector, heading->tupleHeading) ;
-	if (idAttrList == NULL || Tcl_ListObjAppendElement(interp,
-	    headElems[1], idAttrList) != TCL_OK) {
-	    Tcl_DecrRefCount(headElems[0]) ;
-	    Tcl_DecrRefCount(headElems[1]) ;
-	    return NULL ;
-	}
+    headElems[1] = relationHeadingIdsToList(interp, heading) ;
+    if (!headElems[0]) {
+	Tcl_DecrRefCount(headElems[0]) ;
+	return NULL ;
     }
 
     pair[0] = Tcl_NewStringObj(Ral_RelationType.name, -1) ;
@@ -2352,6 +2407,7 @@ relationNameValueList(
 
 static int
 relationDeleteTuple(
+    Tcl_Interp *interp,
     Ral_Relation *relation,
     int where)
 {
@@ -2361,7 +2417,7 @@ relationDeleteTuple(
     assert(where < relation->cardinality) ;
     tupleVector = relation->tupleVector + where ;
 
-    if (Tcl_ConvertToType(NULL, *tupleVector, &Ral_TupleType) != TCL_OK) {
+    if (Tcl_ConvertToType(interp, *tupleVector, &Ral_TupleType) != TCL_OK) {
 	return TCL_ERROR ;
     }
     tuple = (*tupleVector)->internalRep.otherValuePtr ;
@@ -2371,11 +2427,49 @@ relationDeleteTuple(
 
     for ( ; where < relation->cardinality ; ++where, ++tupleVector) {
 	*tupleVector = *(tupleVector + 1) ;
-	if (Tcl_ConvertToType(NULL, *tupleVector, &Ral_TupleType) != TCL_OK) {
+	if (Tcl_ConvertToType(interp, *tupleVector, &Ral_TupleType) != TCL_OK) {
 	    return TCL_ERROR ;
 	}
 	tuple = (*tupleVector)->internalRep.otherValuePtr ;
 	relationHeadingReindexTuple(relation->heading, tuple, where) ;
+    }
+
+    return TCL_OK ;
+}
+
+static int
+relationUpdateTuple(
+    Tcl_Interp *interp,
+    Ral_Relation *relation,
+    int where,
+    Tcl_Obj *nvList)
+{
+    Tcl_Obj **tupleVector ;
+    Tcl_Obj *tupleObj ;
+    Ral_Tuple *tuple ;
+
+    assert(where < relation->cardinality) ;
+    tupleVector = relation->tupleVector + where ;
+
+    if (Tcl_ConvertToType(interp, *tupleVector, &Ral_TupleType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+
+    tupleObj = *tupleVector ;
+    if (Tcl_IsShared(tupleObj)) {
+	Tcl_Obj *dupObj ;
+
+	dupObj = Tcl_DuplicateObj(tupleObj) ;
+	Tcl_DecrRefCount(tupleObj) ;
+	Tcl_IncrRefCount(*tupleVector = tupleObj = dupObj) ;
+    }
+
+    tuple = tupleObj->internalRep.otherValuePtr ;
+    relationHeadingRemoveTupleIndex(relation->heading, tuple) ;
+    if (tupleObjUpdateValues(interp, tupleObj, nvList) != TCL_OK ||
+	relationHeadingIndexTuple(interp, relation->heading, tuple, where)
+	    != TCL_OK) {
+	return TCL_ERROR ;
     }
 
     return TCL_OK ;
@@ -3138,10 +3232,6 @@ TupleUpdateCmd(
     Tcl_Obj *tupleObj ;
     Ral_Tuple *tuple ;
     Ral_TupleHeading *heading ;
-    Tcl_Obj *nvList ;
-    int elemc ;
-    Tcl_Obj **elemv ;
-    Tcl_Obj *allocated = NULL ;
 
     /* tuple update tupleVar name-value-list */
     if (objc != 4) {
@@ -3149,7 +3239,7 @@ TupleUpdateCmd(
 	return TCL_ERROR ;
     }
 
-    tupleObj = Tcl_ObjGetVar2(interp, *(objv + 2), NULL, TCL_LEAVE_ERR_MSG) ;
+    tupleObj = Tcl_ObjGetVar2(interp, objv[2], NULL, TCL_LEAVE_ERR_MSG) ;
     if (tupleObj == NULL) {
 	return TCL_ERROR ;
     }
@@ -3157,55 +3247,24 @@ TupleUpdateCmd(
 	return TCL_ERROR ;
     }
 
-    nvList = *(objv + 3) ;
-    if (Tcl_ListObjGetElements(interp, nvList, &elemc, &elemv) != TCL_OK)
-	return TCL_ERROR ;
-    if (elemc % 2 != 0) {
-	Tcl_ResetResult(interp) ;
-	Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-	    "list must have an even number of elements", NULL) ;
-	return TCL_ERROR ;
-    }
-
     if (Tcl_IsShared(tupleObj)) {
-	allocated = tupleObj = Tcl_DuplicateObj(tupleObj) ;
-    }
-    tuple = tupleObj->internalRep.otherValuePtr ;
-    heading = tuple->heading ;
+	Tcl_Obj *dupObj ;
 
-    for ( ; elemc > 0 ; elemc -= 2, elemv += 2) {
-	Ral_Attribute *attr ;
-	int attrIndex ;
-
-	/*
-	 * Find the entry name.
-	 */
-	attr = tupleHeadingFindAttribute(interp, heading, *elemv, &attrIndex) ;
-	if (attr == NULL) {
-	    goto errorOut ;
+	dupObj = Tcl_DuplicateObj(tupleObj) ;
+	tupleObj = Tcl_ObjSetVar2(interp, objv[2], NULL, dupObj,
+	    TCL_LEAVE_ERR_MSG) ;
+	if (tupleObj == NULL) {
+	    Tcl_DecrRefCount(dupObj) ;
+	    return TCL_ERROR ;
 	}
-	/*
-	 * Force the new value to be of the correct type.
-	 */
-	if (attributeConvertValue(interp, attr, elemv[1]) != TCL_OK) {
-	    goto errorOut ;
-	}
-	/*
-	 * Replace the new value.
-	 */
-	Tcl_DecrRefCount(tuple->values[attrIndex]) ;
-	Tcl_IncrRefCount(tuple->values[attrIndex] = elemv[1]) ;
     }
 
-    Tcl_InvalidateStringRep(tupleObj) ;
+    if (tupleObjUpdateValues(interp, tupleObj, objv[3]) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+
     Tcl_SetObjResult(interp, tupleObj) ;
     return TCL_OK ;
-
-errorOut:
-    if (allocated) {
-	Tcl_DecrRefCount(allocated) ;
-    }
-    return TCL_ERROR ;
 }
 
 static int
@@ -3442,9 +3501,11 @@ relvarFind(
 	    relation = relObj->internalRep.otherValuePtr ;
 	}
     } else {
-	Tcl_ResetResult(interp) ;
-	Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-	    "unknown relvar, \"", Tcl_GetString(relvarName), "\"", NULL) ;
+	if (interp) {
+	    Tcl_ResetResult(interp) ;
+	    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
+		"unknown relvar, \"", Tcl_GetString(relvarName), "\"", NULL) ;
+	}
     }
 
     return relation ;
@@ -3463,17 +3524,16 @@ RelvarAssignCmd(
     Tcl_Obj *const*objv)
 {
     Tcl_HashEntry *entry ;
-    Tcl_Obj *oldRelObj ;
-    Tcl_Obj *newRelObj ;
-    Ral_Relation *oldRelation ;
-    Ral_Relation *newRelation ;
+    Tcl_Obj *relVarObj ;
+    Tcl_Obj *relValueObj ;
+    Ral_Relation *relvarRelation ;
+    Ral_Relation *relvalRelation ;
 
     /* relvar assign relvarName relationValue */
     if (objc != 4) {
 	Tcl_WrongNumArgs(interp, 2, objv, "relvarName relationValue") ;
 	return TCL_ERROR ;
     }
-    newRelObj = objv[3] ;
 
     entry = Tcl_FindHashEntry(&relvarMap, (char *)objv[2]) ;
     if (!entry) {
@@ -3482,30 +3542,31 @@ RelvarAssignCmd(
 	    "unknown relvar, \"", Tcl_GetString(objv[2]), "\"", NULL) ;
 	return TCL_ERROR ;
     }
-    oldRelObj = Tcl_GetHashValue(entry) ;
+    relVarObj = Tcl_GetHashValue(entry) ;
+    relValueObj = objv[3] ;
 
-    if (Tcl_ConvertToType(interp, oldRelObj, &Ral_RelationType) != TCL_OK ||
-	Tcl_ConvertToType(interp, newRelObj, &Ral_RelationType) != TCL_OK) {
+    if (Tcl_ConvertToType(interp, relVarObj, &Ral_RelationType) != TCL_OK ||
+	Tcl_ConvertToType(interp, relValueObj, &Ral_RelationType) != TCL_OK) {
 	return TCL_ERROR ;
     }
 
-    oldRelation = oldRelObj->internalRep.otherValuePtr ;
-    newRelation = newRelObj->internalRep.otherValuePtr ;
+    relvarRelation = relVarObj->internalRep.otherValuePtr ;
+    relvalRelation = relValueObj->internalRep.otherValuePtr ;
     /*
      * Can only assign something of the same type.
      */
-    if (!relationHeadingEqual(oldRelation->heading, newRelation->heading)) {
-	Tcl_ResetResult(interp) ;
-	Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-	    "value assigned to relvar must be of the same type", NULL) ;
+    if (!relationHeadingEqual(relvarRelation->heading,
+	relvalRelation->heading)) {
+	Tcl_SetStringObj(Tcl_GetObjResult(interp), 
+	    "value assigned to relvar must be of the same type", -1) ;
 	return TCL_ERROR ;
     }
 
-    Tcl_DecrRefCount(oldRelObj) ;
-    Tcl_IncrRefCount(newRelObj) ;
-    Tcl_SetHashValue(entry, newRelObj) ;
+    Tcl_DecrRefCount(relVarObj) ;
+    Tcl_IncrRefCount(relValueObj) ;
+    Tcl_SetHashValue(entry, relValueObj) ;
 
-    Tcl_SetObjResult(interp, newRelObj) ;
+    Tcl_SetObjResult(interp, relValueObj) ;
     return TCL_OK ;
 }
 
@@ -3516,12 +3577,12 @@ RelvarCreateCmd(
     Tcl_Obj *const*objv)
 {
     Tcl_Obj *relvarName ;
+    Tcl_HashEntry *entry ;
+    int newPtr ;
     Ral_RelationHeading *heading ;
     Ral_Relation *relation ;
     int i ;
     Tcl_Obj *relObj ;
-    Tcl_HashEntry *entry ;
-    int newPtr ;
 
     /* relvar create relvarName heading identifiers ?name-value-list ...? */
     if (objc < 5) {
@@ -3550,7 +3611,6 @@ RelvarCreateCmd(
     }
 
     relObj = relationObjNew(relation) ;
-
     entry = Tcl_CreateHashEntry(&relvarMap, (char *)relvarName, &newPtr) ;
     if (newPtr == 0) {
 	Tcl_ResetResult(interp) ;
@@ -3560,13 +3620,12 @@ RelvarCreateCmd(
 	Tcl_DecrRefCount(relObj) ;
 	return TCL_ERROR ;
     }
+    /*
+     * Increment the reference count since we are also storing a pointer
+     * to the object in the relvar hash table.
+     */
     Tcl_IncrRefCount(relObj) ;
     Tcl_SetHashValue(entry, relObj) ;
-
-    if (Tcl_ObjSetVar2(interp, relvarName, NULL, relObj, TCL_LEAVE_ERR_MSG)
-	== NULL) {
-	return TCL_ERROR ;
-    }
 
     Tcl_SetObjResult(interp, relObj) ;
 
@@ -3583,7 +3642,7 @@ RelvarDeleteCmd(
     Tcl_Obj *tupleNameObj ;
     Tcl_Obj *exprObj ;
     int index ;
-    Tcl_Obj **tupleVector ;
+    int result = TCL_OK ;
 
     /* relvar delete relvarName tupleVarName expr */
     if (objc != 5) {
@@ -3598,22 +3657,25 @@ RelvarDeleteCmd(
     Tcl_IncrRefCount(tupleNameObj = objv[3]) ;
     Tcl_IncrRefCount(exprObj = objv[4]) ;
 
-    tupleVector = relation->tupleVector ;
     for (index = 0 ; index < relation->cardinality ; ) {
 	int boolValue ;
 
-	if (Tcl_ObjSetVar2(interp, tupleNameObj, NULL, *tupleVector,
-	    TCL_LEAVE_ERR_MSG) == NULL) {
-	    return TCL_ERROR ;
+	if (Tcl_ObjSetVar2(interp, tupleNameObj, NULL,
+	    relation->tupleVector[index], TCL_LEAVE_ERR_MSG) == NULL) {
+	    result = TCL_ERROR ;
+	    break ;
 	}
 	if (Tcl_ExprBooleanObj(interp, exprObj, &boolValue) != TCL_OK) {
-	    return TCL_ERROR ;
+	    result = TCL_ERROR ;
+	    break ;
 	}
-	if (boolValue && relationDeleteTuple(relation, index) != TCL_OK) {
-	    return TCL_ERROR ;
+	if (boolValue) {
+	    if (relationDeleteTuple(interp, relation, index) != TCL_OK) {
+		result = TCL_ERROR ;
+		break ;
+	    }
 	} else {
 	    ++index ;
-	    ++tupleVector ;
 	}
     }
     Tcl_UnsetVar(interp, Tcl_GetString(tupleNameObj), 0) ;
@@ -3642,6 +3704,7 @@ RelvarDestroyCmd(
     entry = Tcl_FindHashEntry(&relvarMap, (char *)objv[2]) ;
     if (entry) {
 	relvarObj = Tcl_GetHashValue(entry) ;
+	assert(relvarObj != NULL) ;
 	Tcl_DecrRefCount(relvarObj) ;
 	Tcl_DeleteHashEntry(entry) ;
 	Tcl_UnsetVar(interp, Tcl_GetString(objv[2]), 0) ;
@@ -3662,6 +3725,174 @@ RelvarDumpCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
+    static const int bodyDump = 1 ;
+    static const int schemaDump = 2 ;
+    static const char *cmdArgs[] = {
+	"-body",
+	"-schema",
+	NULL
+    } ;
+
+    int dumpType ;
+    Tcl_Obj *patternObj ;
+    Tcl_Obj *scriptObj ;
+    Tcl_HashEntry *entry ;
+    Tcl_HashSearch search ;
+    int index ;
+
+    /* relvar dump ?-schema | -body? ?pattern? */
+    if (objc > 4) {
+	Tcl_WrongNumArgs(interp, 2, objv, "?-schema | -body? ?pattern?") ;
+	return TCL_ERROR ;
+    }
+
+    if (objc == 2) {
+	/*
+	 * By default we dump everything for all relvars.
+	 */
+	dumpType = schemaDump | bodyDump ;
+	patternObj = NULL ;
+    } else if (objc == 3) {
+	const char *arg2 = Tcl_GetString(objv[2]) ;
+
+	if (*arg2 == '-') {
+	    if (Tcl_GetIndexFromObj(interp, objv[2], cmdArgs,
+		"dump type switch", 0, &index) != TCL_OK) {
+		return TCL_ERROR ;
+	    }
+	    dumpType = 1 << index ;
+	    patternObj = NULL ;
+	} else {
+	    dumpType = schemaDump | bodyDump ;
+	    patternObj = objv[2] ;
+	}
+    } else {
+	if (Tcl_GetIndexFromObj(interp, objv[2], cmdArgs, "dump type switch", 0,
+	    &index) != TCL_OK) {
+	    return TCL_ERROR ;
+	}
+	dumpType = 1 << index ;
+	patternObj = objv[3] ;
+    }
+
+    scriptObj = Tcl_NewStringObj("package require ral\n", -1) ;
+
+    /*
+     * First emit a set of "relvar create" statements.
+     */
+    if (dumpType & schemaDump) {
+	for (entry = Tcl_FirstHashEntry(&relvarMap, &search) ; entry ;
+	    entry = Tcl_NextHashEntry(&search)) {
+	    Tcl_Obj *relvarName ;
+	    Tcl_Obj *relObj ;
+	    Ral_Relation *relation ;
+	    Ral_RelationHeading *heading ;
+	    Tcl_Obj *headObj ;
+	    Tcl_Obj *idObj ;
+
+	    relvarName = (Tcl_Obj *)Tcl_GetHashKey(&relvarMap, entry) ;
+	    if (patternObj &&
+		!Tcl_StringMatch(Tcl_GetString(relvarName),
+		    Tcl_GetString(patternObj))) {
+		continue ;
+	    }
+
+	    relObj = Tcl_GetHashValue(entry) ;
+	    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationType)
+		!= TCL_OK) {
+		goto errorOut ;
+	    }
+	    relation = relObj->internalRep.otherValuePtr ;
+	    heading = relation->heading ;
+
+	    headObj = tupleHeadingAttrsToList(interp, heading->tupleHeading) ;
+	    if (!headObj) {
+		goto errorOut ;
+	    }
+	    idObj = relationHeadingIdsToList(interp, heading) ;
+	    if (!idObj) {
+		Tcl_DecrRefCount(headObj) ;
+		goto errorOut ;
+	    }
+
+	    Tcl_AppendStringsToObj(scriptObj,
+		"::ral::relvar create ",
+		Tcl_GetString(relvarName),
+		" {",
+		Tcl_GetString(headObj),
+		"} {",
+		Tcl_GetString(idObj),
+		"}\n",
+		NULL) ;
+	    Tcl_DecrRefCount(headObj) ;
+	    Tcl_DecrRefCount(idObj) ;
+	}
+    }
+
+    /*
+     * Next emit the necessary "relvar insert" statements to populate
+     * the schema.
+     */
+    if (dumpType & bodyDump) {
+	for (entry = Tcl_FirstHashEntry(&relvarMap, &search) ; entry ;
+	    entry = Tcl_NextHashEntry(&search)) {
+	    Tcl_Obj *relvarName ;
+	    Tcl_Obj *relObj ;
+	    Ral_Relation *relation ;
+	    int card ;
+	    Tcl_Obj **tupleVector ;
+
+	    relvarName = (Tcl_Obj *)Tcl_GetHashKey(&relvarMap, entry) ;
+	    if (patternObj &&
+		!Tcl_StringMatch(Tcl_GetString(relvarName),
+		    Tcl_GetString(patternObj))) {
+		continue ;
+	    }
+
+	    relObj = Tcl_GetHashValue(entry) ;
+	    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationType)
+		!= TCL_OK) {
+		goto errorOut ;
+	    }
+	    relation = relObj->internalRep.otherValuePtr ;
+	    if (relation->cardinality == 0) {
+		continue ;
+	    }
+
+	    Tcl_AppendStringsToObj(scriptObj,
+		"::ral::relvar insert ",
+		Tcl_GetString(relvarName),
+		NULL) ;
+
+	    for (card = relation->cardinality,
+		tupleVector = relation->tupleVector ; card > 0 ;
+		--card, ++tupleVector) {
+		Ral_Tuple *tuple ;
+		Tcl_Obj *tupleNVList ;
+
+		if (Tcl_ConvertToType(interp, *tupleVector, &Ral_TupleType)
+		    != TCL_OK) {
+		    goto errorOut ;
+		}
+		tuple = (*tupleVector)->internalRep.otherValuePtr ;
+		tupleNVList = tupleNameValueList(interp, tuple) ;
+		if (tupleNVList) {
+		    Tcl_AppendStringsToObj(scriptObj,
+			" {", Tcl_GetString(tupleNVList), "}", NULL) ;
+		    Tcl_DecrRefCount(tupleNVList) ;
+		} else {
+		    goto errorOut ;
+		}
+	    }
+	    Tcl_AppendStringsToObj(scriptObj, "\n", NULL) ;
+	}
+    }
+
+    Tcl_SetObjResult(interp, scriptObj) ;
+    return TCL_OK ;
+
+errorOut:
+    Tcl_DecrRefCount(scriptObj) ;
     return TCL_ERROR ;
 }
 
@@ -3730,7 +3961,50 @@ RelvarUpdateCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
-    return TCL_ERROR ;
+    Ral_Relation *relation ;
+    Tcl_Obj *tupleNameObj ;
+    Tcl_Obj *exprObj ;
+    int index ;
+    int result = TCL_OK ;
+
+    /* relvar update relvarName tupleVarName expr nameValueList */
+    if (objc != 6) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+	    "relvarName tupleVarName expr nameValueList") ;
+	return TCL_ERROR ;
+    }
+
+    relation = relvarFind(interp, objv[2]) ;
+    if (!relation) {
+	return TCL_ERROR ;
+    }
+    Tcl_IncrRefCount(tupleNameObj = objv[3]) ;
+    Tcl_IncrRefCount(exprObj = objv[4]) ;
+
+    for (index = 0 ; index < relation->cardinality ; ++index) {
+	int boolValue ;
+
+	if (Tcl_ObjSetVar2(interp, tupleNameObj, NULL,
+	    relation->tupleVector[index], TCL_LEAVE_ERR_MSG) == NULL) {
+	    result = TCL_ERROR ;
+	    break ;
+	}
+	if (Tcl_ExprBooleanObj(interp, exprObj, &boolValue) != TCL_OK) {
+	    result = TCL_ERROR ;
+	    break ;
+	}
+	if (boolValue &&
+	    relationUpdateTuple(interp, relation, index, objv[5]) != TCL_OK) {
+	    result = TCL_ERROR ;
+	    break ;
+	}
+    }
+    Tcl_UnsetVar(interp, Tcl_GetString(tupleNameObj), 0) ;
+
+    Tcl_DecrRefCount(tupleNameObj) ;
+    Tcl_DecrRefCount(exprObj) ;
+
+    return result ;
 }
 
 /*
@@ -3880,7 +4154,6 @@ RelationEmptyCmd(
 {
     Tcl_Obj *relationObj ;
     Ral_Relation *relation ;
-    int nTuples ;
 
     /* relation empty relationValue */
     if (objc != 3) {
@@ -3894,6 +4167,132 @@ RelationEmptyCmd(
     relation = relationObj->internalRep.otherValuePtr ;
 
     Tcl_SetObjResult(interp, Tcl_NewIntObj(relation->cardinality == 0)) ;
+    return TCL_OK ;
+}
+
+static int
+RelationEmptyofCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_Obj *relationObj ;
+    Ral_Relation *relation ;
+
+    /* relation emptyof relationValue */
+    if (objc != 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relationValue") ;
+	return TCL_ERROR ;
+    }
+
+    relationObj = *(objv + 2) ;
+    if (Tcl_ConvertToType(interp, relationObj, &Ral_RelationType) != TCL_OK)
+	return TCL_ERROR ;
+    relation = relationObj->internalRep.otherValuePtr ;
+
+    Tcl_SetObjResult(interp, relationObjNew(relationNew(relation->heading))) ;
+    return TCL_OK ;
+}
+
+static int
+RelationForeachCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_Obj *varNameObj ;
+    Tcl_Obj *relObj ;
+    Tcl_Obj *scriptObj ;
+    Ral_Relation *relation ;
+    int card ;
+    Tcl_Obj **tupleVector ;
+    int result = TCL_OK ;
+
+    /* relation foreach tupleVarName relationValue script */
+    if (objc != 5) {
+	Tcl_WrongNumArgs(interp, 2, objv, "tupleVarName relationValue script") ;
+	return TCL_ERROR ;
+    }
+
+    varNameObj = objv[2] ;
+    relObj = objv[3] ;
+    scriptObj = objv[4] ;
+
+    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relObj->internalRep.otherValuePtr ;
+    /*
+     * Hang onto these objects in case something strange happens in
+     * the script execution.
+     */
+    Tcl_IncrRefCount(varNameObj) ;
+    Tcl_IncrRefCount(relObj) ;
+    Tcl_IncrRefCount(scriptObj) ;
+
+    Tcl_ResetResult(interp) ;
+
+    for (card = relation->cardinality, tupleVector = relation->tupleVector ;
+	card > 0 ; --card, ++tupleVector) {
+
+	if (Tcl_ObjSetVar2(interp, varNameObj, NULL, *tupleVector,
+	    TCL_LEAVE_ERR_MSG) == NULL) {
+	    result = TCL_ERROR ;
+	    break; 
+	}
+
+	result = Tcl_EvalObjEx(interp, scriptObj, 0) ;
+	if (result != TCL_OK) {
+	    if (result == TCL_CONTINUE) {
+		result = TCL_OK ;
+	    } else if (result == TCL_BREAK) {
+		result = TCL_OK ;
+		break ;
+	    } else if (result == TCL_ERROR) {
+		static const char msgfmt[] =
+		    "\n    (\"relation foreach\" body line %d)" ;
+		char msg[sizeof(msgfmt) + TCL_INTEGER_SPACE] ;
+		sprintf(msg, msgfmt, interp->errorLine) ;
+		Tcl_AddObjErrorInfo(interp, msg, -1) ;
+		break ;
+	    } else {
+		break ;
+	    }
+	}
+    }
+
+    if (relation->cardinality) {
+	Tcl_UnsetVar(interp, Tcl_GetString(varNameObj), 0) ;
+    }
+    Tcl_DecrRefCount(varNameObj) ;
+    Tcl_DecrRefCount(relObj) ;
+    Tcl_DecrRefCount(scriptObj) ;
+
+    return result ;
+}
+
+static int
+RelationNotemptyCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_Obj *relationObj ;
+    Ral_Relation *relation ;
+    Ral_Relation *newRelation ;
+
+    /* relation notempty relValue */
+    if (objc != 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relValue") ;
+	return TCL_ERROR ;
+    }
+
+    relationObj = *(objv + 2) ;
+    if (Tcl_ConvertToType(interp, relationObj, &Ral_RelationType) != TCL_OK)
+	return TCL_ERROR ;
+    relation = relationObj->internalRep.otherValuePtr ;
+
+    Tcl_SetObjResult(interp, Tcl_NewIntObj(relation->cardinality != 0)) ;
     return TCL_OK ;
 }
 
@@ -3969,6 +4368,7 @@ static int relationCmd(
 	RELATION_DIVIDE,
 	RELATION_ELIMINATE,
 	RELATION_EMPTY,
+	RELATION_EMPTYOF,
 	RELATION_EXTEND,
 	RELATION_FOREACH,
 	RELATION_INTERSECT,
@@ -3995,6 +4395,7 @@ static int relationCmd(
 	"divide",
 	"eliminate",
 	"empty",
+	"emptyof",
 	"extend",
 	"foreach",
 	"intersect",
@@ -4056,13 +4457,18 @@ static int relationCmd(
     case RELATION_EMPTY:
 	return RelationEmptyCmd(interp, objc, objv) ;
 
+    case RELATION_EMPTYOF:
+	return RelationEmptyofCmd(interp, objc, objv) ;
+
 #if 0
     case RELATION_EXTEND:
 	return RelationExtendCmd(interp, objc, objv) ;
+#endif
 
     case RELATION_FOREACH:
 	return RelationForeachCmd(interp, objc, objv) ;
 
+#if 0
     case RELATION_INTERSECT:
 	return RelationIntersectCmd(interp, objc, objv) ;
 
@@ -4077,10 +4483,12 @@ static int relationCmd(
 
     case RELATION_MINUS:
 	return RelationMinusCmd(interp, objc, objv) ;
+#endif
 
     case RELATION_NOTEMPTY:
 	return RelationNotemptyCmd(interp, objc, objv) ;
 
+#if 0
     case RELATION_PROJECT:
 	return RelationProjectCmd(interp, objc, objv) ;
 

@@ -39,23 +39,98 @@
 # 
 #  *++
 # MODULE:
-#   Makefile to build libral.so
 # 
 # ABSTRACT:
 # 
-# $RCSfile: Makefile,v $
-# $Revision: 1.3 $
+# $RCSfile: ral.tcl,v $
+# $Revision: 1.1 $
 # $Date: 2004/04/26 04:13:08 $
 #  *--
 
-TCLBASE = /usr/local/ActiveTcl
+namespace eval ::ral {
+    namespace export relformat
+}
 
-CFLAGS = -g -I$(TCLBASE)/include
-LDFLAGS = -shared -g
-LOADLIBES = -L$(TCLBASE)/lib
-LDLIBS = -ltclstub8.5
+proc ::ral::relformat {relValue {title {}}} {
+    set result {}
+    if {[string length $title]} {
+	append result $title\n
+	append result [string repeat - [string length $title]]\n
+    }
+    set heading [lindex [relation typeof $relValue] 1 0]
+    foreach h $heading {
+	foreach {attr type} $h {
+	    set colWidth($attr) [string length $attr]
+	    set typeWidth [string length $type]
+	    if {$typeWidth > $colWidth($attr)} {
+		set colWidth($attr) $typeWidth
+	    }
+	}
+    }
+    relation foreach t $relValue {
+	foreach h $heading {
+	    foreach {attr type} $h {
+		set v [tuple extract $t $attr]
+		switch [lindex $type 0] {
+		    Tuple -
+		    Relation {
+			set v [lindex $v 2]
+		    }
+		}
+		set valueLen [string length $v]
+		if {$valueLen > $colWidth($attr)} {
+		    set colWidth($attr) $valueLen
+		}
+	    }
+	}
+    }
+    set fmtStr {}
+    foreach h $heading {
+	foreach {attr type} $h {
+	    append fmtStr "%$colWidth($attr)s  "
+	}
+    }
+    set fmtStr [string trimright $fmtStr]
+    append fmtStr "\n"
 
-libral.so : ral.o
-	$(CC) -o $@ $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS)
+    # Attributes
+    set fmtCmd [list format $fmtStr]
+    set fmtLine $fmtCmd
+    foreach h $heading {
+	foreach {attr type} $h {
+	    lappend fmtLine $attr
+	}
+    }
+    append result [eval $fmtLine]
 
-rla.o : $(TCLBASE)/include/tcl.h
+    # Types
+    set fmtLine $fmtCmd
+    foreach h $heading {
+	foreach {attr type} $h {
+	    lappend fmtLine $type
+	}
+    }
+    set typesLine [eval $fmtLine]
+    append result $typesLine
+    append result [string repeat "=" [expr {[string length $typesLine] - 1}]]\n
+
+    # Values
+    relation foreach t $relValue {
+	set fmtLine $fmtCmd
+	foreach h $heading {
+	    foreach {attr type} $h {
+		set v [tuple extract $t $attr]
+		switch [lindex $type 0] {
+		    Tuple -
+		    Relation {
+			set v [lindex $v 2]
+		    }
+		}
+		lappend fmtLine $v
+	    }
+	}
+	append result [eval $fmtLine]
+    }
+
+    return [string trimright $result "\n"]
+}
