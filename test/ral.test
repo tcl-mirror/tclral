@@ -46,8 +46,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.15 $
-# $Date: 2004/08/15 21:06:26 $
+# $Revision: 1.16 $
+# $Date: 2004/08/15 22:55:22 $
 #  *--
 
 package require tcltest 2.2
@@ -1854,7 +1854,7 @@ namespace eval ::ral::test {
 		{DogName Missy Breed Poodle}}}\
 	    {Name Alice Dog {{DogName Tiger Breed Setter}}}}}
 	relation ungroup $r Dog
-    } -result {Relation {Name string DogName string Breed string} {{Name DogName Breed}} {{Name Fred DogName Rover Breed Terrier} {Name Fred DogName Missy Breed Poodle} {Name Alice DogName Tiger Breed Setter}}}
+    } -result {Relation {Name string DogName string Breed string} {{Name DogName}} {{Name Fred DogName Rover Breed Terrier} {Name Fred DogName Missy Breed Poodle} {Name Alice DogName Tiger Breed Setter}}}
 
     test relation-ungroup-2.0 {duplicate attribute name} -body {
 	set r {Relation {Name string\
@@ -1875,7 +1875,7 @@ namespace eval ::ral::test {
 		{DogName Missy Breed Poodle}}}\
 	    {Name Fred Dog {{DogName Rover Breed Terrier}}}}}
 	relation ungroup $r Dog
-    } -result {Relation {Name string DogName string Breed string} {{Name DogName Breed}} {{Name Fred DogName Rover Breed Terrier} {Name Fred DogName Missy Breed Poodle}}}
+    } -result {Relation {Name string DogName string Breed string} {{Name DogName}} {{Name Fred DogName Rover Breed Terrier} {Name Fred DogName Missy Breed Poodle}}}
 
     # relation union subcommand
     test relation-union-1.0 {dum relation} -body {

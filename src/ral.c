@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral.c,v $
-$Revision: 1.17 $
-$Date: 2004/08/15 21:06:25 $
+$Revision: 1.18 $
+$Date: 2004/08/15 22:55:21 $
  *--
  */
 
@@ -335,7 +335,7 @@ STATIC DATA ALLOCATION
 */
 static const char ral_version[] = "0.6" ;
 static const char ral_rcsid[] =
-    "$Id: ral.c,v 1.17 2004/08/15 21:06:25 mangoa01 Exp $" ;
+    "$Id: ral.c,v 1.18 2004/08/15 22:55:21 mangoa01 Exp $" ;
 static const char ral_copyright[] =
     "This software is copyrighted 2004 by G. Andrew Mangogna."
     "Terms and conditions for use are distributed with the source code." ;
@@ -2620,6 +2620,63 @@ relationHeadingJoinIdentifiers(
 		}
 	    }
 	    ++jIds ;
+	}
+    }
+
+    return ;
+}
+
+static void
+relationHeadingUngroupIdentifiers(
+    Ral_RelationHeading *ugh,
+    Ral_RelationHeading *relh,
+    Ral_RelationHeading *attrh,
+    int ungrpIndex)
+{
+    Ral_FixedIntVector *relIds = relh->idVector ;
+    Ral_FixedIntVector *relLast = relh->idVector + relh->idCount ;
+    Ral_FixedIntVector *attrIds = attrh->idVector ;
+    Ral_FixedIntVector *attrLast = attrh->idVector + attrh->idCount ;
+    Ral_FixedIntVector *ughIds = ugh->idVector ;
+    int attrIdOffset = relh->tupleHeading->degree - 1 ;
+
+    for ( ; relIds != relLast ; ++relIds) {
+	for ( ; attrIds != attrLast ; ++attrIds) {
+	    /*
+	     * We need to determine if the ungrouped attribute is part of the
+	     * identifier for the relation. If so, then it must be excluded.
+	     */
+	    int foundUngrp = 0 ;
+	    int relIndex ;
+	    int attrIndex ;
+	    int where = 0 ;
+	    for (relIndex = 0 ; relIndex < relIds->count ; ++relIndex) {
+		if (relIds->vector[relIndex] == ungrpIndex) {
+		    ++foundUngrp ;
+		}
+	    }
+	    assert(foundUngrp <= 1) ;
+	    fixedIntVectorCtor(ughIds, relIds->count + attrIds->count
+		- foundUngrp) ;
+	    /*
+	     * Copy all the identifiers from the relation to the ungrouped
+	     * heading except any that match the attribute index of that
+	     * attribute being ungrouped.
+	     */
+	    for (relIndex = 0 ; relIndex < relIds->count ; ++relIndex) {
+		if (relIds->vector[relIndex] != ungrpIndex) {
+		    ughIds->vector[where++] = relIds->vector[relIndex] ;
+		}
+	    }
+	    /*
+	     * Copy all the identifiers from ungrouped attribute. Each has
+	     * to be offset properly.
+	     */
+	    for (attrIndex = 0 ; attrIndex < attrIds->count ; ++attrIndex) {
+		ughIds->vector[where++] = attrIds->vector[attrIndex]
+		    + attrIdOffset ;
+	    }
+	    ++ughIds ;
 	}
     }
 
@@ -7122,13 +7179,15 @@ RelationUngroupCmd(
 	tupleHeadingDelete(ungrpTupleHeading) ;
 	return TCL_ERROR ;
     }
-    ungrpHeading = relationHeadingNew(ungrpTupleHeading, 1) ;
     /*
-     * HERE -- need to do something about the identifiers.
-     * For now, just may all attributes the identifiers.
+     * The number of identifiers for the new relation is the product
+     * of the number of the original relation and that of the ungrouped
+     * attribute.
      */
-    fixedIntVectorIdentityMap(ungrpHeading->idVector,
-	ungrpTupleHeading->degree) ;
+    ungrpHeading = relationHeadingNew(ungrpTupleHeading,
+	rel->heading->idCount * attrHeading->idCount) ;
+    relationHeadingUngroupIdentifiers(ungrpHeading, rel->heading, attrHeading,
+	ungrpIndex) ;
     ungrp = relationNew(ungrpHeading) ;
     /*
      * Now put together the tuples.
