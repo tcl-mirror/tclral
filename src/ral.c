@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral.c,v $
-$Revision: 1.16 $
-$Date: 2004/08/01 18:55:05 $
+$Revision: 1.17 $
+$Date: 2004/08/15 21:06:25 $
  *--
  */
 
@@ -335,7 +335,7 @@ STATIC DATA ALLOCATION
 */
 static const char ral_version[] = "0.6" ;
 static const char ral_rcsid[] =
-    "$Id: ral.c,v 1.16 2004/08/01 18:55:05 mangoa01 Exp $" ;
+    "$Id: ral.c,v 1.17 2004/08/15 21:06:25 mangoa01 Exp $" ;
 static const char ral_copyright[] =
     "This software is copyrighted 2004 by G. Andrew Mangogna."
     "Terms and conditions for use are distributed with the source code." ;
@@ -518,7 +518,7 @@ fixedIntVectorIdentityMap(
 
 /*
  * ======================================================================
- * Fixed Length Integer Map Functions
+ * Variable Length Integer Map Functions
  * ======================================================================
  */
 static void
@@ -2570,6 +2570,60 @@ relationHeadingCmpTypes(
     }
 
     return TCL_OK ;
+}
+
+static void
+relationHeadingJoinIdentifiers(
+    Ral_RelationHeading *jh,
+    Ral_RelationHeading *h1,
+    Ral_RelationHeading *h2,
+    Ral_FixedIntVector *r2AttrMap)
+{
+    Ral_FixedIntVector *r1Ids = h1->idVector ;
+    Ral_FixedIntVector *r1Last = h1->idVector + h1->idCount ;
+    Ral_FixedIntVector *r2Ids = h2->idVector ;
+    Ral_FixedIntVector *r2Last = h2->idVector + h2->idCount ;
+    Ral_FixedIntVector *jIds = jh->idVector ;
+
+    for ( ; r1Ids != r1Last ; ++r1Ids) {
+	for ( ; r2Ids != r2Last ; ++r2Ids) {
+	    /*
+	     * We need to determine the number of attributes that are part
+	     * of this identifier. That will be the number in r1 plus
+	     * the number in r2 minus any in r2 that are eliminated. So
+	     * we need to count how many are eliminated.
+	     */
+	    int eCount = 0 ;
+	    int r2Index ;
+	    int where ;
+	    for (r2Index = 0 ; r2Index < r2Ids->count ; ++r2Index) {
+		if (r2AttrMap->vector[r2Ids->vector[r2Index]] == -1) {
+		    ++eCount ;
+		}
+	    }
+	    fixedIntVectorCtor(jIds, r1Ids->count + r2Ids->count - eCount) ;
+	    /*
+	     * Copy all the identifiers from r1 to the join identifier.
+	     */
+	    memcpy(jIds->vector, r1Ids->vector,
+		r1Ids->count * sizeof(*r1Ids->vector)) ;
+	    /*
+	     * Copy all the identifiers from r2, sans the eliminated join
+	     * identifiers. Use the attribute map to adjust the attribute
+	     * index to be that of the joined relation.
+	     */
+	    where = r1Ids->count ;
+	    for (r2Index = 0 ; r2Index < r2Ids->count ; ++r2Index) {
+		int jAttrIndex = r2AttrMap->vector[r2Ids->vector[r2Index]] ;
+		if (jAttrIndex != -1) {
+		    jIds->vector[where++] = jAttrIndex ;
+		}
+	    }
+	    ++jIds ;
+	}
+    }
+
+    return ;
 }
 
 /*
@@ -6044,7 +6098,7 @@ RelationJoinCmd(
     int r2degree ;
     Ral_RelationJoinMap *jmap ;
     Ral_TupleHeading *joinTupleHeading ;
-    char *tuple2Elim ;
+    Ral_FixedIntVector r2AttrMap ;
     int i ;
     int where ;
     int card2 ;
@@ -6092,40 +6146,58 @@ RelationJoinCmd(
      */
     relationFindJoinTuples(r1, r2, jmap) ;
     /*
-     * Create a mapping that determines which attributes from the second
-     * relation are eliminated as part of the natural join.
+     * Create a mapping that specifies how the attributes of the second
+     * relation are to be mapped into the resulting join. The map is
+     * "r2degree" in length and is indexed by the attribute order in
+     * the second relation. The value stored in the map is the attribute
+     * index in the joined relation or -1 if the attribute is not to be
+     * included in the joined relation (i.e. if the attribute is one of
+     * the eliminated attributes of the join).
      */
-    tuple2Elim = (char *)ckalloc(r2degree * sizeof(*tuple2Elim)) ;
-    memset(tuple2Elim, 0, r2degree * sizeof(*tuple2Elim)) ;
+    fixedIntVectorCtor(&r2AttrMap, r2degree) ;
+    /*
+     * First, the join map contains the attribute index of the join
+     * attributes that are to be eliminated from the result.
+     */
+    memset(r2AttrMap.vector, 0, r2AttrMap.count * sizeof(*r2AttrMap.vector)) ;
     for (i = 0 ; i < jmap->attrMap.count ; ++i) {
-	tuple2Elim[jmap->attrMap.vector[i].index2] = 1 ;
+	r2AttrMap.vector[jmap->attrMap.vector[i].index2] = -1 ;
     }
     /*
      * Compose the matching tuples into the join relation.
+     * All the attributes from the first relation are always part of the join.
      */
     joinTupleHeading = tupleHeadingNew(r1degree + r2degree -
 	jmap->attrMap.count) ;
     tupleHeadingCopy(interp, r1->heading->tupleHeading, 0, r1degree,
 	joinTupleHeading, 0) ;
+    /*
+     * The second relation is added on to the end, less those attributes
+     * that are eliminated.
+     */
     where = r1degree ;
     for (card2 = 0 ; card2 < r2degree ; ++card2) {
-	if (!(tuple2Elim[card2] || tupleHeadingCopy(interp,
-		r2->heading->tupleHeading, card2, card2 + 1, joinTupleHeading,
-		where++) == TCL_OK)) {
-	    tupleHeadingDelete(joinTupleHeading) ;
-	    ckfree((char *)tuple2Elim) ;
-	    relationJoinMapDelete(jmap) ;
-	    return TCL_ERROR ;
+	if (r2AttrMap.vector[card2] != -1) {
+	    if (tupleHeadingCopy(interp, r2->heading->tupleHeading,
+		card2, card2 + 1, joinTupleHeading, where) == TCL_OK) {
+		r2AttrMap.vector[card2] = where++ ;
+	    } else {
+		tupleHeadingDelete(joinTupleHeading) ;
+		fixedIntVectorDtor(&r2AttrMap) ;
+		relationJoinMapDelete(jmap) ;
+		return TCL_ERROR ;
+	    }
 	}
     }
     /*
-     * HERE -- need to do something about the identifiers.
-     * Should be the cross product of identifiers minus any projected
-     * away as part of the natural join.
-     * For now, just may all attributes the identifiers.
+     * The identifiers for the resulting join are the cross product of
+     * the identifiers for the two participating relations minus any
+     * join attributes from r2 that are eliminated from the join.
      */
-    joinHeading = relationHeadingNew(joinTupleHeading, 1) ;
-    fixedIntVectorIdentityMap(joinHeading->idVector, joinTupleHeading->degree) ;
+    joinHeading = relationHeadingNew(joinTupleHeading,
+	r1->heading->idCount * r2->heading->idCount) ;
+    relationHeadingJoinIdentifiers(joinHeading, r1->heading, r2->heading,
+	&r2AttrMap) ;
     join = relationNew(joinHeading) ;
     relationReserve(join, jmap->tupleMap.count) ;
     /*
@@ -6149,10 +6221,10 @@ RelationJoinCmd(
 	 * Take the values from the second relation's tuple, eliminating
 	 * those that are part of the natural join.
 	 */
-	where = r1degree ;
 	for (j = 0 ; j < r2degree ; ++j) {
-	    if (!tuple2Elim[j]) {
-		tupleCopyValues(r2Tuple, j, j + 1, joinTuple, where++) ;
+	    int r2Pos = r2AttrMap.vector[j] ;
+	    if (r2Pos != -1) {
+		tupleCopyValues(r2Tuple, j, j + 1, joinTuple, r2Pos) ;
 	    }
 	}
 
@@ -6162,13 +6234,13 @@ RelationJoinCmd(
 	}
     }
 
-    ckfree(tuple2Elim) ;
+    fixedIntVectorDtor(&r2AttrMap) ;
     relationJoinMapDelete(jmap) ;
     Tcl_SetObjResult(interp, relationObjNew(join)) ;
     return TCL_OK ;
 
 errorOut:
-    ckfree(tuple2Elim) ;
+    fixedIntVectorDtor(&r2AttrMap) ;
     relationJoinMapDelete(jmap) ;
     relationDelete(join) ;
     return TCL_ERROR ;

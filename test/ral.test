@@ -46,8 +46,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.14 $
-# $Date: 2004/08/01 18:55:05 $
+# $Revision: 1.15 $
+# $Date: 2004/08/15 21:06:26 $
 #  *--
 
 package require tcltest 2.2
@@ -1553,7 +1553,7 @@ namespace eval ::ral::test {
 	    {Age 20 City {San Jose}}\
 	    {City Saratoga Age 10}}}
 	relation join $r1 $r2
-    } -result {Relation {Name string Age int City string} {{Name Age City}} {{Name George Age 20 City {San Jose}} {Name Fred Age 10 City Saratoga}}}
+    } -result {Relation {Name string Age int City string} Name {{Name George Age 20 City {San Jose}} {Name Fred Age 10 City Saratoga}}}
 
     test relation-join-2.0 {multiple common attribute} -body {
 	set r1 {Relation {Name string Age int City string} Name\
@@ -1564,7 +1564,7 @@ namespace eval ::ral::test {
 	    {Age 20 City {San Jose}}\
 	    {City Saratoga Age 10}}}
 	relation join $r1 $r2
-    } -result {Relation {Name string Age int City string} {{Name Age City}} {{Name George Age 20 City {San Jose}} {Name Fred Age 10 City Saratoga}}}
+    } -result {Relation {Name string Age int City string} Name {{Name George Age 20 City {San Jose}} {Name Fred Age 10 City Saratoga}}}
 
     test relation-join-3.0 {no common attribute} -body {
 	set r1 {Relation {Name string Age int} Name\
@@ -1575,7 +1575,7 @@ namespace eval ::ral::test {
 	    {Status 20 City {San Jose}}\
 	    {City Saratoga Status 10}}}
 	relation join $r1 $r2
-    } -result {Relation {Name string Age int Status int City string} {{Name Age Status City}} {{Name George Age 20 Status 30 City Sunnyvale} {Name George Age 20 Status 20 City {San Jose}} {Name George Age 20 Status 10 City Saratoga} {Name Fred Age 10 Status 30 City Sunnyvale} {Name Fred Age 10 Status 20 City {San Jose}} {Name Fred Age 10 Status 10 City Saratoga}}}
+    } -result {Relation {Name string Age int Status int City string} {{Name Status}} {{Name George Age 20 Status 30 City Sunnyvale} {Name George Age 20 Status 20 City {San Jose}} {Name George Age 20 Status 10 City Saratoga} {Name Fred Age 10 Status 30 City Sunnyvale} {Name Fred Age 10 Status 20 City {San Jose}} {Name Fred Age 10 Status 10 City Saratoga}}}
 
     test relation-join-4.0 {join with DEE} -body {
 	set r1 {Relation {Name string Age int} Name\
@@ -1583,7 +1583,7 @@ namespace eval ::ral::test {
 	    {Age 10 Name Fred}}}
 	set r2 {Relation {} {{}} {{}}}
 	relation join $r1 $r2
-    } -result {Relation {Name string Age int} {{Name Age}} {{Name George Age 20} {Name Fred Age 10}}}
+    } -result {Relation {Name string Age int} Name {{Name George Age 20} {Name Fred Age 10}}}
 
     test relation-join-5.0 {join with DUM} -body {
 	set r1 {Relation {Name string Age int} Name\
@@ -1591,9 +1591,9 @@ namespace eval ::ral::test {
 	    {Age 10 Name Fred}}}
 	set r2 {Relation {} {{}} {}}
 	relation join $r1 $r2
-    } -result {Relation {Name string Age int} {{Name Age}} {}}
+    } -result {Relation {Name string Age int} Name {}}
 
-    test relation-join-3.0 {specified attribute} -body {
+    test relation-join-6.0 {specified attribute} -body {
 	set r1 {Relation {Name string Age int City string} Name\
 	    {{Age 20 Name George City {San Jose}}\
 	    {City Saratoga Age 10 Name Fred}}}
@@ -1602,7 +1602,7 @@ namespace eval ::ral::test {
 	    {Status 20 City {San Jose}}\
 	    {City Saratoga Status 10}}}
 	relation join $r1 $r2 City
-    } -result {Relation {Name string Age int City string Status int} {{Name Age City Status}} {{Name George Age 20 City {San Jose} Status 20} {Name Fred Age 10 City Saratoga Status 10}}}
+    } -result {Relation {Name string Age int City string Status int} {{Name Status}} {{Name George Age 20 City {San Jose} Status 20} {Name Fred Age 10 City Saratoga Status 10}}}
 
     # relation list subcommand
     test relation-list-1.0 {multiple tuples} -body {
