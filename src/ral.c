@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral.c,v $
-$Revision: 1.18 $
-$Date: 2004/08/15 22:55:21 $
+$Revision: 1.19 $
+$Date: 2004/08/15 23:46:14 $
  *--
  */
 
@@ -335,7 +335,7 @@ STATIC DATA ALLOCATION
 */
 static const char ral_version[] = "0.6" ;
 static const char ral_rcsid[] =
-    "$Id: ral.c,v 1.18 2004/08/15 22:55:21 mangoa01 Exp $" ;
+    "$Id: ral.c,v 1.19 2004/08/15 23:46:14 mangoa01 Exp $" ;
 static const char ral_copyright[] =
     "This software is copyrighted 2004 by G. Andrew Mangogna."
     "Terms and conditions for use are distributed with the source code." ;
@@ -441,15 +441,6 @@ fixedIntVectorDtor(
     if (vect->vector) {
 	ckfree((char *)vect->vector) ;
     }
-}
-
-static void
-fixedIntVectorCopy(
-    Ral_FixedIntVector *src,
-    Ral_FixedIntVector *dst)
-{
-    fixedIntVectorCtor(dst, src->count) ;
-    memcpy(dst->vector, src->vector, dst->count * sizeof(*dst->vector)) ;
 }
 
 static void
@@ -587,6 +578,12 @@ attributeDtor(
     if (attr->name) {
 	Tcl_DecrRefCount(attr->name) ;
 	switch (attr->attrType) {
+	case Tcl_Type:
+	    /*
+	     * Nothing to do for Tcl_Type.
+	     */
+	    break ;
+
 	case Tuple_Type:
 	    tupleHeadingUnreference(attr->tupleHeading) ;
 	    break ;
@@ -595,9 +592,6 @@ attributeDtor(
 	    relationHeadingUnreference(attr->relationHeading) ;
 	    break ;
 	}
-	/*
-	 * Nothing to do for Tcl_Type.
-	 */
     }
 }
 
@@ -630,7 +624,7 @@ attributeTypeEqual(
     Ral_Attribute *a1,
     Ral_Attribute *a2)
 {
-    int result ;
+    int result = 0 ;
 
     switch (a1->attrType) {
     case Tcl_Type:
@@ -836,7 +830,7 @@ attributeValueToString(
     Tcl_Obj *valuePtr,
     Tcl_Obj **resultPtr)
 {
-    Tcl_Obj *result ;
+    Tcl_Obj *result = NULL ;
 
     switch (attr->attrType) {
     case Tcl_Type:
@@ -1268,9 +1262,6 @@ tupleHeadingEqual(
     Ral_TupleHeading *h1,
     Ral_TupleHeading *h2)
 {
-    Ral_Attribute *a1 ;
-    Ral_Attribute *last ;
-
     if (h1 == h2) {
 	return 1 ;
     }
@@ -2144,7 +2135,6 @@ relationHeadingNewRetained(
     Ral_TupleHeading *tupleHeading,
     int *retainMap)
 {
-    int degree = heading->tupleHeading->degree ;
     Ral_FixedIntVector *srcIdVector = heading->idVector ;
     char *retainedIds ;
     int retainedCount ;
@@ -2445,7 +2435,6 @@ relationHeadingNewFromObjs(
 {
     Ral_TupleHeading *tupleHeading ;
     Ral_RelationHeading *heading ;
-    Tcl_Obj *allocated = NULL ;
     int idc ;
     Tcl_Obj **idv ;
     Ral_FixedIntVector *idVector ;
@@ -2744,9 +2733,6 @@ relationReserve(
     Ral_Relation *relation,
     int nTuples)
 {
-    int newAllocated ;
-    Ral_Tuple **newVector ;
-
     if (relation->allocated - relation->cardinality >= nTuples) {
 	return ;
     }
@@ -3162,7 +3148,6 @@ relationAppendReorderedTuple(
 
 static int
 relationDeleteTuple(
-    Tcl_Interp *interp,
     Ral_Relation *relation,
     int where)
 {
@@ -3655,7 +3640,6 @@ TupleCreateCmd(
 {
     Ral_TupleHeading *heading ;
     Ral_Tuple *tuple ;
-    int result = TCL_ERROR ;
 
     /* tuple create heading name-value-list */
     if (objc != 4) {
@@ -3716,7 +3700,6 @@ TupleEliminateCmd(
     char *elimMap ;
     int elimCount ;
     int i ;
-    Tcl_Obj **values ;
     Ral_TupleHeading *newHeading ;
     int attrIndex ;
     Ral_Tuple *newTuple ;
@@ -3843,7 +3826,6 @@ TupleExtendCmd(
     Tcl_Obj *tupleObj ;
     Ral_Tuple *tuple ;
     Ral_TupleHeading *heading ;
-    Tcl_Obj **values ;
     Ral_TupleHeading *newHeading ;
     Ral_Tuple *newTuple ;
     Tcl_Obj **newValues ;
@@ -3928,7 +3910,6 @@ TupleExtractCmd(
     Tcl_Obj *tupleObj ;
     Ral_Tuple *tuple ;
     Ral_TupleHeading *heading ;
-    Ral_Attribute *attr ;
     int attrIndex ;
     Tcl_Obj *resultObj ;
 
@@ -4145,7 +4126,6 @@ TupleUnwrapCmd(
     Tcl_Obj **values ;
     Tcl_Obj *tupleAttrObj ;
     int tupleAttr ;
-    int tupleAttrIndex ;
     Tcl_Obj *tupleAttrValue ;
     Ral_Tuple *unTuple ;
     Ral_TupleHeading *newHeading ;
@@ -4202,7 +4182,6 @@ TupleUnwrapCmd(
 	     */
 	if (attrIndex == tupleAttr) {
 	    Ral_TupleHeading *unHeading ;
-	    int attrIndex ;
 	    /*
 	     * Found attribute that matches the one to be unwrapped.
 	     * Add all the wrapped attributes to the unwrapped heading.
@@ -4244,7 +4223,6 @@ TupleUpdateCmd(
 {
     Tcl_Obj *tupleObj ;
     Ral_Tuple *tuple ;
-    Ral_TupleHeading *heading ;
 
     /* tuple update tupleVar name-value-list */
     if (objc != 4) {
@@ -4404,7 +4382,7 @@ errorOut:
  */
 static int
 tupleCmd(
-    ClientData clientData,
+    ClientData clientData,  /* Not used */
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const*objv)
@@ -4490,7 +4468,6 @@ RelvarCreateCmd(
     int newPtr ;
     Ral_RelationHeading *heading ;
     Ral_Relation *relation ;
-    int i ;
     Tcl_Obj *relObj ;
 
     /* relvar create relvarName heading identifiers ?name-value-list ...? */
@@ -4587,7 +4564,7 @@ RelvarDeleteCmd(
 	    break ;
 	}
 	if (boolValue) {
-	    if (relationDeleteTuple(interp, relation, index) != TCL_OK) {
+	    if (relationDeleteTuple(relation, index) != TCL_OK) {
 		result = TCL_ERROR ;
 		break ;
 	    }
@@ -5033,7 +5010,7 @@ errorOut:
 
 static int
 relvarCmd(
-    ClientData clientData,
+    ClientData clientData,  /* Not used */
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const*objv)
@@ -5078,7 +5055,6 @@ RelationCardinalityCmd(
 {
     Tcl_Obj *relationObj ;
     Ral_Relation *relation ;
-    int nTuples ;
 
     /* relation cardinality relValue */
     if (objc != 3) {
@@ -5138,7 +5114,6 @@ RelationDivideCmd(
     Ral_TupleHeading *medTupleHeading ;
     Tcl_HashTable medHashTable ;
     Ral_Relation *quot ;
-    int idIndex ;
     Ral_TupleHeading *trialTupleHeading ;
     Ral_Tuple *trialTuple ;
     int dendCard ;
@@ -5284,9 +5259,8 @@ RelationDivideCmd(
     Tcl_SetObjResult(interp, relationObjNew(quot)) ;
     return TCL_OK ;
 
-errorOut2:
-    tupleHeadingDelete(trialTupleHeading) ;
 errorOut:
+    tupleHeadingDelete(trialTupleHeading) ;
     Tcl_DeleteHashTable(&medHashTable) ;
     relationDelete(quot) ;
     return TCL_ERROR ;
@@ -5423,7 +5397,6 @@ RelationExtendCmd(
 {
     Tcl_Obj *relObj ;
     Ral_Relation *relation ;
-    Tcl_Obj *tupleObj ;
     Tcl_Obj *varNameObj ;
     Ral_Relation *extRelation ;
     Ral_TupleHeading *extTupleHeading ;
@@ -5988,8 +5961,8 @@ RelationIsCmd(
     Tcl_Obj *r2Obj ;
     int opIndex ;
     enum CmpOperators op ;
-    Ral_Relation *cmpSrcRel ;
-    Ral_Relation *cmpToRel ;
+    Ral_Relation *cmpSrcRel = NULL ;
+    Ral_Relation *cmpToRel = NULL ;
     Ral_AttrOrderMap *orderMap ;
     int matches ;
     Ral_Tuple **tupleVector ;
@@ -6124,7 +6097,6 @@ RelationIsnotemptyCmd(
 {
     Tcl_Obj *relationObj ;
     Ral_Relation *relation ;
-    Ral_Relation *newRelation ;
 
     /* relation notempty relValue */
     if (objc != 3) {
@@ -6426,7 +6398,6 @@ RelationProjectCmd(
     int *retainMap ;
     int retainCount ;
     int c ;
-    Tcl_Obj *const*v ;
     int card ;
     Ral_Tuple **tupleVector ;
     Ral_Tuple *projTuple ;
@@ -6952,13 +6923,13 @@ RelationSummarizeCmd(
 	argVect[1] = tupleObjNew(tuple) ;
 	if (Tcl_ListObjReplace(interp, cmdObj, cmdLength, rCnt, 2, argVect)
 	    != TCL_OK || Tcl_EvalObjEx(interp, cmdObj, 0)) {
-	    goto errorOut2 ;
+	    goto errorOut ;
 	}
 	rCnt = 2 ;
 
 	resultObj = Tcl_GetObjResult(interp) ;
 	if (attributeConvertValue(interp, sumAttribute, resultObj) != TCL_OK) {
-	    goto errorOut2 ;
+	    goto errorOut ;
 	}
 
 	Tcl_DecrRefCount(summaryVector[index]) ;
@@ -6985,7 +6956,7 @@ RelationSummarizeCmd(
 
 	if (relationAppendTuple(interp, sumRelation, sumTuple) != TCL_OK) {
 	    tupleDelete(sumTuple) ;
-	    goto errorOut2 ;
+	    goto errorOut ;
 	}
     }
 
@@ -6995,9 +6966,8 @@ RelationSummarizeCmd(
     Tcl_SetObjResult(interp, relationObjNew(sumRelation)) ;
     return TCL_OK ;
 
-errorOut2:
-    Tcl_DecrRefCount(cmdObj) ;
 errorOut:
+    Tcl_DecrRefCount(cmdObj) ;
     Tcl_DeleteHashTable(&perHashTable) ;
     for (c = 0 ; c < perRelation->cardinality ; ++c) {
 	Tcl_DecrRefCount(summaryVector[c]) ;
@@ -7299,7 +7269,7 @@ RelationUnionCmd(
  */
 
 static int relationCmd(
-    ClientData clientData,
+    ClientData clientData,  /* Not used */
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const*objv)
