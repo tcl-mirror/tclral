@@ -31,7 +31,7 @@ A Brief Introduction to Relation Oriented Programming
 Andrew Mangogna 
 \layout Date
 
-24 March 2004
+29 August 2004
 \layout Abstract
 
 This paper introduces some of the concepts of the Relational Model of Data
@@ -53,7 +53,7 @@ This paper introduces some of the concepts of the Relational Model of Data
 What is the Relational Model of Data?
 \layout Standard
 
-The Relation Model is the application of set theory and predicate logic
+The Relational Model is the application of set theory and predicate logic
  to data management.
 \begin_inset Foot
 collapsed true
@@ -207,7 +207,7 @@ Tuple
 A list of attribute name / data type pairs.
 \layout Enumerate
 
-A list of attribute name attribute value pairs.
+A list of attribute name / attribute value pairs.
 \layout Standard
 
 So for example, the statement,
@@ -227,25 +227,17 @@ t
  Tcl has many data types, but the most useful in this context are probable
  the simple ones, such as string, int, double and list.
  It is possible to have a Tuple valued attribute.
- In recognition of the special status of the string type in Tcl, a literal
- tuple can omit the data type specification and string will be assumed.
- So the above example could also have been written as:
-\layout Verbatim
-
-set t {Tuple {Name Breed {Age int}} {Name Fido Breed Terrier Age 2}}
-\layout Standard
-
-Also, since the ordering of attribute names is not significant when specifying
+ Also, since the ordering of attribute names is not significant when specifying
  the attribute values, the above tuple could also have been written as:
 \layout Verbatim
 
-set t {Tuple {Name Breed {Age int}} {Age 2 Name Fido Breed Terrier}}
+set t {Tuple {{Name string} {Breed string} {Age int}} {Age 2 Name Fido Breed
+ Terrier}}
 \layout Standard
 
 This property leads to the natural conclusion that the string representation
  of a tuple is not unique.
- There turns out to be many different strings that will result in the same
- tuple.
+ There are many different strings that will result in the same tuple.
  This is really no different than the case with integers since 
 \begin_inset Quotes eld
 \end_inset 
@@ -267,124 +259,94 @@ This property leads to the natural conclusion that the string representation
  should not be operated on with string operators.
  Indeed there is an entire set of operators suppied by TclRAL for the purpose
  of manipulating tuple values.
-\layout Subsection
-
-Tuple Operations
-\layout Standard
-
-TclRAL defines the following operations on tuples:
-\layout Itemize
-
-create
-\layout Itemize
-
-get
-\layout Itemize
-
-equal
-\layout Itemize
-
-degree
-\layout Itemize
-
-extract
-\layout Itemize
-
-assign
-\layout Itemize
-
-wrap
-\layout Itemize
-
-unwrap
-\layout Subsubsection
-
-tuple create
-\layout Standard
-
-The command 
-\noun on 
-tuple create
-\noun default 
- creates a tuple and avoids some the nastyness of Tcl list syntax.
- Our previous example could be written:
-\layout Verbatim
-
-package require ral
-\layout Verbatim
-
-namespace import ::ral::tuple
-\layout Verbatim
-
-set t [tuple create {Name Breed {Age int}} {Name Fido Breed Terrier Age
- 2}]
-\layout Standard
-
-In future examples we will forgo the package and namespace import commands
- to shorten the text with the understanding that it is necessary to reference
- the package to obtain the commands and to import the commands if the full
- namespace qualified command name is to be shortened.
-\layout Standard
-
-Notice that the values of a tuple are set by using a list with an even number
- of elements that alternate the attribute name and it value.
- This is the same type of list used by the 
-\family typewriter 
-array set
-\family default 
- and 
-\family typewriter 
-array get
-\family default 
- commands.
- This makes for an easy correspondence between tuples and arrays, as in:
-\layout Verbatim
-
-set dog(Name) Fido
-\layout Verbatim
-
-set dog(Breed) Terrier
-\layout Verbatim
-
-set dog(Age) 2
-\layout Verbatim
-
-set t [tuple create {Name Breed {Age int} [array get dog]]
-\layout Subsubsection
-
-tuple get
-\layout Standard
-
-The correspondence between tuples and arrays is also made easier with the
- 
-\noun on 
-tuple get
-\noun default 
- command.
- This retrieves the values of the tuple in a form suitable for use by the
- 
-\family typewriter 
-array set
-\family default 
- command.
- So,
-\layout Verbatim
-
-set t [tuple create {Name Breed {Age int}} {Name Fido Breed Terrier Age
- 2}]
-\layout Verbatim
-
-array set dog [tuple get $t]
-\layout Standard
-
-will set the dog variable to be an array as we saw above.
 \layout Section
 
 What is a Relation?
+\layout Standard
+
+Roughly speaking, a relation is a set of tuples that all have the same heading.
+ Because a relation is a set, there are no duplicated tuples.
+ Some of the implications of this are:
+\layout Enumerate
+
+Like tuples there is no inherent left to right ordering.
+ Clearly an implementation may choose to store values in some definite order.
+ However, the relation operators do not depend upon any such ordering.
+\layout Enumerate
+
+There is no inherent top to bottom ordering.
+ Again an implementation may store tuples in some definite order, but that
+ order is not part of what the operators expose.
 \layout Subsection
 
 Relations as Predicates
+\layout Standard
+
+More important is that a relation can represent a statement of truth about
+ some subject.
+ That is some of the power that relations bring to modeling software.
+ In the next sections we will show how relations can be used to formalize
+ the facts about some subject matter.
 \layout Section
 
 A Dog of an Example
+\layout Standard
+
+Examples can be difficult.
+ To make them small enough not to consume an entire book risks making them
+ trivial.
+ In a tutorial such as this it is convenient to choose a subject matter
+ that does not require an extensive background from the reader.
+ So we have chosen to examine the problem of managing a dog show.
+\layout Standard
+
+First, let me say that I do not know anything about how dog shows are managed
+ in the real world.
+ I don't even own a dog.
+ The only dog show I have ever seen has been on television.
+ So any reader that does have detailed application knownledge about how
+ to run a dog show is likely to find that this example has little similarity
+ to reality.
+ However, that does not diminish its pedagogical benefit.
+ It just means that you are unlikely to try to turn this examine into a
+ commercial software product (not that you would have been tempted of that
+ anyway).
+\layout Subsection
+
+The Cosmos Dog Show
+\layout Standard
+
+At the Cosmos Dog Show, we are interesting in keeping track of some simple
+ statistics about the dogs that are entered into the show, the contests
+ that are held and the results of the judging.
+ Let's start with a few basic facts:
+\layout Enumerate
+
+We want to keep track of the dogs.
+ Dogs are categorized by breed and breeds are grouped according to their
+ general nature.
+ Generally toy poodles are in a different breed category than large working
+ dogs such as Irish hounds.
+\layout Enumerate
+
+We want to keep track of the dog owners and dog handlers.
+ During a dog show, the dog is often handled by someone other than the owner.
+ We also want to allow for multiple people to own the same dog.
+\layout Enumerate
+
+We want to keep track of judges.
+\layout Enumerate
+
+We want to keep track of what the contests in the dog show are and what
+ the results are.
+\layout Enumerate
+
+We specifically decide not to keep track of the pedigree of a dog.
+ A pedigree can be long and complicated and might be interesting, but we
+ have to draw the line somewhere.
+\layout Standard
+
+So the design strategy is to represent the facts of the dog show as a set
+ of relations and then show how we may operate on those relations to obtain
+ the information we need to manage the dog show.
 \the_end

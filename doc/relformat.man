@@ -1,3 +1,4 @@
+[comment {
 # This software is copyrighted 2004 by G. Andrew Mangogna.  The following
 # terms apply to all files associated with the software unless explicitly
 # disclaimed in individual files.
@@ -39,44 +40,63 @@
 # 
 #  *++
 # MODULE:
-#   Makefile to build libral.so
-# 
+#   relformat -- format a relation into tabular text
 # ABSTRACT:
+#   This file contains the documentation for the "relformat" command.
+#   Relformat is part of the TCLRAL package.
 # 
-# $RCSfile: Makefile,v $
-# $Revision: 1.8 $
-# $Date: 2004/08/30 00:29:11 $
+# $RCSfile: relformat.man,v $
+# $Revision: 1.1 $
+# $Date: 2004/08/30 00:29:10 $
 #  *--
+}]
+[manpage_begin relformat n 0.6]
+[moddesc "Relation formatting"]
+[titledesc "Text formatting for relations"]
+[copyright "2004 by G. Andrew Mangogna"]
+[require ral 0.6]
+[description]
+This manpage describes the
+[cmd relformat]
+command.
+The
+[cmd relformat]
+command is part of the Tcl Relational Algebra Library (ral) package.
 
-# This is set up to use either 8.4 or 8.5. Just uncomment the one
-# appropriate to your Tcl installation.
-#TCLBASE = /usr/local/ActiveTcl-8.4.7
-#LDLIBS = -ltclstub8.4
-TCLBASE = /usr/local/ActiveTcl-8.5.0
-LDLIBS = -ltclstub8.5
+[section COMMANDS]
+[list_begin definitions]
+[call [cmd "::ral::relformat"] [arg relationValue] [opt title]]
+The [cmd relformat] command returns a string that contains a human
+readable form of the relation given by [arg relationValue].
+[cmd Relformat] is intended to be to relations what the [cmd parray]
+command is to arrays, [emph i.e.] a easy means of obtaining human
+readable output.
+Rather than writing the output directly to a channel,
+[cmd relformat] returns it as a string.
+The returned string does not have a newline character.
+If the optional [arg title] argument is present, then it becomes
+the first line of the output effectively giving a title to the relation.
 
-CFLAGS = -g -I$(TCLBASE)/include -Wall
-# Debugging may be easier if optimization is turned off.
-CFLAGS += -O2
+[example {
+% puts [relformat [relvar set DOG] DOG]
+DOG
+---
+DogName      Breed
+ string     string
+==================
+   Fido     Poodle
+    Sam     Collie
+   Spot    Terrier
+  Rover  Retriever
+   Fred    Spaniel
+ Jumper       Mutt
+}]
 
-# Uncomment this for test coverage profiling.
-#CFLAGS += -fprofile-arcs -ftest-coverage
 
-LDFLAGS = -shared -g
-LOADLIBES = -L$(TCLBASE)/lib
-CLEANFILES=\
-    libral.so\
-    ral.bb\
-    ral.bbg\
-    ral.c.gcov\
-    ral.da\
-    ral.o\
-    $(NULL)
+[list_end]
 
-libral.so : ral.o
-	$(CC) -o $@ $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS)
+[see_also relvar relation]
 
-ral.o : $(TCLBASE)/include/tcl.h
+[keywords tuple relation relvar]
 
-clean :
-	$(RM) $(CLEANFILES)
+[manpage_end]

@@ -44,8 +44,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: relvar.man,v $
-# $Revision: 1.4 $
-# $Date: 2004/08/01 18:55:05 $
+# $Revision: 1.5 $
+# $Date: 2004/08/30 00:29:10 $
 #  *--
 }]
 [manpage_begin relvar n 0.6]
@@ -63,7 +63,7 @@ TclRAL defines a variable space for relation variables.
 Relation variables hold relation values and the subcommands of the
 [cmd relvar] command generally operate directly on the values storing
 the results back into the relation variables.
-For this reason, the most of the [cmd relvar] subcommands
+For this reason, most of the [cmd relvar] subcommands
 take the name of a relation variable as an argument.
 
 [para]
@@ -100,7 +100,8 @@ is stored in a Tcl variable, say [emph V], then any insert or delete
 operations on [emph RV] will also be seen when the value is accessed
 via [emph V].
 This could be surprising to some, since most other Tcl commands will
-create a new copy of a shared value before performing any operation on it.
+create a new copy of a shared value before performing any update
+operation on it.
 The behavior described here works well when it is remembered that the
 [cmd relvar] commands can modify the underlying value directly and that
 the [cmd relation] commands only operate on values in a read only fashion
@@ -147,6 +148,30 @@ The return value of the subcommand is the number of tuples deleted.
 relvar delete OWNER o {[tuple extract $o OwnerName] eq "Sue"}
 }]
 
+[call [cmd "::ral::relvar deleteone"] [arg relationVariable]\
+    [arg name-value-list]]
+
+The [cmd deleteone] subcommand deletes at most one tuple from the
+relation variable given by the [arg relationVariable] argument.
+The [arg name-value-list] must be list containing an even number of elements
+which are attribute names alternating with attribute values.
+The set of attribute names in [arg name-value-list] must form one of the
+identifiers of [arg relationVariable].
+If [arg relationVariable] contains a tuple whose attribute values match those
+in [arg name-value-list] then that tuple is deleted and [arg relationVariable]
+is modified in place.
+Otherwise [arg relationVariable] is unchanged.
+This subcommand is useful in those contexts where the attribute values of an
+identifier are known and evaluating an expression over all the tuples
+in [arg relationVariable] is superfluous.
+The return value of the subcommand is the number of tuples deleted which will
+be either 1 or 0.
+
+[example {
+% relvar delete OWNER {OwnerName Sue}
+1
+}]
+
 [call [cmd "::ral::relvar destroy"] [opt "relationVariable ..."]]
 
 The [cmd destroy] deletes all the relation variables whose names are given
@@ -184,8 +209,8 @@ The [cmd insert] subcommand inserts the tuples given by [arg name-value-list]
 arguments into the value of the relation stored in [arg relationVariable].
 The value is modified in place.
 The subcommand has no return value.
-It is an error to attempt to insert a duplicate tuple or a tuple whose type
-does not match the relation heading.
+It is an error to attempt to insert a duplicate tuple or a tuple whose
+heading does not match the relation heading.
 All values of the tuple must be specfied with a valid value representation of
 the type associated with the attribute.
 
@@ -234,6 +259,26 @@ The example below updates Sue's Age to be 20.
 [example {
 relvar update OWNER o {[tuple extract $o OwnerName] eq "Sue"} {Age 20}
 }]
+
+[call [cmd "::ral::relvar updateone"] [arg relationVariable]\
+    [arg id-name-value-list] [arg name-value-list]]
+
+The [cmd updateone] subcommand modifies at most one tuple from the
+relation variable given by the [arg relationVariable] argument.
+The [arg id-name-value-list] must be list containing an even number of elements
+which are attribute names alternating with attribute values.
+The set of attribute names in [arg id-name-value-list] must form one of the
+identifiers of [arg relationVariable].
+If [arg relationVariable] contains a tuple whose attribute values match those
+in [arg name-value-list] then
+then the attributes whose names are mentioned in the [arg name-value-list]
+are set to the corresponding values and [arg relationVariable]
+is modified in place.
+Otherwise [arg relationVariable] is unchanged.
+This subcommand is useful in those contexts where the attribute values of an
+identifier are known and evaluating an expression over all the tuples
+in [arg relationVariable] is superfluous.
+The return value of the subcommand is the number of tuples updated.
 
 [list_end]
 

@@ -43,13 +43,22 @@
 # ABSTRACT:
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.3 $
-# $Date: 2004/07/24 20:17:32 $
+# $Revision: 1.4 $
+# $Date: 2004/08/30 00:29:11 $
 #  *--
 
 namespace eval ::ral {
     namespace export relformat
 }
+
+# This procedure is intended to be to relations what "parray" is to arrays.
+# It provides a very simple text formatting of relation values into a
+# tabular layout. Rather than writing the output to a channel "relformat"
+# returns the string as its return value.
+#
+# N.B. that currently "relformat" does not handle tuple or relation valued
+# attributes very well. They tend to turn into very long columns. This will
+# be corrected with further development.
 
 proc ::ral::relformat {relValue {title {}}} {
     set result {}
@@ -87,7 +96,7 @@ proc ::ral::relformat {relValue {title {}}} {
     set fmtStr [string trimright $fmtStr]
     append fmtStr "\n"
 
-    # Attributes
+    # Attribute Names
     set fmtCmd [list format $fmtStr]
     set fmtLine $fmtCmd
     foreach {attr type} $heading {

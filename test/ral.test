@@ -46,8 +46,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.17 $
-# $Date: 2004/08/23 01:38:36 $
+# $Revision: 1.18 $
+# $Date: 2004/08/30 00:29:11 $
 #  *--
 
 package require tcltest 2.2
@@ -754,6 +754,41 @@ namespace eval ::ral::test {
 	relvar delete X t {[tuple extract $t Name] eq "George"}
     } -result {1}
 
+    # relvar deleteone subcommand
+    test relvar-deleteone-1.0 {no match} -setup {
+	relvar create X {Name string Status int} Name\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar destroy X
+    } -body {
+	relvar deleteone X {Name Jane}
+    } -result {0}
+
+    test relvar-deleteone-2.0 {match} -setup {
+	relvar create X {Name string Status int} Name\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar destroy X
+    } -body {
+	relvar deleteone X {Name Fred}
+    } -result {1}
+
+    test relvar-deleteone-3.0 {bad identifier} -setup {
+	relvar create X {Name string Status int} Name\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar destroy X
+    } -body {
+	relvar deleteone X {Status 30}
+    } -result {attributes in, "Status 30", do not form an identifier}\
+    -returnCodes error
+
     # relvar destroy subcommand
     test relvar-destroy-1.0 {relvar no longer exists after destroy} -setup {
 	relvar create X {Name string Status int} Name\
@@ -970,6 +1005,53 @@ namespace eval ::ral::test {
 	relvar destroy X
     } -body {
 	relvar update X t {[tuple extract $t Name] eq "George"} {Name Fred}
+    } -result {tuple, "Name Fred Status 20", contains duplicate values for the identifier, "Name"}\
+    -returnCodes error
+
+    # relvar updateone subcommand
+    test relvar-updateone-1.0 {no match} -setup {
+	relvar create X {Name string Status int} Name\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar destroy X
+    } -body {
+	relvar updateone X {Name Jane} {Status -1}
+    } -result {0}
+
+    test relvar-updateone-2.0 {match} -setup {
+	relvar create X {Name string Status int} Name\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar destroy X
+    } -body {
+	relvar updateone X {Name Fred} {Status -1}
+    } -result {1}
+
+    test relvar-updateone-3.0 {wrong identifier} -setup {
+	relvar create X {Name string Status int} Name\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar destroy X
+    } -body {
+	relvar updateone X {Status 20} {Name Jane}
+    } -result {attributes in, "Status 20", do not form an identifier}\
+    -returnCodes error
+
+    test relvar-updateone-4.0 {update creates duplicate} -setup {
+	relvar create X {Name string Status int} Name\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar destroy X
+    } -body {
+	relvar updateone X {Name George} {Name Fred}
     } -result {tuple, "Name Fred Status 20", contains duplicate values for the identifier, "Name"}\
     -returnCodes error
 
@@ -1769,6 +1851,39 @@ namespace eval ::ral::test {
 	relation restrict $r selected {< 20}
     } -result {syntax error in expression "< 20": unexpected operator <}\
     -returnCodes error
+
+    # relation restrictone subcommand
+    test relation-restrictone-1.0 {match the only id} -body {
+	set r {Relation {Name string Age int City string} Name\
+	    {{Name Andrew Age 30 City Sunnyvale}\
+	    {Age 20 Name George City {San Jose}}\
+	    {City Saratoga Age 10 Name Fred}}}
+	relation restrictone $r {Name Fred}
+    } -result {Relation {Name string Age int City string} Name\
+	{{Name Fred Age 10 City Saratoga}}}
+
+    test relation-restrictone-2.0 {no match} -body {
+	set r {Relation {Name string Age int City string} Name\
+	    {{Name Andrew Age 30 City Sunnyvale}\
+	    {Age 20 Name George City {San Jose}}\
+	    {City Saratoga Age 10 Name Fred}}}
+	relation restrictone $r {Name Alice}
+    } -result {Relation {Name string Age int City string} Name {}}
+
+    test relation-restrictone-3.0 {bad identifier} -body {
+	set r {Relation {Name string Age int City string} Name\
+	    {{Name Andrew Age 30 City Sunnyvale}\
+	    {Age 20 Name George City {San Jose}}\
+	    {City Saratoga Age 10 Name Fred}}}
+	relation restrictone $r {City Sunnyvale}
+    } -result {attributes in, "City Sunnyvale", do not form an identifier}\
+    -returnCodes 1
+
+    test relation-restrictone-4.0 {multiple identifiers} -body {
+	set r {Relation {Name string Age int} {Name Age}\
+	    {{Name Andrew Age 10} {Name George Age 20} {Name Fred Age 30}}}
+	relation restrictone $r {Age 30}
+    } -result {Relation {Name string Age int} {Name Age} {{Name Fred Age 30}}}
 
     # relation times subcommand
     test relation-times-1.0 {single attribute, square relation} -body {

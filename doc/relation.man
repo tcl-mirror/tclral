@@ -44,13 +44,13 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.7 $
-# $Date: 2004/08/23 01:38:35 $
+# $Revision: 1.8 $
+# $Date: 2004/08/30 00:29:10 $
 #  *--
 }]
 [manpage_begin relation n 0.6]
-[moddesc "Operators for Relation Values"]
-[titledesc "Relation Operators"]
+[moddesc "Relation Operators"]
+[titledesc "Operators for Relation Values"]
 [copyright "2004 by G. Andrew Mangogna"]
 [require ral 0.6]
 [description]
@@ -577,6 +577,39 @@ DogName    Breed
  string   string
 ================
    Fred  Spaniel
+}]
+
+[call [cmd "::ral::relation restrictone"] [arg relationValue]\
+    [arg name-value-list]]
+
+The [cmd restrictone] subcommand returns a new relation
+that has the same heading as [arg relationValue] and a body consisting
+of the set of tuples in [arg relationValue] whose identifying attribute values
+match those contained in [arg name-value-list]
+The cardinality of the returned relation will necessarily then be either 0 or 1.
+The [arg name-value-list] must be list containing an even number of elements
+which are attribute names alternating with attribute values.
+The set of attribute names in [arg name-value-list] must form one of the
+identifiers of [arg relationValue].
+If [arg relationValue] contains a tuple whose attribute values match those
+in [arg name-value-list] then the returned relation will contain that
+single tuple.
+Otherwise the returned relation has cardinality 0.
+This subcommand is useful in those contexts where the attribute values of an
+identifier are known and evaluating an expression over all the tuples
+in [arg relationValue] is superfluous.
+
+[example {
+% relformat [relation restrictone [relvar set DOG] {DogName Fred}]
+DogName    Breed
+ string   string
+================
+   Fred  Spaniel
+
+% relformat [relation restrictone [relvar set DOG] {DogName Jane}]
+DogName    Breed
+ string   string
+================
 }]
 
 [call [cmd "::ral::relation semijoin"] [arg relationValue1]\
