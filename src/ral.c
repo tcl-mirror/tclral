@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral.c,v $
-$Revision: 1.7 $
-$Date: 2004/05/21 04:20:34 $
+$Revision: 1.8 $
+$Date: 2004/05/28 05:03:02 $
  *--
  */
 
@@ -67,6 +67,8 @@ INCLUDE FILES
 MACRO DEFINITIONS
 */
 #define	max(a,b)    ((a) > (b) ? (a) : (b))
+#define	min(a,b)    ((a) < (b) ? (a) : (b))
+#define	countof(a)  (sizeof(a) / sizeof(a[0]))
 
 
 /*
@@ -115,6 +117,30 @@ typedef struct Ral_AttrOrderMap {
     int attrCount ;
     int *attrOrder ;
 } Ral_AttrOrderMap ;
+
+/*
+ * A relation join map is a temporary data structure used to accumulate the
+ * information for performing a join. This consists of two parts.  First, a
+ * mapping of the attributes across which the join is performed and second a
+ * map showing the tuples that match across the join attributes.
+ */
+typedef struct Ral_RelationJoinMap {
+    int attrAllocated ;	/* number of map entries allocated */
+    int attrCount ;	/* number of attributes in the vectors below */
+    struct am {
+	int index1 ;
+	int index2 ;
+    } *attrMap ;	/* the attribute map that gives the attribute indices
+			 * in the two relation across which the join is
+			 * performed. */
+    int tupleAllocated ;/* number of tuple map entries allocated */
+    int tupleCount ;	/* number of tuple map entries used */
+    struct tm {
+	int index1 ;
+	int index2 ;
+    } *tupleMap ;	/* the tuple map giving the index in one relation
+			 * that matches that in another relation */
+} Ral_RelationJoinMap ;
 
 /*
  * A Tuple Heading is a set of Heading Attributes. The attributes are stored in
@@ -258,6 +284,7 @@ static void tupleHeadingReference(struct Ral_TupleHeading *) ;
 static void tupleHeadingUnreference(struct Ral_TupleHeading *) ;
 static Ral_TupleHeading *tupleHeadingNewFromString(Tcl_Interp *, Tcl_Obj *) ;
 static Tcl_Obj *tupleHeadingObjNew(Tcl_Interp *, Ral_TupleHeading *) ;
+static int tupleHeadingFindIndex(Tcl_Interp *, Ral_TupleHeading *, Tcl_Obj *) ;
 
 static int relationHeadingEqual(Ral_RelationHeading *, Ral_RelationHeading *) ;
 static void relationHeadingReference(struct Ral_RelationHeading *) ;
@@ -303,7 +330,7 @@ EXTERNAL DATA REFERENCES
 /*
 STATIC DATA ALLOCATION
 */
-static char rcsid[] = "@(#) $RCSfile: ral.c,v $ $Revision: 1.7 $" ;
+static char rcsid[] = "@(#) $RCSfile: ral.c,v $ $Revision: 1.8 $" ;
 
 static Tcl_ObjType Ral_TupleType = {
     "Tuple",
@@ -366,7 +393,7 @@ ObjsEqual(
     if (l1 != l2) {
 	return 0 ;
     }
-    return (memcmp(s1, s2, l1) == 0) ;
+    return memcmp(s1, s2, l1) == 0 ;
 }
 
 static Tcl_Obj *
@@ -483,18 +510,12 @@ attributeCopy(
 }
 
 static int
-attributeEqual(
+attributeTypeEqual(
     Ral_Attribute *a1,
     Ral_Attribute *a2)
 {
     int result ;
 
-    if (a1 == a2) {
-	return 1 ;
-    }
-    if (!(ObjsEqual(a1->name, a2->name) && a1->attrType == a2->attrType)) {
-	return 0 ;
-    }
     switch (a1->attrType) {
     case Tcl_Type:
 	result = a1->tclType == a2->tclType ;
@@ -514,6 +535,21 @@ attributeEqual(
     }
 
     return result ;
+}
+
+static int
+attributeEqual(
+    Ral_Attribute *a1,
+    Ral_Attribute *a2)
+{
+    if (a1 == a2) {
+	return 1 ;
+    }
+    if (!(ObjsEqual(a1->name, a2->name) && a1->attrType == a2->attrType)) {
+	return 0 ;
+    }
+
+    return attributeTypeEqual(a1, a2) ;
 }
 
 /*
@@ -761,6 +797,125 @@ attributeValueToString(
     }
 
     return (*resultPtr = result) ? TCL_OK : TCL_ERROR ;
+}
+
+/*
+ * ======================================================================
+ * Attribute Order Map Functions
+ * ======================================================================
+ */
+
+static Ral_AttrOrderMap *
+attrOrderMapNew(
+    int attrCount)
+{
+    Ral_AttrOrderMap *map ;
+    int nbytes ;
+
+    nbytes = sizeof(*map) + attrCount * sizeof(*map->attrOrder) ;
+    map = (Ral_AttrOrderMap *)ckalloc(nbytes) ;
+    memset(map, 0, nbytes) ;
+
+    map->isInOrder = 0 ;
+    map->attrCount = attrCount ;
+    map->attrOrder = (int *)(map + 1) ;
+
+    return map ;
+}
+
+/*
+ * Compute ordering to map values from "th2" to the same order as "th1".
+ */
+static Ral_AttrOrderMap *
+attrOrderMapGenerateOrdering(
+    Ral_TupleHeading *th1,
+    Ral_TupleHeading *th2)
+{
+    Ral_AttrOrderMap *map ;
+    int index1 ;
+    Ral_Attribute *attr1 ;
+    int *order ;
+    int nOutOfOrder = 0 ;
+
+    assert(tupleHeadingEqual(th1, th2)) ;
+    map = attrOrderMapNew(th1->degree) ;
+    order = map->attrOrder ;
+
+    attr1 = th1->attrVector ;
+    for (index1 = 0 ; index1 < th1->degree ; ++index1, ++attr1) {
+	int index2 ;
+
+	index2 = tupleHeadingFindIndex(NULL, th2, attr1->name) ;
+	assert(index2 >= 0) ;
+
+	*order++ = index2 ;
+	nOutOfOrder += index1 != index2 ;
+    }
+
+    map->isInOrder = nOutOfOrder == 0 ;
+    return map ;
+}
+
+/*
+ * ======================================================================
+ * Relation Join Map Functions
+ * ======================================================================
+ */
+
+
+static Ral_RelationJoinMap *
+relationJoinMapNew(
+    int nAttrs,
+    int nTuples)
+{
+    Ral_RelationJoinMap *map ;
+
+    map = (Ral_RelationJoinMap *)ckalloc(sizeof(*map)) ;
+
+    map->attrAllocated = nAttrs ;
+    map->attrCount = 0 ;
+    map->attrMap = (struct am *)ckalloc(nAttrs * sizeof(*map->attrMap)) ;
+    memset(map->attrMap, 0, nAttrs * sizeof(*map->attrMap)) ;
+
+    map->tupleAllocated = nTuples ;
+    map->tupleCount = 0 ;
+    map->tupleMap = (struct tm *)ckalloc(nTuples * sizeof(*map->tupleMap)) ;
+    memset(map->tupleMap, 0, nTuples * sizeof(*map->tupleMap)) ;
+
+    return map ;
+}
+
+static void
+relationJoinMapDelete(
+    Ral_RelationJoinMap *map)
+{
+    ckfree((char *)map->attrMap) ;
+    ckfree((char *)map->tupleMap) ;
+    ckfree((char *)map) ;
+}
+
+static void
+relationJoinMapAddAttrs(
+    Ral_RelationJoinMap *map,
+    int i1,
+    int i2)
+{
+    assert(map->attrCount < map->attrAllocated) ;
+    map->attrMap[map->attrCount].index1 = i1 ;
+    map->attrMap[map->attrCount].index2 = i2 ;
+    ++map->attrCount ;
+}
+
+static void
+relationJoinMapAddTuples(
+    Ral_RelationJoinMap *map,
+    int i1,
+    int i2)
+{
+    assert(map->tupleCount < map->tupleAllocated) ;
+    map->tupleMap[map->tupleCount].index1 = i1 ;
+    map->tupleMap[map->tupleCount].index2 = i2 ;
+    ++map->tupleCount ;
 }
 
 /*
@@ -1246,61 +1401,85 @@ tupleHeadingObjNew(
     return Tcl_NewListObj(2, pair) ;
 }
 
-/*
- * ======================================================================
- * Attribute Order Map Functions
- * ======================================================================
- */
-
-static Ral_AttrOrderMap *
-attrOrderMapNew(
-    int attrCount)
-{
-    Ral_AttrOrderMap *map ;
-    int nbytes ;
-
-    nbytes = sizeof(*map) + attrCount * sizeof(*map->attrOrder) ;
-    map = (Ral_AttrOrderMap *)ckalloc(nbytes) ;
-    memset(map, 0, nbytes) ;
-
-    map->isInOrder = 0 ;
-    map->attrCount = attrCount ;
-    map->attrOrder = (int *)(map + 1) ;
-
-    return map ;
-}
-
-/*
- * Compute ordering to map values from "th2" to the same order as "th1".
- */
-static Ral_AttrOrderMap *
-attrOrderMapGenerateOrdering(
+static void
+tupleHeadingCommonAttrs(
     Ral_TupleHeading *th1,
-    Ral_TupleHeading *th2)
+    Ral_TupleHeading *th2,
+    Ral_RelationJoinMap *map)
 {
-    Ral_AttrOrderMap *map ;
     int index1 ;
     Ral_Attribute *attr1 ;
-    int *order ;
-    int nOutOfOrder = 0 ;
 
-    assert(tupleHeadingEqual(th1, th2)) ;
-    map = attrOrderMapNew(th1->degree) ;
-    order = map->attrOrder ;
-
-    attr1 = th1->attrVector ;
-    for (index1 = 0 ; index1 < th1->degree ; ++index1, ++attr1) {
+    for (index1 = 0, attr1 = th1->attrVector ; index1 < th1->degree ;
+	++index1, ++attr1) {
+	Ral_Attribute *attr2 ;
 	int index2 ;
 
-	index2 = tupleHeadingFindIndex(NULL, th2, attr1->name) ;
-	assert(index2 >= 0) ;
+	attr2 = tupleHeadingFindAttribute(NULL, th2, attr1->name, &index2) ;
+	if (attr2 && attributeTypeEqual(attr1, attr2)) {
+	    relationJoinMapAddAttrs(map, index1, index2) ;
+	}
+    }
+}
 
-	*order++ = index2 ;
-	nOutOfOrder += index1 != index2 ;
+static int
+tupleHeadingJoinAttrs(
+    Tcl_Interp *interp,
+    Ral_TupleHeading *th1,
+    Ral_TupleHeading *th2,
+    int nAttrs,
+    Tcl_Obj *const*attrPairs,
+    Ral_RelationJoinMap *map)
+{
+    while (nAttrs-- > 0) {
+	int elemc ;
+	Tcl_Obj **elemv ;
+	Tcl_Obj *name1 ;
+	Tcl_Obj *name2 ;
+	Ral_Attribute *attr1 ;
+	Ral_Attribute *attr2 ;
+	int index1 ;
+	int index2 ;
+
+	if (Tcl_ListObjGetElements(interp, *attrPairs, &elemc, &elemv)
+	    != TCL_OK) {
+	    return TCL_ERROR ;
+	}
+
+	if (elemc == 1) {
+	    name1 = name2 = *elemv ;
+	} else if (elemc == 2) {
+	    name1 = *elemv ;
+	    name2 = *(elemv + 1) ;
+	} else {
+	    Tcl_ResetResult(interp) ;
+	    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
+		"badly formatted join attribute list, {",
+		Tcl_GetString(*attrPairs), "}", NULL) ;
+	    return TCL_ERROR ;
+	}
+
+	attr1 = tupleHeadingFindAttribute(interp, th1, name1, &index1) ;
+	if (attr1 == NULL) {
+	    return TCL_ERROR ;
+	}
+	attr2 = tupleHeadingFindAttribute(interp, th2, name2, &index2) ;
+	if (attr2 == NULL) {
+	    return TCL_ERROR ;
+	}
+	if (attributeTypeEqual(attr1, attr2)) {
+	    relationJoinMapAddAttrs(map, index1, index2) ;
+	} else {
+	    Tcl_ResetResult(interp) ;
+	    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
+		"type of attribute, \"", Tcl_GetString(name1),
+		"\", does not match that of attribute, \"",
+		Tcl_GetString(name2), "\"", NULL) ;
+	    return TCL_ERROR ;
+	}
     }
 
-    map->isInOrder = nOutOfOrder == 0 ;
-    return map ;
+    return TCL_OK ;
 }
 
 /*
@@ -1378,9 +1557,10 @@ tupleCopyValues(
 
     assert(first <= srcTuple->heading->degree) ;
     assert(last <= srcTuple->heading->degree) ;
-    assert(first + last <= srcTuple->heading->degree) ;
+    assert(last >= first) ;
+    assert(last - first <= srcTuple->heading->degree) ;
     assert(start <= destTuple->heading->degree) ;
-    assert(start + last <= destTuple->heading->degree) ;
+    assert(start + (last - first) <= destTuple->heading->degree) ;
 
     srcValues = srcTuple->values + first ;
     lastValue = srcTuple->values + last ;
@@ -2048,31 +2228,25 @@ relationHeadingDup(
     Ral_RelationHeading *srcHeading,
     int addAttrs)
 {
-    if (addAttrs == 0) {
-	relationHeadingReference(srcHeading) ;
-	return srcHeading ;
-    } else {
-	Ral_TupleHeading *tupleHeading ;
-	Ral_RelationHeading *heading ;
-	int idCount = srcHeading->idCount ;
-	Ral_RelId *srcIdVector = srcHeading->idVector ;
-	Ral_RelId *destIdVector ;
+    Ral_TupleHeading *tupleHeading ;
+    Ral_RelationHeading *heading ;
+    int idCount = srcHeading->idCount ;
+    Ral_RelId *srcIdVector = srcHeading->idVector ;
+    Ral_RelId *destIdVector ;
 
-	tupleHeading = tupleHeadingDup(srcHeading->tupleHeading, addAttrs) ;
-	if (!tupleHeading) {
-	    return NULL ;
-	}
-
-	heading = relationHeadingNew(tupleHeading, idCount) ;
-	for (destIdVector = heading->idVector ; idCount > 0 ;
-	    --idCount, ++srcIdVector, ++destIdVector) {
-	    relIdCtor(destIdVector, srcIdVector->attrCount) ;
-	    memcpy(destIdVector->attrIndices, srcIdVector->attrIndices,
-		srcIdVector->attrCount * sizeof(*srcIdVector->attrIndices)) ;
-	}
-	return heading ;
+    tupleHeading = tupleHeadingDup(srcHeading->tupleHeading, addAttrs) ;
+    if (!tupleHeading) {
+	return NULL ;
     }
-    /* NOTREACHED */
+
+    heading = relationHeadingNew(tupleHeading, idCount) ;
+    for (destIdVector = heading->idVector ; idCount > 0 ;
+	--idCount, ++srcIdVector, ++destIdVector) {
+	relIdCtor(destIdVector, srcIdVector->attrCount) ;
+	memcpy(destIdVector->attrIndices, srcIdVector->attrIndices,
+	    srcIdVector->attrCount * sizeof(*srcIdVector->attrIndices)) ;
+    }
+    return heading ;
 }
 
 static void
@@ -2409,12 +2583,12 @@ relationReserve(
     int newAllocated ;
     Ral_Tuple **newVector ;
 
-    if (relation->allocated - relation->cardinality > nTuples) {
+    if (relation->allocated - relation->cardinality >= nTuples) {
 	return ;
     }
 
-    relation->allocated = relation->allocated + relation->allocated / 2 +
-	nTuples ;
+    relation->allocated = relation->allocated +
+	max(relation->allocated / 2, nTuples) ;
     relation->tupleVector = (Ral_Tuple **)ckrealloc(
 	(char *)relation->tupleVector,
 	relation->allocated * sizeof(*relation->tupleVector)) ;
@@ -2944,7 +3118,6 @@ relationMultTuples(
 	int card2 ;
 	Ral_Tuple **mier ;
 
-
 	for (card2 = multiplier->cardinality, mier = multiplier->tupleVector ;
 	    card2 > 0 ; --card2, ++mier) {
 	    Ral_Tuple *t2 = *mier ;
@@ -2960,6 +3133,198 @@ relationMultTuples(
 
     return TCL_OK ;
 }
+
+
+/*
+ * Big opportunity here to use the hash tables that index tuples
+ * based on identifiers to find the matches.
+ */
+static void
+relationFindJoinTuples(
+    Ral_Relation *r1,
+    Ral_Relation *r2,
+    Ral_RelationJoinMap *map)
+{
+    int card1 ;
+    Ral_Tuple **tv1 ;
+
+    for (card1 = 0, tv1 = r1->tupleVector ; card1 < r1->cardinality ;
+	++card1, ++tv1) {
+	Ral_Tuple *tuple1 ;
+	int card2 ;
+	Ral_Tuple **tv2 ;
+
+	tuple1 = *tv1 ;
+	for (card2 = 0, tv2 = r2->tupleVector ; card2 < r2->cardinality ;
+	    ++card2, ++tv2) {
+	    Ral_Tuple *tuple2 ;
+	    int nAttrs ;
+	    struct am *av ;
+	    int matches = 0 ;
+
+	    tuple2 = *tv2 ;
+	    for (nAttrs = map->attrCount, av = map->attrMap ; nAttrs > 0 ;
+		--nAttrs, ++av) {
+		assert(av->index1 < tuple1->heading->degree) ;
+		assert(av->index2 < tuple2->heading->degree) ;
+
+		if (!ObjsEqual(tuple1->values[av->index1],
+		    tuple2->values[av->index2])) {
+		    break ;
+		}
+		++matches ;
+	    }
+
+	    if (matches == map->attrCount) {
+		relationJoinMapAddTuples(map, card1, card2) ;
+	    }
+	}
+    }
+}
+
+static int
+relationFindSortAttrs(
+    Tcl_Interp *interp,
+    Ral_Relation *relation,
+    Tcl_Obj *attrList,
+    int *count,
+    int **indices)
+{
+    int elemc ;
+    Tcl_Obj **elemv ;
+    int *sortAttrs ;
+    int i ;
+
+    if (Tcl_ListObjGetElements(interp, attrList, &elemc, &elemv) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    *indices = sortAttrs = (int *)ckalloc(elemc * sizeof(*sortAttrs)) ;
+    memset(sortAttrs, 0 , elemc * sizeof(*sortAttrs)) ;
+    *count = elemc ;
+
+    for (i = 0 ; i < elemc ; ++i) {
+	int index ;
+
+	index = tupleHeadingFindIndex(interp, relation->heading->tupleHeading,
+	    *elemv++) ;
+	if (index < 0) {
+	    ckfree((char *)sortAttrs) ;
+	    return TCL_ERROR ;
+	}
+	sortAttrs[i] = index ;
+    }
+
+    return TCL_OK ;
+}
+
+static int tupleSortCount ;
+static int *tupleSortAttrs ;
+
+static void
+tupleSortKey(
+    const Ral_Tuple *tuple,
+    Tcl_DString *idKey)
+{
+    Tcl_Obj **values = tuple->values ;
+    int *attrIndices = tupleSortAttrs ;
+    int i ;
+
+    Tcl_DStringInit(idKey) ;
+    for (i = tupleSortCount ; i > 0 ; --i) {
+	Tcl_DStringAppend(idKey, Tcl_GetString(values[*attrIndices++]), -1) ;
+    }
+}
+
+static int
+tupleCompareAscending(
+    const void *v1,
+    const void *v2)
+{
+    Ral_Tuple *const*t1 = v1 ;
+    Ral_Tuple *const*t2 = v2 ;
+    Tcl_DString sortKey1 ;
+    Tcl_DString sortKey2 ;
+    int result ;
+
+    tupleSortKey(*t1, &sortKey1) ;
+    tupleSortKey(*t2, &sortKey2) ;
+
+    result = strcmp(Tcl_DStringValue(&sortKey1), Tcl_DStringValue(&sortKey2)) ;
+
+    Tcl_DStringFree(&sortKey1) ;
+    Tcl_DStringFree(&sortKey2) ;
+
+    return result ;
+}
+
+static int
+tupleCompareDescending(
+    const void *v1,
+    const void *v2)
+{
+    Ral_Tuple *const*t1 = v1 ;
+    Ral_Tuple *const*t2 = v2 ;
+    Tcl_DString sortKey1 ;
+    Tcl_DString sortKey2 ;
+    int result ;
+
+    tupleSortKey(*t1, &sortKey1) ;
+    tupleSortKey(*t2, &sortKey2) ;
+
+    /*
+     * N.B. inverted order of first and second tuple to obtain
+     * the proper result for descending order.
+     */
+    result = strcmp(Tcl_DStringValue(&sortKey2), Tcl_DStringValue(&sortKey1)) ;
+
+    Tcl_DStringFree(&sortKey1) ;
+    Tcl_DStringFree(&sortKey2) ;
+
+    return result ;
+}
+
+static Ral_Tuple **
+relationSortAscending(
+    Tcl_Interp *interp,
+    Ral_Relation *relation,
+    Tcl_Obj *attrList)
+{
+    Ral_Tuple **tv ;
+
+    tv = (Ral_Tuple **)ckalloc(relation->cardinality * sizeof(*tv)) ;
+    memcpy(tv, relation->tupleVector, relation->cardinality * sizeof(*tv)) ;
+    if (relationFindSortAttrs(interp, relation, attrList, &tupleSortCount,
+	&tupleSortAttrs) != TCL_OK) {
+	return NULL ;
+    }
+
+    qsort(tv, relation->cardinality, sizeof(*tv), tupleCompareAscending) ;
+    ckfree((char *)tupleSortAttrs) ;
+
+    return tv ;
+}
+
+static Ral_Tuple **
+relationSortDescending(
+    Tcl_Interp *interp,
+    Ral_Relation *relation,
+    Tcl_Obj *attrList)
+{
+    Ral_Tuple **tv ;
+
+    tv = (Ral_Tuple **)ckalloc(relation->cardinality * sizeof(*tv)) ;
+    memcpy(tv, relation->tupleVector, relation->cardinality * sizeof(*tv)) ;
+    if (relationFindSortAttrs(interp, relation, attrList, &tupleSortCount,
+	&tupleSortAttrs) != TCL_OK) {
+	return NULL ;
+    }
+
+    qsort(tv, relation->cardinality, sizeof(*tv), tupleCompareDescending) ;
+    ckfree((char *)tupleSortAttrs) ;
+
+    return tv ;
+}
+
 
 /*
  * ======================================================================
@@ -4112,9 +4477,11 @@ RelvarCreateCmd(
      */
     Tcl_IncrRefCount(relObj) ;
     Tcl_SetHashValue(entry, relObj) ;
-
-    Tcl_SetObjResult(interp, relObj) ;
-
+    /*
+     * No return from "relvar create". Must use "relvar get" to access
+     * the value.
+     */
+    Tcl_ResetResult(interp) ;
     return TCL_OK ;
 }
 
@@ -5162,28 +5529,67 @@ RelationForeachCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
+    enum Ordering {
+	SORT_ASCENDING,
+	SORT_DESCENDING
+    } ;
+    static const char *orderKeyWords[] = {
+	"ascending",
+	"descending",
+	NULL
+    } ;
+
     Tcl_Obj *varNameObj ;
     Tcl_Obj *relObj ;
     Tcl_Obj *scriptObj ;
     Ral_Relation *relation ;
+    int index ;
     int card ;
     Ral_Tuple **tupleVector ;
+    Ral_Tuple **allocated = NULL ;
     int result = TCL_OK ;
 
-    /* relation foreach tupleVarName relationValue script */
-    if (objc != 5) {
-	Tcl_WrongNumArgs(interp, 2, objv, "tupleVarName relationValue script") ;
+    /* relation foreach tupleVarName relationValue ?ascending | descending?
+     *	?attr-list? script */
+    if (objc < 5 || objc > 7) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+	    "tupleVarName relationValue ?ascending | descending? ?attr-list?"
+	    "script") ;
 	return TCL_ERROR ;
     }
 
     varNameObj = objv[2] ;
     relObj = objv[3] ;
-    scriptObj = objv[4] ;
 
     if (Tcl_ConvertToType(interp, relObj, &Ral_RelationType) != TCL_OK) {
 	return TCL_ERROR ;
     }
     relation = relObj->internalRep.otherValuePtr ;
+
+    if (objc == 5) {
+	tupleVector = relation->tupleVector ;
+	scriptObj = objv[4] ;
+    } else if (objc == 6) {
+	allocated = tupleVector = relationSortAscending(interp, relation,
+	    objv[4]) ;
+	if (allocated == NULL) {
+	    return TCL_ERROR ;
+	}
+	scriptObj = objv[5] ;
+    } else /* objc == 7 */ {
+	if (Tcl_GetIndexFromObj(interp, objv[4], orderKeyWords, "ordering", 0,
+	    &index) != TCL_OK) {
+	    return TCL_ERROR ;
+	}
+	allocated = tupleVector = index == SORT_ASCENDING ?
+	    relationSortAscending(interp, relation, objv[5]) :
+	    relationSortDescending(interp, relation, objv[5]) ;
+	if (allocated == NULL) {
+	    return TCL_ERROR ;
+	}
+	scriptObj = objv[6] ;
+    }
+
     /*
      * Hang onto these objects in case something strange happens in
      * the script execution.
@@ -5194,8 +5600,7 @@ RelationForeachCmd(
 
     Tcl_ResetResult(interp) ;
 
-    for (card = relation->cardinality, tupleVector = relation->tupleVector ;
-	card > 0 ; --card, ++tupleVector) {
+    for (card = relation->cardinality ; card > 0 ; --card, ++tupleVector) {
 	Tcl_Obj *tupleObj ;
 
 	tupleObj = tupleObjNew(*tupleVector) ;
@@ -5228,6 +5633,9 @@ RelationForeachCmd(
 
     if (relation->cardinality) {
 	Tcl_UnsetVar(interp, Tcl_GetString(varNameObj), 0) ;
+    }
+    if (allocated) {
+	ckfree((char *)allocated) ;
     }
     Tcl_DecrRefCount(varNameObj) ;
     Tcl_DecrRefCount(relObj) ;
@@ -5445,8 +5853,17 @@ RelationJoinCmd(
     Ral_Relation *r1 ;
     Tcl_Obj *r2Obj ;
     Ral_Relation *r2 ;
-    Ral_Relation *joinRel ;
-    int result = TCL_ERROR ;
+    int r1degree ;
+    int r2degree ;
+    Ral_RelationJoinMap *jmap ;
+    Ral_TupleHeading *joinTupleHeading ;
+    int *tuple2Elim ;
+    int i ;
+    int where ;
+    int card2 ;
+    Ral_Attribute *attr2 ;
+    Ral_RelationHeading *joinHeading ;
+    Ral_Relation *join ;
 
     /* relation join relation1 relation2 ?joinAttrs1 joinAttrs2 ... ? */
     if (objc < 4) {
@@ -5459,57 +5876,117 @@ RelationJoinCmd(
 	return TCL_ERROR ;
     }
     r1 = r1Obj->internalRep.otherValuePtr ;
+    r1degree = r1->heading->tupleHeading->degree ;
 
     r2Obj = *(objv + 3) ;
     if (Tcl_ConvertToType(interp, r2Obj, &Ral_RelationType) != TCL_OK) {
 	return TCL_ERROR ;
     }
     r2 = r2Obj->internalRep.otherValuePtr ;
+    r2degree = r2->heading->tupleHeading->degree ;
 
     objc -= 4 ;
     objv += 4 ;
 
-#if 0
     if (objc == 0) {
-	/*
-	 * Join on the common attributes. Worst case count is the
-	 * min of the attributes in the relations.
-	 */
-	nJoinAttrs = r1->heading.attrCount < r2->heading.attrCount ?
-	    r1->heading.attrCount : r2->heading.attrCount ;
+	jmap = relationJoinMapNew(min(r1degree, r2degree),
+	    r1->cardinality * r2->cardinality) ;
+	tupleHeadingCommonAttrs(r1->heading->tupleHeading,
+	    r2->heading->tupleHeading, jmap) ;
     } else {
-	nJoinAttrs = objc ;
+	jmap = relationJoinMapNew(objc, r1->cardinality * r2->cardinality) ;
+	if (tupleHeadingJoinAttrs(interp, r1->heading->tupleHeading,
+	    r2->heading->tupleHeading, objc, objv, jmap) != TCL_OK) {
+	    relationJoinMapDelete(jmap) ;
+	    return TCL_ERROR ;
+	}
     }
+    /*
+     * Find the tuples that match.
+     */
+    relationFindJoinTuples(r1, r2, jmap) ;
+    /*
+     * Create a mapping that determines which attributes from the second
+     * relation are eliminated as part of the natural join.
+     */
+    tuple2Elim = (int *)ckalloc(r2degree * sizeof(*tuple2Elim)) ;
+    memset(tuple2Elim, 0, r2degree * sizeof(*tuple2Elim)) ;
+    for (i = 0 ; i < jmap->attrCount ; ++i) {
+	tuple2Elim[jmap->attrMap[i].index2] = 1 ;
+    }
+    /*
+     * Compose the matching tuples into the join relation.
+     */
+    joinTupleHeading = tupleHeadingNew(r1degree + r2degree - jmap->attrCount) ;
+    tupleHeadingCopy(interp, r1->heading->tupleHeading->attrVector,
+	r1->heading->tupleHeading->attrVector + r1degree, joinTupleHeading, 0) ;
+    where = r1degree ;
+    for (card2 = 0, attr2 = r2->heading->tupleHeading->attrVector ;
+	card2 < r2degree ; ++card2, ++attr2) {
+	if (!tuple2Elim[card2] &&
+	    tupleHeadingCopy(interp, attr2, attr2 + 1, joinTupleHeading,
+		where++) != TCL_OK) {
+	    tupleHeadingDelete(joinTupleHeading) ;
+	    ckfree((char *)tuple2Elim) ;
+	    relationJoinMapDelete(jmap) ;
+	    return TCL_ERROR ;
+	}
+    }
+    /*
+     * HERE -- need to do something about the identifiers.
+     * Should be the cross product of identifiers minus any projected
+     * away as part of the natural join.
+     * For now, just may all attributes the identifiers.
+     */
+    joinHeading = relationHeadingNew(joinTupleHeading, 1) ;
+    relIdSetAllAttributes(joinHeading->idVector, joinTupleHeading->degree) ;
+    join = relationNew(joinHeading) ;
+    relationReserve(join, jmap->tupleCount) ;
+    /*
+     * Step through the matches found in the join map and compose the
+     * indicated tuples.
+     */
+    for (i = 0 ; i < jmap->tupleCount ; ++i) {
+	struct tm *match ;
+	Ral_Tuple *r1Tuple ;
+	Ral_Tuple *r2Tuple ;
+	Ral_Tuple *joinTuple ;
+	int j ;
 
-    rj = relJoinNew(interp, r1, r2, nJoinAttrs) ;
-    if (rj == NULL) {
-	return TCL_ERROR ;
-    }
-    if (objc == 0) {
-	relJoinFindCommonAttrs(rj) ;
-    } else {
-	if (relJoinMapJoinAttrs(interp, rj, objc, objv) != TCL_OK) {
+	match = jmap->tupleMap + i ;
+	r1Tuple = r1->tupleVector[match->index1] ;
+	r2Tuple = r2->tupleVector[match->index2] ;
+	joinTuple = tupleNew(joinTupleHeading) ;
+	/*
+	 * Take all the values from the first relation's tuple.
+	 */
+	tupleCopyValues(r1Tuple, 0, r1degree, joinTuple, 0) ;
+	/*
+	 * Take the values from the second relation's tuple, eliminating
+	 * those that are part of the natural join.
+	 */
+	where = r1degree ;
+	for (j = 0 ; j < r2degree ; ++j) {
+	    if (!tuple2Elim[j]) {
+		tupleCopyValues(r2Tuple, j, j + 1, joinTuple, where++) ;
+	    }
+	}
+
+	if (relationAppendTuple(interp, join, joinTuple) != TCL_OK) {
+	    tupleDelete(joinTuple) ;
 	    goto errorOut ;
 	}
     }
 
-    if (relJoinFindMatches(interp, rj) != TCL_OK) {
-	goto errorOut ;
-    }
-
-    joinRel = relJoinComposeMatches(interp, rj) ;
-    ckfree((char *)rj) ;
-
-    if (joinRel) {
-	Tcl_SetObjResult(interp, relMakeObj(joinRel)) ;
-	result = TCL_OK ;
-    }
-
-    return result ;
+    ckfree((char *)tuple2Elim) ;
+    relationJoinMapDelete(jmap) ;
+    Tcl_SetObjResult(interp, relationObjNew(join)) ;
+    return TCL_OK ;
 
 errorOut:
-    ckfree((char *)rj) ;
-#endif
+    ckfree((char *)tuple2Elim) ;
+    relationJoinMapDelete(jmap) ;
+    relationDelete(join) ;
     return TCL_ERROR ;
 }
 
@@ -5845,6 +6322,195 @@ errorOut:
     Tcl_DecrRefCount(exprObj) ;
     Tcl_DecrRefCount(varName) ;
     relationDelete(newRelation) ;
+    return TCL_ERROR ;
+}
+
+static int
+RelationSemijoinCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_Obj *r1Obj ;
+    Ral_Relation *r1 ;
+    Tcl_Obj *r2Obj ;
+    Ral_Relation *r2 ;
+    int r1degree ;
+    int r2degree ;
+    Ral_RelationJoinMap *jmap ;
+    int i ;
+    Ral_Relation *semijoin ;
+
+    /* relation semijoin relation1 relation2 ?joinAttrs1 joinAttrs2 ... ? */
+    if (objc < 4) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+	    "relation1 relation2 ?joinAttrs1 joinAttrs2 ... ?") ;
+	return TCL_ERROR ;
+    }
+    r1Obj = *(objv + 2) ;
+    if (Tcl_ConvertToType(interp, r1Obj, &Ral_RelationType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    r1 = r1Obj->internalRep.otherValuePtr ;
+    r1degree = r1->heading->tupleHeading->degree ;
+
+    r2Obj = *(objv + 3) ;
+    if (Tcl_ConvertToType(interp, r2Obj, &Ral_RelationType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    r2 = r2Obj->internalRep.otherValuePtr ;
+    r2degree = r2->heading->tupleHeading->degree ;
+
+    objc -= 4 ;
+    objv += 4 ;
+
+    if (objc == 0) {
+	jmap = relationJoinMapNew(min(r1degree, r2degree),
+	    r1->cardinality * r2->cardinality) ;
+	tupleHeadingCommonAttrs(r1->heading->tupleHeading,
+	    r2->heading->tupleHeading, jmap) ;
+    } else {
+	jmap = relationJoinMapNew(objc, r1->cardinality * r2->cardinality) ;
+	if (tupleHeadingJoinAttrs(interp, r1->heading->tupleHeading,
+	    r2->heading->tupleHeading, objc, objv, jmap) != TCL_OK) {
+	    relationJoinMapDelete(jmap) ;
+	    return TCL_ERROR ;
+	}
+    }
+    /*
+     * Find the tuples that match.
+     */
+    relationFindJoinTuples(r1, r2, jmap) ;
+    /*
+     * The semijoin has the same relation heading as the first relation.
+     */
+    semijoin = relationNew(r1->heading) ;
+    relationReserve(semijoin, jmap->tupleCount) ;
+    /*
+     * Step through the matches found in the join map and compose the
+     * indicated tuples. We are only interesting in the tuple from the
+     * first relation.
+     */
+    for (i = 0 ; i < jmap->tupleCount ; ++i) {
+	struct tm *match ;
+	Ral_Tuple *r1Tuple ;
+
+	match = jmap->tupleMap + i ;
+	r1Tuple = r1->tupleVector[match->index1] ;
+	if (relationAppendTuple(interp, semijoin, r1Tuple) != TCL_OK) {
+	    goto errorOut ;
+	}
+    }
+
+    relationJoinMapDelete(jmap) ;
+    Tcl_SetObjResult(interp, relationObjNew(semijoin)) ;
+    return TCL_OK ;
+
+errorOut:
+    relationJoinMapDelete(jmap) ;
+    relationDelete(semijoin) ;
+    return TCL_ERROR ;
+}
+
+static int
+RelationSemiminusCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_Obj *r1Obj ;
+    Ral_Relation *r1 ;
+    Tcl_Obj *r2Obj ;
+    Ral_Relation *r2 ;
+    int r1degree ;
+    int r2degree ;
+    Ral_RelationJoinMap *jmap ;
+    int i ;
+    Ral_Relation *semiminus ;
+    char *includeTupleMap ;
+
+    /* relation semiminus relation1 relation2 ?joinAttrs1 joinAttrs2 ... ? */
+    if (objc < 4) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+	    "relation1 relation2 ?joinAttrs1 joinAttrs2 ... ?") ;
+	return TCL_ERROR ;
+    }
+    r1Obj = *(objv + 2) ;
+    if (Tcl_ConvertToType(interp, r1Obj, &Ral_RelationType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    r1 = r1Obj->internalRep.otherValuePtr ;
+    r1degree = r1->heading->tupleHeading->degree ;
+
+    r2Obj = *(objv + 3) ;
+    if (Tcl_ConvertToType(interp, r2Obj, &Ral_RelationType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    r2 = r2Obj->internalRep.otherValuePtr ;
+    r2degree = r2->heading->tupleHeading->degree ;
+
+    objc -= 4 ;
+    objv += 4 ;
+
+    if (objc == 0) {
+	jmap = relationJoinMapNew(min(r1degree, r2degree),
+	    r1->cardinality * r2->cardinality) ;
+	tupleHeadingCommonAttrs(r1->heading->tupleHeading,
+	    r2->heading->tupleHeading, jmap) ;
+    } else {
+	jmap = relationJoinMapNew(objc, r1->cardinality * r2->cardinality) ;
+	if (tupleHeadingJoinAttrs(interp, r1->heading->tupleHeading,
+	    r2->heading->tupleHeading, objc, objv, jmap) != TCL_OK) {
+	    relationJoinMapDelete(jmap) ;
+	    return TCL_ERROR ;
+	}
+    }
+    /*
+     * Find the tuples that match.
+     */
+    relationFindJoinTuples(r1, r2, jmap) ;
+    /*
+     * The semiminus has the same relation heading as the first relation.
+     */
+    semiminus = relationNew(r1->heading) ;
+    /*
+     * The semiminus are the tuples in the first relation that do not
+     * match anything in the second.
+     */
+    relationReserve(semiminus, r1->cardinality - jmap->tupleCount) ;
+    /*
+     * So we put together a mapping to know which tuple to include in the
+     * semiminus relation.
+     */
+    includeTupleMap = (char *)ckalloc(r1->cardinality *
+	sizeof(*includeTupleMap)) ;
+    memset(includeTupleMap, 1, r1->cardinality * sizeof(*includeTupleMap)) ;
+    for (i = 0 ; i < jmap->tupleCount ; ++i) {
+	struct tm *match = jmap->tupleMap + i ;
+
+	assert(match->index1 < r1->cardinality) ;
+	includeTupleMap[match->index1] = 0 ;
+    }
+    relationJoinMapDelete(jmap) ;
+    /*
+     * Step through the tuples of the first relation and add only those
+     * that did not match the join operation.
+     */
+    for (i = 0 ; i < r1->cardinality ; ++i) {
+	if (includeTupleMap[i] &&
+	    relationAppendTuple(interp, semiminus, r1->tupleVector[i])
+	    != TCL_OK) {
+	    goto errorOut ;
+	}
+    }
+
+    ckfree(includeTupleMap) ;
+    Tcl_SetObjResult(interp, relationObjNew(semiminus)) ;
+    return TCL_OK ;
+
+errorOut:
+    ckfree(includeTupleMap) ;
+    relationDelete(semiminus) ;
     return TCL_ERROR ;
 }
 
@@ -6201,6 +6867,122 @@ RelationTypeofCmd(
 }
 
 static int
+RelationUngroupCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_Obj *relObj ;
+    Ral_Relation *rel ;
+    Ral_TupleHeading *tupleHeading ;
+    Tcl_Obj *attrObj ;
+    Ral_Attribute *attr ;
+    Ral_Attribute *attrVector ;
+    Ral_Attribute *ungrpVector ;
+    int ungrpIndex ;
+    Ral_RelationHeading *attrHeading ;
+    Ral_TupleHeading *ungrpTupleHeading ;
+    Ral_RelationHeading *ungrpHeading ;
+    Ral_Relation *ungrp ;
+    int card ;
+    Ral_Tuple **tupleVector ;
+
+    /* relation ungroup relation attribute */
+    if (objc != 4) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relation attribute") ;
+	return TCL_ERROR ;
+    }
+    relObj = *(objv + 2) ;
+    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    rel = relObj->internalRep.otherValuePtr ;
+    tupleHeading = rel->heading->tupleHeading ;
+    attrObj = *(objv + 3) ;
+
+    /*
+     * Check that the attribute exists and is a relation type attribute
+     */
+    attr = tupleHeadingFindAttribute(interp, tupleHeading, attrObj,
+	&ungrpIndex) ;
+    if (attr == NULL) {
+	return TCL_ERROR ;
+    }
+    if (attr->attrType != Relation_Type) {
+	Tcl_ResetResult(interp) ;
+	Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
+	    "attribute, \"", Tcl_GetString(attrObj),
+	    "\", is not a Relation type", NULL) ;
+	return TCL_ERROR ;
+    }
+    attrHeading = attr->relationHeading ;
+    /*
+     * The ungrouped relation has a heading with all the attributes
+     * of the original plus that of the ungrouped attribute minus one.
+     */
+    ungrpTupleHeading = tupleHeadingNew(tupleHeading->degree +
+	attrHeading->tupleHeading->degree - 1) ;
+    attrVector = tupleHeading->attrVector ;
+    ungrpVector = attrHeading->tupleHeading->attrVector ;
+	/* copy up to the attribute to be ungrouped */
+    if (tupleHeadingCopy(interp, attrVector, attrVector + ungrpIndex,
+	    ungrpTupleHeading, 0) != TCL_OK ||
+	/* copy the attributes after the one to be ungrouped */
+	tupleHeadingCopy(interp, attrVector + ungrpIndex + 1,
+	    attrVector + tupleHeading->degree, ungrpTupleHeading, ungrpIndex)
+	    != TCL_OK ||
+	/* copy the heading from the ungrouped attribute itself */
+	tupleHeadingCopy(interp, ungrpVector,
+	    ungrpVector + attrHeading->tupleHeading->degree, ungrpTupleHeading,
+	    tupleHeading->degree - 1) != TCL_OK) {
+	tupleHeadingDelete(ungrpTupleHeading) ;
+	return TCL_ERROR ;
+    }
+    ungrpHeading = relationHeadingNew(ungrpTupleHeading, 1) ;
+    /*
+     * HERE -- need to do something about the identifiers.
+     * For now, just may all attributes the identifiers.
+     */
+    relIdSetAllAttributes(ungrpHeading->idVector, ungrpTupleHeading->degree) ;
+    ungrp = relationNew(ungrpHeading) ;
+    /*
+     * Now put together the tuples.
+     */
+    for (card = rel->cardinality, tupleVector = rel->tupleVector ; card > 0 ;
+	--card, ++tupleVector) {
+	Ral_Tuple *tuple = *tupleVector ;
+	Tcl_Obj *ungrpObj = tuple->values[ungrpIndex] ;
+	Ral_Relation *ungrpValue ;
+	int c ;
+	Ral_Tuple **tv ;
+
+	if (Tcl_ConvertToType(interp, ungrpObj, &Ral_RelationType) != TCL_OK) {
+	    relationDelete(ungrp) ;
+	    return TCL_ERROR ;
+	}
+	ungrpValue = ungrpObj->internalRep.otherValuePtr ;
+	relationReserve(ungrp, ungrpValue->cardinality) ;
+
+	for (c = ungrpValue->cardinality, tv = ungrpValue->tupleVector ; c > 0 ;
+	    --c, ++tv) {
+	    Ral_Tuple *ungrpTuple = tupleNew(ungrpTupleHeading) ;
+
+	    tupleCopyValues(tuple, 0, ungrpIndex, ungrpTuple, 0) ;
+	    tupleCopyValues(tuple, ungrpIndex + 1, tupleHeading->degree,
+		ungrpTuple, ungrpIndex) ;
+	    tupleCopyValues(*tv, 0, attrHeading->tupleHeading->degree,
+		ungrpTuple, tupleHeading->degree - 1) ;
+	    if (relationAppendTuple(interp, ungrp, ungrpTuple) != TCL_OK) {
+		tupleDelete(ungrpTuple) ;
+	    }
+	}
+    }
+
+    Tcl_SetObjResult(interp, relationObjNew(ungrp)) ;
+    return TCL_OK ;
+}
+
+static int
 RelationUnionCmd(
     Tcl_Interp *interp,
     int objc,
@@ -6300,7 +7082,6 @@ static int relationCmd(
 	RELATION_SEMIJOIN,
 	RELATION_SEMIMINUS,
 	RELATION_SUMMARIZE,
-	RELATION_TCLOSE,
 	RELATION_TIMES,
 	RELATION_TUPLE,
 	RELATION_TYPEOF,
@@ -6329,7 +7110,6 @@ static int relationCmd(
 	"semijoin",
 	"semiminus",
 	"summarize",
-	"tclose",
 	"times",
 	"tuple",
 	"typeof",
@@ -6407,21 +7187,14 @@ static int relationCmd(
     case RELATION_RESTRICT:
 	return RelationRestrictCmd(interp, objc, objv) ;
 
-#if 0
     case RELATION_SEMIJOIN:
 	return RelationSemijoinCmd(interp, objc, objv) ;
 
     case RELATION_SEMIMINUS:
 	return RelationSemiminusCmd(interp, objc, objv) ;
-#endif
 
     case RELATION_SUMMARIZE:
 	return RelationSummarizeCmd(interp, objc, objv) ;
-
-#if 0
-    case RELATION_TCLOSE:
-	return RelationTcloseCmd(interp, objc, objv) ;
-#endif
 
     case RELATION_TIMES:
 	return RelationTimesCmd(interp, objc, objv) ;
@@ -6432,10 +7205,8 @@ static int relationCmd(
     case RELATION_TYPEOF:
 	return RelationTypeofCmd(interp, objc, objv) ;
 
-#if 0
     case RELATION_UNGROUP:
 	return RelationUngroupCmd(interp, objc, objv) ;
-#endif
 
     case RELATION_UNION:
 	return RelationUnionCmd(interp, objc, objv) ;

@@ -46,13 +46,14 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.6 $
-# $Date: 2004/05/17 00:16:29 $
+# $Revision: 1.7 $
+# $Date: 2004/05/28 05:03:03 $
 #  *--
 
 package require tcltest 2.2
 eval tcltest::configure $argv
 load [file join .. src libral[info sharedlibextension]]
+source [file join .. src ral.tcl]
 
 namespace eval ::ral::test {
     namespace import ::tcltest::*
@@ -514,18 +515,21 @@ namespace eval ::ral::test {
     # relvar create subcommand
     test relvar-create-1.0 {single attribute, single body tuple} -body {
 	relvar create N Name Name {Name Andrew}
+	relvar get N
     } -cleanup {
 	relvar destroy N
     } -result {Relation {{{Name string}} Name} {{Name Andrew}}}
 
     test relvar-create-2.0 {multiple attributes, single body tuple} -body {
 	relvar create N {Name {Age int}} Name {Name Andrew Age 20}
+	relvar get N
     } -cleanup {
 	relvar destroy N
     } -result {Relation {{{Name string} {Age int}} Name} {{Name Andrew Age 20}}}
 
     test relvar-create-3.0 {single attribute, multiple body tuples} -body {
 	relvar create N Name Name {Name Andrew} {Name George} {Name Fred}
+	relvar get N
     } -cleanup {
 	relvar destroy N
     } -result {Relation {{{Name string}} Name}\
@@ -536,6 +540,7 @@ namespace eval ::ral::test {
 	    {Name Andrew Age 20}\
 	    {Name George Age 20}\
 	    {Name Fred Age 20}
+	relvar get N
     } -cleanup {
 	relvar destroy N
     } -result {Relation {{{Name string} {Age int}} Name}\
@@ -546,6 +551,7 @@ namespace eval ::ral::test {
 	    {Name Andrew Age 20 City Sunnyvale}\
 	    {Age 20 Name George City {San Jose}}\
 	    {Name Fred City Saratoga Age 20}
+	relvar get N
     } -cleanup {
 	relvar destroy N
     } -result {Relation {{{Name string} {Age int} {City string}} Name}\
@@ -555,18 +561,21 @@ namespace eval ::ral::test {
 
     test relvar-create-6.0 {empty relvar} -body {
 	relvar create N Name Name
+	relvar get N
     } -cleanup {
 	relvar destroy N
     } -result {Relation {{{Name string}} Name} {}}
 
     test relvar-create-7.0 {dee relvar} -body {
 	relvar create DEE {} {{}} {}
+	relvar get DEE
     } -cleanup {
 	relvar destroy DEE
     } -result {Relation {{} {{}}} {{}}}
 
     test relvar-create-8.0 {dum relvar} -body {
 	relvar create DUM {} {{}}
+	relvar get DUM
     } -cleanup {
 	relvar destroy DUM
     } -result {Relation {{} {{}}} {}}
@@ -576,6 +585,7 @@ namespace eval ::ral::test {
 	    {Name Andrew Age 20}\
 	    {Name George Age 20}\
 	    {Name Andrew Age 20}
+	relvar get N
     } -result {tuple, "Name Andrew Age 20",\
 	contains duplicate values for the identifier, "Name"}\
     -returnCodes error
@@ -585,6 +595,7 @@ namespace eval ::ral::test {
 	    {Name Andrew Age 20}\
 	    {Name George Age 20}\
 	    {Name Fred Age 20}
+	relvar get N
     } -cleanup {
 	relvar destroy N
     } -result {Relation {{{Name string} {Age int}} {{Name Age}}}\
@@ -595,6 +606,7 @@ namespace eval ::ral::test {
 	    {Name Andrew Age 10}\
 	    {Name George Age 20}\
 	    {Name Fred Age 30}
+	relvar get N
     } -cleanup {
 	relvar destroy N
     } -result {Relation {{{Name string} {Age int}} {Name Age}}\
@@ -624,6 +636,7 @@ namespace eval ::ral::test {
 	    Name\
 	    {Name Fred Address {Number 500 Street Main}}\
 	    {Address {Number 600 Street Elm} Name Alice}
+	relvar get N
     } -cleanup {
 	relvar destroy N
     } -result {Relation {{{Name string} {Address {Tuple {{Number int} {Street string}}}}} Name} {{Name Fred Address {Number 500 Street Main}} {Name Alice Address {Number 600 Street Elm}}}}
@@ -637,6 +650,7 @@ namespace eval ::ral::test {
 		{DogName Missy Breed Poodle}}}\
 	    {Name Alice Dog {\
 		{DogName Tiger Breed Setter}}}
+	relvar get N
     } -cleanup {
 	relvar destroy N
     } -result {Relation {{{Name string} {Dog {Relation {{{DogName string} {Breed string}} DogName}}}} Name} {{Name Fred Dog {{DogName Rover Breed Terrier} {DogName Missy Breed Poodle}}} {Name Alice Dog {{DogName Tiger Breed Setter}}}}}
@@ -1018,6 +1032,39 @@ namespace eval ::ral::test {
     } -result {unknown attribute name, "foo"} -returnCodes error
     # HERE -- add tests
 
+    # relation foreach subcommand
+    test relation-foreach-1.0 {simple visit of suppliers} -body {
+	set nameList [list]
+	relation foreach sup [relvar get S] {
+	    lappend nameList [tuple extract $sup SNAME]
+	}
+	lsort $nameList
+    } -result {Adams Blake Clark Jones Smith}
+
+    test relation-foreach-2.0 {visit of suppliers ascending order} -body {
+	set nameList [list]
+	relation foreach sup [relvar get S] ascending SNAME {
+	    lappend nameList [tuple extract $sup SNAME]
+	}
+	set nameList
+    } -result {Adams Blake Clark Jones Smith}
+
+    test relation-foreach-3.0 {visit of suppliers descending order} -body {
+	set nameList [list]
+	relation foreach sup [relvar get S] descending SNAME {
+	    lappend nameList [tuple extract $sup SNAME]
+	}
+	set nameList
+    } -result {Smith Jones Clark Blake Adams}
+
+    test relation-foreach-3.0 {visit of suppliers ordered by multiple} -body {
+	set nameList [list]
+	relation foreach sup [relvar get S] ascending {STATUS CITY} {
+	    lappend nameList [tuple extract $sup SNAME]
+	}
+	set nameList
+    } -result {Jones Smith Clark Adams Blake}
+
     # relation intersect subcommand
     test relation-intersect-1.0 {dum relation} -body {
 	set r {Relation {{} {{}}} {}}
@@ -1369,6 +1416,67 @@ namespace eval ::ral::test {
 	relation is $r1 supersetof $r2
     } -result 0
 
+    # relation join subcommand
+    test relation-join-1.0 {one common attribute} -body {
+	set r1 {Relation {{{Name string} {Age int}} Name}\
+	    {{Age 20 Name George}\
+	    {Age 10 Name Fred}}}
+	set r2 {Relation {{{Age int} {City string}} Age}\
+	    {{Age 30 City Sunnyvale}\
+	    {Age 20 City {San Jose}}\
+	    {City Saratoga Age 10}}}
+	relation join $r1 $r2
+    } -result {Relation {{{Name string} {Age int} {City string}} {{Name Age City}}} {{Name George Age 20 City {San Jose}} {Name Fred Age 10 City Saratoga}}}
+
+    test relation-join-2.0 {multiple common attribute} -body {
+	set r1 {Relation {{{Name string} {Age int} {City string}} Name}\
+	    {{Age 20 Name George City {San Jose}}\
+	    {City Saratoga Age 10 Name Fred}}}
+	set r2 {Relation {{{Age int} {City string}} Age}\
+	    {{Age 30 City Sunnyvale}\
+	    {Age 20 City {San Jose}}\
+	    {City Saratoga Age 10}}}
+	relation join $r1 $r2
+    } -result {Relation {{{Name string} {Age int} {City string}} {{Name Age City}}} {{Name George Age 20 City {San Jose}} {Name Fred Age 10 City Saratoga}}}
+
+    test relation-join-3.0 {no common attribute} -body {
+	set r1 {Relation {{{Name string} {Age int}} Name}\
+	    {{Age 20 Name George}\
+	    {Age 10 Name Fred}}}
+	set r2 {Relation {{{Status int} {City string}} Status}\
+	    {{Status 30 City Sunnyvale}\
+	    {Status 20 City {San Jose}}\
+	    {City Saratoga Status 10}}}
+	relation join $r1 $r2
+    } -result {Relation {{{Name string} {Age int} {Status int} {City string}} {{Name Age Status City}}} {{Name George Age 20 Status 30 City Sunnyvale} {Name George Age 20 Status 20 City {San Jose}} {Name George Age 20 Status 10 City Saratoga} {Name Fred Age 10 Status 30 City Sunnyvale} {Name Fred Age 10 Status 20 City {San Jose}} {Name Fred Age 10 Status 10 City Saratoga}}}
+
+    test relation-join-4.0 {join with DEE} -body {
+	set r1 {Relation {{{Name string} {Age int}} Name}\
+	    {{Age 20 Name George}\
+	    {Age 10 Name Fred}}}
+	set r2 {Relation {{} {{}}} {{}}}
+	relation join $r1 $r2
+    } -result {Relation {{{Name string} {Age int}} {{Name Age}}} {{Name George Age 20} {Name Fred Age 10}}}
+
+    test relation-join-5.0 {join with DUM} -body {
+	set r1 {Relation {{{Name string} {Age int}} Name}\
+	    {{Age 20 Name George}\
+	    {Age 10 Name Fred}}}
+	set r2 {Relation {{} {{}}} {}}
+	relation join $r1 $r2
+    } -result {Relation {{{Name string} {Age int}} {{Name Age}}} {}}
+
+    test relation-join-3.0 {specified attribute} -body {
+	set r1 {Relation {{{Name string} {Age int} {City string}} Name}\
+	    {{Age 20 Name George City {San Jose}}\
+	    {City Saratoga Age 10 Name Fred}}}
+	set r2 {Relation {{{Status int} {City string}} Status}\
+	    {{Status 30 City Sunnyvale}\
+	    {Status 20 City {San Jose}}\
+	    {City Saratoga Status 10}}}
+	relation join $r1 $r2 City
+    } -result {Relation {{{Name string} {Age int} {City string} {Status int}} {{Name Age City Status}}} {{Name George Age 20 City {San Jose} Status 20} {Name Fred Age 10 City Saratoga Status 10}}}
+
     # relation minus subcommand
     test relation-minus-1.0 {dum relation} -body {
 	set r {Relation {{} {{}}} {}}
@@ -1538,7 +1646,31 @@ namespace eval ::ral::test {
 	relation times $r1 $r2
     } -result {Relation {{{Name string} {Status int}} {{Name Status}}} {{Name Andrew Status 20} {Name Andrew Status 30} {Name George Status 20} {Name George Status 30}}}
 
-    # relation summarize command
+    # relation semijoin subcommand
+    test relation-semijoin-1.0 {one common attribute} -body {
+	set r1 {Relation {{{Name string} {Age int}} Name}\
+	    {{Age 20 Name George}\
+	    {Age 10 Name Fred}}}
+	set r2 {Relation {{{Age int} {City string}} Age}\
+	    {{Age 30 City Sunnyvale}\
+	    {Age 20 City {San Jose}}\
+	    {City Saratoga Age 10}}}
+	relation semijoin $r1 $r2
+    } -result {Relation {{{Name string} {Age int}} Name} {{Name George Age 20} {Name Fred Age 10}}}
+
+    test relation-semijoin-2.0 {one common attribute} -body {
+	set r1 {Relation {{{Name string} {Age int}} Name}\
+	    {{Age 20 Name George}\
+	    {Age 10 Name Fred}}}
+	set r2 {Relation {{{Age int} {City string}} Age}\
+	    {{Age 35 City Sunnyvale}\
+	    {Age 20 City {San Jose}}\
+	    {City Saratoga Age 15}}}
+	relation semijoin $r1 $r2
+    } -result {Relation {{{Name string} {Age int}} Name} {{Name George Age 20}}}
+    # HERE -- add tests
+
+    # relation summarize subcommand
     test relation-summarize-1.0 {count} -body {
 	set sp [relvar get SP]
 	set p [relation project [relvar get P] P#]
@@ -1586,6 +1718,38 @@ namespace eval ::ral::test {
     test relation-typeof-4.0 {multiple attributes} -body {
 	relation typeof [relvar get SP]
     } -result {Relation {{{S# string} {P# string} {QTY int}} {{S# P#}}}}
+
+    # relation ungroup subcommand
+    test relation-ungroup-1.0 {two attribute relation} -body {
+	set r {Relation {{{Name string}\
+	    {Dog {Relation {{{DogName string} {Breed string}} DogName}}}} Name}\
+	    {{Name Fred Dog\
+		{{DogName Rover Breed Terrier}\
+		{DogName Missy Breed Poodle}}}\
+	    {Name Alice Dog {{DogName Tiger Breed Setter}}}}}
+	relation ungroup $r Dog
+    } -result {Relation {{{Name string} {DogName string} {Breed string}} {{Name DogName Breed}}} {{Name Fred DogName Rover Breed Terrier} {Name Fred DogName Missy Breed Poodle} {Name Alice DogName Tiger Breed Setter}}}
+
+    test relation-ungroup-2.0 {duplicate attribute name} -body {
+	set r {Relation {{{Name string}\
+	    {Dog {Relation {{{Name string} {Breed string}} Name}}}} Name}\
+	    {{Name Fred Dog\
+		{{Name Rover Breed Terrier}\
+		{Name Missy Breed Poodle}}}\
+	    {Name Alice Dog {{Name Tiger Breed Setter}}}}}
+	relation ungroup $r Dog
+    } -result {duplicate attribute name, "Name"} -returnCodes error
+
+    test relation-ungroup-3.0 {common tuples in the relation attribute} -body {
+	set r {Relation {{{Name string}\
+	    {Dog {Relation {{{DogName string} {Breed string}} DogName}}}}\
+		{{Name Dog}}}\
+	    {{Name Fred Dog\
+		{{DogName Rover Breed Terrier}\
+		{DogName Missy Breed Poodle}}}\
+	    {Name Fred Dog {{DogName Rover Breed Terrier}}}}}
+	relation ungroup $r Dog
+    } -result {Relation {{{Name string} {DogName string} {Breed string}} {{Name DogName Breed}}} {{Name Fred DogName Rover Breed Terrier} {Name Fred DogName Missy Breed Poodle}}}
 
     # relation union subcommand
     test relation-union-1.0 {dum relation} -body {
@@ -1665,6 +1829,142 @@ namespace eval ::ral::test {
     } -result {Relation {{{Name string} {Age int} {City string}} Name}\
 	{{Name Andrew Age 30 City Sunnyvale}\
 	 {Name George Age 20 City {San Jose}}}}
+
+    # examples from the Date book
+    test date-example-1.0 {Get suppliers who supply all parts} -body {
+	set pnums [relation project [relvar get P] P#]
+	set f [relation restrict [relvar get S] sx\
+	    {[relation is\
+		[relation project\
+		    [relation restrict [relvar get SP] spx\
+		    {[tuple extract $spx S#] eq [tuple extract $sx S#]}] P#]\
+	    equal $pnums]}]
+	relformat $f "Suppliers who supply all parts"
+    } -result {Suppliers who supply all parts
+------------------------------
+    S#   SNAME  STATUS    CITY
+string  string     int  string
+==============================
+    S1   Smith      20  London}
+
+    test date-example-2.0 {Get supplier numbers who supply all parts (divide)}\
+    -body {
+	set allp [relation join\
+	    [relation divide\
+		[relation project [relvar get S] S#]\
+		[relation project [relvar get P] P#]\
+		[relation project [relvar get SP] S# P#]] [relvar get S]]
+	relformat $allp "Suppliers who supply all parts (divide)"
+    } -result {Suppliers who supply all parts (divide)
+---------------------------------------
+    S#   SNAME  STATUS    CITY
+string  string     int  string
+==============================
+    S1   Smith      20  London}
+
+    test date-example-3.0 {Get supplier names for suppliers who supply part P2}\
+    -body {
+	set n [relation project\
+	    [relation restrict [relation join [relvar get SP] [relvar get S]]\
+		r1 {[tuple extract $r1 P#] eq "P2"}] SNAME]
+	relformat $n "Get supplier names for suppliers who supply part P2"
+    } -result {Get supplier names for suppliers who supply part P2
+---------------------------------------------------
+ SNAME
+string
+======
+ Smith
+ Jones
+ Blake
+ Clark}
+
+    test date-example-4.0 {Get supplier name for suppliers who supply at\
+    least one red part} -body {
+	set rp [relation project\
+	    [relation join\
+	    [relation project\
+	    [relation join\
+		[relation restrict [relvar get P] t1\
+		    {[tuple extract $t1 COLOR] eq "Red"}]\
+		[relvar get SP]] S#] [relvar get S]] SNAME]
+	relformat $rp "Get supplier name for suppliers who supply at\
+	    least one red part"
+    } -result {Get supplier name for suppliers who supply at least one red part
+----------------------------------------------------------------
+ SNAME
+string
+======
+ Smith
+ Jones
+ Clark}
+
+    test date-example-5.0 {Get supplier numbers for suppliers who supply\
+	at least all those parts supplied by supplier S2} -body {
+	set alls2 [relation divide\
+	    [relation project [relvar get S] S#]\
+	    [relation project\
+		[relation restrict [relvar get SP] r1\
+		{[tuple extract $r1 S#] eq "S2"}] P#]\
+	    [relation project [relvar get SP] S# P#]]
+	relformat $alls2 "Get supplier numbers for suppliers who supply\
+	    at least all those parts supplied by supplier S2."
+    } -result {Get supplier numbers for suppliers who supply at least all those parts supplied by supplier S2.
+-----------------------------------------------------------------------------------------------
+    S#
+string
+======
+    S1
+    S2}
+
+    test date-example-6.0 {Get all pairs of supplier numbers such that\
+	the suppliers concerned are colocated} -body {
+	set col [relation project\
+	    [relation restrict\
+	    [relation join\
+	    [relation project [relation rename [relvar get S] S# SA] SA CITY]\
+	    [relation project [relation rename [relvar get S] S# SB] SB CITY]]\
+		t1 {[string compare\
+		[tuple extract $t1 SA] [tuple extract $t1 SB]] < 0}]\
+	    SA SB CITY]
+	relformat $col "Get all pairs of supplier numbers such that the\
+	    suppliers concerned are colocated"
+    } -result {Get all pairs of supplier numbers such that the suppliers concerned are colocated
+---------------------------------------------------------------------------------
+    SA      SB    CITY
+string  string  string
+======================
+    S1      S4  London
+    S2      S3   Paris}
+
+    test date-example-7.0 {Get supplier info for suppliers who supply part P2}\
+    -body {
+	set p2 [relation semijoin [relvar get S]\
+	    [relation restrict [relvar get SP] r1\
+	    {[tuple extract $r1 P#] eq "P2"}]]
+	relformat $p2 "Get supplier info for suppliers who supply part P2"
+    } -result {Get supplier info for suppliers who supply part P2
+--------------------------------------------------
+    S#   SNAME  STATUS    CITY
+string  string     int  string
+==============================
+    S1   Smith      20  London
+    S2   Jones      10   Paris
+    S3   Blake      30   Paris
+    S4   Clark      20  London}
+
+    test date-example-8.0 {Get supplier info for suppliers who do not\
+	supply part P2} -body {
+	set np2 [relation semiminus [relvar get S]\
+	    [relation restrict [relvar get SP] r1\
+		{[tuple extract $r1 P#] eq "P2"}]]
+	relformat $np2 "Get supplier info for suppliers who do not supply\
+	    part P2"
+    } -result {Get supplier info for suppliers who do not supply part P2
+---------------------------------------------------------
+    S#   SNAME  STATUS    CITY
+string  string     int  string
+==============================
+    S5   Adams      30  Athens}
 
     cleanupTests
 }
