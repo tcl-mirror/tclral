@@ -39,6 +39,8 @@ boolean
 [bullet]
 list
 [bullet]
+bytearray
+[bullet]
 Tuple
 [list_end]
 
@@ -64,7 +66,7 @@ All attribute names must be unique.
 The is no inherent left to right ordering in tuples.
 Clearly, the implementation may store components in a particular order
 and any string representation must have some left to right ordering to it
-(since I write in a Roman alphabet which is left to right ordered),
+(since I write in a Latin alphabet which is left to right ordered),
 but the operations on Tuples do not expose or depend upon any ordering of
 components.
 Consequently, using string and list operators on the string representation
@@ -310,4 +312,5 @@ returns:
 [see_also relvar relation]
 
 [keywords tuple relation relvar]
+
 [manpage_end]

@@ -1,36 +1,197 @@
 [manpage_begin relvar n 0.6]
-[moddesc "Operators for Relational Variables"]
-[titledesc "Relvar Operators"]
+[moddesc "Relvar Operators"]
+[titledesc "Operators for Relation Variables"]
 [copyright "2004 by G. Andrew Mangogna"]
 [require ral 0.6]
 [description]
-This manpage describes the
-[cmd relvar]
-command.
-The
-[cmd relvar]
-command is part of the Tcl Relational Algebra Library (ral) package.
-[section OVERVIEW]
+This manpage describes the [cmd relvar] command.
+The [cmd relvar] command is part of the Tcl Relational Algebra Library
+(ral) package.
+
+[para]
+TclRAL defines a variable space for relation variables.
+Relation variables hold relation values and the subcommands of the
+[cmd relvar] command generally operate directly on the values storing
+the results back into the relation variables.
+For this reason, the [cmd relvar] subcommands all take the name of a relation
+variable as an argument.
+
+[para]
+In the relational model, relation variables play the important role of
+representing the persistent data base values.
+Relation variables are the leaves of the
+expression tree that performs the desired computation and represent
+the core data from which results may be computed.
+That computation is expressed as a single, sometimes complex expression.
+This allows for a non-procedural way of specifying the computation and
+allows optimizers to find the most efficient manner of computing the result.
+
+[para]
+In the TclRAL implementation,
+relation variables serve a similar role although there
+is no persistence supplied by the library.
+Relation values may be stored in Tcl variables like any other Tcl object.
+This does abandon the non-procedural nature of relational expressions
+as usually accomplished in the relational model, but is a better fit
+to the Tcl way of doing things.
+
+[para]
+Since it is possible to store a relation value in an ordinary Tcl variable,
+the user should be aware of some of the consequences of this.
+Because internally Tcl objects are reference counted,
+storing a relation value in a variable in effect creates another reference
+to the underlying object.
+Since the [cmd relvar] commands operate directly on the underlying value,
+any changes to the value affected by the [cmd relvar] subcommands will
+also be reflected in the value seen by any references to the value stored
+in ordinary Tcl variables.
+So, for example, if the value of a relation variable, say [emph RV],
+is stored in a Tcl variable, say [emph V], then any insert or delete
+operations on [emph RV] will also be seen when the value is accessed
+via [emph V].
+This could be surprising to some, since most other Tcl commands will
+create a new copy of a shared value before performing any operation on it.
+The behavior described here works well when it is remembered that the
+[cmd relvar] commands can modify the underlying value directly and that
+the [cmd relation] commands only operate on values in a read only fashion
+and never modify their argument directly.
 
 [section COMMANDS]
 [list_begin definitions]
-[call [cmd "::ral::relvar assign"] [arg relationVariable]]
+[call [cmd "::ral::relvar create"] [arg relationVariable]\
+    [arg heading] [arg identifiers] [opt "name-value-list ..."]]
 
-[call [cmd "::ral::relvar create"] [arg relationVariable]]
+The [cmd create] subcommand creates a new relvar whose name is given
+by [arg relationVariable].
+The subcommand has no return value.
+The [arg heading] is specified by a list each element of which may
+contain one or two subelements. If an element of the [arg heading]
+list contains two sub-elements then the first sub-element is taken as the
+attribute name and second sub-element is taken as the attribute data type.
+If only one sub-element is given, then it is taken to be the attribute
+name and the attribute data type is taken to be [emph string].
+The [arg identifiers] argument is a list of identifying attribute sets.
+Each element of the [arg identifiers] list is in turn a list containing
+a set of attribute names that constititute an identifier.
+Relations may have an arbitrary number of identifiers however,
+no identifier may be a subset of another identifier.
+Optionally, an arbitrary number of tuples may be specified.
+Tuples consists of a list of alternating attribute name / attribute value
+pairs.
+Optional tuples are inserted into the relation variable as if
+[cmd "relvar insert"] had been called.
 
-[call [cmd "::ral::relvar delete"] [arg relationVariable]]
+[example_begin]
+relvar create OWNER {{OwnerName string} {Age int} {City string}} OwnerName
+[example_end]
 
-[call [cmd "::ral::relvar destroy"] [arg relationVariable]]
+[call [cmd "::ral::relvar delete"] [arg relationVariable]\
+    [arg tupleVariable] [arg expression]]
+
+The [cmd delete] subcommands deletes tuples from the relation variable
+given by the [arg relationVariable] argument.
+Each tuple in the body of [arg relationVariable] is assigned to the
+tuple variable named [arg tupleVariable] and [arg expression] is evaluated.
+If [arg expression] returns true, then that tuple is deleted, directly
+modifying the value contained in [arg relationVariable].
+The return value of the subcommand is the number of tuples deleted.
+
+[example {
+relvar delete OWNER o {[tuple extract $o OwnerName] eq "Sue"}
+}]
+
+[call [cmd "::ral::relvar destroy"] [opt "relationVariable ..."]]
+
+The [cmd destroy] deletes all the relation variables whose names are given
+as the subcommand arguments.
 
 [call [cmd "::ral::relvar dump"] [opt {-schema | -body}] [opt pattern]]
 
-[call [cmd "::ral::relvar get"] [arg relationVariable]]
+The [cmd dump] subcommand returns a Tcl script that when evaluated will
+reconstruct the relation variables in the state that existed at the time
+the [cmd dump] subcommand is issued.
+This command provides a primative means of persistence for the relation
+variables since the value returned from [cmd dump] may be stored in a file
+to be [cmd source]'ed in later.
+If the [arg -schema] argument is present then only [cmd "relvar create"]
+commands are included in the dump, in effect dumping only the schema.
+If the [arg -body] argument is present then only [cmd "relvar insert"]
+commands are included in the dump, in effect dumping only the data.
+If neither [arg -schema] or [arg -body] are present then both the necessary
+[cmd "relvar create"] and [cmd "relvar insert"] commands are returned.
+If the [arg pattern] is present then only those relation variables names
+matching [arg pattern] are dumped.
+Matching of relation variable names against pattern happens in the
+same manner as for the [cmd "string match"] command.
 
-[call [cmd "::ral::relvar insert"] [arg relationVariable]]
+[example {
+set c [::open vars.tcl w]
+puts -nonewline [relvar dump]
+::close $c
+}]
 
-[call [cmd "::ral::relvar names"] [arg relationVariable]]
+[call [cmd "::ral::relvar insert"] [arg relationVariable]\
+    [opt "name-value-list ..."]]
 
-[call [cmd "::ral::relvar update"] [arg relationVariable]]
+The [cmd insert] subcommand inserts the tuples given by [arg name-value-list]
+arguments into the value of the relation stored in [arg relationVariable].
+The value is modified in place.
+The subcommand has no return value.
+It is an error to attempt to insert a duplicate tuple or a tuple whose type
+does not match the relation heading.
+All values of the tuple must be specfied with a valid value representation of
+the type associated with the attribute.
+
+[example {
+relvar insert OWNER\
+    {OwnerName Sue Age 20 City {New York}}\
+    {City {San Francisco} Age 32 OwnerName Frank}
+}]
+
+[call [cmd "::ral::relvar names"] [arg relationVariable] [opt pattern]]
+
+The [cmd names] subcommand returns a list of the currently defined
+relation variables.
+If the [arg pattern] argument is specified then only those names matching
+[arg pattern] are returned.
+Name matching is performed as for the [cmd "string match"] command.
+
+[call [cmd "::ral::relvar set"] [arg relationVariable] [opt relationValue]]
+
+The [cmd set] replaces the current value held by the relation variable named
+[arg relationVariable] with the value given by [arg relationValue].
+It is an error to attempt to assign a relation value to a relation variable
+that is of a different type than the type of the value
+that the variable currently holds.
+The return value of the subcommand the current value
+held by [arg relationVariable].
+If the [arg relationValue] argument is missing, then no attempt is made to
+change the value of [arg relationVariable].
+This command operates in a manner analogous to the [cmd set] command for
+ordinary Tcl variables.
+
+[call [cmd "::ral::relvar update"] [arg relationVariable] [arg tupleVariable]\
+    [arg expression] [arg name-value-list]]
+
+The [cmd update] subcommand modifies the values of tuples in the relation
+value contained in the relation variable given by [arg relationVariable].
+Each tuple in [arg relationVariable] is successively assigned to the tuple
+variable given by [arg tupleVariable] and [arg expression] is evaluated.
+If the result of the evaluation is true,
+then the attributes whose names are mentioned in the [arg name-value-list]
+are set to the corresponding values.
+The [arg name-value-list] argument consists of alternating attribute names
+and attribute values.
+The return value of the subcommand is the number of tuples updated.
+The example below updates Sue's Age to be 20.
+[example {
+relvar update OWNER o {[tuple extract $o OwnerName] eq "Sue"} {Age 20}
+}]
 
 [list_end]
+
+[see_also tuple relation]
+
+[keywords relation variable]
+
 [manpage_end]

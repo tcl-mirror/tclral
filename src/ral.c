@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral.c,v $
-$Revision: 1.11 $
-$Date: 2004/06/27 17:58:46 $
+$Revision: 1.12 $
+$Date: 2004/07/10 18:02:10 $
  *--
  */
 
@@ -330,7 +330,7 @@ EXTERNAL DATA REFERENCES
 /*
 STATIC DATA ALLOCATION
 */
-static char rcsid[] = "@(#) $RCSfile: ral.c,v $ $Revision: 1.11 $" ;
+static char rcsid[] = "@(#) $RCSfile: ral.c,v $ $Revision: 1.12 $" ;
 
 static Tcl_ObjType Ral_TupleType = {
     "Tuple",
@@ -2764,12 +2764,10 @@ relationNameValueList(
     Tcl_Interp *interp,
     Ral_Relation *relation)
 {
-    Ral_RelationHeading *heading ;
     Tcl_Obj *nvList ;
     Ral_Tuple **tupleVector ;
     Ral_Tuple **last ;
 
-    heading = relation->heading ;
     nvList = Tcl_NewListObj(0, NULL) ;
 
     for (tupleVector = relation->tupleVector,
@@ -4538,59 +4536,6 @@ relvarFind(
  */
 
 static int
-RelvarAssignCmd(
-    Tcl_Interp *interp,
-    int objc,
-    Tcl_Obj *const*objv)
-{
-    Tcl_HashEntry *entry ;
-    Tcl_Obj *relVarObj ;
-    Tcl_Obj *relValueObj ;
-    Ral_Relation *relvarRelation ;
-    Ral_Relation *relvalRelation ;
-
-    /* relvar assign relvarName relationValue */
-    if (objc != 4) {
-	Tcl_WrongNumArgs(interp, 2, objv, "relvarName relationValue") ;
-	return TCL_ERROR ;
-    }
-
-    entry = Tcl_FindHashEntry(&relvarMap, (char *)objv[2]) ;
-    if (!entry) {
-	Tcl_ResetResult(interp) ;
-	Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-	    "unknown relvar, \"", Tcl_GetString(objv[2]), "\"", NULL) ;
-	return TCL_ERROR ;
-    }
-    relVarObj = Tcl_GetHashValue(entry) ;
-    relValueObj = objv[3] ;
-
-    if (Tcl_ConvertToType(interp, relVarObj, &Ral_RelationType) != TCL_OK ||
-	Tcl_ConvertToType(interp, relValueObj, &Ral_RelationType) != TCL_OK) {
-	return TCL_ERROR ;
-    }
-
-    relvarRelation = relVarObj->internalRep.otherValuePtr ;
-    relvalRelation = relValueObj->internalRep.otherValuePtr ;
-    /*
-     * Can only assign something of the same type.
-     */
-    if (!relationHeadingEqual(relvarRelation->heading,
-	relvalRelation->heading)) {
-	Tcl_SetStringObj(Tcl_GetObjResult(interp), 
-	    "value assigned to relvar must be of the same type", -1) ;
-	return TCL_ERROR ;
-    }
-
-    Tcl_DecrRefCount(relVarObj) ;
-    Tcl_IncrRefCount(relValueObj) ;
-    Tcl_SetHashValue(entry, relValueObj) ;
-
-    Tcl_SetObjResult(interp, relValueObj) ;
-    return TCL_OK ;
-}
-
-static int
 RelvarCreateCmd(
     Tcl_Interp *interp,
     int objc,
@@ -4647,7 +4592,7 @@ RelvarCreateCmd(
     Tcl_IncrRefCount(relObj) ;
     Tcl_SetHashValue(entry, relObj) ;
     /*
-     * No return from "relvar create". Must use "relvar get" to access
+     * No return from "relvar create". Must use "relvar set" to access
      * the value.
      */
     Tcl_ResetResult(interp) ;
@@ -4715,7 +4660,7 @@ RelvarDeleteCmd(
 	Tcl_InvalidateStringRep(relObj) ;
     }
 
-    Tcl_SetObjResult(interp, relObj) ;
+    Tcl_SetObjResult(interp, Tcl_NewIntObj(deleted)) ;
     return TCL_OK ;
 }
 
@@ -4928,28 +4873,6 @@ errorOut:
 }
 
 static int
-RelvarGetCmd(
-    Tcl_Interp *interp,
-    int objc,
-    Tcl_Obj *const*objv)
-{
-    Tcl_Obj *relObj ;
-
-    /* relvar get relvarName */
-    if (objc != 3) {
-	Tcl_WrongNumArgs(interp, 2, objv, "relvarName") ;
-	return TCL_ERROR ;
-    }
-    relObj = relvarFind(interp, objv[2]) ;
-    if (!relObj) {
-	return TCL_ERROR ;
-    }
-
-    Tcl_SetObjResult(interp, relObj) ;
-    return TCL_OK ;
-}
-
-static int
 RelvarInsertCmd(
     Tcl_Interp *interp,
     int objc,
@@ -4986,7 +4909,10 @@ RelvarInsertCmd(
 	Tcl_InvalidateStringRep(relObj) ;
     }
 
-    Tcl_SetObjResult(interp, relObj) ;
+    /*
+     * No return value. Use "relvar set"
+     */
+    Tcl_ResetResult(interp) ;
     return TCL_OK ;
 }
 
@@ -5026,6 +4952,65 @@ RelvarNamesCmd(
     }
 
     Tcl_SetObjResult(interp, nameList) ;
+    return TCL_OK ;
+}
+
+static int
+RelvarSetCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_HashEntry *entry ;
+    Tcl_Obj *relVarObj ;
+    Tcl_Obj *relValueObj ;
+
+    /* relvar set relvarName ?relationValue? */
+    if (objc < 3 || objc > 4) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relvarName ?relationValue?") ;
+	return TCL_ERROR ;
+    }
+
+    entry = Tcl_FindHashEntry(&relvarMap, (char *)objv[2]) ;
+    if (!entry) {
+	Tcl_ResetResult(interp) ;
+	Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
+	    "unknown relvar, \"", Tcl_GetString(objv[2]), "\"", NULL) ;
+	return TCL_ERROR ;
+    }
+    relVarObj = Tcl_GetHashValue(entry) ;
+
+    if (objc == 4) {
+	Ral_Relation *relvarRelation ;
+	Ral_Relation *relvalRelation ;
+
+	relValueObj = objv[3] ;
+
+	if (Tcl_ConvertToType(interp, relVarObj, &Ral_RelationType) != TCL_OK ||
+	    Tcl_ConvertToType(interp, relValueObj, &Ral_RelationType)
+	    != TCL_OK) {
+	    return TCL_ERROR ;
+	}
+
+	relvarRelation = relVarObj->internalRep.otherValuePtr ;
+	relvalRelation = relValueObj->internalRep.otherValuePtr ;
+	/*
+	 * Can only assign something of the same type.
+	 */
+	if (!relationHeadingEqual(relvarRelation->heading,
+	    relvalRelation->heading)) {
+	    Tcl_SetStringObj(Tcl_GetObjResult(interp), 
+		"value assigned to relvar must be of the same type", -1) ;
+	    return TCL_ERROR ;
+	}
+
+	Tcl_DecrRefCount(relVarObj) ;
+	Tcl_IncrRefCount(relValueObj) ;
+	Tcl_SetHashValue(entry, relValueObj) ;
+	relVarObj = relValueObj ;
+    }
+
+    Tcl_SetObjResult(interp, relVarObj) ;
     return TCL_OK ;
 }
 
@@ -5070,11 +5055,14 @@ RelvarUpdateCmd(
 	if (Tcl_ExprBooleanObj(interp, exprObj, &boolValue) != TCL_OK) {
 	    goto errorOut ;
 	}
-	if (boolValue &&
-	    relationUpdateTuple(interp, relation, index, objv[5]) != TCL_OK) {
-	    goto errorOut ;
+	if (boolValue) {
+	    if (relationUpdateTuple(interp, relation, index, objv[5])
+		== TCL_OK) {
+		++updated ;
+	    } else {
+		goto errorOut ;
+	    }
 	}
-	++updated ;
     }
     Tcl_UnsetVar(interp, Tcl_GetString(tupleNameObj), 0) ;
 
@@ -5085,7 +5073,7 @@ RelvarUpdateCmd(
 	Tcl_InvalidateStringRep(relObj) ;
     }
 
-    Tcl_SetObjResult(interp, relObj) ;
+    Tcl_SetObjResult(interp, Tcl_NewIntObj(updated)) ;
     return TCL_OK ;
 
 errorOut:
@@ -5112,25 +5100,23 @@ relvarCmd(
     Tcl_Obj *const*objv)
 {
     enum RelvarSubCmds {
-	RELVAR_ASSIGN,
 	RELVAR_CREATE,
 	RELVAR_DELETE,
 	RELVAR_DESTROY,
 	RELVAR_DUMP,
-	RELVAR_GET,
 	RELVAR_INSERT,
 	RELVAR_NAMES,
+	RELVAR_SET,
 	RELVAR_UPDATE
     } ;
     static const char *subCmds[] = {
-	"assign",
 	"create",
 	"delete",
 	"destroy",
 	"dump",
-	"get",
 	"insert",
 	"names",
+	"set",
 	"update",
 	NULL
     } ;
@@ -5148,9 +5134,6 @@ relvarCmd(
     }
 
     switch ((enum RelvarSubCmds)index) {
-    case RELVAR_ASSIGN:
-	return RelvarAssignCmd(interp, objc, objv) ;
-
     case RELVAR_CREATE:
 	return RelvarCreateCmd(interp, objc, objv) ;
 
@@ -5163,14 +5146,14 @@ relvarCmd(
     case RELVAR_DUMP:
 	return RelvarDumpCmd(interp, objc, objv) ;
 
-    case RELVAR_GET:
-	return RelvarGetCmd(interp, objc, objv) ;
-
     case RELVAR_INSERT:
 	return RelvarInsertCmd(interp, objc, objv) ;
 
     case RELVAR_NAMES:
 	return RelvarNamesCmd(interp, objc, objv) ;
+
+    case RELVAR_SET:
+	return RelvarSetCmd(interp, objc, objv) ;
 
     case RELVAR_UPDATE:
 	return RelvarUpdateCmd(interp, objc, objv) ;
@@ -5929,22 +5912,31 @@ RelationGroupCmd(
 	    Ral_Tuple *grpTuple = group->tupleVector[index] ;
 	    Tcl_Obj *grpAttrRelObj =
 		grpTuple->values[grpTupleHeading->degree - 1] ;
-	    Ral_Relation * grpAttrRel =
+	    Ral_Relation *grpAttrRel =
 		grpAttrRelObj->internalRep.otherValuePtr ;
 	    relationReserve(grpAttrRel, 1) ;
 	    if (relationAppendTuple(interp, grpAttrRel, grpAttrTuple)
 		!= TCL_OK) {
 		goto errorOut ;
 	    }
+	    /*
+	     * Make sure to clear out the string rep since various
+	     * comparisons can cause it to be recomputed between the
+	     * time that the relation object is first put into the
+	     * tuple and here.
+	     */
+	    Tcl_InvalidateStringRep(grpAttrRelObj) ;
 	}
     }
 
+    ckfree(relAttrMap) ;
     Tcl_DeleteHashTable(&groupHash) ;
 
     Tcl_SetObjResult(interp, relationObjNew(group)) ;
     return TCL_OK ;
 
 errorOut:
+    ckfree(relAttrMap) ;
     Tcl_DeleteHashTable(&groupHash) ;
     tupleDelete(grpAttrTuple) ;
     relationDelete(group) ;
@@ -6732,19 +6724,12 @@ RelationSemijoinCmd(
 	Ral_Tuple *r1Tuple ;
 
 	r1Tuple = r1->tupleVector[jmap->tupleMap.vector[i].index1] ;
-	if (relationAppendTuple(interp, semijoin, r1Tuple) != TCL_OK) {
-	    goto errorOut ;
-	}
+	relationAppendTuple(NULL, semijoin, r1Tuple) ;
     }
 
     relationJoinMapDelete(jmap) ;
     Tcl_SetObjResult(interp, relationObjNew(semijoin)) ;
     return TCL_OK ;
-
-errorOut:
-    relationJoinMapDelete(jmap) ;
-    relationDelete(semijoin) ;
-    return TCL_ERROR ;
 }
 
 static int
@@ -6812,7 +6797,7 @@ RelationSemiminusCmd(
      * The semiminus are the tuples in the first relation that do not
      * match anything in the second.
      */
-    relationReserve(semiminus, r1->cardinality - jmap->tupleMap.count) ;
+    relationReserve(semiminus, jmap->tupleMap.count - r1->cardinality) ;
     /*
      * So we put together a mapping to know which tuple to include in the
      * semiminus relation.

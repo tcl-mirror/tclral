@@ -43,8 +43,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.1 $
-# $Date: 2004/04/26 04:13:08 $
+# $Revision: 1.2 $
+# $Date: 2004/07/10 18:02:10 $
 #  *--
 
 namespace eval ::ral {
@@ -61,7 +61,7 @@ proc ::ral::relformat {relValue {title {}}} {
     foreach h $heading {
 	foreach {attr type} $h {
 	    set colWidth($attr) [string length $attr]
-	    set typeWidth [string length $type]
+	    set typeWidth [string length [lindex $type 0]]
 	    if {$typeWidth > $colWidth($attr)} {
 		set colWidth($attr) $typeWidth
 	    }
@@ -107,7 +107,7 @@ proc ::ral::relformat {relValue {title {}}} {
     set fmtLine $fmtCmd
     foreach h $heading {
 	foreach {attr type} $h {
-	    lappend fmtLine $type
+	    lappend fmtLine [lindex $type 0]
 	}
     }
     set typesLine [eval $fmtLine]

@@ -46,8 +46,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.10 $
-# $Date: 2004/06/27 17:58:46 $
+# $Revision: 1.11 $
+# $Date: 2004/07/10 18:02:10 $
 #  *--
 
 package require tcltest 2.2
@@ -583,21 +583,21 @@ namespace eval ::ral::test {
     # relvar create subcommand
     test relvar-create-1.0 {single attribute, single body tuple} -body {
 	relvar create N Name Name {Name Andrew}
-	relvar get N
+	relvar set N
     } -cleanup {
 	relvar destroy N
     } -result {Relation {{{Name string}} Name} {{Name Andrew}}}
 
     test relvar-create-2.0 {multiple attributes, single body tuple} -body {
 	relvar create N {Name {Age int}} Name {Name Andrew Age 20}
-	relvar get N
+	relvar set N
     } -cleanup {
 	relvar destroy N
     } -result {Relation {{{Name string} {Age int}} Name} {{Name Andrew Age 20}}}
 
     test relvar-create-3.0 {single attribute, multiple body tuples} -body {
 	relvar create N Name Name {Name Andrew} {Name George} {Name Fred}
-	relvar get N
+	relvar set N
     } -cleanup {
 	relvar destroy N
     } -result {Relation {{{Name string}} Name}\
@@ -608,7 +608,7 @@ namespace eval ::ral::test {
 	    {Name Andrew Age 20}\
 	    {Name George Age 20}\
 	    {Name Fred Age 20}
-	relvar get N
+	relvar set N
     } -cleanup {
 	relvar destroy N
     } -result {Relation {{{Name string} {Age int}} Name}\
@@ -619,7 +619,7 @@ namespace eval ::ral::test {
 	    {Name Andrew Age 20 City Sunnyvale}\
 	    {Age 20 Name George City {San Jose}}\
 	    {Name Fred City Saratoga Age 20}
-	relvar get N
+	relvar set N
     } -cleanup {
 	relvar destroy N
     } -result {Relation {{{Name string} {Age int} {City string}} Name}\
@@ -629,21 +629,21 @@ namespace eval ::ral::test {
 
     test relvar-create-6.0 {empty relvar} -body {
 	relvar create N Name Name
-	relvar get N
+	relvar set N
     } -cleanup {
 	relvar destroy N
     } -result {Relation {{{Name string}} Name} {}}
 
     test relvar-create-7.0 {dee relvar} -body {
 	relvar create DEE {} {{}} {}
-	relvar get DEE
+	relvar set DEE
     } -cleanup {
 	relvar destroy DEE
     } -result {Relation {{} {{}}} {{}}}
 
     test relvar-create-8.0 {dum relvar} -body {
 	relvar create DUM {} {{}}
-	relvar get DUM
+	relvar set DUM
     } -cleanup {
 	relvar destroy DUM
     } -result {Relation {{} {{}}} {}}
@@ -653,7 +653,7 @@ namespace eval ::ral::test {
 	    {Name Andrew Age 20}\
 	    {Name George Age 20}\
 	    {Name Andrew Age 20}
-	relvar get N
+	relvar set N
     } -result {tuple, "Name Andrew Age 20",\
 	contains duplicate values for the identifier, "Name"}\
     -returnCodes error
@@ -663,7 +663,7 @@ namespace eval ::ral::test {
 	    {Name Andrew Age 20}\
 	    {Name George Age 20}\
 	    {Name Fred Age 20}
-	relvar get N
+	relvar set N
     } -cleanup {
 	relvar destroy N
     } -result {Relation {{{Name string} {Age int}} {{Name Age}}}\
@@ -674,7 +674,7 @@ namespace eval ::ral::test {
 	    {Name Andrew Age 10}\
 	    {Name George Age 20}\
 	    {Name Fred Age 30}
-	relvar get N
+	relvar set N
     } -cleanup {
 	relvar destroy N
     } -result {Relation {{{Name string} {Age int}} {Name Age}}\
@@ -704,7 +704,7 @@ namespace eval ::ral::test {
 	    Name\
 	    {Name Fred Address {Number 500 Street Main}}\
 	    {Address {Number 600 Street Elm} Name Alice}
-	relvar get N
+	relvar set N
     } -cleanup {
 	relvar destroy N
     } -result {Relation {{{Name string} {Address {Tuple {{Number int} {Street string}}}}} Name} {{Name Fred Address {Number 500 Street Main}} {Name Alice Address {Number 600 Street Elm}}}}
@@ -718,30 +718,10 @@ namespace eval ::ral::test {
 		{DogName Missy Breed Poodle}}}\
 	    {Name Alice Dog {\
 		{DogName Tiger Breed Setter}}}
-	relvar get N
+	relvar set N
     } -cleanup {
 	relvar destroy N
     } -result {Relation {{{Name string} {Dog {Relation {{{DogName string} {Breed string}} DogName}}}} Name} {{Name Fred Dog {{DogName Rover Breed Terrier} {DogName Missy Breed Poodle}}} {Name Alice Dog {{DogName Tiger Breed Setter}}}}}
-
-    # relvar assign subcommand
-    test relvar-assign-1.0 {same type} -setup {
-	relvar create X {Name {Status int}} Name {Name George Status 20}
-    } -cleanup {
-	relvar destroy X
-    } -body {
-	relvar assign X {Relation {{{Name string} {Status int}} Name}\
-	    {{Name Fred Status 40} {Status 25 Name Alice}}}
-    } -result {Relation {{{Name string} {Status int}} Name} {{Name Fred Status 40} {Name Alice Status 25}}}
-
-    test relvar-assign-2.0 {different types} -setup {
-	relvar create X {City {Status int}} City {City Sunnyvale Status 20}
-    } -cleanup {
-	relvar destroy X
-    } -body {
-	relvar assign X {Relation {{{Name string} {Status int}} Name}\
-	    {{Name Fred Status 40} {Status 25 Name Alice}}}
-    } -result {value assigned to relvar must be of the same type}\
-    -returnCodes error
 
     # relvar delete subcommand
     test relvar-delete-1.0 {expression is false} -setup {
@@ -753,7 +733,7 @@ namespace eval ::ral::test {
 	relvar destroy X
     } -body {
 	relvar delete X t {0}
-    } -result {Relation {{{Name string} {Status int}} Name} {{Name George Status 20} {Name Fred Status 30} {Name Alice Status 40}}}
+    } -result {0}
 
     test relvar-delete-2.0 {expression is true} -setup {
 	relvar create X {Name {Status int}} Name\
@@ -764,7 +744,7 @@ namespace eval ::ral::test {
 	relvar destroy X
     } -body {
 	relvar delete X t {1}
-    } -result {Relation {{{Name string} {Status int}} Name} {}}
+    } -result {3}
 
     test relvar-delete-3.0 {subset is deleted} -setup {
 	relvar create X {Name {Status int}} Name\
@@ -775,7 +755,7 @@ namespace eval ::ral::test {
 	relvar destroy X
     } -body {
 	relvar delete X t {[tuple extract $t Name] eq "George"}
-    } -result {Relation {{{Name string} {Status int}} Name} {{Name Fred Status 30} {Name Alice Status 40}}}
+    } -result {1}
 
     # relvar destroy subcommand
     test relvar-destroy-1.0 {relvar no longer exists after destroy} -setup {
@@ -785,7 +765,7 @@ namespace eval ::ral::test {
 	    {Status 40 Name Alice}
     } -body {
 	relvar destroy X
-	relvar get X
+	relvar set X
     } -result {unknown relvar, "X"} -returnCodes error
 
     # relvar dump subcommand
@@ -847,8 +827,8 @@ namespace eval ::ral::test {
 ::ral::relvar insert X {Name George Status 20} {Name Fred Status 30} {Name Alice Status 40}
 } -result {}
 
-    # relvar get subcommand
-    test relvar-get-1.0 {get relation value} -setup {
+    # relvar set subcommand
+    test relvar-set-1.0 {get relation value} -setup {
 	relvar create N {Name {Age int} City} Name\
 	    {Name Andrew Age 20 City Sunnyvale}\
 	    {Age 20 Name George City {San Jose}}\
@@ -856,11 +836,30 @@ namespace eval ::ral::test {
     } -cleanup {
 	relvar destroy N
     } -body {
-	relvar get N
+	relvar set N
     } -result {Relation {{{Name string} {Age int} {City string}} Name}\
 	{{Name Andrew Age 20 City Sunnyvale}\
 	 {Name George Age 20 City {San Jose}}\
 	 {Name Fred Age 20 City Saratoga}}}
+
+    test relvar-set-2.0 {same type} -setup {
+	relvar create X {Name {Status int}} Name {Name George Status 20}
+    } -cleanup {
+	relvar destroy X
+    } -body {
+	relvar set X {Relation {{{Name string} {Status int}} Name}\
+	    {{Name Fred Status 40} {Status 25 Name Alice}}}
+    } -result {Relation {{{Name string} {Status int}} Name} {{Name Fred Status 40} {Name Alice Status 25}}}
+
+    test relvar-set-3.0 {different types} -setup {
+	relvar create X {City {Status int}} City {City Sunnyvale Status 20}
+    } -cleanup {
+	relvar destroy X
+    } -body {
+	relvar set X {Relation {{{Name string} {Status int}} Name}\
+	    {{Name Fred Status 40} {Status 25 Name Alice}}}
+    } -result {value assigned to relvar must be of the same type}\
+    -returnCodes error
 
     # relvar insert subcommand
     test relvar-insert-1.0 {insert single tuple} -setup {
@@ -869,6 +868,7 @@ namespace eval ::ral::test {
 	relvar destroy N
     } -body {
 	relvar insert N {Name Andrew Age 20 City Sunnyvale}
+	relvar set N
     } -result {Relation {{{Name string} {Age int} {City string}} Name}\
 	{{Name Andrew Age 20 City Sunnyvale}}}
 
@@ -881,6 +881,7 @@ namespace eval ::ral::test {
 	    {Name Andrew Age 20 City Sunnyvale}\
 	    {Age 20 Name George City {San Jose}}\
 	    {Name Fred City Saratoga Age 20}
+	relvar set N
     } -result {Relation {{{Name string} {Age int} {City string}} Name}\
 	{{Name Andrew Age 20 City Sunnyvale}\
 	 {Name George Age 20 City {San Jose}}\
@@ -933,7 +934,7 @@ namespace eval ::ral::test {
 	relvar destroy X
     } -body {
 	relvar update X t {0} {Status -1}
-    } -result {Relation {{{Name string} {Status int}} Name} {{Name George Status 20} {Name Fred Status 30} {Name Alice Status 40}}}
+    } -result {0}
 
     test relvar-update-2.0 {expression is true} -setup {
 	relvar create X {Name {Status int}} Name\
@@ -944,7 +945,7 @@ namespace eval ::ral::test {
 	relvar destroy X
     } -body {
 	relvar update X t {1} {Status -1}
-    } -result {Relation {{{Name string} {Status int}} Name} {{Name George Status -1} {Name Fred Status -1} {Name Alice Status -1}}}
+    } -result {3}
 
     test relvar-update-3.0 {subset is updated} -setup {
 	relvar create X {Name {Status int}} Name\
@@ -955,7 +956,7 @@ namespace eval ::ral::test {
 	relvar destroy X
     } -body {
 	relvar update X t {[tuple extract $t Name] eq "George"} {Status -1}
-    } -result {Relation {{{Name string} {Status int}} Name} {{Name George Status -1} {Name Fred Status 30} {Name Alice Status 40}}}
+    } -result {1}
 
     test relvar-update-4.0 {update creates duplicate} -setup {
 	relvar create X {Name {Status int}} Name\
@@ -982,7 +983,7 @@ namespace eval ::ral::test {
     } -result 1
 
     test relation-cardinality-3.0 {multiple body tuples} -body {
-	relation cardinality [relvar get S]
+	relation cardinality [relvar set S]
     } -result 5
 
     # relation degree subcommand
@@ -995,25 +996,25 @@ namespace eval ::ral::test {
     } -result 1
 
     test relation-degree-3.0 {multiple attributes} -body {
-	relation degree [relvar get S]
+	relation degree [relvar set S]
     } -result 4
 
     # relation divide subcommand
     test relation-divide-1.0 {suppliers who supply P1} -setup {
-	set dend [relation project [relvar get S] S#]
-	set med [relation project [relvar get SP] S# P#]
+	set dend [relation project [relvar set S] S#]
+	set med [relation project [relvar set SP] S# P#]
 	set dsor [relation project\
 	    [relation restrict\
-		[relvar get P] t {[tuple extract $t P#] eq "P1"}] P#]
+		[relvar set P] t {[tuple extract $t P#] eq "P1"}] P#]
     } -body {
 	relation divide $dend $dsor $med
     } -result {Relation {{{S# string}} S#} {{S# S1} {S# S2}}}
 
     test relation-divide-2.0 {suppliers who supply P2 and P4} -setup {
-	set dend [relation project [relvar get S] S#]
-	set med [relation project [relvar get SP] S# P#]
+	set dend [relation project [relvar set S] S#]
+	set med [relation project [relvar set SP] S# P#]
 	set dsor [relation project\
-	    [relation restrict [relvar get P] t\
+	    [relation restrict [relvar set P] t\
 	    {[tuple extract $t P#] eq "P2" || [tuple extract $t P#] eq "P4"}]\
 	    P#]
     } -body {
@@ -1021,16 +1022,16 @@ namespace eval ::ral::test {
     } -result {Relation {{{S# string}} S#} {{S# S1} {S# S4}}}
 
     test relation-divide-3.0 {suppliers who supply all parts} -setup {
-	set dend [relation project [relvar get S] S#]
-	set med [relation project [relvar get SP] S# P#]
-	set dsor [relation project [relvar get P] P#]
+	set dend [relation project [relvar set S] S#]
+	set med [relation project [relvar set SP] S# P#]
+	set dsor [relation project [relvar set P] P#]
     } -body {
 	relation divide $dend $dsor $med
     } -result {Relation {{{S# string}} S#} {{S# S1}}}
 
     # relation emptyof subcommand
     test relation-emptyof-1.0 {multiple attributes} -body {
-	relation emptyof [relvar get S]
+	relation emptyof [relvar set S]
     } -result {Relation {{{S# string} {SNAME string} {STATUS int} {CITY string}} S#} {}}
 
     # relation eliminate subcommand
@@ -1105,7 +1106,7 @@ namespace eval ::ral::test {
     # relation foreach subcommand
     test relation-foreach-1.0 {simple visit of suppliers} -body {
 	set nameList [list]
-	relation foreach sup [relvar get S] {
+	relation foreach sup [relvar set S] {
 	    lappend nameList [tuple extract $sup SNAME]
 	}
 	lsort $nameList
@@ -1113,7 +1114,7 @@ namespace eval ::ral::test {
 
     test relation-foreach-2.0 {visit of suppliers ascending order} -body {
 	set nameList [list]
-	relation foreach sup [relvar get S] ascending SNAME {
+	relation foreach sup [relvar set S] ascending SNAME {
 	    lappend nameList [tuple extract $sup SNAME]
 	}
 	set nameList
@@ -1121,7 +1122,7 @@ namespace eval ::ral::test {
 
     test relation-foreach-3.0 {visit of suppliers descending order} -body {
 	set nameList [list]
-	relation foreach sup [relvar get S] descending SNAME {
+	relation foreach sup [relvar set S] descending SNAME {
 	    lappend nameList [tuple extract $sup SNAME]
 	}
 	set nameList
@@ -1129,7 +1130,7 @@ namespace eval ::ral::test {
 
     test relation-foreach-3.0 {visit of suppliers ordered by multiple} -body {
 	set nameList [list]
-	relation foreach sup [relvar get S] ascending {STATUS CITY} {
+	relation foreach sup [relvar set S] ascending {STATUS CITY} {
 	    lappend nameList [tuple extract $sup SNAME]
 	}
 	set nameList
@@ -1137,11 +1138,11 @@ namespace eval ::ral::test {
 
     # relation group subcommand
     test relation-group-1.0 {group two attributes} -body {
-	relation group [relvar get SP] PQ P# QTY
+	relation group [relvar set SP] PQ P# QTY
     } -result {Relation {{{S# string} {PQ {Relation {{{P# string} {QTY int}} {{P# QTY}}}}}} {{S# PQ}}} {{S# S1 PQ {{P# P1 QTY 300} {P# P2 QTY 200} {P# P3 QTY 400} {P# P4 QTY 200} {P# P5 QTY 100} {P# P6 QTY 100}}} {S# S2 PQ {{P# P1 QTY 300} {P# P2 QTY 400}}} {S# S3 PQ {{P# P2 QTY 200}}} {S# S4 PQ {{P# P2 QTY 200} {P# P4 QTY 300} {P# P5 QTY 400}}}}}
 
     test relation-group-2.0 {group two attributes} -body {
-	relation group [relvar get SP] SQ S# QTY
+	relation group [relvar set SP] SQ S# QTY
     } -result {Relation {{{P# string} {SQ {Relation {{{S# string} {QTY int}} {{S# QTY}}}}}} {{P# SQ}}} {{P# P1 SQ {{S# S1 QTY 300} {S# S2 QTY 300}}} {P# P2 SQ {{S# S1 QTY 200} {S# S2 QTY 400} {S# S3 QTY 200} {S# S4 QTY 200}}} {P# P3 SQ {{S# S1 QTY 400}}} {P# P4 SQ {{S# S1 QTY 200} {S# S4 QTY 300}}} {P# P5 SQ {{S# S1 QTY 100} {S# S4 QTY 400}}} {P# P6 SQ {{S# S1 QTY 100}}}}}
 
     # relation intersect subcommand
@@ -1505,7 +1506,7 @@ namespace eval ::ral::test {
     } -result 0
 
     test relation-isempty-3.0 {multiple body tuples} -body {
-	relation isempty [relvar get P]
+	relation isempty [relvar set P]
     } -result 0
 
     # relation isnotempty subcommand
@@ -1518,7 +1519,7 @@ namespace eval ::ral::test {
     } -result 1
 
     test relation-isnotempty-3.0 {multiple body tuples} -body {
-	relation isnotempty [relvar get P]
+	relation isnotempty [relvar set P]
     } -result 1
 
     # relation join subcommand
@@ -1584,7 +1585,7 @@ namespace eval ::ral::test {
 
     # relation list subcommand
     test relation-list-1.0 {multiple tuples} -body {
-	lsort [relation list [relation project [relvar get S] CITY]]
+	lsort [relation list [relation project [relvar set S] CITY]]
     } -result {Athens London Paris}
 
     test relation-list-2.0 {one tuple} -body {
@@ -1783,13 +1784,13 @@ namespace eval ::ral::test {
 
     # relation summarize subcommand
     test relation-summarize-1.0 {count} -body {
-	set sp [relvar get SP]
-	set p [relation project [relvar get P] P#]
+	set sp [relvar set SP]
+	set p [relation project [relvar set P] P#]
 	relation summarize $sp $p {Total int} [list sum QTY] 0
     } -result {Relation {{{P# string} {Total int}} P#} {{P# P1 Total 600} {P# P2 Total 1000} {P# P3 Total 400} {P# P4 Total 500} {P# P5 Total 500} {P# P6 Total 100}}}
 
     test relation-summarize-2.0 {summarize per dee} -body {
-	set sp [relvar get SP]
+	set sp [relvar set SP]
 	set dee {Relation {{} {{}}} {{}}}
 	relation summarize $sp $dee {GrandTotal int} [list sum QTY] 0
     } -result {Relation {{{GrandTotal int}} GrandTotal} {{GrandTotal 3100}}}
@@ -1827,7 +1828,7 @@ namespace eval ::ral::test {
     } -result {Relation {{{Name string}} Name}}
 
     test relation-typeof-4.0 {multiple attributes} -body {
-	relation typeof [relvar get SP]
+	relation typeof [relvar set SP]
     } -result {Relation {{{S# string} {P# string} {QTY int}} {{S# P#}}}}
 
     # relation ungroup subcommand
@@ -1943,11 +1944,11 @@ namespace eval ::ral::test {
 
     # examples from the Date book
     test date-example-1.0 {Get suppliers who supply all parts} -body {
-	set pnums [relation project [relvar get P] P#]
-	set f [relation restrict [relvar get S] sx\
+	set pnums [relation project [relvar set P] P#]
+	set f [relation restrict [relvar set S] sx\
 	    {[relation is\
 		[relation project\
-		    [relation restrict [relvar get SP] spx\
+		    [relation restrict [relvar set SP] spx\
 		    {[tuple extract $spx S#] eq [tuple extract $sx S#]}] P#]\
 	    equal $pnums]}]
 	relformat $f "Suppliers who supply all parts"
@@ -1962,9 +1963,9 @@ string  string     int  string
     -body {
 	set allp [relation join\
 	    [relation divide\
-		[relation project [relvar get S] S#]\
-		[relation project [relvar get P] P#]\
-		[relation project [relvar get SP] S# P#]] [relvar get S]]
+		[relation project [relvar set S] S#]\
+		[relation project [relvar set P] P#]\
+		[relation project [relvar set SP] S# P#]] [relvar set S]]
 	relformat $allp "Suppliers who supply all parts (divide)"
     } -result {Suppliers who supply all parts (divide)
 ---------------------------------------
@@ -1976,7 +1977,7 @@ string  string     int  string
     test date-example-3.0 {Get supplier names for suppliers who supply part P2}\
     -body {
 	set n [relation project\
-	    [relation restrict [relation join [relvar get SP] [relvar get S]]\
+	    [relation restrict [relation join [relvar set SP] [relvar set S]]\
 		r1 {[tuple extract $r1 P#] eq "P2"}] SNAME]
 	relformat $n "Get supplier names for suppliers who supply part P2"
     } -result {Get supplier names for suppliers who supply part P2
@@ -1995,9 +1996,9 @@ string
 	    [relation join\
 	    [relation project\
 	    [relation join\
-		[relation restrict [relvar get P] t1\
+		[relation restrict [relvar set P] t1\
 		    {[tuple extract $t1 COLOR] eq "Red"}]\
-		[relvar get SP]] S#] [relvar get S]] SNAME]
+		[relvar set SP]] S#] [relvar set S]] SNAME]
 	relformat $rp "Get supplier name for suppliers who supply at\
 	    least one red part"
     } -result {Get supplier name for suppliers who supply at least one red part
@@ -2012,11 +2013,11 @@ string
     test date-example-5.0 {Get supplier numbers for suppliers who supply\
 	at least all those parts supplied by supplier S2} -body {
 	set alls2 [relation divide\
-	    [relation project [relvar get S] S#]\
+	    [relation project [relvar set S] S#]\
 	    [relation project\
-		[relation restrict [relvar get SP] r1\
+		[relation restrict [relvar set SP] r1\
 		{[tuple extract $r1 S#] eq "S2"}] P#]\
-	    [relation project [relvar get SP] S# P#]]
+	    [relation project [relvar set SP] S# P#]]
 	relformat $alls2 "Get supplier numbers for suppliers who supply\
 	    at least all those parts supplied by supplier S2."
     } -result {Get supplier numbers for suppliers who supply at least all those parts supplied by supplier S2.
@@ -2032,8 +2033,8 @@ string
 	set col [relation project\
 	    [relation restrict\
 	    [relation join\
-	    [relation project [relation rename [relvar get S] S# SA] SA CITY]\
-	    [relation project [relation rename [relvar get S] S# SB] SB CITY]]\
+	    [relation project [relation rename [relvar set S] S# SA] SA CITY]\
+	    [relation project [relation rename [relvar set S] S# SB] SB CITY]]\
 		t1 {[string compare\
 		[tuple extract $t1 SA] [tuple extract $t1 SB]] < 0}]\
 	    SA SB CITY]
@@ -2049,8 +2050,8 @@ string  string  string
 
     test date-example-7.0 {Get supplier info for suppliers who supply part P2}\
     -body {
-	set p2 [relation semijoin [relvar get S]\
-	    [relation restrict [relvar get SP] r1\
+	set p2 [relation semijoin [relvar set S]\
+	    [relation restrict [relvar set SP] r1\
 	    {[tuple extract $r1 P#] eq "P2"}]]
 	relformat $p2 "Get supplier info for suppliers who supply part P2"
     } -result {Get supplier info for suppliers who supply part P2
@@ -2065,8 +2066,8 @@ string  string     int  string
 
     test date-example-8.0 {Get supplier info for suppliers who do not\
 	supply part P2} -body {
-	set np2 [relation semiminus [relvar get S]\
-	    [relation restrict [relvar get SP] r1\
+	set np2 [relation semiminus [relvar set S]\
+	    [relation restrict [relvar set SP] r1\
 		{[tuple extract $r1 P#] eq "P2"}]]
 	relformat $np2 "Get supplier info for suppliers who do not supply\
 	    part P2"
