@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral.c,v $
-$Revision: 1.9 $
-$Date: 2004/05/31 20:57:09 $
+$Revision: 1.10 $
+$Date: 2004/06/05 01:37:19 $
  *--
  */
 
@@ -73,6 +73,28 @@ MACRO DEFINITIONS
 /*
 TYPE DEFINITIONS
 */
+
+/*
+ * There are a number of places where fixed sized integer vectors
+ * are needed.
+ */
+typedef struct Ral_FixedIntVector {
+    int count ;
+    int *vector ;
+} Ral_FixedIntVector ;
+
+/*
+ * There are also a number of places where a mapping between indices
+ * is needed. These are held as a vector of an array of two integers.
+ */
+typedef struct Ral_FixedIntMap {
+    int allocated ;
+    int count ;
+    struct intmap {
+	int index1 ;
+	int index2 ;
+    } *vector ;
+} Ral_FixedIntMap ;
 
 /*
  * Attributes can be of either a base type supplied by Tcl or one of
@@ -107,14 +129,13 @@ typedef struct Ral_Attribute {
  * tuple to be reordered to match that of another tuple. Since attribute order
  * is arbitrary, it is possible to combine tuples from different relations that
  * have equal headings but for which the attributes are ordered differently.
- * In this case the attributes must be reordered to match the order stored a
- * relation heading.
+ * In this case the attributes must be reordered to match the order of the
+ * target relation heading.
  */
 
 typedef struct Ral_AttrOrderMap {
     int isInOrder ;	/* if the order happens to match, this is non-zero */
-    int attrCount ;
-    int *attrOrder ;
+    Ral_FixedIntVector ordering ;
 } Ral_AttrOrderMap ;
 
 /*
@@ -124,21 +145,12 @@ typedef struct Ral_AttrOrderMap {
  * map showing the tuples that match across the join attributes.
  */
 typedef struct Ral_RelationJoinMap {
-    int attrAllocated ;	/* number of map entries allocated */
-    int attrCount ;	/* number of attributes in the vectors below */
-    struct am {
-	int index1 ;
-	int index2 ;
-    } *attrMap ;	/* the attribute map that gives the attribute indices
-			 * in the two relation across which the join is
-			 * performed. */
-    int tupleAllocated ;/* number of tuple map entries allocated */
-    int tupleCount ;	/* number of tuple map entries used */
-    struct tm {
-	int index1 ;
-	int index2 ;
-    } *tupleMap ;	/* the tuple map giving the index in one relation
-			 * that matches that in another relation */
+    Ral_FixedIntMap attrMap ;	/* Attribute map that gives
+				 * the attribute indices in the two relations
+				 * across which the join is performed. */
+    Ral_FixedIntMap tupleMap ;	/* the tuple map giving the index in one
+				 * relation that matches that in another
+				 * relation */
 } Ral_RelationJoinMap ;
 
 /*
@@ -205,29 +217,16 @@ typedef struct Ral_Tuple {
 } Ral_Tuple ;
 
 /*
- * A Relation may also have identifiers defined for it. Identifiers are sub
- * sets of attributes for which the tuples may not have duplicated values. We
- * will also build hash tables for the identifiers that can be used for indices
- * into the values of a Relation.
- */
-
-typedef struct Ral_RelId {
-    int attrCount ;	/* Number of attributes in the identifier */
-    int *attrIndices ;	/* Pointer to an array of attribute indices that
-			 * constitute the identifier. The attribute indices
-			 * index into the "attrVector" of the corresponding
-			 * tuple heading */
-} Ral_RelId ;
-
-/*
  * A Relation Heading is a Tuple Heading with the addition of identifiers.
+ * Identifiers are sub
+ * sets of attributes for which the tuples may not have duplicated values.
  */
 
 typedef struct Ral_RelationHeading {
     int refCount ;
     Ral_TupleHeading *tupleHeading ;
     int idCount ;
-    Ral_RelId *idVector ;
+    Ral_FixedIntVector *idVector ;
 } Ral_RelationHeading ;
 
 /*
@@ -251,8 +250,10 @@ typedef struct Ral_RelationHeading {
  *    {{Name Andrew Number 200 Wage 5.75}\
  *     {Name George Number 174 Wage 10.25}}}
  * is a Relation consisting of a body which has two tuples.
- * All tuples in a relation must have the same heading and all tuples
- * in a relation must be unique.
+ *
+ * All tuples in a relation must have the same heading and all tuples in a
+ * relation must be unique.  We build hash tables for the identifiers that can
+ * be used for indices into the values of a Relation.
  */
 
 typedef struct Ral_Relation {
@@ -329,7 +330,7 @@ EXTERNAL DATA REFERENCES
 /*
 STATIC DATA ALLOCATION
 */
-static char rcsid[] = "@(#) $RCSfile: ral.c,v $ $Revision: 1.9 $" ;
+static char rcsid[] = "@(#) $RCSfile: ral.c,v $ $Revision: 1.10 $" ;
 
 static Tcl_ObjType Ral_TupleType = {
     "Tuple",
@@ -407,6 +408,129 @@ int_ind_compare(
     const int *i2 = m2 ;
 
     return *i1 - *i2 ;
+}
+
+/*
+ * ======================================================================
+ * Fixed Length Integer Vectors Functions
+ * ======================================================================
+ */
+
+static void
+fixedIntVectorCtor(
+    Ral_FixedIntVector *vect,
+    int count)
+{
+    vect->count = count ;
+    vect->vector = count == 0 ? NULL :
+	(int *)ckalloc(count * sizeof(*vect->vector)) ;
+}
+
+static void
+fixedIntVectorDtor(
+    Ral_FixedIntVector *vect)
+{
+    if (vect->vector) {
+	ckfree((char *)vect->vector) ;
+    }
+}
+
+static void
+fixedIntVectorCopy(
+    Ral_FixedIntVector *src,
+    Ral_FixedIntVector *dst)
+{
+    fixedIntVectorCtor(dst, src->count) ;
+    memcpy(dst->vector, src->vector, dst->count * sizeof(*dst->vector)) ;
+}
+
+static void
+fixedIntVectorSort(
+    Ral_FixedIntVector *vect)
+{
+    qsort(vect->vector, vect->count, sizeof(*vect->vector), int_ind_compare) ;
+}
+
+static int
+fixedIntVectorEqual(
+    Ral_FixedIntVector *v1,
+    Ral_FixedIntVector *v2)
+{
+    if (v1 == v2) {
+	return 1 ;
+    }
+    if (v1->count != v2->count) {
+	return 0 ;
+    }
+    /*
+     * This works only if the integer vectors are in sorted order, as is the
+     * case when the vector contains a set of indices to identifying
+     * attributes.
+     */
+    return memcmp(v1->vector, v2->vector, v1->count * sizeof(*v1->vector))
+	== 0 ;
+}
+
+/*
+ * Is v1 a subset (perhaps improper subset) of v2.
+ */
+static int
+fixedIntVectorIsSubsetOf(
+    Ral_FixedIntVector *v1,
+    Ral_FixedIntVector *v2)
+{
+    if (v1 == v2) {
+	return 1 ;
+    }
+    if (v1->count > v2->count) {
+	return 0 ;
+    }
+    /*
+     * Index vector is sorted.
+     */
+    return memcmp(v1->vector, v2->vector, v1->count * sizeof(*v1->vector))
+	== 0 ;
+}
+
+/*
+ * Create a vector that holds the identity mapping.
+ */
+static void
+fixedIntVectorIdentityMap(
+    Ral_FixedIntVector *fiv,
+    int degree)
+{
+    int index ;
+
+    fixedIntVectorCtor(fiv, degree) ;
+    for (index = 0 ; index < degree ; ++index) {
+	fiv->vector[index] = index ;
+    }
+}
+
+/*
+ * ======================================================================
+ * Fixed Length Integer Map Functions
+ * ======================================================================
+ */
+static void
+fixedIntMapCtor(
+    Ral_FixedIntMap *map,
+    int maxNum)
+{
+    map->allocated = maxNum ;
+    map->count = 0 ;
+    map->vector = maxNum == 0 ? NULL :
+	(struct intmap *)ckalloc(maxNum * sizeof(*map->vector)) ;
+}
+
+static void
+fixedIntMapDtor(
+    Ral_FixedIntMap *map)
+{
+    if (map->vector) {
+	ckfree((char *)map->vector) ;
+    }
 }
 
 /*
@@ -783,6 +907,23 @@ attributeValueToString(
     return (*resultPtr = result) ? TCL_OK : TCL_ERROR ;
 }
 
+static void
+attributeAppendIdAttrs(
+    Ral_Attribute *tupleAttrs,
+    Ral_FixedIntVector *relId,
+    Tcl_Obj *resultObj)
+{
+    int i ;
+
+    for (i = 0 ; i < relId->count ; ++i) {
+	if (i != 0) {
+	    Tcl_AppendStringsToObj(resultObj, ", ", NULL) ;
+	}
+	Tcl_AppendStringsToObj(resultObj,
+	    Tcl_GetString(tupleAttrs[relId->vector[i]].name), NULL) ;
+    }
+}
+
 /*
  * ======================================================================
  * Attribute Order Map Functions
@@ -794,17 +935,20 @@ attrOrderMapNew(
     int attrCount)
 {
     Ral_AttrOrderMap *map ;
-    int nbytes ;
 
-    nbytes = sizeof(*map) + attrCount * sizeof(*map->attrOrder) ;
-    map = (Ral_AttrOrderMap *)ckalloc(nbytes) ;
-    memset(map, 0, nbytes) ;
-
+    map = (Ral_AttrOrderMap *)ckalloc(sizeof(*map)) ;
     map->isInOrder = 0 ;
-    map->attrCount = attrCount ;
-    map->attrOrder = (int *)(map + 1) ;
+    fixedIntVectorCtor(&map->ordering, attrCount) ;
 
     return map ;
+}
+
+static void
+attrOrderMapDelete(
+    Ral_AttrOrderMap *map)
+{
+    fixedIntVectorDtor(&map->ordering) ;
+    ckfree((char *)map) ;
 }
 
 /*
@@ -823,7 +967,7 @@ attrOrderMapGenerateOrdering(
 
     assert(tupleHeadingEqual(th1, th2)) ;
     map = attrOrderMapNew(th1->degree) ;
-    order = map->attrOrder ;
+    order = map->ordering.vector ;
 
     attr1 = th1->attrVector ;
     for (index1 = 0 ; index1 < th1->degree ; ++index1, ++attr1) {
@@ -855,16 +999,8 @@ relationJoinMapNew(
     Ral_RelationJoinMap *map ;
 
     map = (Ral_RelationJoinMap *)ckalloc(sizeof(*map)) ;
-
-    map->attrAllocated = nAttrs ;
-    map->attrCount = 0 ;
-    map->attrMap = (struct am *)ckalloc(nAttrs * sizeof(*map->attrMap)) ;
-    memset(map->attrMap, 0, nAttrs * sizeof(*map->attrMap)) ;
-
-    map->tupleAllocated = nTuples ;
-    map->tupleCount = 0 ;
-    map->tupleMap = (struct tm *)ckalloc(nTuples * sizeof(*map->tupleMap)) ;
-    memset(map->tupleMap, 0, nTuples * sizeof(*map->tupleMap)) ;
+    fixedIntMapCtor(&map->attrMap, nAttrs) ;
+    fixedIntMapCtor(&map->tupleMap, nTuples) ;
 
     return map ;
 }
@@ -873,8 +1009,8 @@ static void
 relationJoinMapDelete(
     Ral_RelationJoinMap *map)
 {
-    ckfree((char *)map->attrMap) ;
-    ckfree((char *)map->tupleMap) ;
+    fixedIntMapDtor(&map->attrMap) ;
+    fixedIntMapDtor(&map->tupleMap) ;
     ckfree((char *)map) ;
 }
 
@@ -884,10 +1020,10 @@ relationJoinMapAddAttrs(
     int i1,
     int i2)
 {
-    assert(map->attrCount < map->attrAllocated) ;
-    map->attrMap[map->attrCount].index1 = i1 ;
-    map->attrMap[map->attrCount].index2 = i2 ;
-    ++map->attrCount ;
+    assert(map->attrMap.count < map->attrMap.allocated) ;
+    map->attrMap.vector[map->attrMap.count].index1 = i1 ;
+    map->attrMap.vector[map->attrMap.count].index2 = i2 ;
+    ++map->attrMap.count ;
 }
 
 static void
@@ -896,10 +1032,10 @@ relationJoinMapAddTuples(
     int i1,
     int i2)
 {
-    assert(map->tupleCount < map->tupleAllocated) ;
-    map->tupleMap[map->tupleCount].index1 = i1 ;
-    map->tupleMap[map->tupleCount].index2 = i2 ;
-    ++map->tupleCount ;
+    assert(map->tupleMap.count < map->tupleMap.allocated) ;
+    map->tupleMap.vector[map->tupleMap.count].index1 = i1 ;
+    map->tupleMap.vector[map->tupleMap.count].index2 = i2 ;
+    ++map->tupleMap.count ;
 }
 
 /*
@@ -1470,6 +1606,84 @@ tupleHeadingJoinAttrs(
     return TCL_OK ;
 }
 
+static int
+tupleHeadingSetIdFromObj(
+    Tcl_Interp *interp,
+    Ral_TupleHeading *tupleHeading,
+    Ral_FixedIntVector *relId,
+    Tcl_Obj *objPtr)
+{
+    int elemc ;
+    Tcl_Obj **elemv ;
+    int c ;
+
+    if (Tcl_ListObjGetElements(interp, objPtr, &elemc, &elemv)) {
+	return TCL_ERROR ;
+    }
+    fixedIntVectorCtor(relId, elemc) ;
+
+    for (c = 0 ; c < elemc ; ++c) {
+	int index ;
+
+	index = tupleHeadingFindIndex(interp, tupleHeading, *elemv++) ;
+	if (index < 0) {
+	    return TCL_ERROR ;
+	}
+	relId->vector[c] = index ;
+    }
+    fixedIntVectorSort(relId) ;
+
+    return TCL_OK ;
+}
+
+static Tcl_Obj *
+tupleHeadingIdToList(
+    Tcl_Interp *interp,
+    Ral_TupleHeading *tupleHeading,
+    Ral_FixedIntVector *relId)
+{
+    Tcl_Obj *attrList ;
+    int c ;
+
+    attrList = Tcl_NewListObj(0, NULL) ;
+    for (c = 0 ; c < relId->count ; ++c) {
+	assert(relId->vector[c] < tupleHeading->degree) ;
+	if (Tcl_ListObjAppendElement(interp, attrList,
+	    tupleHeading->attrVector[relId->vector[c]].name) != TCL_OK) {
+	    Tcl_DecrRefCount(attrList) ;
+	    return NULL ;
+	}
+    }
+
+    return attrList ;
+}
+
+/*
+ * Recompute a relId based on the names from one heading indexed into
+ * another heading.
+ * Assumes the tuple headings are equal!
+ */
+static void
+tupleHeadingMapIds(
+    Ral_TupleHeading *h1,
+    Ral_FixedIntVector *relId1,
+    Ral_TupleHeading *h2,
+    Ral_FixedIntVector *relId2)
+{
+    int c ;
+
+    assert(tupleHeadingEqual(h1, h2)) ;
+
+    for (c = 0 ; c < relId1->count ; ++c) {
+	int index ;
+
+	index = tupleHeadingFindIndex(NULL, h2, h1->attrVector[c].name) ;
+	assert(index >= 0) ;
+	relId2->vector[c] = index ;
+    }
+    fixedIntVectorSort(relId2) ;
+}
+
 /*
  * ======================================================================
  * Tuple Functions
@@ -1828,6 +2042,21 @@ tupleUpdateValues(
     return TCL_OK ;
 }
 
+static void
+tupleGetIdKey(
+    Ral_Tuple *tuple,
+    Ral_FixedIntVector *relId,
+    Tcl_DString *idKey)
+{
+    int i ;
+
+    Tcl_DStringInit(idKey) ;
+    for (i = 0 ; i < relId->count ; ++i) {
+	Tcl_DStringAppend(idKey,
+	    Tcl_GetString(tuple->values[relId->vector[i]]), -1) ;
+    }
+}
+
 /*
  * ======================================================================
  * Functions to Support the Tcl type
@@ -1948,218 +2177,6 @@ SetTupleFromAny(
 
 /*
  * ======================================================================
- * Relation Identifier Functions
- * ======================================================================
- */
-
-static void
-relIdDtor(
-    Ral_RelId *relId)
-{
-    if (relId->attrIndices) {
-	ckfree((char *)relId->attrIndices) ;
-    }
-    relId->attrIndices = NULL ;
-    relId->attrCount = 0 ;
-}
-
-static void
-relIdCtor(
-    Ral_RelId *relId,
-    int nAttrs)
-{
-    relIdDtor(relId) ;
-
-    if (nAttrs > 0) {
-	relId->attrCount = nAttrs ;
-	relId->attrIndices = (int *)ckalloc(nAttrs *
-	    sizeof(*relId->attrIndices)) ;
-    }
-}
-
-static int
-relIdEqual(
-    Ral_RelId *id1,
-    Ral_RelId *id2)
-{
-    if (id1 == id2) {
-	return 1 ;
-    }
-    if (id1->attrCount != id2->attrCount) {
-	return 0 ;
-    }
-    /*
-     * This works because the attribute index vectors are
-     * always kept in sorted order.
-     */
-    return memcmp(id1->attrIndices, id2->attrIndices,
-	id1->attrCount * sizeof(*id1->attrIndices)) == 0 ;
-}
-
-/*
- * Is id1 a subset (perhaps improper subset) of id2.
- */
-static int
-relIdIsSubsetOf(
-    Ral_RelId *id1,
-    Ral_RelId *id2)
-{
-    if (id1 == id2) {
-	return 1 ;
-    }
-    if (id1->attrCount > id2->attrCount) {
-	return 0 ;
-    }
-    /*
-     * Index vector is sorted.
-     */
-    return memcmp(id1->attrIndices, id2->attrIndices,
-	id1->attrCount * sizeof(*id1->attrIndices)) == 0 ;
-}
-
-static int
-relIdSetFromObj(
-    Tcl_Interp *interp,
-    Ral_RelId *relId,
-    Ral_TupleHeading *tupleHeading,
-    Tcl_Obj *objPtr)
-{
-    int elemc ;
-    Tcl_Obj **elemv ;
-    int *attrIndices ;
-
-    if (Tcl_ListObjGetElements(interp, objPtr, &elemc, &elemv)) {
-	return TCL_ERROR ;
-    }
-    relIdCtor(relId, elemc) ;
-
-    for (attrIndices = relId->attrIndices ; elemc > 0 ;
-	--elemc, ++elemv, ++attrIndices) {
-	int index ;
-
-	index = tupleHeadingFindIndex(interp, tupleHeading, *elemv) ;
-	if (index < 0) {
-	    return TCL_ERROR ;
-	}
-	*attrIndices = index ;
-    }
-    qsort(relId->attrIndices, relId->attrCount, sizeof(*relId->attrIndices),
-	int_ind_compare) ;
-
-    return TCL_OK ;
-}
-
-/*
- * Create an identifier that matches all the attributes of the heading.
- */
-static void
-relIdSetAllAttributes(
-    Ral_RelId *relId,
-    int degree)
-{
-    int index ;
-    int *attrIndices ;
-
-    relIdCtor(relId, degree) ;
-    for (index = 0, attrIndices = relId->attrIndices ; index < degree ;
-	++index, ++attrIndices) {
-	*attrIndices = index ;
-    }
-}
-
-static Tcl_Obj *
-relIdAttrsToList(
-    Tcl_Interp *interp,
-    Ral_RelId *relId,
-    Ral_TupleHeading *tupleHeading)
-{
-    Tcl_Obj *attrList ;
-    int attrCount ;
-    int *attrIndices ;
-    Ral_Attribute *attrSet ;
-
-    attrList = Tcl_NewListObj(0, NULL) ;
-    attrSet = tupleHeading->attrVector ;
-    for (attrCount = relId->attrCount, attrIndices = relId->attrIndices ;
-	attrCount > 0 ; --attrCount, ++attrIndices) {
-	if (Tcl_ListObjAppendElement(interp, attrList,
-	    attrSet[*attrIndices].name) != TCL_OK) {
-	    Tcl_DecrRefCount(attrList) ;
-	    return NULL ;
-	}
-    }
-
-    return attrList ;
-}
-
-static void
-relIdAppendAttrNames(
-    Ral_RelId *relId,
-    Ral_Attribute *tupleAttrs,
-    Tcl_Obj *resultObj)
-{
-    int *attrIndices ;
-    int i ;
-
-    attrIndices = relId->attrIndices ;
-    for (i = 0 ; i < relId->attrCount ; ++i) {
-	if (i != 0) {
-	    Tcl_AppendStringsToObj(resultObj, ", ", NULL) ;
-	}
-	Tcl_AppendStringsToObj(resultObj,
-	    Tcl_GetString(tupleAttrs[*attrIndices++].name), NULL) ;
-    }
-}
-
-static void
-relIdKey(
-    Ral_RelId *relId,
-    Ral_Tuple *tuple,
-    Tcl_DString *idKey)
-{
-    Tcl_Obj **values = tuple->values ;
-    int *attrIndices = relId->attrIndices ;
-    int i ;
-
-    Tcl_DStringInit(idKey) ;
-    for (i = relId->attrCount ; i > 0 ; --i) {
-	Tcl_DStringAppend(idKey, Tcl_GetString(values[*attrIndices++]), -1) ;
-    }
-}
-
-/*
- * Recompute a relId based on the names from one heading indexed into
- * another heading.
- * Assumes the tuple headings are equal!
- */
-static void
-relIdMapToHeading(
-    Ral_RelId *relId1,
-    Ral_TupleHeading *h1,
-    Ral_RelId *relId2,
-    Ral_TupleHeading *h2)
-{
-    int c1 = relId1->attrCount ;
-    int *v1 = relId1->attrIndices ;
-    int *v2 = relId2->attrIndices ;
-
-    assert(h1->degree == h2->degree) ;
-
-    for ( ; c1 > 0 ; --c1, ++v1, ++v2) {
-	Ral_Attribute *attr1 = h1->attrVector + *v1 ;
-	Ral_Attribute *attr2 ;
-	int index ;
-
-	index = tupleHeadingFindIndex(NULL, h2, attr1->name) ;
-	assert(index >= 0) ;
-	*v2 = index ;
-    }
-    qsort(relId2->attrIndices, relId2->attrCount, sizeof(*relId2->attrIndices),
-	int_ind_compare) ;
-}
-
-/*
- * ======================================================================
  * Relation Heading Functions
  * ======================================================================
  */
@@ -2171,7 +2188,7 @@ relationHeadingNew(
 {
     Ral_RelationHeading *heading ;
     int nBytes ;
-    Ral_RelId *idVector ;
+    Ral_FixedIntVector *idVector ;
 
     assert(nIds > 0) ;
 
@@ -2182,10 +2199,10 @@ relationHeadingNew(
     heading->refCount = 0 ;
     tupleHeadingReference(heading->tupleHeading = tupleHeading) ;
     heading->idCount = nIds ;
-    idVector = heading->idVector = (Ral_RelId *)(heading + 1) ;
+    idVector = heading->idVector = (Ral_FixedIntVector *)(heading + 1) ;
 
     for ( ; nIds > 0 ; --nIds, ++idVector) {
-	relIdCtor(idVector, 0) ;
+	fixedIntVectorCtor(idVector, 0) ;
     }
 
     return heading ;
@@ -2195,13 +2212,13 @@ static void
 relationHeadingDelete(
     Ral_RelationHeading *heading)
 {
-    Ral_RelId *idVector = heading->idVector ;
+    Ral_FixedIntVector *idVector = heading->idVector ;
     int nIds ;
 
     assert(heading->refCount <= 0) ;
 
     for (nIds = heading->idCount ; nIds > 0 ; --nIds, ++idVector) {
-	relIdDtor(idVector) ;
+	fixedIntVectorDtor(idVector) ;
     }
     tupleHeadingUnreference(heading->tupleHeading) ;
     ckfree((char *)heading) ;
@@ -2215,8 +2232,8 @@ relationHeadingDup(
     Ral_TupleHeading *tupleHeading ;
     Ral_RelationHeading *heading ;
     int idCount = srcHeading->idCount ;
-    Ral_RelId *srcIdVector = srcHeading->idVector ;
-    Ral_RelId *destIdVector ;
+    Ral_FixedIntVector *srcIdVector = srcHeading->idVector ;
+    Ral_FixedIntVector *destIdVector ;
 
     tupleHeading = tupleHeadingDup(srcHeading->tupleHeading, addAttrs) ;
     if (!tupleHeading) {
@@ -2226,9 +2243,9 @@ relationHeadingDup(
     heading = relationHeadingNew(tupleHeading, idCount) ;
     for (destIdVector = heading->idVector ; idCount > 0 ;
 	--idCount, ++srcIdVector, ++destIdVector) {
-	relIdCtor(destIdVector, srcIdVector->attrCount) ;
-	memcpy(destIdVector->attrIndices, srcIdVector->attrIndices,
-	    srcIdVector->attrCount * sizeof(*srcIdVector->attrIndices)) ;
+	fixedIntVectorCtor(destIdVector, srcIdVector->count) ;
+	memcpy(destIdVector->vector, srcIdVector->vector,
+	    srcIdVector->count * sizeof(*srcIdVector->vector)) ;
     }
     return heading ;
 }
@@ -2249,22 +2266,22 @@ relationHeadingUnreference(
     }
 }
 
-static Ral_RelId *
+static int
 relationHeadingFindId(
     Ral_RelationHeading *heading,
-    Ral_RelId *id)
+    Ral_FixedIntVector *idKey)
 {
-    int idCount ;
-    Ral_RelId *idVector ;
+    int idNum ;
+    Ral_FixedIntVector *idVector ;
 
-    for (idCount = heading->idCount, idVector = heading->idVector ;
-	idCount > 0 ; --idCount, ++idVector) {
-	if (relIdEqual(idVector, id)) {
-	    return idVector ;
+    for (idNum = 0, idVector = heading->idVector ;
+	idNum < heading->idCount ; ++idNum, ++idVector) {
+	if (fixedIntVectorEqual(idVector, idKey)) {
+	    return idNum ;
 	}
     }
 
-    return NULL ;
+    return -1 ;
 }
 
 /*
@@ -2273,12 +2290,13 @@ relationHeadingFindId(
  */
 static int
 relationHeadingCheckId(
-    Ral_RelId *start,
-    Ral_RelId *last,
-    Ral_RelId *key)
+    Ral_FixedIntVector *start,
+    Ral_FixedIntVector *last,
+    Ral_FixedIntVector *key)
 {
     for ( ; start != last ; ++start) {
-	if (relIdIsSubsetOf(key, start) || relIdIsSubsetOf(start, key)) {
+	if (fixedIntVectorIsSubsetOf(key, start) ||
+	    fixedIntVectorIsSubsetOf(start, key)) {
 	    return 0 ;
 	}
     }
@@ -2297,31 +2315,31 @@ relationHeadingIdsEqual(
 {
     Ral_TupleHeading *th1 = h1->tupleHeading ;
     int idCount = h1->idCount ;
-    Ral_RelId *idVector = h1->idVector ;
+    Ral_FixedIntVector *idVector = h1->idVector ;
     Ral_TupleHeading *th2 = h2->tupleHeading ;
-    Ral_RelId keyId ;
+    Ral_FixedIntVector keyId ;
 
     if (h1->idCount != h2->idCount) {
 	return 0 ;
     }
     /*
-     * Strategy is to compose a "relId" using the names of h1 and find
-     * the corresponding indices from h2. Then we can search the Id's
-     * of h2 to see if we can find a match. If identifier in h1 has
-     * a correspondence in h2, then we have a match.
+     * Strategy is to compose a vector of indices of the identifying attributes
+     * using the names of h1 and find the corresponding indices from h2. Then
+     * we can search the Id's of h2 to see if we can find a match. If an
+     * identifier in h1 has a correspondence in h2, then we have a match.
      */
     memset(&keyId, 0, sizeof(keyId)) ;
     for ( ; idCount > 0 ; --idCount, ++idVector) {
-	Ral_RelId *found ;
+	int found ;
 
-	relIdCtor(&keyId, idVector->attrCount) ;
+	fixedIntVectorCtor(&keyId, idVector->count) ;
 
-	relIdMapToHeading(idVector, th1, &keyId, th2) ;
+	tupleHeadingMapIds(th1, idVector, th2, &keyId) ;
 	found = relationHeadingFindId(h2, &keyId) ;
 
-	relIdDtor(&keyId) ;
+	fixedIntVectorDtor(&keyId) ;
 
-	if (found == NULL) {
+	if (found < 0) {
 	    return 0 ;
 	}
     }
@@ -2354,7 +2372,7 @@ relationHeadingNewFromObjs(
     Tcl_Obj *allocated = NULL ;
     int idc ;
     Tcl_Obj **idv ;
-    Ral_RelId *idVector ;
+    Ral_FixedIntVector *idVector ;
 
     tupleHeading = tupleHeadingNewFromString(interp, headingObj) ;
     if (!tupleHeading) {
@@ -2374,7 +2392,8 @@ relationHeadingNewFromObjs(
 
     heading = relationHeadingNew(tupleHeading, idc) ;
     for (idVector = heading->idVector ; idc > 0 ; --idc, ++idv, ++idVector) {
-	if (relIdSetFromObj(interp, idVector, tupleHeading, *idv) != TCL_OK) {
+	if (tupleHeadingSetIdFromObj(interp, tupleHeading, idVector, *idv)
+	    != TCL_OK) {
 	    relationHeadingDelete(heading) ;
 	    return NULL ;
 	}
@@ -2385,7 +2404,7 @@ relationHeadingNewFromObjs(
 		Tcl_ResetResult(interp) ;
 		resultObj = Tcl_GetObjResult(interp) ;
 		Tcl_AppendStringsToObj(resultObj, "identifier, \"", NULL) ;
-		relIdAppendAttrNames(idVector, tupleHeading->attrVector,
+		attributeAppendIdAttrs(tupleHeading->attrVector, idVector,
 		    resultObj) ;
 		Tcl_AppendStringsToObj(resultObj,
 	"\", is not irreducible with respect to least one other indentifier",
@@ -2429,14 +2448,15 @@ relationHeadingIdsToList(
 {
     Tcl_Obj *idObj ;
     int idCount ;
-    Ral_RelId *idVector ;
+    Ral_FixedIntVector *idVector ;
 
     idObj = Tcl_NewListObj(0, NULL) ;
     for (idCount = heading->idCount, idVector = heading->idVector ;
 	idCount > 0 ; --idCount, ++idVector) {
 	Tcl_Obj *idAttrList ;
 
-	idAttrList = relIdAttrsToList(interp, idVector, heading->tupleHeading) ;
+	idAttrList = tupleHeadingIdToList(interp, heading->tupleHeading,
+	    idVector) ;
 	if (idAttrList == NULL || Tcl_ListObjAppendElement(interp, idObj,
 	    idAttrList) != TCL_OK) {
 	    Tcl_DecrRefCount(idObj) ;
@@ -2455,7 +2475,7 @@ relationHeadingObjNew(
     Tcl_Obj *headElems[2] ;
     Tcl_Obj *pair[2] ;
     int idCount ;
-    Ral_RelId *idVector ;
+    Ral_FixedIntVector *idVector ;
 
     headElems[0] = tupleHeadingAttrsToList(interp, heading->tupleHeading) ;
     if (!headElems[0]) {
@@ -2629,7 +2649,7 @@ relationIndexIdentifier(
     Ral_Tuple *tuple,
     int where)
 {
-    Ral_RelId *relId ;
+    Ral_FixedIntVector *relId ;
     Tcl_HashTable *hashTable ;
     Tcl_DString idKey ;
     Tcl_HashEntry *entry ;
@@ -2640,7 +2660,7 @@ relationIndexIdentifier(
     relId = relation->heading->idVector + idIndex ;
     hashTable = relation->indexVector + idIndex ;
 
-    relIdKey(relId, tuple, &idKey) ;
+    tupleGetIdKey(tuple, relId, &idKey) ;
     entry = Tcl_CreateHashEntry(hashTable, Tcl_DStringValue(&idKey), &newPtr) ;
     Tcl_DStringFree(&idKey) ;
     /*
@@ -2656,7 +2676,8 @@ relationIndexIdentifier(
 	    Tcl_AppendStringsToObj(resultObj, "tuple, \"",
 		Tcl_GetString(nvList),
 		"\", contains duplicate values for the identifier, \"", NULL) ;
-	    relIdAppendAttrNames(relId, tuple->heading->attrVector, resultObj) ;
+	    attributeAppendIdAttrs(tuple->heading->attrVector, relId,
+		resultObj) ;
 	    Tcl_AppendStringsToObj(resultObj, "\"", NULL) ;
 	    Tcl_DecrRefCount(nvList) ;
 	}
@@ -2673,15 +2694,13 @@ relationFindIndexEntry(
     int idIndex,
     Ral_Tuple *tuple)
 {
-    Ral_RelId *relId ;
     Tcl_DString idKey ;
     Tcl_HashEntry *entry ;
 
     assert(idIndex < relation->heading->idCount) ;
-    relId = relation->heading->idVector + idIndex ;
 
-    relIdKey(relId, tuple, &idKey) ;
-    entry = Tcl_FindHashEntry(relation->indexVector + idIndex,
+    tupleGetIdKey(tuple, &relation->heading->idVector[idIndex], &idKey) ;
+    entry = Tcl_FindHashEntry(&relation->indexVector[idIndex],
 	Tcl_DStringValue(&idKey)) ;
     Tcl_DStringFree(&idKey) ;
 
@@ -2735,18 +2754,19 @@ relationFindIndexInOrder(
 	tupleIndex = relationFindTupleIndex(relation, idIndex, tuple) ;
     } else {
 	Tcl_DString idKey ;
-	Ral_RelId *relId = relation->heading->idVector + idIndex ;
+	Ral_FixedIntVector *relId = relation->heading->idVector + idIndex ;
 	Tcl_Obj **values = tuple->values ;
-	int *attrIndices = relId->attrIndices ;
-	int *attrOrder = order->attrOrder ;
+	int *attrIndices = relId->vector ;
+	int *attrOrder = order->ordering.vector ;
 	Tcl_HashTable *indexTable = relation->indexVector + idIndex ;
 	int i ;
 	Tcl_HashEntry *entry ;
 
-	assert(relation->heading->tupleHeading->degree == order->attrCount) ;
+	assert(relation->heading->tupleHeading->degree ==
+	    order->ordering.count) ;
 
 	Tcl_DStringInit(&idKey) ;
-	for (i = relId->attrCount ; i > 0 ; --i) {
+	for (i = relId->count ; i > 0 ; --i) {
 	    Tcl_DStringAppend(&idKey,
 		Tcl_GetString(values[attrOrder[*attrIndices++]]), -1) ;
 	}
@@ -2963,19 +2983,14 @@ relationAppendReorderedTuple(
 	return relationAppendTuple(interp, relation , tuple) ;
     } else {
 	Ral_Tuple *newTuple ;
-	int attrCount ;
-	int *order ;
-	Tcl_Obj **values ;
-	Tcl_Obj **newValues ;
+	int c ;
 
 	newTuple = tupleNew(relation->heading->tupleHeading) ;
 
-	order = orderMap->attrOrder ;
-	values = tuple->values ;
-	newValues = newTuple->values ;
-	assert(newTuple->heading->degree == orderMap->attrCount) ;
-	for (attrCount = orderMap->attrCount ; attrCount > 0 ; --attrCount) {
-	    Tcl_IncrRefCount(*newValues++ = values[*order++]) ;
+	assert(newTuple->heading->degree == orderMap->ordering.count) ;
+	for (c = 0 ; c < orderMap->ordering.count ; ++c) {
+	    Tcl_IncrRefCount(newTuple->values[c] =
+		tuple->values[orderMap->ordering.vector[c]]) ;
 	}
 
 	if (relationAppendTuple(interp, relation , newTuple) != TCL_OK) {
@@ -3142,24 +3157,25 @@ relationFindJoinTuples(
 	for (card2 = 0, tv2 = r2->tupleVector ; card2 < r2->cardinality ;
 	    ++card2, ++tv2) {
 	    Ral_Tuple *tuple2 ;
-	    int nAttrs ;
-	    struct am *av ;
+	    int attrIndex ;
 	    int matches = 0 ;
 
 	    tuple2 = *tv2 ;
-	    for (nAttrs = map->attrCount, av = map->attrMap ; nAttrs > 0 ;
-		--nAttrs, ++av) {
-		assert(av->index1 < tuple1->heading->degree) ;
-		assert(av->index2 < tuple2->heading->degree) ;
+	    for (attrIndex = 0 ; attrIndex < map->attrMap.count ; ++attrIndex) {
+		assert(map->attrMap.vector[attrIndex].index1 <
+		    tuple1->heading->degree) ;
+		assert(map->attrMap.vector[attrIndex].index2 <
+		    tuple2->heading->degree) ;
 
-		if (!ObjsEqual(tuple1->values[av->index1],
-		    tuple2->values[av->index2])) {
+		if (!ObjsEqual(
+		    tuple1->values[map->attrMap.vector[attrIndex].index1],
+		    tuple2->values[map->attrMap.vector[attrIndex].index2])) {
 		    break ;
 		}
 		++matches ;
 	    }
 
-	    if (matches == map->attrCount) {
+	    if (matches == map->attrMap.count) {
 		relationJoinMapAddTuples(map, card1, card2) ;
 	    }
 	}
@@ -4140,19 +4156,21 @@ TupleWrapCmd(
     /*
      * The wrapped tuple will have the number of attributes specified.
      */
-    wrapAttrMap = ckalloc(heading->degree) ;
+    wrapAttrMap = ckalloc(heading->degree * sizeof(*wrapAttrMap)) ;
     memset(wrapAttrMap, 0, heading->degree) ;
     wrapHeading = tupleHeadingNew(elemc) ;
     wrapTuple = tupleNew(wrapHeading) ;
     for (i = 0 ; i < elemc ; ++i) {
 	attrIndex = tupleHeadingFindIndex(interp, heading, *elemv++) ;
 	if (attrIndex < 0) {
+	    tupleDelete(wrapTuple) ;
 	    goto errorOut ;
 	}
 	assert(attrIndex < heading->degree) ;
 	wrapAttrMap[attrIndex] = 1 ;
 	if (tupleHeadingCopy(interp, heading, attrIndex, attrIndex + 1,
 	    wrapHeading, i) != TCL_OK) {
+	    tupleDelete(wrapTuple) ;
 	    goto errorOut ;
 	}
 	tupleCopyValues(tuple, attrIndex, attrIndex + 1, wrapTuple, i) ;
@@ -4199,9 +4217,9 @@ TupleWrapCmd(
 
 errorOut2:
     tupleDelete(newTuple) ;
+    Tcl_DecrRefCount(wrapTupleObj) ;
 errorOut:
     ckfree(wrapAttrMap) ;
-    Tcl_DecrRefCount(wrapTupleObj) ;
     return TCL_ERROR ;
 }
 
@@ -5075,6 +5093,7 @@ RelationDivideCmd(
     Ral_TupleHeading *medTupleHeading ;
     Tcl_HashTable medHashTable ;
     Ral_Relation *quot ;
+    int idIndex ;
     Ral_TupleHeading *trialTupleHeading ;
     Ral_Tuple *trialTuple ;
     int dendCard ;
@@ -5138,12 +5157,12 @@ RelationDivideCmd(
     /*
      * create quotient
      */
-    quot = relationNew(relationHeadingNew(dendTupleHeading, 1)) ;
-    relIdCtor(quot->heading->idVector, dend->heading->idVector->attrCount) ;
-    memcpy(quot->heading->idVector->attrIndices,
-	dend->heading->idVector->attrIndices,
-	quot->heading->idVector->attrCount *
-	    sizeof(*quot->heading->idVector->attrIndices)) ;
+    quot = relationNew(relationHeadingNew(dendTupleHeading,
+	dend->heading->idCount)) ;
+    for (idIndex = 0 ; idIndex < dend->heading->idCount ; ++idIndex) {
+	fixedIntVectorCopy(&dend->heading->idVector[idIndex],
+	    &quot->heading->idVector[idIndex]) ;
+    }
     relationReserve(quot, dend->cardinality) ;
     /*
      * Create an index for the mediator relation that will be used to
@@ -5317,7 +5336,7 @@ RelationEliminateCmd(
      * "project" command.
      */
     elimHeading = relationHeadingNew(elimTupleHeading, 1) ;
-    relIdSetAllAttributes(elimHeading->idVector, elimTupleHeading->degree) ;
+    fixedIntVectorIdentityMap(elimHeading->idVector, elimTupleHeading->degree) ;
     elimRelation = relationNew(elimHeading) ;
     relationReserve(elimRelation, relation->cardinality) ;
 
@@ -5602,6 +5621,195 @@ RelationForeachCmd(
 }
 
 static int
+RelationGroupCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_Obj *relObj ;
+    Ral_Relation *rel ;
+    Ral_TupleHeading *tupleHeading ;
+    Tcl_Obj *newAttrObj ;
+    Ral_TupleHeading *grpAttrTupleHeading ;
+    Ral_RelationHeading *grpAttrRelationHeading ;
+    char *relAttrMap ;
+    int c ;
+    int d ;
+    int attrIndex ;
+    int where ;
+    Ral_TupleHeading *grpTupleHeading ;
+    Ral_RelationHeading *grpHeading ;
+    Ral_Relation *group ;
+    Tcl_HashTable groupHash ;
+    Ral_Tuple *grpAttrTuple ;
+
+    /* relation group relation newattribute ?attr1 attr2 ...? */
+    if (objc < 4) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+	    "relation newattribute ?attr1 attr2 ...?") ;
+	return TCL_ERROR ;
+    }
+    relObj = objv[2] ;
+    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    rel = relObj->internalRep.otherValuePtr ;
+    tupleHeading = rel->heading->tupleHeading ;
+    newAttrObj = objv[3] ;
+    objc -= 4 ;
+    objv += 4 ;
+
+    if (objc > tupleHeading->degree) {
+	Tcl_SetStringObj(Tcl_GetObjResult(interp), 
+	    "attempt to group more attributes than exist in the relation", -1) ;
+    }
+
+    /*
+     * Examine the attribute arguments to determine if the attributes exist and
+     * build a map to use later to determine which attributes will be in the
+     * new relation valued attribute and which will remain in the tuple.
+     * Construct the tuple heading for the new relation valued attribute.
+     */
+    relAttrMap = ckalloc(tupleHeading->degree) ;
+    memset(relAttrMap, 0 , tupleHeading->degree) ;
+    grpAttrTupleHeading = tupleHeadingNew(objc) ;
+    for (d = 0 ; d < objc ; ++d) {
+	attrIndex = tupleHeadingFindIndex(interp, tupleHeading, *objv++) ;
+	if (attrIndex < 0 || tupleHeadingCopy(interp, tupleHeading,
+	    attrIndex, attrIndex + 1, grpAttrTupleHeading, d) != TCL_OK) {
+	    tupleHeadingDelete(grpAttrTupleHeading) ;
+	    ckfree(relAttrMap) ;
+	    return TCL_ERROR ;
+	} else {
+	    relAttrMap[attrIndex] = 1 ;
+	}
+    }
+    grpAttrRelationHeading = relationHeadingNew(grpAttrTupleHeading, 1) ;
+    /*
+     * HERE - do something about the identifiers.
+     */
+    fixedIntVectorIdentityMap(grpAttrRelationHeading->idVector,
+	grpAttrTupleHeading->degree) ;
+
+    /*
+     * The grouped relation has a heading that contains all the attributes
+     * minus those that go into the grouping relation plus one for the
+     * new relation valued attribute.
+     */
+    grpTupleHeading = tupleHeadingNew(tupleHeading->degree - objc + 1) ;
+    where = 0 ;
+    for (d = 0 ; d < tupleHeading->degree ; ++d) {
+	if (!relAttrMap[d]) {
+	    tupleHeadingCopy(interp, tupleHeading, d, d + 1, grpTupleHeading,
+		where++) ;
+	}
+    }
+    if (tupleHeadingInsertName(interp, grpTupleHeading, newAttrObj, where)
+	!= TCL_OK) {
+	ckfree(relAttrMap) ;
+	relationHeadingDelete(grpAttrRelationHeading) ;
+	tupleHeadingDelete(grpTupleHeading) ;
+	return TCL_ERROR ;
+    }
+    attributeCtorRelationType(grpTupleHeading->attrVector + where, newAttrObj,
+	grpAttrRelationHeading) ;
+
+    grpHeading = relationHeadingNew(grpTupleHeading, 1) ;
+    /*
+     * HERE - do something about the identifiers.
+     */
+    fixedIntVectorIdentityMap(grpHeading->idVector, grpTupleHeading->degree) ;
+    group = relationNew(grpHeading) ;
+
+    /*
+     * Build up the tuples for the new grouped relation.
+     */
+    Tcl_InitHashTable(&groupHash, TCL_STRING_KEYS) ;
+    for (c = 0 ; c < rel->cardinality ; ++c) {
+	Ral_Tuple *tuple = rel->tupleVector[c] ;
+	Tcl_DString relKey ;
+	int place = 0 ;
+	Tcl_HashEntry *entry ;
+	int newPtr ;
+
+	grpAttrTuple = tupleNew(grpAttrTupleHeading) ;
+	Tcl_DStringInit(&relKey) ;
+	for (d = 0 ; d < tupleHeading->degree ; ++d) {
+	    if (relAttrMap[d]) {
+		tupleCopyValues(tuple, d, d + 1, grpAttrTuple, place++) ;
+	    } else {
+		Tcl_DStringAppend(&relKey, Tcl_GetString(tuple->values[d]),
+		    -1) ;
+	    }
+	}
+
+	entry = Tcl_CreateHashEntry(&groupHash, Tcl_DStringValue(&relKey),
+	    &newPtr) ;
+	Tcl_DStringFree(&relKey) ;
+	if (newPtr) {
+	    /*
+	     * Build a new tuple in the grouped relation.
+	     */
+	    Ral_Relation *grpAttrRel = relationNew(grpAttrRelationHeading) ;
+	    Ral_Tuple *grpTuple = tupleNew(grpTupleHeading) ;
+	    int place = 0 ;
+
+	    Tcl_SetHashValue(entry, group->cardinality) ;
+
+	    relationReserve(grpAttrRel, 1) ;
+	    if (relationAppendTuple(interp, grpAttrRel, grpAttrTuple)
+		!= TCL_OK) {
+		relationDelete(grpAttrRel) ;
+		tupleDelete(grpTuple) ;
+		goto errorOut ;
+	    }
+
+	    grpTuple = tupleNew(grpTupleHeading) ;
+	    for (d = 0 ; d < tupleHeading->degree ; ++d) {
+		if (!relAttrMap[d]) {
+		    tupleCopyValues(tuple, d, d + 1, grpTuple, place++) ;
+		}
+	    }
+	    Tcl_IncrRefCount(grpTuple->values[grpTupleHeading->degree - 1] =
+		relationObjNew(grpAttrRel)) ;
+	    relationReserve(group, 1) ;
+	    if (relationAppendTuple(interp, group, grpTuple) != TCL_OK) {
+		relationDelete(grpAttrRel) ;
+		tupleDelete(grpTuple) ;
+		goto errorOut ;
+	    }
+	} else {
+	    /*
+	     * Added a tuple to the relation valued attribute.
+	     */
+	    int index = (int)Tcl_GetHashValue(entry) ;
+	    assert(index < group->cardinality) ;
+	    Ral_Tuple *grpTuple = group->tupleVector[index] ;
+	    Tcl_Obj *grpAttrRelObj =
+		grpTuple->values[grpTupleHeading->degree - 1] ;
+	    Ral_Relation * grpAttrRel =
+		grpAttrRelObj->internalRep.otherValuePtr ;
+	    relationReserve(grpAttrRel, 1) ;
+	    if (relationAppendTuple(interp, grpAttrRel, grpAttrTuple)
+		!= TCL_OK) {
+		goto errorOut ;
+	    }
+	}
+    }
+
+    Tcl_DeleteHashTable(&groupHash) ;
+
+    Tcl_SetObjResult(interp, relationObjNew(group)) ;
+    return TCL_OK ;
+
+errorOut:
+    Tcl_DeleteHashTable(&groupHash) ;
+    tupleDelete(grpAttrTuple) ;
+    relationDelete(group) ;
+    return TCL_ERROR ;
+}
+
+static int
 RelationIntersectCmd(
     Tcl_Interp *interp,
     int objc,
@@ -5660,7 +5868,7 @@ RelationIntersectCmd(
 	    }
 	}
 
-	ckfree((char *)order) ;
+	attrOrderMapDelete(order) ;
 	r1 = interRel ;
     }
 
@@ -5863,7 +6071,7 @@ RelationJoinCmd(
     int r2degree ;
     Ral_RelationJoinMap *jmap ;
     Ral_TupleHeading *joinTupleHeading ;
-    int *tuple2Elim ;
+    char *tuple2Elim ;
     int i ;
     int where ;
     int card2 ;
@@ -5914,15 +6122,16 @@ RelationJoinCmd(
      * Create a mapping that determines which attributes from the second
      * relation are eliminated as part of the natural join.
      */
-    tuple2Elim = (int *)ckalloc(r2degree * sizeof(*tuple2Elim)) ;
+    tuple2Elim = (char *)ckalloc(r2degree * sizeof(*tuple2Elim)) ;
     memset(tuple2Elim, 0, r2degree * sizeof(*tuple2Elim)) ;
-    for (i = 0 ; i < jmap->attrCount ; ++i) {
-	tuple2Elim[jmap->attrMap[i].index2] = 1 ;
+    for (i = 0 ; i < jmap->attrMap.count ; ++i) {
+	tuple2Elim[jmap->attrMap.vector[i].index2] = 1 ;
     }
     /*
      * Compose the matching tuples into the join relation.
      */
-    joinTupleHeading = tupleHeadingNew(r1degree + r2degree - jmap->attrCount) ;
+    joinTupleHeading = tupleHeadingNew(r1degree + r2degree -
+	jmap->attrMap.count) ;
     tupleHeadingCopy(interp, r1->heading->tupleHeading, 0, r1degree,
 	joinTupleHeading, 0) ;
     where = r1degree ;
@@ -5943,23 +6152,21 @@ RelationJoinCmd(
      * For now, just may all attributes the identifiers.
      */
     joinHeading = relationHeadingNew(joinTupleHeading, 1) ;
-    relIdSetAllAttributes(joinHeading->idVector, joinTupleHeading->degree) ;
+    fixedIntVectorIdentityMap(joinHeading->idVector, joinTupleHeading->degree) ;
     join = relationNew(joinHeading) ;
-    relationReserve(join, jmap->tupleCount) ;
+    relationReserve(join, jmap->tupleMap.count) ;
     /*
      * Step through the matches found in the join map and compose the
      * indicated tuples.
      */
-    for (i = 0 ; i < jmap->tupleCount ; ++i) {
-	struct tm *match ;
+    for (i = 0 ; i < jmap->tupleMap.count ; ++i) {
 	Ral_Tuple *r1Tuple ;
 	Ral_Tuple *r2Tuple ;
 	Ral_Tuple *joinTuple ;
 	int j ;
 
-	match = jmap->tupleMap + i ;
-	r1Tuple = r1->tupleVector[match->index1] ;
-	r2Tuple = r2->tupleVector[match->index2] ;
+	r1Tuple = r1->tupleVector[jmap->tupleMap.vector[i].index1] ;
+	r2Tuple = r2->tupleVector[jmap->tupleMap.vector[i].index2] ;
 	joinTuple = tupleNew(joinTupleHeading) ;
 	/*
 	 * Take all the values from the first relation's tuple.
@@ -5982,13 +6189,13 @@ RelationJoinCmd(
 	}
     }
 
-    ckfree((char *)tuple2Elim) ;
+    ckfree(tuple2Elim) ;
     relationJoinMapDelete(jmap) ;
     Tcl_SetObjResult(interp, relationObjNew(join)) ;
     return TCL_OK ;
 
 errorOut:
-    ckfree((char *)tuple2Elim) ;
+    ckfree(tuple2Elim) ;
     relationJoinMapDelete(jmap) ;
     relationDelete(join) ;
     return TCL_ERROR ;
@@ -6166,7 +6373,7 @@ RelationProjectCmd(
      * "eliminate" command.
      */
     projHeading = relationHeadingNew(projTupleHeading, 1) ;
-    relIdSetAllAttributes(projHeading->idVector, projTupleHeading->degree) ;
+    fixedIntVectorIdentityMap(projHeading->idVector, projTupleHeading->degree) ;
     projRelation = relationNew(projHeading) ;
     relationReserve(projRelation, relation->cardinality) ;
 
@@ -6363,18 +6570,16 @@ RelationSemijoinCmd(
      * The semijoin has the same relation heading as the first relation.
      */
     semijoin = relationNew(r1->heading) ;
-    relationReserve(semijoin, jmap->tupleCount) ;
+    relationReserve(semijoin, jmap->tupleMap.count) ;
     /*
      * Step through the matches found in the join map and compose the
      * indicated tuples. We are only interesting in the tuple from the
      * first relation.
      */
-    for (i = 0 ; i < jmap->tupleCount ; ++i) {
-	struct tm *match ;
+    for (i = 0 ; i < jmap->tupleMap.count ; ++i) {
 	Ral_Tuple *r1Tuple ;
 
-	match = jmap->tupleMap + i ;
-	r1Tuple = r1->tupleVector[match->index1] ;
+	r1Tuple = r1->tupleVector[jmap->tupleMap.vector[i].index1] ;
 	if (relationAppendTuple(interp, semijoin, r1Tuple) != TCL_OK) {
 	    goto errorOut ;
 	}
@@ -6455,7 +6660,7 @@ RelationSemiminusCmd(
      * The semiminus are the tuples in the first relation that do not
      * match anything in the second.
      */
-    relationReserve(semiminus, r1->cardinality - jmap->tupleCount) ;
+    relationReserve(semiminus, r1->cardinality - jmap->tupleMap.count) ;
     /*
      * So we put together a mapping to know which tuple to include in the
      * semiminus relation.
@@ -6463,11 +6668,9 @@ RelationSemiminusCmd(
     includeTupleMap = (char *)ckalloc(r1->cardinality *
 	sizeof(*includeTupleMap)) ;
     memset(includeTupleMap, 1, r1->cardinality * sizeof(*includeTupleMap)) ;
-    for (i = 0 ; i < jmap->tupleCount ; ++i) {
-	struct tm *match = jmap->tupleMap + i ;
-
-	assert(match->index1 < r1->cardinality) ;
-	includeTupleMap[match->index1] = 0 ;
+    for (i = 0 ; i < jmap->tupleMap.count ; ++i) {
+	assert(jmap->tupleMap.vector[i].index1 < r1->cardinality) ;
+	includeTupleMap[jmap->tupleMap.vector[i].index1] = 0 ;
     }
     relationJoinMapDelete(jmap) ;
     /*
@@ -6581,7 +6784,7 @@ RelationSummarizeCmd(
     }
 
     sumHeading = relationHeadingNew(sumTupleHeading, 1) ;
-    relIdSetAllAttributes(sumHeading->idVector, sumTupleHeading->degree) ;
+    fixedIntVectorIdentityMap(sumHeading->idVector, sumTupleHeading->degree) ;
     sumRelation = relationNew(sumHeading) ;
     relationReserve(sumRelation, perRelation->cardinality) ;
 
@@ -6733,7 +6936,7 @@ RelationTimesCmd(
     /*
      * One identifier consisting of all the attributes.
      */
-    relIdSetAllAttributes(relationHeading->idVector, tupleHeading->degree) ;
+    fixedIntVectorIdentityMap(relationHeading->idVector, tupleHeading->degree) ;
 
     product = relationNew(relationHeading) ;
     relationReserve(product, r1->cardinality * r2->cardinality) ;
@@ -6745,8 +6948,6 @@ RelationTimesCmd(
     objc -= 4 ;
     objv += 4 ;
     while (objc-- > 0) {
-	int i ;
-
 	r1 = product ;
 
 	r2Obj = *objv++ ;
@@ -6762,13 +6963,12 @@ RelationTimesCmd(
 	}
 
 	/*
+	 * HERE -- do something about the identifiers.
 	 * One identifier consisting of all the attributes.
 	 */
 	relationHeading = relationHeadingNew(tupleHeading, 1) ;
-	relIdCtor(relationHeading->idVector, tupleHeading->degree) ;
-	for (i = 0 ; i < tupleHeading->degree ; ++i) {
-	    relationHeading->idVector->attrIndices[i] = i ;
-	}
+	fixedIntVectorIdentityMap(relationHeading->idVector,
+	    tupleHeading->degree) ;
 
 	product = relationNew(relationHeading) ;
 	relationReserve(product, r1->cardinality * r2->cardinality) ;
@@ -6914,7 +7114,8 @@ RelationUngroupCmd(
      * HERE -- need to do something about the identifiers.
      * For now, just may all attributes the identifiers.
      */
-    relIdSetAllAttributes(ungrpHeading->idVector, ungrpTupleHeading->degree) ;
+    fixedIntVectorIdentityMap(ungrpHeading->idVector,
+	ungrpTupleHeading->degree) ;
     ungrp = relationNew(ungrpHeading) ;
     /*
      * Now put together the tuples.
@@ -6951,200 +7152,6 @@ RelationUngroupCmd(
 
     Tcl_SetObjResult(interp, relationObjNew(ungrp)) ;
     return TCL_OK ;
-}
-
-static int
-RelationGroupCmd(
-    Tcl_Interp *interp,
-    int objc,
-    Tcl_Obj *const*objv)
-{
-    Tcl_Obj *relObj ;
-    Ral_Relation *rel ;
-    Ral_TupleHeading *tupleHeading ;
-    Tcl_Obj *newAttrObj ;
-    Tcl_Obj *oldAttrListObj ;
-    int elemc ;
-    Tcl_Obj **elemv ;
-    Ral_TupleHeading *grpAttrTupleHeading ;
-    Ral_RelationHeading *grpAttrRelationHeading ;
-    char *relAttrMap ;
-    int c ;
-    int d ;
-    int attrIndex ;
-    int where ;
-    Ral_TupleHeading *grpTupleHeading ;
-    Ral_RelationHeading *grpHeading ;
-    Ral_Relation *group ;
-    Tcl_HashTable groupHash ;
-    Ral_Tuple *grpAttrTuple ;
-
-    /* relation group relation newattribute oldattrlist */
-    if (objc != 5) {
-	Tcl_WrongNumArgs(interp, 2, objv, "relation newattribute oldattrlist") ;
-	return TCL_ERROR ;
-    }
-    relObj = objv[2] ;
-    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationType) != TCL_OK) {
-	return TCL_ERROR ;
-    }
-    rel = relObj->internalRep.otherValuePtr ;
-    tupleHeading = rel->heading->tupleHeading ;
-    newAttrObj = objv[3] ;
-    oldAttrListObj = objv[4] ;
-
-    if (Tcl_ListObjGetElements(interp, oldAttrListObj, &elemc, &elemv)
-	!= TCL_OK) {
-	return TCL_ERROR ;
-    }
-    if (elemc > tupleHeading->degree) {
-	Tcl_SetStringObj(Tcl_GetObjResult(interp), 
-	    "attempt to group more attributes than exist in the relation", -1) ;
-    }
-
-    /*
-     * Examine the "oldattrlist" to determine if the attributes exist and build
-     * a map to use later to determine which attributes will be in the new
-     * relation valued attribute and which will remain in the tuple.  Construct
-     * the tuple heading for the new relation valued attribute.
-     */
-    relAttrMap = ckalloc(tupleHeading->degree) ;
-    memset(relAttrMap, 0 , tupleHeading->degree) ;
-    grpAttrTupleHeading = tupleHeadingNew(elemc) ;
-    for (d = 0 ; d < elemc ; ++d) {
-	attrIndex = tupleHeadingFindIndex(interp, tupleHeading, *elemv++) ;
-	if (attrIndex < 0 || tupleHeadingCopy(interp, tupleHeading,
-	    attrIndex, attrIndex + 1, grpAttrTupleHeading, d) != TCL_OK) {
-	    tupleHeadingDelete(grpAttrTupleHeading) ;
-	    ckfree(relAttrMap) ;
-	    return TCL_ERROR ;
-	} else {
-	    relAttrMap[attrIndex] = 1 ;
-	}
-    }
-    grpAttrRelationHeading = relationHeadingNew(grpAttrTupleHeading, 1) ;
-    /*
-     * HERE - do something about the identifiers.
-     */
-    relIdSetAllAttributes(grpAttrRelationHeading->idVector,
-	grpAttrTupleHeading->degree) ;
-
-    /*
-     * The grouped relation has a heading that contains all the attributes
-     * minus those that go into the grouping relation plus one for the
-     * new relation valued attribute.
-     */
-    grpTupleHeading = tupleHeadingNew(tupleHeading->degree - elemc + 1) ;
-    where = 0 ;
-    for (d = 0 ; d < tupleHeading->degree ; ++d) {
-	if (!relAttrMap[d]) {
-	    tupleHeadingCopy(interp, tupleHeading, d, d + 1, grpTupleHeading,
-		where++) ;
-	}
-    }
-    if (tupleHeadingInsertName(interp, grpTupleHeading, newAttrObj, where)
-	!= TCL_OK) {
-	ckfree(relAttrMap) ;
-	relationHeadingDelete(grpAttrRelationHeading) ;
-	tupleHeadingDelete(grpTupleHeading) ;
-	return TCL_ERROR ;
-    }
-    attributeCtorRelationType(grpTupleHeading->attrVector + where, newAttrObj,
-	grpAttrRelationHeading) ;
-
-    grpHeading = relationHeadingNew(grpTupleHeading, 1) ;
-    /*
-     * HERE - do something about the identifiers.
-     */
-    relIdSetAllAttributes(grpHeading->idVector, grpTupleHeading->degree) ;
-    group = relationNew(grpHeading) ;
-
-    /*
-     * Build up the tuples for the new grouped relation.
-     */
-    Tcl_InitHashTable(&groupHash, TCL_STRING_KEYS) ;
-    for (c = 0 ; c < rel->cardinality ; ++c) {
-	Ral_Tuple *tuple = rel->tupleVector[c] ;
-	Tcl_DString relKey ;
-	int place = 0 ;
-	Tcl_HashEntry *entry ;
-	int newPtr ;
-
-	grpAttrTuple = tupleNew(grpAttrTupleHeading) ;
-	Tcl_DStringInit(&relKey) ;
-	for (d = 0 ; d < tupleHeading->degree ; ++d) {
-	    if (relAttrMap[d]) {
-		tupleCopyValues(tuple, d, d + 1, grpAttrTuple, place++) ;
-	    } else {
-		Tcl_DStringAppend(&relKey, Tcl_GetString(tuple->values[d]),
-		    -1) ;
-	    }
-	}
-
-	entry = Tcl_CreateHashEntry(&groupHash, Tcl_DStringValue(&relKey),
-	    &newPtr) ;
-	Tcl_DStringFree(&relKey) ;
-	if (newPtr) {
-	    /*
-	     * Build a new tuple in the grouped relation.
-	     */
-	    Ral_Relation *grpAttrRel = relationNew(grpAttrRelationHeading) ;
-	    Ral_Tuple *grpTuple = tupleNew(grpTupleHeading) ;
-	    int place = 0 ;
-
-	    Tcl_SetHashValue(entry, group->cardinality) ;
-
-	    relationReserve(grpAttrRel, 1) ;
-	    if (relationAppendTuple(interp, grpAttrRel, grpAttrTuple)
-		!= TCL_OK) {
-		relationDelete(grpAttrRel) ;
-		tupleDelete(grpTuple) ;
-		goto errorOut ;
-	    }
-
-	    grpTuple = tupleNew(grpTupleHeading) ;
-	    for (d = 0 ; d < tupleHeading->degree ; ++d) {
-		if (!relAttrMap[d]) {
-		    tupleCopyValues(tuple, d, d + 1, grpTuple, place++) ;
-		}
-	    }
-	    Tcl_IncrRefCount(grpTuple->values[grpTupleHeading->degree - 1] =
-		relationObjNew(grpAttrRel)) ;
-	    relationReserve(group, 1) ;
-	    if (relationAppendTuple(interp, group, grpTuple) != TCL_OK) {
-		relationDelete(grpAttrRel) ;
-		tupleDelete(grpTuple) ;
-		goto errorOut ;
-	    }
-	} else {
-	    /*
-	     * Added a tuple to the relation valued attribute.
-	     */
-	    int index = (int)Tcl_GetHashValue(entry) ;
-	    assert(index < group->cardinality) ;
-	    Ral_Tuple *grpTuple = group->tupleVector[index] ;
-	    Tcl_Obj *grpAttrRelObj =
-		grpTuple->values[grpTupleHeading->degree - 1] ;
-	    Ral_Relation * grpAttrRel =
-		grpAttrRelObj->internalRep.otherValuePtr ;
-	    relationReserve(grpAttrRel, 1) ;
-	    if (relationAppendTuple(interp, grpAttrRel, grpAttrTuple)
-		!= TCL_OK) {
-		goto errorOut ;
-	    }
-	}
-    }
-
-    Tcl_DeleteHashTable(&groupHash) ;
-
-    Tcl_SetObjResult(interp, relationObjNew(group)) ;
-    return TCL_OK ;
-
-errorOut:
-    Tcl_DeleteHashTable(&groupHash) ;
-    tupleDelete(grpAttrTuple) ;
-    relationDelete(group) ;
-    return TCL_ERROR ;
 }
 
 static int

@@ -14,57 +14,164 @@ command is part of the Tcl Relational Algebra Library (ral) package.
 
 [section "STRING REPRESENTATION"]
 
+[section EXAMPLE]
+[example_begin]
+DOG
+DogName      Breed
+ string     string
+==================
+   Fido     Poodle
+    Sam     Collie
+   Spot    Terrier
+  Rover  Retriever
+   Fred    Spaniel
+
+OWNER
+OwnerName  Age           City
+   string  int         string
+=============================
+      Sue   24      Cupertino
+   George   35      Sunnyvale
+    Alice   30       San Jose
+     Mike   50       San Jose
+      Jim   42  San Francisco
+
+OWNERSHIP
+OwnerName  DogName  Acquired
+   string   string    string
+============================
+      Sue     Fido      2001
+      Sue      Sam      2000
+   George     Fido      2001
+   George      Sam      2000
+    Alice     Spot      2001
+     Mike    Rover      2002
+      Jim     Fred      2003
+[example_end]
+
 [section COMMANDS]
 [list_begin definitions]
 [call [cmd "::ral::relation cardinality"] [arg relationValue]]
 
+The [cmd cardinality] subcommand returns the number tuples contained
+in the body of [arg relationValue].
+
 [call [cmd "::ral::relation degree"] [arg relationValue]]
 
-[call [cmd "::ral::relation divide"] [arg relationValue]]
+The [cmd degree] subcommand returns the number of attributes in the
+tuples of [arg relationValue]
 
-[call [cmd "::ral::relation eliminate"] [arg relationValue]]
+[call [cmd "::ral::relation divide"] [arg dividend] [arg divisor]\
+    [arg mediator]]
+
+The [cmd divide] subcommand implements a relational divide operation.
+The headings of [arg dividend] and [arg divisor] must be disjoint and
+the heading of [arg mediator] must be the union of the [arg dividend]
+and [arg divisor] headings.
+The returned result is a new relation that has the same heading as
+[arg dividend] and contains all the tuples from [arg dividend] whose
+corresponding tuples in [arg mediator] include all the tuples in
+[arg divisor].
+Using the data from our ongoing example, then the following example shows
+how division can be used to find all the Dogs owned by both Sue and George.
+
+[example_begin]
+Dividend:
+	DogName
+	 string
+	=======
+	   Fido
+	    Sam
+	   Spot
+	  Rover
+	   Fred
+
+Divisor:
+	OwnerName
+	   string
+	=========
+	      Sue
+	   George
+
+Mediator:
+	OwnerName  DogName
+	   string   string
+	==================
+	      Sue     Fido
+	      Sue      Sam
+	   George     Fido
+	   George      Sam
+	    Alice     Spot
+	     Mike    Rover
+	      Jim     Fred
+
+Quotient:
+	DogName
+	 string
+	=======
+	   Fido
+	    Sam
+[example_end]
+
+[call [cmd "::ral::relation eliminate"] [arg relationValue]\
+    [opt "attribute ..."]]
 
 [call [cmd "::ral::relation emptyof"] [arg relationValue]]
+The [cmd emptyof] subcommand returns a new relation that has the same
+heading as [arg relationValue] but whose cardinality is zero.
 
-[call [cmd "::ral::relation extend"] [arg relationValue]]
+[call [cmd "::ral::relation extend"] [arg relationValue]\
+    [opt "attr1 expr1 attr2 expr2 ..."]]
 
-[call [cmd "::ral::relation foreach"] [arg relationValue]]
+[call [cmd "::ral::relation foreach"] [arg relationValue] [arg tupleVariable]\
+    [opt "ascending | descending"] [opt attr-list] [arg script]]
 
-[call [cmd "::ral::relation group"] [arg relationValue]]
+[call [cmd "::ral::relation group"] [arg relationValue] [arg newattribute]\
+    [opt "attr1 attr2 ..."]]
 
-[call [cmd "::ral::relation intersect"] [arg relationValue]]
+[call [cmd "::ral::relation intersect"] [arg relationValue1]\
+    [arg relationValue2] [opt "relationValue3 ..."]]
 
-[call [cmd "::ral::relation is"] [arg relationValue]]
+[call [cmd "::ral::relation is"] [arg relationValue1] [arg relop]\
+    [arg relationValue2]]
 
 [call [cmd "::ral::relation isempty"] [arg relationValue]]
 
 [call [cmd "::ral::relation isnotempty"] [arg relationValue]]
 
-[call [cmd "::ral::relation join"] [arg relationValue]]
+[call [cmd "::ral::relation join"] [arg relationValue1] [arg relationValue2]\
+    [opt "attr1 attr2 ..."]]
 
 [call [cmd "::ral::relation list"] [arg relationValue]]
 
-[call [cmd "::ral::relation minus"] [arg relationValue]]
+[call [cmd "::ral::relation minus"] [arg relationValue1] [arg relationValue2]]
 
-[call [cmd "::ral::relation project"] [arg relationValue]]
+[call [cmd "::ral::relation project"] [arg relationValue]\
+    [opt "attr1 attr2 ..."]]
 
-[call [cmd "::ral::relation rename"] [arg relationValue]]
+[call [cmd "::ral::relation rename"] [arg relationValue]\
+    [opt "oldname newname ..."]]
 
-[call [cmd "::ral::relation restrict"] [arg relationValue]]
+[call [cmd "::ral::relation restrict"] [arg relationValue] [arg tupleVariable]\
+    [arg expression]]
 
-[call [cmd "::ral::relation semijoin"] [arg relationValue]]
+[call [cmd "::ral::relation semijoin"] [arg relationValue1]\
+    [arg relationValue2] [opt "attr1 attr2 ..."]]
 
-[call [cmd "::ral::relation semiminus"] [arg relationValue]]
+[call [cmd "::ral::relation semiminus"] [arg relationValue1]\
+    [arg relationValue2] [opt "attr1 attr2 ..."]]
 
-[call [cmd "::ral::relation summarize"] [arg relationValue]]
+[call [cmd "::ral::relation summarize"] [arg relationValue] [arg perRelation]\
+    [arg attr-type] [arg cmd] [arg initialValue]]
 
-[call [cmd "::ral::relation times"] [arg relationValue]]
+[call [cmd "::ral::relation times"] [arg relationValue1] [arg relationValue2]\
+    [opt "relationValue3 ..."]]
 
 [call [cmd "::ral::relation tuple"] [arg relationValue]]
 
 [call [cmd "::ral::relation typeof"] [arg relationValue]]
 
-[call [cmd "::ral::relation ungroup"] [arg relationValue]]
+[call [cmd "::ral::relation ungroup"] [arg relationValue] [arg attribute]]
 
 [list_end]
 [manpage_end]

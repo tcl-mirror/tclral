@@ -44,13 +44,15 @@
 # ABSTRACT:
 # 
 # $RCSfile: Makefile,v $
-# $Revision: 1.4 $
-# $Date: 2004/05/09 20:17:20 $
+# $Revision: 1.5 $
+# $Date: 2004/06/05 01:37:19 $
 #  *--
 
 TCLBASE = /usr/local/ActiveTcl
 
 CFLAGS = -g -I$(TCLBASE)/include -Werror-implicit-function-declaration
+# CFLAGS += -O2
+# CFLAGS += -fprofile-arcs -ftest-coverage
 LDFLAGS = -shared -g
 LOADLIBES = -L$(TCLBASE)/lib
 LDLIBS = -ltclstub8.5
@@ -58,4 +60,7 @@ LDLIBS = -ltclstub8.5
 libral.so : ral.o
 	$(CC) -o $@ $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS)
 
-rla.o : $(TCLBASE)/include/tcl.h
+ral.o : $(TCLBASE)/include/tcl.h
+
+clean :
+	$(RM) ral.o libral.so

@@ -46,8 +46,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.8 $
-# $Date: 2004/05/31 20:57:09 $
+# $Revision: 1.9 $
+# $Date: 2004/06/05 01:37:20 $
 #  *--
 
 package require tcltest 2.2
@@ -999,7 +999,7 @@ namespace eval ::ral::test {
     } -result 4
 
     # relation divide subcommand
-    test relation-divide-1.0 {supplier who supply P1} -setup {
+    test relation-divide-1.0 {suppliers who supply P1} -setup {
 	set dend [relation project [relvar get S] S#]
 	set med [relation project [relvar get SP] S# P#]
 	set dsor [relation project\
@@ -1009,7 +1009,7 @@ namespace eval ::ral::test {
 	relation divide $dend $dsor $med
     } -result {Relation {{{S# string}} S#} {{S# S1} {S# S2}}}
 
-    test relation-divide-2.0 {supplier who supply P2 and P4} -setup {
+    test relation-divide-2.0 {suppliers who supply P2 and P4} -setup {
 	set dend [relation project [relvar get S] S#]
 	set med [relation project [relvar get SP] S# P#]
 	set dsor [relation project\
@@ -1020,13 +1020,18 @@ namespace eval ::ral::test {
 	relation divide $dend $dsor $med
     } -result {Relation {{{S# string}} S#} {{S# S1} {S# S4}}}
 
-    test relation-divide-3.0 {supplier who supply all parts} -setup {
+    test relation-divide-3.0 {suppliers who supply all parts} -setup {
 	set dend [relation project [relvar get S] S#]
 	set med [relation project [relvar get SP] S# P#]
 	set dsor [relation project [relvar get P] P#]
     } -body {
 	relation divide $dend $dsor $med
     } -result {Relation {{{S# string}} S#} {{S# S1}}}
+
+    # relation emptyof subcommand
+    test relation-emptyof-1.0 {multiple attributes} -body {
+	relation emptyof [relvar get S]
+    } -result {Relation {{{S# string} {SNAME string} {STATUS int} {CITY string}} S#} {}}
 
     # relation eliminate subcommand
     test relation-eliminate-1.0 {single attribute} -body {
@@ -1122,11 +1127,11 @@ namespace eval ::ral::test {
 
     # relation group subcommand
     test relation-group-1.0 {group two attributes} -body {
-	relation group [relvar get SP] PQ {P# QTY}
+	relation group [relvar get SP] PQ P# QTY
     } -result {Relation {{{S# string} {PQ {Relation {{{P# string} {QTY int}} {{P# QTY}}}}}} {{S# PQ}}} {{S# S1 PQ {{P# P1 QTY 300} {P# P2 QTY 200} {P# P3 QTY 400} {P# P4 QTY 200} {P# P5 QTY 100} {P# P6 QTY 100}}} {S# S2 PQ {{P# P1 QTY 300} {P# P2 QTY 400}}} {S# S3 PQ {{P# P2 QTY 200}}} {S# S4 PQ {{P# P2 QTY 200} {P# P4 QTY 300} {P# P5 QTY 400}}}}}
 
     test relation-group-2.0 {group two attributes} -body {
-	relation group [relvar get SP] SQ {S# QTY}
+	relation group [relvar get SP] SQ S# QTY
     } -result {Relation {{{P# string} {SQ {Relation {{{S# string} {QTY int}} {{S# QTY}}}}}} {{P# SQ}}} {{P# P1 SQ {{S# S1 QTY 300} {S# S2 QTY 300}}} {P# P2 SQ {{S# S1 QTY 200} {S# S2 QTY 400} {S# S3 QTY 200} {S# S4 QTY 200}}} {P# P3 SQ {{S# S1 QTY 400}}} {P# P4 SQ {{S# S1 QTY 200} {S# S4 QTY 300}}} {P# P5 SQ {{S# S1 QTY 100} {S# S4 QTY 400}}} {P# P6 SQ {{S# S1 QTY 100}}}}}
 
     # relation intersect subcommand
@@ -1566,6 +1571,15 @@ namespace eval ::ral::test {
 	    {City Saratoga Status 10}}}
 	relation join $r1 $r2 City
     } -result {Relation {{{Name string} {Age int} {City string} {Status int}} {{Name Age City Status}}} {{Name George Age 20 City {San Jose} Status 20} {Name Fred Age 10 City Saratoga Status 10}}}
+
+    # relation list subcommand
+    test relation-list-1.0 {multiple tuples} -body {
+	lsort [relation list [relation project [relvar get S] CITY]]
+    } -result {Athens London Paris}
+
+    test relation-list-2.0 {one tuple} -body {
+	relation list {Relation {{{Name string}} Name} {{Name Fred}}}
+    } -result {Fred}
 
     # relation minus subcommand
     test relation-minus-1.0 {dum relation} -body {
