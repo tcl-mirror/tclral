@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral.c,v $
-$Revision: 1.12 $
-$Date: 2004/07/10 18:02:10 $
+$Revision: 1.13 $
+$Date: 2004/07/10 18:23:07 $
  *--
  */
 
@@ -330,7 +330,7 @@ EXTERNAL DATA REFERENCES
 /*
 STATIC DATA ALLOCATION
 */
-static char rcsid[] = "@(#) $RCSfile: ral.c,v $ $Revision: 1.12 $" ;
+static char rcsid[] = "@(#) $RCSfile: ral.c,v $ $Revision: 1.13 $" ;
 
 static Tcl_ObjType Ral_TupleType = {
     "Tuple",
@@ -6794,11 +6794,6 @@ RelationSemiminusCmd(
      */
     semiminus = relationNew(r1->heading) ;
     /*
-     * The semiminus are the tuples in the first relation that do not
-     * match anything in the second.
-     */
-    relationReserve(semiminus, jmap->tupleMap.count - r1->cardinality) ;
-    /*
      * So we put together a mapping to know which tuple to include in the
      * semiminus relation.
      */
@@ -6815,10 +6810,12 @@ RelationSemiminusCmd(
      * that did not match the join operation.
      */
     for (i = 0 ; i < r1->cardinality ; ++i) {
-	if (includeTupleMap[i] &&
-	    relationAppendTuple(interp, semiminus, r1->tupleVector[i])
-	    != TCL_OK) {
-	    goto errorOut ;
+	if (includeTupleMap[i]) {
+	    relationReserve(semiminus, 1) ;
+	    if (relationAppendTuple(interp, semiminus, r1->tupleVector[i])
+		!= TCL_OK) {
+		goto errorOut ;
+	    }
 	}
     }
 

@@ -46,8 +46,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.11 $
-# $Date: 2004/07/10 18:02:10 $
+# $Revision: 1.12 $
+# $Date: 2004/07/10 18:23:07 $
 #  *--
 
 package require tcltest 2.2
@@ -1780,6 +1780,16 @@ namespace eval ::ral::test {
 	    {City Saratoga Age 15}}}
 	relation semijoin $r1 $r2
     } -result {Relation {{{Name string} {Age int}} Name} {{Name George Age 20}}}
+    # HERE -- add tests
+
+    # relation semiminus subcommand
+    test relation-semiminus-1.0 {one common attribute} -body {
+	relation semiminus [relvar set S] [relvar set SP]
+    } -result {Relation {{{S# string} {SNAME string} {STATUS int} {CITY string}} S#} {{S# S5 SNAME Adams STATUS 30 CITY Athens}}}
+
+    test relation-semiminus-2.0 {one common attribute} -body {
+	relation semiminus [relvar set SP] [relvar set S]
+    } -result {Relation {{{S# string} {P# string} {QTY int}} {{S# P#}}} {}}
     # HERE -- add tests
 
     # relation summarize subcommand
