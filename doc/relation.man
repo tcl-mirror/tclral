@@ -44,8 +44,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.8 $
-# $Date: 2004/08/30 00:29:10 $
+# $Revision: 1.9 $
+# $Date: 2004/09/20 02:15:22 $
 #  *--
 }]
 [manpage_begin relation n 0.6]
@@ -793,6 +793,17 @@ OwnerName  DogName  Acquired
      Mike    Rover      2002
       Jim     Fred      2003
 }]
+
+[call [cmd "::ral::relation union"] [arg relationValue1]\
+    [arg relationValue2] [opt "relationValue3 ..."]]
+
+The [cmd union] subcommand returns the set union of two or more relations.
+All relations must be of the same type.
+The result relation has a heading that is the same as any of the arguments
+and has a body consisting of all tuples present in any of the
+[arg relationValue] arguments.
+Since the union operation is both associative and commutative,
+the order of the [arg relationValue] arguments has no effect the result.
 
 [list_end]
 

@@ -46,13 +46,13 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.18 $
-# $Date: 2004/08/30 00:29:11 $
+# $Revision: 1.19 $
+# $Date: 2004/09/20 02:15:22 $
 #  *--
 
 package require tcltest 2.2
 eval tcltest::configure $argv
-load [file join .. src libral[info sharedlibextension]]
+load [file join .. libral0.6[info sharedlibextension]]
 source [file join .. src ral.tcl]
 
 namespace eval ::ral::test {
