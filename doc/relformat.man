@@ -46,15 +46,15 @@
 #   Relformat is part of the TCLRAL package.
 # 
 # $RCSfile: relformat.man,v $
-# $Revision: 1.1 $
-# $Date: 2004/08/30 00:29:10 $
+# $Revision: 1.2 $
+# $Date: 2004/12/25 23:06:07 $
 #  *--
 }]
-[manpage_begin relformat n 0.6]
+[manpage_begin relformat n 0.7]
 [moddesc "Relation formatting"]
 [titledesc "Text formatting for relations"]
 [copyright "2004 by G. Andrew Mangogna"]
-[require ral 0.6]
+[require ral 0.7]
 [description]
 This manpage describes the
 [cmd relformat]

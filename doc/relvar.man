@@ -44,15 +44,15 @@
 # ABSTRACT:
 # 
 # $RCSfile: relvar.man,v $
-# $Revision: 1.5 $
-# $Date: 2004/08/30 00:29:10 $
+# $Revision: 1.6 $
+# $Date: 2004/12/25 23:06:07 $
 #  *--
 }]
-[manpage_begin relvar n 0.6]
+[manpage_begin relvar n 0.7]
 [moddesc "Relvar Operators"]
 [titledesc "Operators for Relation Variables"]
 [copyright "2004 by G. Andrew Mangogna"]
-[require ral 0.6]
+[require ral 0.7]
 [description]
 This manpage describes the [cmd relvar] command.
 The [cmd relvar] command is part of the Tcl Relational Algebra Library
@@ -168,7 +168,7 @@ The return value of the subcommand is the number of tuples deleted which will
 be either 1 or 0.
 
 [example {
-% relvar delete OWNER {OwnerName Sue}
+% relvar deleteone OWNER {OwnerName Sue}
 1
 }]
 
@@ -230,13 +230,24 @@ Name matching is performed as for the [cmd "string match"] command.
 
 [call [cmd "::ral::relvar set"] [arg relationVariable] [opt relationValue]]
 
-The [cmd set] replaces the current value held by the relation variable named
-[arg relationVariable] with the value given by [arg relationValue].
+The [cmd set] subcommand replaces the current value held by the relation
+variable named [arg relationVariable] with the value given by
+[arg relationValue].
+The [cmd set] subcommands operates differently depending upon whether
+[arg relationVariable] is a base relvar or a virtual relvar.
+If [arg relationVariable] is a base relvar, then [cmd set] attempts to
+assign [arg relationValue], if present, to the relvar.
 It is an error to attempt to assign a relation value to a relation variable
 that is of a different type than the type of the value
 that the variable currently holds.
+If [arg relationVariable] is a virtual relvar,
+then [arg relationValue] is interpreted as a relational expression string
+and is associated in a macro-like fashion to [arg relationVariable].
 The return value of the subcommand the current value
 held by [arg relationVariable].
+If [arg relationVariable] is virtual,
+then its associated relation expression is evaluated and returned as
+the value of the [cmd set] subcommand.
 If the [arg relationValue] argument is missing, then no attempt is made to
 change the value of [arg relationVariable].
 This command operates in a manner analogous to the [cmd set] command for
@@ -279,6 +290,21 @@ This subcommand is useful in those contexts where the attribute values of an
 identifier are known and evaluating an expression over all the tuples
 in [arg relationVariable] is superfluous.
 The return value of the subcommand is the number of tuples updated.
+
+[call [cmd "::ral::relvar virtual"] [arg relationVariable]\
+    [arg relationExpression]]
+
+The [cmd virtual] subcommand creates a virtual relvar whose name is given
+by [arg relationVariable] and whose value is given by [arg relationExpression].
+The [arg relationExpression] is a script that is evaluated each time
+that the value stored in [arg relationVariable] is fetched (via the
+[cmd "relvar set"] command).
+Thus a virtual relvar behaves as a kind of macro.
+It is an error to attempt to perform any updates on a virtual relvar except
+to use [cmd "relvar set"] to change the script associated with the relvar.
+It is also an error if the result of evaluating the script associated
+with a virtual relvar is not an object that can be converted into a Relation
+type.
 
 [list_end]
 

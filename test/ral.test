@@ -42,24 +42,30 @@ exec tclsh "$0" "$@"
 # 
 #  *++
 # MODULE:
+#   ral.test -- test cases for the Tcl Relational Algebra Library
 # 
 # ABSTRACT:
+#   This file contains a set of test cases suitable for execution via
+#   "tcltest" to test the code associated with the TCL Relational
+#   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.20 $
-# $Date: 2004/10/04 01:23:45 $
+# $Revision: 1.21 $
+# $Date: 2004/12/25 23:06:08 $
 #  *--
 
 package require tcltest 2.2
 eval tcltest::configure $argv
 
-set auto_path [linsert $auto_path 0 [file normalize [file join .. src]]]
+set ::auto_path [linsert $::auto_path 0 [file normalize [file join .. src]]]
 package require ral 0.7
 
 namespace eval ::ral::test {
     namespace import ::tcltest::*
     namespace import ::ral::*
 
+    # The "infamous" parts data base from Date. Used for his
+    # examples as well as other tests.
     proc createPartsDB {} {
 	relvar create S\
 	    {S# string SNAME string STATUS int CITY string}\
@@ -1055,6 +1061,46 @@ namespace eval ::ral::test {
 	relvar updateone X {Name George} {Name Fred}
     } -result {tuple, "Name Fred Status 20", contains duplicate values for the identifier, "Name"}\
     -returnCodes error
+
+    test relvar-virtual-1.0 {create a virtual relvar} -setup {
+	relvar create X {Name string Status int} Name\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+	relvar virtual XN {relation project [relvar set X] Name}
+    } -cleanup {
+	relvar destroy X XN
+    } -body {
+	relvar set XN
+    } -result {Relation {Name string} Name {{Name George} {Name Fred} {Name Alice}}}
+
+    test relvar-virtual-2.0 {dump a virtual relvar} -setup {
+	relvar virtual XN {relation project [relvar set X] Name}
+    } -cleanup {
+	relvar destroy XN
+    } -body {
+	relvar dump XN
+    } -result {package require ral 0.7
+::ral::relvar virtual XN {relation project [relvar set X] Name}
+}
+
+    test relvar-virtual-3.0 {change a virtual relvar} -setup {
+	relvar create X {Name string Status int} Name\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+	relvar virtual XN {relation project [relvar set X] Name}
+    } -cleanup {
+	relvar destroy X XN
+    } -body {
+	relvar set XN {relation project [relvar set X] Status}
+    } -result {Relation {Status int} Status {{Status 20} {Status 30} {Status 40}}}
+    test relvar-virtual-4.0 {create a non-sense relvar} -setup {
+	relvar virtual XN {}
+    } -cleanup {
+    } -body {
+	relvar set XN {set a 3}
+    } -result {badly formatted relation, "3"} -returnCodes error
 
     # Relation Tests
     createPartsDB

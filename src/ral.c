@@ -41,12 +41,16 @@ terms specified in this license.
 /*
  *++
 MODULE:
+    ral.c -- source for the TclRAL Relational Algebra library.
 
 ABSTRACT:
+    This file contains the "C" source to an extension of the TCL
+    language that provides an implementation of the Relational
+    Algebra.
 
 $RCSfile: ral.c,v $
-$Revision: 1.22 $
-$Date: 2004/10/04 01:23:45 $
+$Revision: 1.23 $
+$Date: 2004/12/25 23:06:07 $
  *--
  */
 
@@ -359,7 +363,7 @@ STATIC DATA ALLOCATION
 static const char ral_pkgname[] = "ral" ;
 static const char ral_version[] = "0.7" ;
 static const char ral_rcsid[] =
-    "$Id: ral.c,v 1.22 2004/10/04 01:23:45 mangoa01 Exp $" ;
+    "$Id: ral.c,v 1.23 2004/12/25 23:06:07 mangoa01 Exp $" ;
 static const char ral_copyright[] =
     "This software is copyrighted 2004 by G. Andrew Mangogna."
     "Terms and conditions for use are distributed with the source code." ;
@@ -3954,17 +3958,28 @@ relvarFind(
     entry = Tcl_FindHashEntry(relvarMap, (char *)relvarName) ;
     if (entry) {
 	Ral_Relvar *relvar = Tcl_GetHashValue(entry) ;
-	relObj = relvar->value ;
-	if (relvar->type == BaseRelvar_Type &&
-	    Tcl_ConvertToType(interp, relObj, &Ral_RelationType) != TCL_OK) {
-	    return NULL ;
+	switch (relvar->type) {
+	case BaseRelvar_Type:
+	    relObj = relvar->value ;
+	    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationType)
+		!= TCL_OK) {
+		return NULL ;
+	    }
+	    break ;
+
+	case VirtualRelvar_Type:
+	    Tcl_SetStringObj(Tcl_GetObjResult(interp), 
+		"virtual relvars may not be updated", -1) ;
+	    break ;
+
+	default:
+	    Tcl_Panic("unknown relvar type") ;
+	    break ;
 	}
     } else {
-	if (interp) {
-	    Tcl_ResetResult(interp) ;
-	    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-		"unknown relvar, \"", Tcl_GetString(relvarName), "\"", NULL) ;
-	}
+	Tcl_ResetResult(interp) ;
+	Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
+	    "unknown relvar, \"", Tcl_GetString(relvarName), "\"", NULL) ;
     }
 
     return relObj ;
@@ -5064,33 +5079,48 @@ RelvarDumpCmd(
 	    }
 
 	    relObj = relvar->value ;
-	    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationType)
-		!= TCL_OK) {
-		goto errorOut ;
-	    }
-	    relation = relObj->internalRep.otherValuePtr ;
-	    heading = relation->heading ;
+	    switch (relvar->type) {
+	    case BaseRelvar_Type:
+		if (Tcl_ConvertToType(interp, relObj, &Ral_RelationType)
+		    != TCL_OK) {
+		    goto errorOut ;
+		}
+		relation = relObj->internalRep.otherValuePtr ;
+		heading = relation->heading ;
 
-	    headObj = tupleHeadingAttrsToList(interp, heading->tupleHeading) ;
-	    if (!headObj) {
-		goto errorOut ;
-	    }
-	    idObj = relationHeadingIdsToList(interp, heading) ;
-	    if (!idObj) {
+		headObj = tupleHeadingAttrsToList(interp,
+		    heading->tupleHeading) ;
+		if (!headObj) {
+		    goto errorOut ;
+		}
+		idObj = relationHeadingIdsToList(interp, heading) ;
+		if (!idObj) {
+		    Tcl_DecrRefCount(headObj) ;
+		    goto errorOut ;
+		}
+
+		Tcl_AppendStringsToObj(scriptObj,
+		    "::ral::relvar create ", relvarName,
+		    " {",
+		    Tcl_GetString(headObj),
+		    "} {",
+		    Tcl_GetString(idObj),
+		    "}\n",
+		    NULL) ;
 		Tcl_DecrRefCount(headObj) ;
-		goto errorOut ;
-	    }
+		Tcl_DecrRefCount(idObj) ;
+		break ;
 
-	    Tcl_AppendStringsToObj(scriptObj,
-		"::ral::relvar create ", relvarName,
-		" {",
-		Tcl_GetString(headObj),
-		"} {",
-		Tcl_GetString(idObj),
-		"}\n",
-		NULL) ;
-	    Tcl_DecrRefCount(headObj) ;
-	    Tcl_DecrRefCount(idObj) ;
+	    case VirtualRelvar_Type:
+		Tcl_AppendStringsToObj(scriptObj,
+		    "::ral::relvar virtual ", relvarName,
+		    " {", Tcl_GetString(relObj), "}\n", NULL) ;
+		break ;
+
+	    default:
+		Tcl_Panic("unknown relvar type") ;
+		/* Does not return */
+	    }
 	}
     }
 
@@ -5108,6 +5138,12 @@ RelvarDumpCmd(
 	    Ral_Tuple **tupleVector ;
 	    Ral_Tuple **lastVector ;
 
+	    /*
+	     * Only dump the "body" of a base relvar.
+	     */
+	    if (relvar->type == VirtualRelvar_Type) {
+		continue ;
+	    }
 	    relvarName = Tcl_GetString(
 		(Tcl_Obj *)Tcl_GetHashKey(relvarMap, entry)) ;
 	    if (patternObj &&
@@ -5260,33 +5296,57 @@ RelvarSetCmd(
     relvar = Tcl_GetHashValue(entry) ;
     relVarObj = relvar->value ;
 
-    if (objc == 4) {
-	Ral_Relation *relvarRelation ;
-	Ral_Relation *relvalRelation ;
+    switch (relvar->type) {
+    case BaseRelvar_Type:
+	if (objc == 4) {
+	    Ral_Relation *relvarRelation ;
+	    Ral_Relation *relvalRelation ;
 
-	relValueObj = objv[3] ;
+	    relValueObj = objv[3] ;
 
-	if (Tcl_ConvertToType(interp, relVarObj, &Ral_RelationType) != TCL_OK ||
-	    Tcl_ConvertToType(interp, relValueObj, &Ral_RelationType)
+	    if (Tcl_ConvertToType(interp, relVarObj, &Ral_RelationType)
+		    != TCL_OK ||
+		Tcl_ConvertToType(interp, relValueObj, &Ral_RelationType)
+		    != TCL_OK) {
+		return TCL_ERROR ;
+	    }
+
+	    relvarRelation = relVarObj->internalRep.otherValuePtr ;
+	    relvalRelation = relValueObj->internalRep.otherValuePtr ;
+	    /*
+	     * Can only assign something of the same type.
+	     */
+	    if (!relationHeadingEqual(relvarRelation->heading,
+		relvalRelation->heading)) {
+		Tcl_SetStringObj(Tcl_GetObjResult(interp), 
+		    "value assigned to relvar must be of the same type", -1) ;
+		return TCL_ERROR ;
+	    }
+
+	    Tcl_DecrRefCount(relvar->value) ;
+	    Tcl_IncrRefCount(relvar->value = relValueObj) ;
+	    relVarObj = relValueObj ;
+	}
+	break ;
+
+    case VirtualRelvar_Type:
+	if (objc == 4) {
+	    Tcl_DecrRefCount(relvar->value) ;
+	    Tcl_IncrRefCount(relvar->value = objv[3]) ;
+	}
+	if (Tcl_EvalObjEx(interp, relvar->value, 0) != TCL_OK) {
+	    return TCL_ERROR ;
+	}
+	relVarObj = Tcl_GetObjResult(interp) ;
+	if (Tcl_ConvertToType(interp, relVarObj, &Ral_RelationType)
 	    != TCL_OK) {
 	    return TCL_ERROR ;
 	}
+	break ;
 
-	relvarRelation = relVarObj->internalRep.otherValuePtr ;
-	relvalRelation = relValueObj->internalRep.otherValuePtr ;
-	/*
-	 * Can only assign something of the same type.
-	 */
-	if (!relationHeadingEqual(relvarRelation->heading,
-	    relvalRelation->heading)) {
-	    Tcl_SetStringObj(Tcl_GetObjResult(interp), 
-		"value assigned to relvar must be of the same type", -1) ;
-	    return TCL_ERROR ;
-	}
-
-	Tcl_DecrRefCount(relVarObj) ;
-	Tcl_IncrRefCount(relvar->value = relValueObj) ;
-	relVarObj = relValueObj ;
+    default:
+	Tcl_Panic("unknown relvar type") ;
+	/* Does not return */
     }
 
     Tcl_SetObjResult(interp, relVarObj) ;
@@ -5407,6 +5467,30 @@ RelvarUpdateOneCmd(
     return TCL_OK ;
 }
 
+static int
+RelvarVirtualCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    /* relvar virtual relvarName relExpr */
+    if (objc != 4) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relvarName relExpr") ;
+	return TCL_ERROR ;
+    }
+
+    if (relvarCreate(interp, VirtualRelvar_Type, objv[2], objv[3])
+	!= TCL_OK) {
+	return TCL_ERROR ;
+    }
+    /*
+     * No return from "relvar virtual". Must use "relvar set" to access
+     * the value.
+     */
+    Tcl_ResetResult(interp) ;
+    return TCL_OK ;
+}
+
 /*
  * ======================================================================
  * Relvar Ensemble Command Function
@@ -5431,6 +5515,7 @@ relvarCmd(
 	{"set", RelvarSetCmd},
 	{"update", RelvarUpdateCmd},
 	{"updateone", RelvarUpdateOneCmd},
+	{"virtual", RelvarVirtualCmd},
 	{NULL, NULL},
     } ;
     int index ;
