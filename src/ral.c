@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral.c,v $
-$Revision: 1.5 $
-$Date: 2004/05/09 20:17:20 $
+$Revision: 1.6 $
+$Date: 2004/05/17 00:16:28 $
  *--
  */
 
@@ -296,7 +296,7 @@ EXTERNAL DATA REFERENCES
 /*
 STATIC DATA ALLOCATION
 */
-static char rcsid[] = "@(#) $RCSfile: ral.c,v $ $Revision: 1.5 $" ;
+static char rcsid[] = "@(#) $RCSfile: ral.c,v $ $Revision: 1.6 $" ;
 
 static Tcl_ObjType Ral_TupleType = {
     "Tuple",
@@ -969,6 +969,36 @@ tupleHeadingFindIndex(
     return index ;
 }
 
+/*
+ * Determine the number of attributes in "h1" that have a match in "h2".
+ */
+static int
+tupleHeadingCompare(
+    Ral_TupleHeading *h1,
+    Ral_TupleHeading *h2)
+{
+    Ral_Attribute *a1 ;
+    Ral_Attribute *last ;
+    int matches = 0 ;
+
+    /*
+     * Heading order does not matter.  So iterate through the vector of the
+     * first heading an look up the corresponding attribute names in the other
+     * heading.
+     */
+    last = h1->attrVector + h1->degree ;
+    for (a1 = h1->attrVector ; a1 != last ; ++a1) {
+	Ral_Attribute *a2 ;
+
+	a2 = tupleHeadingFindAttribute(NULL, h2, a1->name, NULL) ;
+	if (a2 && attributeEqual(a1, a2)) {
+	    ++matches ;
+	}
+    }
+
+    return matches ;
+}
+
 static int
 tupleHeadingEqual(
     Ral_TupleHeading *h1,
@@ -983,28 +1013,8 @@ tupleHeadingEqual(
     if (h1->degree != h2->degree) {
 	return 0 ;
     }
-    /*
-     * Headings are equal if both the attribute names are equal and the
-     * corresponding data types are the same. However, order does not
-     * matter. Two headings can be equal even if the order in which the
-     * attributes appear in the vector differs.  So iterate through the
-     * vector of the first heading an look up the corresponding attribute
-     * names in the other heading.
-     */
-    last = h1->attrVector + h1->degree ;
-    for (a1 = h1->attrVector ; a1 != last ; ++a1) {
-	Ral_Attribute *a2 ;
 
-	a2 = tupleHeadingFindAttribute(NULL, h2, a1->name, NULL) ;
-	if (!a2) {
-	    return 0 ;
-	}
-	if (!attributeEqual(a1, a2)) {
-	    return 0 ;
-	}
-    }
-
-    return 1 ;
+    return tupleHeadingCompare(h1, h2) == h1->degree ;
 }
 
 static int
@@ -2127,9 +2137,6 @@ relationHeadingEqual(
     Ral_RelationHeading *h1,
     Ral_RelationHeading *h2)
 {
-    int idCount ;
-    Ral_RelId *idVector ;
-
     if (h1 == h2) {
 	return 1 ;
     }
@@ -2607,6 +2614,84 @@ relationReindexTuple(
 {
     relationRemoveTupleIndex(relation, tuple) ;
     relationIndexTuple(NULL, relation, tuple, where) ;
+}
+
+/*
+ * Create a hash table based on the values of all the attributes.
+ */
+static int
+relationIndexAllAttributes(
+    Tcl_Interp *interp,
+    Ral_Relation *relation,
+    Tcl_HashTable *hashTable)
+{
+    Tcl_Obj **tupleVector = relation->tupleVector ;
+    int card ;
+    Ral_TupleHeading *tupleHeading = relation->heading->tupleHeading ;
+
+    for (card = 0 ; card < relation->cardinality ; ++card, ++tupleVector) {
+	Tcl_Obj *tupleObj = *tupleVector ;
+	Ral_Tuple *tuple ;
+	int degree ;
+	Tcl_DString idKey ;
+	Tcl_HashEntry *entry ;
+	int newPtr ;
+
+	if (Tcl_ConvertToType(interp, tupleObj, &Ral_TupleType) != TCL_OK) {
+	    return TCL_ERROR ;
+	}
+	tuple = tupleObj->internalRep.otherValuePtr ;
+
+	Tcl_DStringInit(&idKey) ;
+
+	for (degree = 0 ; degree < tupleHeading->degree ; ++degree) {
+	    Tcl_DStringAppend(&idKey, Tcl_GetString(tuple->values[degree]),
+		-1) ;
+	}
+
+	entry = Tcl_CreateHashEntry(hashTable, Tcl_DStringValue(&idKey),
+	    &newPtr) ;
+	Tcl_DStringFree(&idKey) ;
+	/*
+	 * there are not supposed to be duplicate tuples in a relation.
+	 */
+	assert(newPtr == 1) ;
+	assert(entry != NULL) ;
+	Tcl_SetHashValue(entry, card) ;
+    }
+
+    return TCL_OK ;
+}
+
+/*
+ * Find the index in a hash table were the values of tuple match.
+ * Only those parts of the tuple that correpond to the given tuple heading
+ * are considered.
+ */
+static int
+relationFindCorresponding(
+    Ral_Tuple *tuple,
+    Ral_TupleHeading *hashTupleHeading,
+    Tcl_HashTable *hashTable)
+{
+    Tcl_DString idKey ;
+    int degree ;
+    Ral_Attribute *attrVector ;
+    Tcl_HashEntry *entry ;
+
+    Tcl_DStringInit(&idKey) ;
+
+    for (degree = hashTupleHeading->degree,
+	attrVector = hashTupleHeading->attrVector ; degree > 0 ;
+	--degree, ++attrVector) {
+	int index ;
+	index = tupleHeadingFindIndex(NULL, tuple->heading, attrVector->name) ;
+	assert(index >= 0) ;
+	Tcl_DStringAppend(&idKey, Tcl_GetString(tuple->values[index]), -1) ;
+    }
+    entry = Tcl_FindHashEntry(hashTable, Tcl_DStringValue(&idKey)) ;
+    Tcl_DStringFree(&idKey) ;
+    return entry ? (int)Tcl_GetHashValue(entry) : -1 ;
 }
 
 static int
@@ -3887,7 +3972,7 @@ tupleCmd(
 	return TupleWrapCmd(interp, objc, objv) ;
 
     default:
-	Tcl_Panic("unexpected tuple subcommand value") ;
+	Tcl_Panic("tuple: unexpected tuple subcommand value") ;
     }
 
     /*
@@ -4570,7 +4655,7 @@ relvarCmd(
 	return RelvarUpdateCmd(interp, objc, objv) ;
 
     default:
-	Tcl_Panic("unexpected relvar subcommand value") ;
+	Tcl_Panic("relvar: unexpected relvar subcommand value") ;
     }
 
     /*
@@ -4634,6 +4719,345 @@ RelationDegreeCmd(
 	Tcl_NewIntObj(relation->heading->tupleHeading->degree)) ;
 
     return TCL_OK ;
+}
+
+static int
+RelationDivideCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_Obj *dendObj ;
+    Ral_Relation *dend ;
+    Ral_TupleHeading *dendTupleHeading ;
+    Tcl_Obj *dsorObj ;
+    Ral_Relation *dsor ;
+    Ral_TupleHeading *dsorTupleHeading ;
+    Tcl_Obj *medObj ;
+    Ral_Relation *med ;
+    Ral_TupleHeading *medTupleHeading ;
+    Tcl_HashTable medHashTable ;
+    Ral_Relation *quot ;
+    Ral_TupleHeading *trialTupleHeading ;
+    Ral_Tuple *trialTuple ;
+    int dendCard ;
+    Tcl_Obj **dendTupleVector ;
+
+    /* relation divide dividend divisor mediator */
+    if (objc != 5) {
+	Tcl_WrongNumArgs(interp, 2, objv, "dividend divisor mediator") ;
+	return TCL_ERROR ;
+    }
+
+    dendObj = *(objv + 2) ;
+    if (Tcl_ConvertToType(interp, dendObj, &Ral_RelationType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    dend = dendObj->internalRep.otherValuePtr ;
+    dendTupleHeading = dend->heading->tupleHeading ;
+
+    dsorObj = *(objv + 3) ;
+    if (Tcl_ConvertToType(interp, dsorObj, &Ral_RelationType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    dsor = dsorObj->internalRep.otherValuePtr ;
+    dsorTupleHeading = dsor->heading->tupleHeading ;
+
+    medObj = *(objv + 4) ;
+    if (Tcl_ConvertToType(interp, medObj, &Ral_RelationType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    med = medObj->internalRep.otherValuePtr ;
+    medTupleHeading = med->heading->tupleHeading ;
+
+    /*
+     * The heading of the dividend must be disjoint from the heading of the
+     * divisor.
+     *
+     * The heading of the mediator must be the union of the dividend and
+     * divisor headings.
+     *
+     * The quotient, which has the same heading as the dividend, is then
+     * computed by iterating over the dividend and for each tuple, determining
+     * if all the tuples composed by combining a dividend tuple with all the
+     * divisor tuples are contained in the mediator.  If they are, the that
+     * dividend tuple is a tuple of the quotient.
+     */
+
+    if (tupleHeadingCompare(dendTupleHeading, dsorTupleHeading) != 0) {
+	Tcl_SetStringObj(Tcl_GetObjResult(interp), 
+	    "divisor heading must be disjoint from the dividend heading", -1) ;
+	return TCL_ERROR ;
+    }
+
+    if (tupleHeadingCompare(dendTupleHeading, medTupleHeading) +
+	tupleHeadingCompare(dsorTupleHeading, medTupleHeading) !=
+	medTupleHeading->degree) {
+	Tcl_SetStringObj(Tcl_GetObjResult(interp), 
+"mediator heading must be the union of dividend heading and divisor heading",
+	    -1) ;
+	return TCL_ERROR ;
+    }
+    /*
+     * HERE
+     * create quotient
+     * index all of mediator
+     * loop over dividend
+     *	    loop over divisor
+     *		compose tuple from dividend and divisor
+     *		if tuple is in mediator
+     *		    add to quotient
+     */
+    /*
+     * create quotient
+     */
+    quot = relationNew(relationHeadingNew(dendTupleHeading, 1)) ;
+    relIdCtor(quot->heading->idVector, dend->heading->idVector->attrCount) ;
+    memcpy(quot->heading->idVector->attrIndices,
+	dend->heading->idVector->attrIndices,
+	quot->heading->idVector->attrCount *
+	    sizeof(*quot->heading->idVector->attrIndices)) ;
+    relationReserve(quot, dend->cardinality) ;
+    /*
+     * Create an index for the mediator relation that will be used to
+     * find the matching tuples for the quotient.
+     */
+    Tcl_InitHashTable(&medHashTable, TCL_STRING_KEYS) ;
+    if (relationIndexAllAttributes(interp, med, &medHashTable) != TCL_OK) {
+	goto errorOut ;
+    }
+    /*
+     * The trial tuple has a heading that is the union of
+     * the dividend and divisor. That heading is the same as the
+     * mediator heading, except for the possible difference in
+     * attribute order. That's okay, because as we construct the
+     * trial tuple from the dividend and divisor in their value order,
+     * the comparison against the indexed mediator will happen in the
+     * correct order when "relationFindCorresponding" is called.
+     * Otherwise we would have to figure out how to construct the
+     * trial tuple in mediator order.
+     */
+    trialTupleHeading = tupleHeadingUnion(interp, dendTupleHeading,
+	dsorTupleHeading) ;
+    if (trialTupleHeading == NULL) {
+	goto errorOut ;
+    }
+    /*
+     * Loop over the dividend.
+     */
+    for (dendCard = dend->cardinality, dendTupleVector = dend->tupleVector ;
+	dendCard > 0 ; --dendCard, ++dendTupleVector) {
+	Tcl_Obj *dendTupleObj ;
+	Ral_Tuple *dendTuple ;
+	int matches ;
+	int dsorCard ;
+	Tcl_Obj **dsorTupleVector ;
+
+	dendTupleObj = *dendTupleVector ;
+	if (Tcl_ConvertToType(interp, dendTupleObj, &Ral_TupleType) != TCL_OK) {
+	    goto errorOut2 ;
+	}
+	dendTuple = dendTupleObj->internalRep.otherValuePtr ;
+	matches = 0 ;
+	/*
+	 * Loop over the divsor.
+	 */
+	for (dsorCard = dsor->cardinality, dsorTupleVector = dsor->tupleVector ;
+	    dsorCard > 0 ; --dsorCard, ++dsorTupleVector) {
+	    Tcl_Obj *dsorTupleObj ;
+	    Ral_Tuple *dsorTuple ;
+	    int index ;
+
+	    dsorTupleObj = *dsorTupleVector ;
+	    /*
+	     * This conversion is over done. Should be able to do
+	     * it once and then just reference the tuples.
+	     */
+	    if (Tcl_ConvertToType(interp, dsorTupleObj, &Ral_TupleType)
+		!= TCL_OK) {
+		goto errorOut2 ;
+	    }
+	    dsorTuple = dsorTupleObj->internalRep.otherValuePtr ;
+	    /*
+	     * Create the trial tuple.
+	     */
+	    trialTuple = tupleNew(trialTupleHeading) ;
+	    /*
+	     * Copy the dividend and divsor values into the trial tuple.
+	     */
+	    tupleCopyValues(dendTuple, 0, dendTupleHeading->degree,
+		trialTuple, 0) ;
+	    tupleCopyValues(dsorTuple, 0, dsorTupleHeading->degree,
+		trialTuple, dendTupleHeading->degree) ;
+	    /*
+	     * Find the trial tuple in the mediator.
+	     */
+	    index = relationFindCorresponding(trialTuple, medTupleHeading,
+		&medHashTable) ;
+	    if (index >= 0) {
+		++matches ;
+	    }
+	    tupleDelete(trialTuple) ;
+	}
+
+	    /*
+	     * If every trial tuple appeared in the mediator, then
+	     * corresponding dividend tuple is inserted into the mediator.
+	     */
+	if (matches == dsor->cardinality) {
+	    if (relationIndexTuple(interp, quot, dendTuple, quot->cardinality)
+		!= TCL_OK) {
+		return TCL_ERROR ;
+	    }
+	    Tcl_IncrRefCount(quot->tupleVector[quot->cardinality] =
+		dendTupleObj) ;
+	    ++quot->cardinality ;
+	}
+    }
+
+    tupleHeadingDelete(trialTupleHeading) ;
+    Tcl_DeleteHashTable(&medHashTable) ;
+    Tcl_SetObjResult(interp, relationObjNew(quot)) ;
+    return TCL_OK ;
+
+errorOut2:
+    tupleHeadingDelete(trialTupleHeading) ;
+errorOut:
+    Tcl_DeleteHashTable(&medHashTable) ;
+    relationDelete(quot) ;
+    return TCL_ERROR ;
+}
+
+static int
+RelationEliminateCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_Obj *relObj ;
+    Ral_Relation *relation ;
+    Ral_TupleHeading *tupleHeading ;
+    int elimDegree ;
+    int c ;
+    int *elimMap ;
+    int elimCount ;
+    int where ;
+    Ral_TupleHeading *elimTupleHeading ;
+    Ral_RelationHeading *elimHeading ;
+    Ral_Relation *elimRelation ;
+    int card ;
+    Tcl_Obj **tupleVector ;
+    Ral_Tuple *elimTuple ;
+
+    /* relation eliminate relationValue ?attr ... ? */
+    if (objc < 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relationValue ?attr ... ?") ;
+	return TCL_ERROR ;
+    }
+    relObj = *(objv + 2) ;
+    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relObj->internalRep.otherValuePtr ;
+    tupleHeading = relation->heading->tupleHeading ;
+
+    objc -= 3 ;
+    objv += 3 ;
+
+    if (objc > tupleHeading->degree) {
+	Tcl_SetStringObj(Tcl_GetObjResult(interp), 
+	"attempted to eliminate more attributes than exist in the relation",
+	    -1) ;
+	return TCL_ERROR ;
+    }
+
+    elimMap = (int *)ckalloc(tupleHeading->degree * sizeof(*elimMap)) ;
+    memset(elimMap, 0, tupleHeading->degree * sizeof(*elimMap)) ;
+    while (objc-- > 0) {
+	int index ;
+
+	index = tupleHeadingFindIndex(interp, tupleHeading, *objv++) ;
+	if (index < 0) {
+	    ckfree((char *)elimMap) ;
+	    return TCL_ERROR ;
+	}
+	elimMap[index] = 1 ;
+    }
+    elimCount = 0 ;
+    for (c = 0 ; c < tupleHeading->degree ; ++c) {
+	if (elimMap[c]) {
+	    ++elimCount ;
+	}
+    }
+    elimDegree = tupleHeading->degree - elimCount ;
+    elimTupleHeading = tupleHeadingNew(elimDegree) ;
+
+    where = 0 ;
+    for (c = 0 ; c < tupleHeading->degree ; ++c) {
+	if (!elimMap[c]) {
+	    Ral_Attribute *attr = tupleHeading->attrVector + c ;
+
+	    if (tupleHeadingCopy(interp, attr, attr + 1, elimTupleHeading,
+		where++) != TCL_OK) {
+		ckfree((char *)elimMap) ;
+		tupleHeadingDelete(elimTupleHeading) ;
+		return TCL_ERROR ;
+	    }
+	}
+    }
+
+    /*
+     * HERE
+     * This is probably wrong! If we are not eliminating any
+     * identifying attributes, then we should keep the identifiers
+     * of the original relation. Only if we are eliminating an attribute
+     * that is part of an identifier do we have to resort to just
+     * making every attribute part of a identifer. Same goes for
+     * "project" command.
+     */
+    elimHeading = relationHeadingNew(elimTupleHeading, 1) ;
+    relIdSetAllAttributes(elimHeading->idVector, elimTupleHeading->degree) ;
+    elimRelation = relationNew(elimHeading) ;
+    relationReserve(elimRelation, relation->cardinality) ;
+
+    for (card = relation->cardinality, tupleVector = relation->tupleVector ;
+	card > 0 ; --card, ++tupleVector) {
+	Tcl_Obj *srcTupleObj ;
+	Ral_Tuple *srcTuple ;
+	int degree ;
+
+	srcTupleObj = *tupleVector ;
+	if (Tcl_ConvertToType(interp, srcTupleObj, &Ral_TupleType) != TCL_OK) {
+	    goto errorOut ;
+	}
+	srcTuple = srcTupleObj->internalRep.otherValuePtr ;
+
+	elimTuple = tupleNew(elimTupleHeading) ;
+	where = 0 ;
+	for (degree = 0 ; degree < tupleHeading->degree ; ++degree) {
+	    if (!elimMap[degree]) {
+		Tcl_IncrRefCount(elimTuple->values[where++] =
+		    srcTuple->values[degree]) ;
+	    }
+	}
+	if (relationIndexTuple(NULL, elimRelation, elimTuple,
+	    elimRelation->cardinality) == TCL_OK) {
+	    Tcl_IncrRefCount(
+		elimRelation->tupleVector[elimRelation->cardinality++] =
+		tupleObjNew(elimTuple)) ;
+	} else {
+	    tupleDelete(elimTuple) ;
+	}
+    }
+
+    ckfree((char *)elimMap) ;
+    Tcl_SetObjResult(interp, relationObjNew(elimRelation)) ;
+    return TCL_OK ;
+
+errorOut:
+    ckfree((char *)elimMap) ;
+    relationDelete(elimRelation) ;
+    return TCL_ERROR ;
 }
 
 static int
@@ -5024,7 +5448,7 @@ RelationIsCmd(
 	break ;
 
     default:
-	Tcl_Panic("unexpected relational comparison operator value") ;
+	Tcl_Panic("relation is: unknown relational comparison operator") ;
     }
 
     if (relationHeadingCmpTypes(interp, cmpSrcRel->heading, cmpToRel->heading)
@@ -5091,7 +5515,7 @@ RelationIsCmd(
 	break ;
 
     default:
-	Tcl_Panic("unexpected relational comparison operator value") ;
+	Tcl_Panic("relation is: unknown relational comparison operator") ;
     }
 
     Tcl_SetObjResult(interp, Tcl_NewBooleanObj(result)) ;
@@ -5305,6 +5729,15 @@ RelationProjectCmd(
 	*vm++ = index ;
     }
 
+    /*
+     * HERE
+     * This is probably wrong! If we are not eliminating any
+     * identifying attributes, then we should keep the identifiers
+     * of the original relation. Only if we are eliminating an attribute
+     * that is part of an identifier do we have to resort to just
+     * making every attribute part of a identifer. Same goes for
+     * "project" command.
+     */
     projHeading = relationHeadingNew(projTupleHeading, 1) ;
     relIdSetAllAttributes(projHeading->idVector, projTupleHeading->degree) ;
     projRelation = relationNew(projHeading) ;
@@ -5469,6 +5902,223 @@ errorOut:
     Tcl_DecrRefCount(exprObj) ;
     Tcl_DecrRefCount(varName) ;
     relationDelete(newRelation) ;
+    return TCL_ERROR ;
+}
+
+/*
+ * HERE
+ * Allow for multiple "summaries", i.e. multiple "attr-type cmd initValue"
+ * argument sets.
+ */
+static int
+RelationSummarizeCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_Obj *relObj ;
+    Tcl_Obj *perObj ;
+    Tcl_Obj *attrObj ;
+    Tcl_Obj *cmdObj ;
+    int cmdLength ;
+    Tcl_Obj *initObj ;
+    Ral_Relation *relation ;
+    Ral_TupleHeading *tupleHeading ;
+    Ral_Relation *perRelation ;
+    Ral_TupleHeading *perTupleHeading ;
+    Ral_TupleHeading *sumTupleHeading ;
+    Ral_RelationHeading *sumHeading ;
+    Ral_Relation *sumRelation ;
+    Ral_Attribute *sumAttribute ;
+    Tcl_Obj **summaryVector ;
+    Tcl_HashTable perHashTable ;
+    int c ;
+    int rCnt = 0 ;
+
+    /* relation summarize relationValue perRelation attr-type cmd initValue */
+    if (objc != 7) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+	    "relationValue perRelation attr-type cmd initValue") ;
+	return TCL_ERROR ;
+    }
+
+    relObj = *(objv + 2) ;
+    perObj = *(objv + 3) ;
+    attrObj = *(objv + 4) ;
+    cmdObj = *(objv + 5) ;
+    initObj = *(objv + 6) ;
+
+    if (Tcl_ListObjLength(interp, cmdObj, &cmdLength) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relObj->internalRep.otherValuePtr ;
+    tupleHeading = relation->heading->tupleHeading ;
+
+    if (Tcl_ConvertToType(interp, perObj, &Ral_RelationType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    perRelation = perObj->internalRep.otherValuePtr ;
+    perTupleHeading = perRelation->heading->tupleHeading ;
+
+    /*
+     * The "per" relation must be a subset of the summarized relation.
+     */
+    if (tupleHeadingCompare(perTupleHeading, tupleHeading) !=
+	perTupleHeading->degree) {
+	Tcl_SetStringObj(Tcl_GetObjResult(interp), 
+	"the \"per\" relation heading must be a subset of summarized relation",
+	    -1) ;
+	return TCL_ERROR ;
+    }
+
+    /*
+     * Construct the heading for the result. It the heading of the
+     * "per" relation plus the summary attribute.
+     */
+    sumTupleHeading = tupleHeadingNew(perTupleHeading->degree + 1) ;
+    if (tupleHeadingCopy(interp, perTupleHeading->attrVector,
+	    perTupleHeading->attrVector + perTupleHeading->degree,
+	    sumTupleHeading, 0) != TCL_OK ||
+	tupleHeadingInsertAttributeFromPair(interp, sumTupleHeading, attrObj,
+	    perTupleHeading->degree) != TCL_OK) {
+	tupleHeadingDelete(sumTupleHeading) ;
+	return TCL_ERROR ;
+    }
+
+    sumAttribute = sumTupleHeading->attrVector + perTupleHeading->degree ;
+    if (attributeConvertValue(interp, sumAttribute, initObj) != TCL_OK) {
+	tupleHeadingDelete(sumTupleHeading) ;
+	return TCL_ERROR ;
+    }
+
+    sumHeading = relationHeadingNew(sumTupleHeading, 1) ;
+    relIdSetAllAttributes(sumHeading->idVector, sumTupleHeading->degree) ;
+    sumRelation = relationNew(sumHeading) ;
+    relationReserve(sumRelation, perRelation->cardinality) ;
+
+    /*
+     * Create a vector containing a copy of initialization object. This
+     * will be used to accumulate the result of the command evaluation.
+     */
+    summaryVector = (Tcl_Obj **)ckalloc(perRelation->cardinality *
+	sizeof(*summaryVector)) ;
+    for (c = 0 ; c < perRelation->cardinality ; ++c) {
+	Tcl_IncrRefCount(summaryVector[c] = initObj) ;
+    }
+
+    /*
+     * Create an index for the "per" relation that will be used to
+     * find the matching tuples in the summarized relation.
+     */
+    Tcl_InitHashTable(&perHashTable, TCL_STRING_KEYS) ;
+    if (relationIndexAllAttributes(interp, perRelation, &perHashTable)
+	!= TCL_OK) {
+	goto errorOut ;
+    }
+
+    /*
+     * Take a copy of the command so that we can hold on to it and
+     * modify it by adding arguments.
+     */
+    cmdObj = Tcl_DuplicateObj(cmdObj) ;
+    Tcl_IncrRefCount(cmdObj) ;
+    /*
+     * Loop through each tuple of the summarized relation and find
+     * the match in the "per" relation. If there is a match, then
+     * run the command and place the result back in the summary vector.
+     */
+    for (c = 0 ; c < relation->cardinality ; ++c) {
+	Tcl_Obj *tupleObj ;
+	Ral_Tuple *tuple ;
+	int index ;
+	Tcl_Obj *argVect[2] ;
+	Tcl_Obj *resultObj ;
+
+	tupleObj = relation->tupleVector[c] ;
+	if (Tcl_ConvertToType(NULL, tupleObj, &Ral_TupleType) != TCL_OK) {
+	    goto errorOut2 ;
+	}
+	tuple = tupleObj->internalRep.otherValuePtr ;
+	index = relationFindCorresponding(tuple, perTupleHeading,
+	    &perHashTable) ;
+	if (index < 0) {
+	    continue ;
+	}
+	/*
+	 * Append to arguments to the command:
+	 * (1) The summary value
+	 * (2) The tuple
+	 */
+	argVect[0] = summaryVector[index] ;
+	argVect[1] = tupleObj ;
+	if (Tcl_ListObjReplace(interp, cmdObj, cmdLength, rCnt, 2, argVect)
+	    != TCL_OK || Tcl_EvalObjEx(interp, cmdObj, 0)) {
+	    goto errorOut2 ;
+	}
+	rCnt = 2 ;
+
+	resultObj = Tcl_GetObjResult(interp) ;
+	if (attributeConvertValue(interp, sumAttribute, resultObj) != TCL_OK) {
+	    goto errorOut2 ;
+	}
+
+	Tcl_DecrRefCount(summaryVector[index]) ;
+	Tcl_IncrRefCount(summaryVector[index] = resultObj) ;
+    }
+
+    /*
+     * At this point the summary vector contains the values for the
+     * additional attribute. Now we put together the summary relation
+     * by extending the "per" relation with the summary values.
+     */
+    for (c = 0 ; c < perRelation->cardinality ; ++c) {
+	Tcl_Obj *tupleObj ;
+	Ral_Tuple *tuple ;
+	Ral_Tuple *sumTuple ;
+	int i ;
+
+	tupleObj = perRelation->tupleVector[c] ;
+	if (Tcl_ConvertToType(interp, tupleObj, &Ral_TupleType) != TCL_OK) {
+	    goto errorOut2 ;
+	}
+	tuple = tupleObj->internalRep.otherValuePtr ;
+
+	sumTuple = tupleNew(sumTupleHeading) ;
+	for (i = 0 ; i < perTupleHeading->degree ; ++i) {
+	    Tcl_IncrRefCount(sumTuple->values[i] = tuple->values[i]) ;
+	}
+	assert(i < sumTupleHeading->degree) ;
+	Tcl_IncrRefCount(sumTuple->values[i] = summaryVector[c]) ;
+
+	if (relationIndexTuple(interp, sumRelation, sumTuple,
+	    sumRelation->cardinality) == TCL_OK) {
+	    Tcl_IncrRefCount(
+		sumRelation->tupleVector[sumRelation->cardinality++] =
+		tupleObjNew(sumTuple)) ;
+	} else {
+	    tupleDelete(sumTuple) ;
+	    goto errorOut2 ;
+	}
+    }
+
+    Tcl_DecrRefCount(cmdObj) ;
+    Tcl_DeleteHashTable(&perHashTable) ;
+    ckfree((char *)summaryVector) ;
+    Tcl_SetObjResult(interp, relationObjNew(sumRelation)) ;
+    return TCL_OK ;
+
+errorOut2:
+    Tcl_DecrRefCount(cmdObj) ;
+errorOut:
+    Tcl_DeleteHashTable(&perHashTable) ;
+    for (c = 0 ; c < perRelation->cardinality ; ++c) {
+	Tcl_DecrRefCount(summaryVector[c]) ;
+    }
+    ckfree((char *)summaryVector) ;
+    relationDelete(sumRelation) ;
     return TCL_ERROR ;
 }
 
@@ -5789,13 +6439,11 @@ static int relationCmd(
     case RELATION_DEGREE:
 	return RelationDegreeCmd(interp, objc, objv) ;
 
-#if 0
     case RELATION_DIVIDE:
 	return RelationDivideCmd(interp, objc, objv) ;
 
     case RELATION_ELIMINATE:
 	return RelationEliminateCmd(interp, objc, objv) ;
-#endif
 
     case RELATION_EMPTY:
 	return RelationEmptyCmd(interp, objc, objv) ;
@@ -5849,10 +6497,12 @@ static int relationCmd(
 
     case RELATION_SEMIMINUS:
 	return RelationSemiminusCmd(interp, objc, objv) ;
+#endif
 
     case RELATION_SUMMARIZE:
 	return RelationSummarizeCmd(interp, objc, objv) ;
 
+#if 0
     case RELATION_TCLOSE:
 	return RelationTcloseCmd(interp, objc, objv) ;
 #endif
@@ -5875,7 +6525,7 @@ static int relationCmd(
 	return RelationUnionCmd(interp, objc, objv) ;
 
     default:
-	Tcl_Panic("unexpected relation subcommand value") ;
+	Tcl_Panic("relation: unexpected relation subcommand value") ;
     }
 
     /*

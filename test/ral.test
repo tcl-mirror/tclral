@@ -46,8 +46,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.5 $
-# $Date: 2004/05/09 20:17:20 $
+# $Revision: 1.6 $
+# $Date: 2004/05/17 00:16:29 $
 #  *--
 
 package require tcltest 2.2
@@ -107,8 +107,6 @@ namespace eval ::ral::test {
 
     proc max {attr start t} {
 	set cmp [tuple extract $t $attr]
-	puts "cmp = $cmp"
-	puts "tuple = $t"
 	return [expr {$cmp > $start ? $cmp : $start}]
     }
 
@@ -918,6 +916,74 @@ namespace eval ::ral::test {
 	relation degree [relvar get S]
     } -result 4
 
+    # relation divide subcommand
+    test relation-divide-1.0 {supplier who supply P1} -setup {
+	set dend [relation project [relvar get S] S#]
+	set med [relation project [relvar get SP] S# P#]
+	set dsor [relation project\
+	    [relation restrict\
+		[relvar get P] t {[tuple extract $t P#] eq "P1"}] P#]
+    } -body {
+	relation divide $dend $dsor $med
+    } -result {Relation {{{S# string}} S#} {{S# S1} {S# S2}}}
+
+    test relation-divide-2.0 {supplier who supply P2 and P4} -setup {
+	set dend [relation project [relvar get S] S#]
+	set med [relation project [relvar get SP] S# P#]
+	set dsor [relation project\
+	    [relation restrict [relvar get P] t\
+	    {[tuple extract $t P#] eq "P2" || [tuple extract $t P#] eq "P4"}]\
+	    P#]
+    } -body {
+	relation divide $dend $dsor $med
+    } -result {Relation {{{S# string}} S#} {{S# S1} {S# S4}}}
+
+    test relation-divide-3.0 {supplier who supply all parts} -setup {
+	set dend [relation project [relvar get S] S#]
+	set med [relation project [relvar get SP] S# P#]
+	set dsor [relation project [relvar get P] P#]
+    } -body {
+	relation divide $dend $dsor $med
+    } -result {Relation {{{S# string}} S#} {{S# S1}}}
+
+    # relation eliminate subcommand
+    test relation-eliminate-1.0 {single attribute} -body {
+	set r1 {Relation \
+	    {{{Name string} {Number int} {Street string} {IsMale boolean}}\
+		Name}\
+	    {{Name Andrew Number 599 Street Blackwood IsMale true}\
+	    {Name Jane Street Main Number 300 IsMale false}\
+	    {Name Fred Street Maple Number 599 IsMale 1}}}
+	relation eliminate $r1 Name
+    } -result {Relation {{{Number int} {Street string} {IsMale boolean}} {{Number Street IsMale}}} {{Number 599 Street Blackwood IsMale 1} {Number 300 Street Main IsMale 0} {Number 599 Street Maple IsMale 1}}}
+
+    test relation-eliminate-2.0 {multiple attributes} -body {
+	set r1 {Relation \
+	    {{{Name string} {Number int} {Street string} {IsMale boolean}}\
+		Name}\
+	    {{Name Andrew Number 599 Street Blackwood IsMale true}\
+	    {Name Jane Street Main Number 300 IsMale false}\
+	    {Name Fred Street Maple Number 599 IsMale 1}}}
+	relation eliminate $r1 Number IsMale
+    } -result {Relation {{{Name string} {Street string}} {{Name Street}}} {{Name Andrew Street Blackwood} {Name Jane Street Main} {Name Fred Street Maple}}}
+
+    test relation-eliminate-3.0 {nullary eliminate, non-empty relation} -body {
+	set r1 {Relation \
+	    {{{Name string} {Number int} {Street string} {IsMale boolean}}\
+		Name}\
+	    {{Name Andrew Number 599 Street Blackwood IsMale true}\
+	    {Name Jane Street Main Number 300 IsMale false}\
+	    {Name Fred Street Maple Number 599 IsMale 1}}}
+	relation eliminate $r1
+    } -result {Relation {{{Name string} {Number int} {Street string} {IsMale boolean}} {{Name Number Street IsMale}}} {{Name Andrew Number 599 Street Blackwood IsMale 1} {Name Jane Number 300 Street Main IsMale 0} {Name Fred Number 599 Street Maple IsMale 1}}}
+
+    test relation-eliminate-4.0 {nullary eliminate, empty relation} -body {
+	set r1 {Relation \
+	    {{{Name string} {Number int} {Street string} {IsMale boolean}}\
+		Name} {}}
+	relation eliminate $r1
+    } -result {Relation {{{Name string} {Number int} {Street string} {IsMale boolean}} {{Name Number Street IsMale}}} {}}
+
     # relation empty subcommand
     test relation-empty-1.0 {dum relation} -body {
 	relation empty {Relation {{} {{}}} {}}
@@ -1471,6 +1537,19 @@ namespace eval ::ral::test {
 	set r2 {Relation {{{Status int}} Status} {{Status 20} {Status 30}}}
 	relation times $r1 $r2
     } -result {Relation {{{Name string} {Status int}} {{Name Status}}} {{Name Andrew Status 20} {Name Andrew Status 30} {Name George Status 20} {Name George Status 30}}}
+
+    # relation summarize command
+    test relation-summarize-1.0 {count} -body {
+	set sp [relvar get SP]
+	set p [relation project [relvar get P] P#]
+	relation summarize $sp $p {Total int} [list sum QTY] 0
+    } -result {Relation {{{P# string} {Total int}} {{P# Total}}} {{P# P1 Total 600} {P# P2 Total 1000} {P# P3 Total 400} {P# P4 Total 500} {P# P5 Total 500} {P# P6 Total 100}}}
+
+    test relation-summarize-2.0 {summarize per dee} -body {
+	set sp [relvar get SP]
+	set dee {Relation {{} {{}}} {{}}}
+	relation summarize $sp $dee {GrandTotal int} [list sum QTY] 0
+    } -result {Relation {{{GrandTotal int}} GrandTotal} {{GrandTotal 3100}}}
 
     # relation tuple subcommand
     test relation-tuple-1.0 {single attribute} -body {
