@@ -1,5 +1,4 @@
 SRCS =\
-    doctools_fmt\
     relation\
     relvar\
     tuple\
