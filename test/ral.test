@@ -46,8 +46,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.16 $
-# $Date: 2004/08/15 22:55:22 $
+# $Revision: 1.17 $
+# $Date: 2004/08/23 01:38:36 $
 #  *--
 
 package require tcltest 2.2
@@ -1143,11 +1143,35 @@ namespace eval ::ral::test {
     # relation group subcommand
     test relation-group-1.0 {group two attributes} -body {
 	relation group [relvar set SP] PQ P# QTY
-    } -result {Relation {S# string PQ {Relation {P# string QTY int} {{P# QTY}}}} {{S# PQ}} {{S# S1 PQ {{P# P1 QTY 300} {P# P2 QTY 200} {P# P3 QTY 400} {P# P4 QTY 200} {P# P5 QTY 100} {P# P6 QTY 100}}} {S# S2 PQ {{P# P1 QTY 300} {P# P2 QTY 400}}} {S# S3 PQ {{P# P2 QTY 200}}} {S# S4 PQ {{P# P2 QTY 200} {P# P4 QTY 300} {P# P5 QTY 400}}}}}
+    } -result {Relation {S# string PQ {Relation {P# string QTY int} P#}} S# {{S# S1 PQ {{P# P1 QTY 300} {P# P2 QTY 200} {P# P3 QTY 400} {P# P4 QTY 200} {P# P5 QTY 100} {P# P6 QTY 100}}} {S# S2 PQ {{P# P1 QTY 300} {P# P2 QTY 400}}} {S# S3 PQ {{P# P2 QTY 200}}} {S# S4 PQ {{P# P2 QTY 200} {P# P4 QTY 300} {P# P5 QTY 400}}}}}
 
     test relation-group-2.0 {group two attributes} -body {
 	relation group [relvar set SP] SQ S# QTY
-    } -result {Relation {P# string SQ {Relation {S# string QTY int} {{S# QTY}}}} {{P# SQ}} {{P# P1 SQ {{S# S1 QTY 300} {S# S2 QTY 300}}} {P# P2 SQ {{S# S1 QTY 200} {S# S2 QTY 400} {S# S3 QTY 200} {S# S4 QTY 200}}} {P# P3 SQ {{S# S1 QTY 400}}} {P# P4 SQ {{S# S1 QTY 200} {S# S4 QTY 300}}} {P# P5 SQ {{S# S1 QTY 100} {S# S4 QTY 400}}} {P# P6 SQ {{S# S1 QTY 100}}}}}
+    } -result {Relation {P# string SQ {Relation {S# string QTY int} S#}} P# {{P# P1 SQ {{S# S1 QTY 300} {S# S2 QTY 300}}} {P# P2 SQ {{S# S1 QTY 200} {S# S2 QTY 400} {S# S3 QTY 200} {S# S4 QTY 200}}} {P# P3 SQ {{S# S1 QTY 400}}} {P# P4 SQ {{S# S1 QTY 200} {S# S4 QTY 300}}} {P# P5 SQ {{S# S1 QTY 100} {S# S4 QTY 400}}} {P# P6 SQ {{S# S1 QTY 100}}}}}
+
+    test relation-group-3.0 {group; no ids in grouped attribute} -setup {
+	set r1 {Relation\
+	    {Name string Number int Street string}\
+	    Name\
+	    {{Name Andrew Number 599 Street Blackwood}\
+	    {Name Jane Street Main Number 300}\
+	    {Name Alice Street Main Number 300}\
+	    {Name Fred Street Maple Number 599}}}
+    } -body {
+	relation group $r1 Addr Number Street
+    } -result {Relation {Name string Addr {Relation {Number int Street string} {{Number Street}}}} Name {{Name Andrew Addr {{Number 599 Street Blackwood}}} {Name Jane Addr {{Number 300 Street Main}}} {Name Alice Addr {{Number 300 Street Main}}} {Name Fred Addr {{Number 599 Street Maple}}}}}
+
+    test relation-group-4.0 {group; all ids in grouped attribute} -setup {
+	set r1 {Relation\
+	    {Name string Number int Street string}\
+	    {{Name Number Street}}\
+	    {{Name Andrew Number 599 Street Blackwood}\
+	    {Name Jane Street Main Number 300}\
+	    {Name Alice Street Main Number 300}\
+	    {Name Fred Street Maple Number 599}}}
+    } -body {
+	relation group $r1 Addr Number Street
+    } -result {Relation {Name string Addr {Relation {Number int Street string} {{Number Street}}}} Name {{Name Andrew Addr {{Number 599 Street Blackwood}}} {Name Jane Addr {{Number 300 Street Main}}} {Name Alice Addr {{Number 300 Street Main}}} {Name Fred Addr {{Number 599 Street Maple}}}}}
 
     # relation heading subcommand
     test relation-heading-1.0 {dum relation} -body {

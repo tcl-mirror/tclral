@@ -44,8 +44,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.6 $
-# $Date: 2004/08/01 18:55:05 $
+# $Revision: 1.7 $
+# $Date: 2004/08/23 01:38:35 $
 #  *--
 }]
 [manpage_begin relation n 0.6]
@@ -97,7 +97,7 @@ Note that all the operators are [emph "read only"] in the sense that
 they operate on relation values without modifying them.
 All of these operators return either a new relation or scalar value and
 do not modify the relation arguments.
-Only the [cmd relval] command can modify a relation variable in place.
+Only the [cmd relvar] command can modify a relation variable in place.
 
 [section "STRING REPRESENTATION"]
 Like any Tcl value, relations have a string representation.

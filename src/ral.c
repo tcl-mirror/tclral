@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral.c,v $
-$Revision: 1.19 $
-$Date: 2004/08/15 23:46:14 $
+$Revision: 1.20 $
+$Date: 2004/08/23 01:38:35 $
  *--
  */
 
@@ -335,7 +335,7 @@ STATIC DATA ALLOCATION
 */
 static const char ral_version[] = "0.6" ;
 static const char ral_rcsid[] =
-    "$Id: ral.c,v 1.19 2004/08/15 23:46:14 mangoa01 Exp $" ;
+    "$Id: ral.c,v 1.20 2004/08/23 01:38:35 mangoa01 Exp $" ;
 static const char ral_copyright[] =
     "This software is copyrighted 2004 by G. Andrew Mangogna."
     "Terms and conditions for use are distributed with the source code." ;
@@ -489,6 +489,23 @@ fixedIntVectorIsSubsetOf(
      */
     return memcmp(v1->vector, v2->vector, v1->count * sizeof(*v1->vector))
 	== 0 ;
+}
+
+static int
+fixedIntVectorContains(
+    Ral_FixedIntVector *v,
+    int e)
+{
+    int *vect = v->vector ;
+    int *last = vect + v->count ;
+
+    for ( ; vect != last ; ++vect) {
+	if (*vect == e) {
+	    return 1 ;
+	}
+    }
+
+    return 0 ;
 }
 
 /*
@@ -2635,18 +2652,11 @@ relationHeadingUngroupIdentifiers(
 	     * We need to determine if the ungrouped attribute is part of the
 	     * identifier for the relation. If so, then it must be excluded.
 	     */
-	    int foundUngrp = 0 ;
 	    int relIndex ;
 	    int attrIndex ;
 	    int where = 0 ;
-	    for (relIndex = 0 ; relIndex < relIds->count ; ++relIndex) {
-		if (relIds->vector[relIndex] == ungrpIndex) {
-		    ++foundUngrp ;
-		}
-	    }
-	    assert(foundUngrp <= 1) ;
 	    fixedIntVectorCtor(ughIds, relIds->count + attrIds->count
-		- foundUngrp) ;
+		- fixedIntVectorContains(relIds, ungrpIndex)) ;
 	    /*
 	     * Copy all the identifiers from the relation to the ungrouped
 	     * heading except any that match the attribute index of that
@@ -2670,6 +2680,146 @@ relationHeadingUngroupIdentifiers(
     }
 
     return ;
+}
+
+static Ral_RelationHeading *
+relationHeadingNewGrouped(
+    Ral_RelationHeading *oldHeading,
+    char *relAttrMap,
+    Ral_TupleHeading *tupleHeading)
+{
+    Ral_RelationHeading *newHeading ;
+    Ral_FixedIntVector *idVector = oldHeading->idVector ;
+    Ral_FixedIntVector *last = idVector + oldHeading->idCount ;
+    int newIdCount = 0 ;
+
+    /*
+     * Go through each identifier and determine if any of the
+     * attributes of that identifier are part of the grouped attribute.
+     * We tally the number of attributes eliminated. If all the attributes
+     * are not eliminated then that identifier will become part of
+     * the new heading.
+     */
+    for ( ; idVector != last ; ++idVector) {
+	int elimCnt = 0 ;
+	int *pattr = idVector->vector ;
+	int *plast = pattr + idVector->count ;
+
+	for ( ; pattr != plast ; ++pattr) {
+	    elimCnt += relAttrMap[*pattr] ;
+	}
+
+	newIdCount += elimCnt < idVector->count ;
+    }
+
+    if (newIdCount) {
+	Ral_FixedIntVector *newIds ;
+
+	newHeading = relationHeadingNew(tupleHeading, newIdCount) ;
+	newIds = newHeading->idVector ;
+	/*
+	 * At least one identifier remains. Go back through and create the
+	 * identifiers.
+	 */
+	for (idVector = oldHeading->idVector ; idVector != last ; ++idVector) {
+	    int elimCnt = 0 ;
+	    int *pattr = idVector->vector ;
+	    int *plast = pattr + idVector->count ;
+
+	    for ( ; pattr != plast ; ++pattr) {
+		elimCnt += relAttrMap[*pattr] ;
+	    }
+	    if (elimCnt < idVector->count) {
+		int *pnew ;
+
+		fixedIntVectorCtor(newIds, idVector->count - elimCnt) ;
+		pnew = newIds->vector ;
+		for (pattr = idVector->vector ; pattr != plast ; ++pattr) {
+		    if (!relAttrMap[*pattr]) {
+			/*
+			 * Translate the index in the old heading to
+			 * the correct value in the new heading by hashing
+			 * through the name.
+			 */
+			Tcl_Obj *attrName = oldHeading->tupleHeading->
+			    attrVector[*pattr].name ;
+			int newAttrIndex = tupleHeadingFindIndex(NULL,
+			    tupleHeading, attrName) ;
+			assert(newAttrIndex >= 0) ;
+			*pnew++ = newAttrIndex ;
+		    }
+		}
+		++newIds ;
+	    }
+	}
+    } else {
+	/*
+	 * All the identifying attributes were swept into the grouped
+	 * attribute. Take the default attribute.
+	 */
+	newHeading = relationHeadingNew(tupleHeading, 1) ;
+	fixedIntVectorIdentityMap(newHeading->idVector, tupleHeading->degree) ;
+    }
+
+    return newHeading ;
+}
+
+Ral_RelationHeading *
+relationHeadingNewGroupedAttr(
+    Ral_RelationHeading *oldHeading,
+    int idCount,
+    char *relAttrMap,
+    Ral_TupleHeading *tupleHeading)
+{
+    Ral_RelationHeading *newHeading ;
+    Ral_FixedIntVector *idVector ;
+    Ral_FixedIntVector *last ;
+    int where = 0 ;
+
+    newHeading = relationHeadingNew(tupleHeading, idCount) ;
+
+    /*
+     * Examine each identifier of the old Heading to determine the
+     * set of attributes that are both in the attribute map and in
+     * the identifier.
+     * If that set is non-empty, then look up the name of the attribute
+     * in the old heading and map it to a new index in the tupleHeading.
+     * Accumulate all the indices and sort them to make an identifier
+     * for the grouped attribute.
+     */
+    idVector = oldHeading->idVector ;
+    last = idVector + idCount ;
+    for ( ; idVector != last ; ++idVector) {
+	int *pindex = idVector->vector ;
+	int *plast = pindex + idVector->count ;
+	int found = 0 ;
+
+	for ( ; pindex != plast ; ++pindex) {
+	    found += relAttrMap[*pindex] ;
+	}
+	if (found) {
+	    Ral_FixedIntVector *nvect = newHeading->idVector + where++ ;
+	    int *pnew ;
+
+	    fixedIntVectorCtor(nvect, found) ;
+	    pnew = nvect->vector ;
+	    for (pindex = idVector->vector ; pindex != plast ; ++pindex) {
+		int oldAttrIndex = *pindex ;
+
+		if (relAttrMap[oldAttrIndex]) {
+		    Tcl_Obj *attrName = oldHeading->tupleHeading->
+			attrVector[oldAttrIndex].name ;
+		    int newAttrIndex = tupleHeadingFindIndex(NULL, tupleHeading,
+			attrName) ;
+		    assert(newAttrIndex >= 0) ;
+		    *pnew++ = newAttrIndex ;
+		}
+	    }
+	    fixedIntVectorSort(nvect) ;
+	}
+    }
+
+    return newHeading ;
 }
 
 /*
@@ -5626,6 +5776,7 @@ RelationGroupCmd(
 {
     Tcl_Obj *relObj ;
     Ral_Relation *rel ;
+    Ral_RelationHeading *heading ;
     Ral_TupleHeading *tupleHeading ;
     Tcl_Obj *newAttrObj ;
     Ral_TupleHeading *grpAttrTupleHeading ;
@@ -5634,6 +5785,7 @@ RelationGroupCmd(
     int c ;
     int d ;
     int attrIndex ;
+    int idCount ;
     int where ;
     Ral_TupleHeading *grpTupleHeading ;
     Ral_RelationHeading *grpHeading ;
@@ -5652,7 +5804,8 @@ RelationGroupCmd(
 	return TCL_ERROR ;
     }
     rel = relObj->internalRep.otherValuePtr ;
-    tupleHeading = rel->heading->tupleHeading ;
+    heading = rel->heading ;
+    tupleHeading = heading->tupleHeading ;
     newAttrObj = objv[3] ;
     objc -= 4 ;
     objv += 4 ;
@@ -5682,12 +5835,38 @@ RelationGroupCmd(
 	    relAttrMap[attrIndex] = 1 ;
 	}
     }
-    grpAttrRelationHeading = relationHeadingNew(grpAttrTupleHeading, 1) ;
     /*
-     * HERE - do something about the identifiers.
+     * The new grouped attribute has as many identifiers as there are
+     * attributes contained in the identifiers of the original relation.
+     * If there are no attributes of the new relational attribute then
+     * we must use the default that all of its attributes become the
+     * single identifier.
      */
-    fixedIntVectorIdentityMap(grpAttrRelationHeading->idVector,
-	grpAttrTupleHeading->degree) ;
+    idCount = 0 ;
+    for (c = 0 ; c < heading->idCount ; ++c) {
+	Ral_FixedIntVector *idVector = heading->idVector + c ;
+
+	for (d = 0 ; d < tupleHeading->degree ; ++d) {
+	    if (relAttrMap[d] && fixedIntVectorContains(idVector, d)) {
+		++idCount ;
+		break ;
+	    }
+	}
+    }
+
+    if (idCount) {
+	grpAttrRelationHeading = relationHeadingNewGroupedAttr(
+	    heading, idCount, relAttrMap, grpAttrTupleHeading) ;
+    } else {
+	/* The attributes in the new relational attribute do not appear
+	 * in any of the identifiers of the original relation. So by
+	 * default we make the identifier of the relational attribute
+	 * all the attributes it contains.
+	 */
+	grpAttrRelationHeading = relationHeadingNew(grpAttrTupleHeading, 1) ;
+	fixedIntVectorIdentityMap(grpAttrRelationHeading->idVector,
+	    grpAttrTupleHeading->degree) ;
+    }
 
     /*
      * The grouped relation has a heading that contains all the attributes
@@ -5712,15 +5891,25 @@ RelationGroupCmd(
     attributeCtorRelationType(grpTupleHeading->attrVector + where, newAttrObj,
 	grpAttrRelationHeading) ;
 
-    grpHeading = relationHeadingNew(grpTupleHeading, 1) ;
     /*
-     * HERE - do something about the identifiers.
+     * The grouped relation has identifiers that are the same as the
+     * original relation minus any attributes contained in the new
+     * relational attribute. If that leaves an identifier to be the
+     * empty set then it must be eliminated. And of course if that means
+     * that all the identifiers are empty, then we must make all the
+     * attributes of the new grouped relation the single identifier.
+     * N.B. that the new relation valued attribute is never an identifier.
      */
-    fixedIntVectorIdentityMap(grpHeading->idVector, grpTupleHeading->degree) ;
+    grpHeading = relationHeadingNewGrouped(heading, relAttrMap,
+	grpTupleHeading) ;
     group = relationNew(grpHeading) ;
 
     /*
      * Build up the tuples for the new grouped relation.
+     * The strategy is to compute the value of an identifier based on
+     * the attribute values form the old relation. If the tuple already
+     * exists, then add to the relation valued attribute. Otherwise,
+     * add the new tuple and add its corresponding relation valued attribute.
      */
     Tcl_InitHashTable(&groupHash, TCL_STRING_KEYS) ;
     for (c = 0 ; c < rel->cardinality ; ++c) {
@@ -5735,7 +5924,7 @@ RelationGroupCmd(
 	for (d = 0 ; d < tupleHeading->degree ; ++d) {
 	    if (relAttrMap[d]) {
 		tupleCopyValues(tuple, d, d + 1, grpAttrTuple, place++) ;
-	    } else {
+	    } else if (fixedIntVectorContains(heading->idVector, d)) {
 		Tcl_DStringAppend(&relKey, Tcl_GetString(tuple->values[d]),
 		    -1) ;
 	    }

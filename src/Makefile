@@ -44,15 +44,15 @@
 # ABSTRACT:
 # 
 # $RCSfile: Makefile,v $
-# $Revision: 1.6 $
-# $Date: 2004/08/15 23:46:14 $
+# $Revision: 1.7 $
+# $Date: 2004/08/23 01:38:35 $
 #  *--
 
 TCLBASE = /usr/local/ActiveTcl
 
 CFLAGS = -g -I$(TCLBASE)/include -Wall
 #CFLAGS = -g -I$(TCLBASE)/include -Werror-implicit-function-declaration
-CFLAGS += -O2
+#CFLAGS += -O2
 #CFLAGS += -fprofile-arcs -ftest-coverage
 LDFLAGS = -shared -g
 LOADLIBES = -L$(TCLBASE)/lib
