@@ -88,13 +88,8 @@ The tuple heading.
 [enum]
 The tuple values.
 [list_end]
-The tuple heading is itself a list whose elements give the attribute names
-and attribute data types of the tuple.
-Each heading element consists of further sub-elements.
-If the heading element list consists of two sub-elements then they are
-the attribute name and attribute data type respectively. If only one
-sub-element is present, then it is take as the attribute name and the
-attribute data type is set to [emph string].
+The tuple heading is an even numbered list consisting alternately of
+an attribute name and an attribute data type.
 Data types may be any valid Tcl object type.
 [para]
 The tuple values are also specified by a list consisting of an even
@@ -107,16 +102,8 @@ give the corresponding attribute value.
 The following is a literal string representation of a tuple with
 three attributes.
 [example_begin]
-{Tuple {{Name string} {Breed string} {Age int}} {Name Fido Breed Terrier Age 2}}
+{Tuple {Name string Breed string Age int} {Name Fido Breed Terrier Age 2}}
 [example_end]
-By taking advantage of the fact that strings are very common and have a
-special place in Tcl, the above example could also be written as:
-[example_begin]
-{Tuple {Name Breed {Age int}} {Name Fido Breed Terrier Age 2}}
-[example_end]
-[para]
-These examples demonstrate the fact that the string representation of
-a tuple is [emph not] unique.
 
 [section COMMANDS]
 [list_begin definitions]
@@ -138,21 +125,18 @@ The [cmd assign] subcommand returns the empty string.
 The [cmd create] subcommand creates a new tuple that has a heading
 given by the [arg heading] argument and values given by the
 [arg name-value-list] argument and returns the value of the new tuple.
-The [arg heading] is specified by a list each element of which may
-contain one or two subelements. If an element of the [arg heading]
-list contains two sub-elements then the first sub-element is taken as the
-attribute name and second sub-element is taken as the attribute data type.
-If only one sub-element is given, then it is taken to be the attribute
-name and the attribute data type is taken to be [emph string].
+The [arg heading] is specified by a list containing an even number of elements.
+The [arg heading] list consists of alternating attribute names and
+attribute data types.
 The [arg name-value-list] must have an even number of elements and the
 elements are treated as pairs.
 The first element of a pair is taken to be an attribute name and the second is
 taken as the corresponding value for the attribute.
-This is the same form of list accepted by the [cmd "array set"] command.
+This are the same forms of lists accepted by the [cmd "array set"] command.
 
 When a tuple is created each value is converted to the underlying data
 type specified in the heading of the tuple.
-It is an error if conversion fails.
+It is an error if the conversion fails.
 It is also an error not to supply a value for every attribute or to attempt
 to supply the value of any attribute more than once.
 
@@ -226,6 +210,12 @@ command and accepted by the [cmd "array set"] command.
 The [cmd get] subcommand provides a convenient means to move tuple
 values into an array.
 
+[call [cmd "::ral::tuple heading"] [arg tupleValue]]
+
+The [cmd heading] subcommand returns the heading of the given [arg tupleValue].
+The heading of a tuple is an even numbered list consisting alternately of
+attribute names and attribute data types.
+
 [call [cmd "::ral::tuple project"] [arg tupleValue] [opt [arg "attr ..."]]]
 
 The [cmd project] subcommand returns a new tuple that consists of only the
@@ -243,12 +233,6 @@ Many pairs of [arg oldname]/[arg newname] arguments may be given.
 It is an error to attempt to given an [arg oldname] that is not an attribute
 name in the tuple or to attempt to change the name of an attribute to be
 one that already exists in the tuple.
-
-[call [cmd "::ral::tuple typeof"] [arg tupleValue]]
-
-The [cmd typeof] subcommand returns the type of the given [arg tupleValue].
-The type of a tuple is a list consisting of the first two elements
-of the string representation of a tuple, as described above.
 
 [call [cmd "::ral::tuple unwrap"] [arg tupleValue] [arg attr]]
 

@@ -13,8 +13,8 @@ TclRAL defines a variable space for relation variables.
 Relation variables hold relation values and the subcommands of the
 [cmd relvar] command generally operate directly on the values storing
 the results back into the relation variables.
-For this reason, the [cmd relvar] subcommands all take the name of a relation
-variable as an argument.
+For this reason, the most of the [cmd relvar] subcommands
+take the name of a relation variable as an argument.
 
 [para]
 In the relational model, relation variables play the important role of
@@ -54,25 +54,22 @@ create a new copy of a shared value before performing any operation on it.
 The behavior described here works well when it is remembered that the
 [cmd relvar] commands can modify the underlying value directly and that
 the [cmd relation] commands only operate on values in a read only fashion
-and never modify their argument directly.
+and never modify their arguments directly.
 
 [section COMMANDS]
 [list_begin definitions]
 [call [cmd "::ral::relvar create"] [arg relationVariable]\
     [arg heading] [arg identifiers] [opt "name-value-list ..."]]
 
-The [cmd create] subcommand creates a new relvar whose name is given
+The [cmd create] subcommand creates a new relation variable whose name is given
 by [arg relationVariable].
 The subcommand has no return value.
-The [arg heading] is specified by a list each element of which may
-contain one or two subelements. If an element of the [arg heading]
-list contains two sub-elements then the first sub-element is taken as the
-attribute name and second sub-element is taken as the attribute data type.
-If only one sub-element is given, then it is taken to be the attribute
-name and the attribute data type is taken to be [emph string].
+The [arg heading] is specified by an even numbered list consisting alternately
+of an attribute name and attribute data type.
 The [arg identifiers] argument is a list of identifying attribute sets.
 Each element of the [arg identifiers] list is in turn a list containing
 a set of attribute names that constititute an identifier.
+Relations must have at least one identifier.
 Relations may have an arbitrary number of identifiers however,
 no identifier may be a subset of another identifier.
 Optionally, an arbitrary number of tuples may be specified.
@@ -82,7 +79,7 @@ Optional tuples are inserted into the relation variable as if
 [cmd "relvar insert"] had been called.
 
 [example_begin]
-relvar create OWNER {{OwnerName string} {Age int} {City string}} OwnerName
+relvar create OWNER {OwnerName string Age int City string} OwnerName
 [example_end]
 
 [call [cmd "::ral::relvar delete"] [arg relationVariable]\
@@ -121,7 +118,7 @@ If neither [arg -schema] or [arg -body] are present then both the necessary
 [cmd "relvar create"] and [cmd "relvar insert"] commands are returned.
 If the [arg pattern] is present then only those relation variables names
 matching [arg pattern] are dumped.
-Matching of relation variable names against pattern happens in the
+Matching of relation variable names against [arg pattern] happens in the
 same manner as for the [cmd "string match"] command.
 
 [example {
@@ -148,7 +145,7 @@ relvar insert OWNER\
     {City {San Francisco} Age 32 OwnerName Frank}
 }]
 
-[call [cmd "::ral::relvar names"] [arg relationVariable] [opt pattern]]
+[call [cmd "::ral::relvar names"] [opt pattern]]
 
 The [cmd names] subcommand returns a list of the currently defined
 relation variables.

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral.c,v $
-$Revision: 1.13 $
-$Date: 2004/07/10 18:23:07 $
+$Revision: 1.14 $
+$Date: 2004/07/24 20:17:32 $
  *--
  */
 
@@ -159,23 +159,18 @@ typedef struct Ral_RelationJoinMap {
  * attribute array. The "nameMap" hash table has as a key the attribute name
  * and as a value the index into the attribute array.
  *
- * The external string representation of a "heading" is a list with each
- * element being a sub-list containing an attribute name / attribute type pair.
- * For example:
+ * The external string representation of a "heading" is a list of alternating
+ * pairs of attribute name / attribute type, i.e. it looks like a dictionary.
  *
- *	{{Name string} {Street int} {Wage double}}
- *
- * If the type of an attribute is Tuple or Relation, then the type sub-element
- * will be a list of two elements itself. The first element will be the keyword
- * "Tuple" or "Relation" and the second element will be the heading.  For
- * example:
- *
- *	{{Name string} {Address {Tuple {{Number int} {Street string}}}}}
+ *	{Name string Street int Wage double}
  *
  * The attribute name can be an arbitrary string. Attribute names must be
  * unique within a given heading. The attribute type must be a valid registered
  * Tcl type such that Tcl_GetObjType() will return a non-NULL result or a Tuple
  * or Relation type.
+ *
+ * Notice that Tuple Headings are reference counted. Many tuples (e.g. in
+ * a relation) will reference the same heading.
  */
 
 typedef struct Ral_TupleHeading {
@@ -198,12 +193,12 @@ typedef struct Ral_TupleHeading {
  *
  * 3. A value definition.
  *
- * The keyword distinguishes the string as a Tuple.  The heading is as described
- * above.  The heading consists of a list of sublists which contains the
- * Attribute Names and Data Types.  The value definition is also a list
- * consisting of Attribute Name / Attribute Value pairs.
+ * The keyword distinguishes the string as a Tuple.  The heading is as
+ * described above.  The heading consists of a list Attribute Name and Data
+ * Type pairs.  The value definition is also a list consisting of Attribute
+ * Name / Attribute Value pairs.
  * E.G.
- *	{Tuple {{Name string} {Street int} {Wage double}}\
+ *	{Tuple {Name string Street int Wage double}\
  *	{Name Andrew Street Blackwood Wage 5.74}}
  *
  * Internally tuples are reference counted. The same tuple is sometimes
@@ -218,8 +213,8 @@ typedef struct Ral_Tuple {
 
 /*
  * A Relation Heading is a Tuple Heading with the addition of identifiers.
- * Identifiers are sub
- * sets of attributes for which the tuples may not have duplicated values.
+ * Identifiers are sub sets of attributes for which the tuples may not have
+ * duplicated values.
  */
 
 typedef struct Ral_RelationHeading {
@@ -238,12 +233,13 @@ typedef struct Ral_RelationHeading {
  *
  * 1. The keyword "Relation".
  *
- * 2. A relation heading. A relation heading is a two element list.
- *    The first sub-element is a tuple heading as described above.  The second
- *    sub-element is a list of identifiers (keys).  Each element is in turn a
- *    list of attribute names that constitute the identifier.
+ * 2. A tuple heading. A tuple heading is a list of Name / Type pairs as
+ *    described above.
  *
- * 3. A list of tuple values. Each element of the list is a set of
+ * 3. A list of identifiers. Each identifier is in turn a list of attribute
+ *    names that constitute the identifier
+ *
+ * 4. A list of tuple values. Each element of the list is a set of
  *    Attribute Name / Attribute Value pairs.
  * E.G.
  *    {Relation {{{Name string} {Number int} {Wage double}} {{Name}}}\
@@ -289,10 +285,9 @@ static int tupleHeadingFindIndex(Tcl_Interp *, Ral_TupleHeading *, Tcl_Obj *) ;
 static int relationHeadingEqual(Ral_RelationHeading *, Ral_RelationHeading *) ;
 static void relationHeadingReference(struct Ral_RelationHeading *) ;
 static void relationHeadingUnreference(struct Ral_RelationHeading *) ;
-static Ral_RelationHeading *relationHeadingNewFromString(Tcl_Interp *,
-    Tcl_Obj *) ;
-static Tcl_Obj *relationHeadingObjNew(Tcl_Interp *,
-    Ral_RelationHeading *) ;
+static Ral_RelationHeading *relationHeadingNewFromObjs(Tcl_Interp *,
+    Tcl_Obj *, Tcl_Obj *) ;
+static Tcl_Obj *relationHeadingObjNew(Tcl_Interp *, Ral_RelationHeading *) ;
 
 static Ral_Tuple *tupleNew(Ral_TupleHeading *) ;
 static void tupleDelete(Ral_Tuple *) ;
@@ -330,7 +325,7 @@ EXTERNAL DATA REFERENCES
 /*
 STATIC DATA ALLOCATION
 */
-static char rcsid[] = "@(#) $RCSfile: ral.c,v $ $Revision: 1.13 $" ;
+static char rcsid[] = "@(#) $RCSfile: ral.c,v $ $Revision: 1.14 $" ;
 
 static Tcl_ObjType Ral_TupleType = {
     "Tuple",
@@ -670,100 +665,73 @@ attributeFromObjs(
     Tcl_Obj *attrName,
     Tcl_Obj *dataType)
 {
-    /*
-     * By default, if the data type is missing, then assume "string"
-     */
-    if (dataType == NULL) {
-	attributeCtorTclType(attr, attrName, Tcl_GetObjType("string")) ;
-	assert(attr->tclType != NULL) ;
-    } else {
-	int typec ;
-	Tcl_Obj **typev ;
+    int typec ;
+    Tcl_Obj **typev ;
+    const char *typeName ;
 
-	if (Tcl_ListObjGetElements(interp, dataType, &typec, &typev)
-	    != TCL_OK) {
+    if (Tcl_ListObjGetElements(interp, dataType, &typec, &typev)
+	!= TCL_OK) {
+	return TCL_ERROR ;
+    }
+    typeName = Tcl_GetString(*typev) ;
+    if (typec == 1) {
+	Tcl_ObjType *tclType = Tcl_GetObjType(typeName) ;
+
+	if (tclType == NULL) {
+	    if (interp) {
+		Tcl_ResetResult(interp) ;
+		Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
+		    "unknown data type, \"", Tcl_GetString(*typev), "\"",
+		    NULL) ;
+	    }
 	    return TCL_ERROR ;
 	}
-	if (typec == 1) {
-	    Tcl_ObjType *tclType = Tcl_GetObjType(Tcl_GetString(*typev)) ;
+	attributeCtorTclType(attr, attrName, tclType) ;
+    } else if (typec == 2) {
+	if (strcmp("Tuple", typeName) == 0) {
+	    Ral_TupleHeading *heading =
+		tupleHeadingNewFromString(interp, *(typev + 1)) ;
 
-	    if (tclType == NULL) {
-		if (interp) {
-		    Tcl_ResetResult(interp) ;
-		    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-			"unknown data type, \"", Tcl_GetString(*typev), "\"",
-			NULL) ;
-		}
-		return TCL_ERROR ;
-	    }
-	    attributeCtorTclType(attr, attrName, tclType) ;
-	} else if (typec == 2) {
-	    const char *typeName = Tcl_GetString(*typev) ;
-	    if (strcmp("Tuple", typeName) == 0) {
-		Ral_TupleHeading *heading =
-		    tupleHeadingNewFromString(interp, *(typev + 1)) ;
-
-		if (heading) {
-		    attributeCtorTupleType(attr, attrName, heading) ;
-		} else {
-		    return TCL_ERROR ;
-		}
-	    } else if (strcmp("Relation", typeName) == 0) {
-		Ral_RelationHeading *heading =
-		    relationHeadingNewFromString(interp, *(typev + 1)) ;
-
-		if (heading) {
-		    attributeCtorRelationType(attr, attrName, heading) ;
-		} else {
-		    return TCL_ERROR ;
-		}
+	    if (heading) {
+		attributeCtorTupleType(attr, attrName, heading) ;
 	    } else {
-		if (interp) {
-		    Tcl_ResetResult(interp) ;
-		    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-			"expected Tuple or Relation type, but got, \"",
-			typeName, "\"", NULL) ;
-		}
 		return TCL_ERROR ;
 	    }
 	} else {
 	    if (interp) {
 		Tcl_ResetResult(interp) ;
 		Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-		    "bad type specification, \"", Tcl_GetString(dataType),
-		    "\"", NULL) ;
+		    "expected Tuple type, but got, \"", typeName, "\"",
+		    NULL) ;
 	    }
 	    return TCL_ERROR ;
 	}
-    }
+    } else if (typec == 3) {
+	if (strcmp("Relation", typeName) == 0) {
+	    Ral_RelationHeading *heading =
+		relationHeadingNewFromObjs(interp, *(typev + 1),
+		*(typev +2)) ;
 
-    return TCL_OK ;
-}
-
-/*
- * Assign to an attribute based on a string.
- */
-static int
-attributeFromString(
-    Tcl_Interp *interp,
-    Ral_Attribute *attr,
-    Tcl_Obj *attrSpec)
-{
-    int pairc ;
-    Tcl_Obj **pairv ;
-
-    if (Tcl_ListObjGetElements(interp, attrSpec, &pairc, &pairv) != TCL_OK) {
-	return TCL_ERROR ;
-    }
-    if (pairc == 1) {
-	attributeFromObjs(interp, attr, *pairv, NULL) ;
-    } else if (pairc == 2) {
-	attributeFromObjs(interp, attr, *pairv, *(pairv + 1)) ;
+	    if (heading) {
+		attributeCtorRelationType(attr, attrName, heading) ;
+	    } else {
+		return TCL_ERROR ;
+	    }
+	} else {
+	    if (interp) {
+		Tcl_ResetResult(interp) ;
+		Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
+		    "expected Relation type, but got, \"", typeName, "\"",
+		    NULL) ;
+	    }
+	    return TCL_ERROR ;
+	}
     } else {
 	if (interp) {
 	    Tcl_ResetResult(interp) ;
 	    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-		"bad heading format, \"", Tcl_GetString(attrSpec), "\"", NULL) ;
+		"bad type specification, \"", Tcl_GetString(dataType),
+		"\"", NULL) ;
 	}
 	return TCL_ERROR ;
     }
@@ -1318,38 +1286,6 @@ tupleHeadingInsertAttribute(
 }
 
 static int
-tupleHeadingInsertAttributeFromPair(
-    Tcl_Interp *interp,
-    Ral_TupleHeading *heading,
-    Tcl_Obj *pair,
-    int where)
-{
-    int pairc ;
-    Tcl_Obj **pairv ;
-    int result ;
-
-    if (Tcl_ListObjGetElements(interp, pair, &pairc, &pairv) != TCL_OK) {
-	return TCL_ERROR ;
-    }
-    if (pairc == 1) {
-	result = tupleHeadingInsertAttribute(interp, heading, *pairv,
-	    NULL, where) ;
-    } else if (pairc == 2) {
-	result = tupleHeadingInsertAttribute(interp, heading, *pairv,
-	    *(pairv + 1), where) ;
-    } else {
-	if (interp) {
-	    Tcl_ResetResult(interp) ;
-	    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-		"bad heading format, \"", Tcl_GetString(pair), "\"", NULL) ;
-	}
-	result = TCL_ERROR ;
-    }
-
-    return result ;
-}
-
-static int
 tupleHeadingRenameAttribute(
     Tcl_Interp *interp,		/* interpreter for error reporting */
     Ral_TupleHeading *heading,  /* heading to which the attribute is added */
@@ -1408,7 +1344,7 @@ tupleHeadingNewFromString(
     int objc ;
     Tcl_Obj **objv ;
     Ral_TupleHeading *heading ;
-    int i ;
+    int where ;
 
     /*
      * Since the string representation of a Heading is a list of pairs,
@@ -1417,14 +1353,22 @@ tupleHeadingNewFromString(
     if (Tcl_ListObjGetElements(interp, objPtr, &objc, &objv) != TCL_OK) {
 	return NULL ;
     }
-    heading = tupleHeadingNew(objc) ;
+    if (objc % 2 != 0) {
+	if (interp) {
+	    Tcl_ResetResult(interp) ;
+	    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
+		"bad heading format, \"", Tcl_GetString(objPtr), "\"", NULL) ;
+	}
+	return NULL ;
+    }
+    heading = tupleHeadingNew(objc / 2) ;
     /*
      * Iterate through the list adding each element as an attribute to
      * a newly created Heading.
      */
-    for (i = 0 ; i < objc ; ++i) {
-	if (tupleHeadingInsertAttributeFromPair(interp, heading, *objv++, i)
-	    != TCL_OK) {
+    for (where = 0 ; objc > 0 ; objc -= 2, objv += 2) {
+	if (tupleHeadingInsertAttribute(interp, heading, *objv, *(objv + 1),
+	    where++) != TCL_OK) {
 	    goto errorOut ;
 	}
     }
@@ -1459,26 +1403,19 @@ tupleHeadingAttrsToList(
     headList = Tcl_NewListObj(0, NULL) ;
     last = heading->attrVector + heading->degree ;
     for (attr = heading->attrVector ; attr != last ; ++attr) {
-	Tcl_Obj *pair ;
-	/*
-	 * Create a new list to contain the attribute name / data
-	 * type pair.
-	 */
-	pair = Tcl_NewListObj(0, NULL) ;
-
-	if (Tcl_ListObjAppendElement(interp, pair, attr->name) != TCL_OK) {
+	if (Tcl_ListObjAppendElement(interp, headList, attr->name) != TCL_OK) {
 	    goto errorOut ;
 	}
 	switch (attr->attrType) {
 	case Tcl_Type:
-	    if (Tcl_ListObjAppendElement(interp, pair,
+	    if (Tcl_ListObjAppendElement(interp, headList,
 		Tcl_NewStringObj(attr->tclType->name, -1)) != TCL_OK) {
 		goto errorOut ;
 	    }
 	    break ;
 
 	case Tuple_Type:
-	    if (Tcl_ListObjAppendElement(interp, pair,
+	    if (Tcl_ListObjAppendElement(interp, headList,
 		tupleHeadingObjNew(interp, attr->tupleHeading))
 		!= TCL_OK) {
 		goto errorOut ;
@@ -1486,7 +1423,7 @@ tupleHeadingAttrsToList(
 	    break ;
 
 	case Relation_Type:
-	    if (Tcl_ListObjAppendElement(interp, pair,
+	    if (Tcl_ListObjAppendElement(interp, headList,
 		relationHeadingObjNew(interp, attr->relationHeading))
 		!= TCL_OK) {
 		goto errorOut ;
@@ -1495,10 +1432,6 @@ tupleHeadingAttrsToList(
 
 	default:
 	    Tcl_Panic("unknown attribute data type") ;
-	}
-
-	if (Tcl_ListObjAppendElement(interp, headList, pair) != TCL_OK) {
-	    goto errorOut ;
 	}
     }
 
@@ -1795,26 +1728,6 @@ tupleDup(
      * Copy the values to the new tuple.
      */
     tupleCopyValues(srcTuple, 0, srcTuple->heading->degree, dupTuple, 0) ;
-
-    return dupTuple ;
-}
-
-/*
- * A shallow tuple duplication just references the tuple heading instead
- * of also making a copy.
- */
-static Ral_Tuple *
-tupleDupShallow(
-    Ral_Tuple *srcTuple)
-{
-    Ral_TupleHeading *srcHeading = srcTuple->heading ;
-    Ral_Tuple *dupTuple ;
-
-    dupTuple = tupleNew(srcHeading) ;
-    /*
-     * Copy the values to the new tuple.
-     */
-    tupleCopyValues(srcTuple, 0, srcHeading->degree, dupTuple, 0) ;
 
     return dupTuple ;
 }
@@ -2568,29 +2481,6 @@ relationHeadingNewFromObjs(
     return heading ;
 }
 
-static Ral_RelationHeading *
-relationHeadingNewFromString(
-    Tcl_Interp *interp,
-    Tcl_Obj *objPtr)
-{
-    int elemc ;
-    Tcl_Obj **elemv ;
-
-    if (Tcl_ListObjGetElements(interp, objPtr, &elemc, &elemv) != TCL_OK) {
-	return NULL ;
-    }
-
-    if (elemc != 2) {
-	Tcl_ResetResult(interp) ;
-	Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-	    "bad relation heading format, \"", Tcl_GetString(objPtr),
-	    "\"", NULL) ;
-	return NULL ;
-    }
-
-    return relationHeadingNewFromObjs(interp, elemv[0], elemv[1]) ;
-}
-
 static Tcl_Obj *
 relationHeadingIdsToList(
     Tcl_Interp *interp,
@@ -2622,25 +2512,21 @@ relationHeadingObjNew(
     Tcl_Interp *interp,
     Ral_RelationHeading *heading)
 {
-    Tcl_Obj *headElems[2] ;
-    Tcl_Obj *pair[2] ;
-    int idCount ;
-    Ral_FixedIntVector *idVector ;
+    Tcl_Obj *headElems[3] ;
 
-    headElems[0] = tupleHeadingAttrsToList(interp, heading->tupleHeading) ;
-    if (!headElems[0]) {
+    headElems[1] = tupleHeadingAttrsToList(interp, heading->tupleHeading) ;
+    if (!headElems[1]) {
 	return NULL ;
     }
-    headElems[1] = relationHeadingIdsToList(interp, heading) ;
-    if (!headElems[0]) {
-	Tcl_DecrRefCount(headElems[0]) ;
+    headElems[2] = relationHeadingIdsToList(interp, heading) ;
+    if (!headElems[2]) {
+	Tcl_DecrRefCount(headElems[1]) ;
 	return NULL ;
     }
 
-    pair[0] = Tcl_NewStringObj(Ral_RelationType.name, -1) ;
-    pair[1] = Tcl_NewListObj(2, headElems) ;
+    headElems[0] = Tcl_NewStringObj(Ral_RelationType.name, -1) ;
 
-    return Tcl_NewListObj(2, pair) ;
+    return Tcl_NewListObj(3, headElems) ;
 }
 
 static int
@@ -3549,7 +3435,7 @@ SetRelationFromAny(
     if (Tcl_ListObjGetElements(interp, objPtr, &objc, &objv) != TCL_OK) {
 	return TCL_ERROR ;
     }
-    if (objc != 3) {
+    if (objc != 4) {
 	Tcl_ResetResult(interp) ;
 	Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
 	    "badly formatted relation, \"", Tcl_GetString(objPtr), "\"", NULL) ;
@@ -3563,13 +3449,13 @@ SetRelationFromAny(
 	return TCL_ERROR ;
     }
 
-    heading = relationHeadingNewFromString(interp, *(objv + 1)) ;
+    heading = relationHeadingNewFromObjs(interp, *(objv + 1), *(objv + 2)) ;
     if (!heading) {
 	return TCL_ERROR ;
     }
 
     relation = relationNew(heading) ;
-    if (relationSetValuesFromString(interp, relation, *(objv + 2)) != TCL_OK) {
+    if (relationSetValuesFromString(interp, relation, *(objv + 3)) != TCL_OK) {
 	relationDelete(relation) ;
 	return TCL_ERROR ;
     }
@@ -4007,6 +3893,30 @@ TupleGetCmd(
 }
 
 static int
+TupleHeadingCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_Obj *tupleObj ;
+    Ral_Tuple *tuple ;
+
+    /* tuple heading tupleValue */
+    if (objc != 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "tupleValue") ;
+	return TCL_ERROR ;
+    }
+
+    tupleObj = *(objv + 2) ;
+    if (Tcl_ConvertToType(interp, tupleObj, &Ral_TupleType) != TCL_OK)
+	return TCL_ERROR ;
+    tuple = tupleObj->internalRep.otherValuePtr ;
+
+    Tcl_SetObjResult(interp, tupleHeadingAttrsToList(interp, tuple->heading)) ;
+    return TCL_OK ;
+}
+
+static int
 TupleProjectCmd(
     Tcl_Interp *interp,
     int objc,
@@ -4096,30 +4006,6 @@ TupleRenameCmd(
     }
 
     Tcl_SetObjResult(interp, tupleObjNew(newTuple)) ;
-    return TCL_OK ;
-}
-
-static int
-TupleTypeofCmd(
-    Tcl_Interp *interp,
-    int objc,
-    Tcl_Obj *const*objv)
-{
-    Tcl_Obj *tupleObj ;
-    Ral_Tuple *tuple ;
-
-    /* tuple typeof tupleValue */
-    if (objc != 3) {
-	Tcl_WrongNumArgs(interp, 2, objv, "tupleValue") ;
-	return TCL_ERROR ;
-    }
-
-    tupleObj = *(objv + 2) ;
-    if (Tcl_ConvertToType(interp, tupleObj, &Ral_TupleType) != TCL_OK)
-	return TCL_ERROR ;
-    tuple = tupleObj->internalRep.otherValuePtr ;
-
-    Tcl_SetObjResult(interp, tupleHeadingObjNew(interp, tuple->heading)) ;
     return TCL_OK ;
 }
 
@@ -4408,9 +4294,9 @@ tupleCmd(
 	TUPLE_EXTEND,
 	TUPLE_EXTRACT,
 	TUPLE_GET,
+	TUPLE_HEADING,
 	TUPLE_PROJECT,
 	TUPLE_RENAME,
-	TUPLE_TYPEOF,
 	TUPLE_UNWRAP,
 	TUPLE_UPDATE,
 	TUPLE_WRAP
@@ -4424,9 +4310,9 @@ tupleCmd(
 	"extend",
 	"extract",
 	"get",
+	"heading",
 	"project",
 	"rename",
-	"typeof",
 	"unwrap",
 	"update",
 	"wrap",
@@ -4470,14 +4356,14 @@ tupleCmd(
     case TUPLE_GET:
 	return TupleGetCmd(interp, objc, objv) ;
 
+    case TUPLE_HEADING:
+	return TupleHeadingCmd(interp, objc, objv) ;
+
     case TUPLE_PROJECT:
 	return TupleProjectCmd(interp, objc, objv) ;
 
     case TUPLE_RENAME:
 	return TupleRenameCmd(interp, objc, objv) ;
-
-    case TUPLE_TYPEOF:
-	return TupleTypeofCmd(interp, objc, objv) ;
 
     case TUPLE_UNWRAP:
 	return TupleUnwrapCmd(interp, objc, objv) ;
@@ -4670,8 +4556,7 @@ RelvarDestroyCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
-    Tcl_HashEntry *entry ;
-    Tcl_Obj *relvarObj ;
+    Tcl_Obj *nameObj ;
 
     /* relvar destroy ?relvarName ... ? */
     if (objc < 2) {
@@ -4679,10 +4564,14 @@ RelvarDestroyCmd(
 	return TCL_ERROR ;
     }
 
+    nameObj = objv[2] ;
     objc -= 2 ;
     objv += 2 ;
 
     while (objc-- > 0) {
+	Tcl_HashEntry *entry ;
+	Tcl_Obj *relvarObj ;
+
 	entry = Tcl_FindHashEntry(&relvarMap, (char *)*objv++) ;
 	if (entry) {
 	    relvarObj = Tcl_GetHashValue(entry) ;
@@ -4692,7 +4581,7 @@ RelvarDestroyCmd(
 	} else {
 	    Tcl_ResetResult(interp) ;
 	    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-		"relvar, \"", Tcl_GetString(objv[2]), "\" does not exist",
+		"relvar, \"", nameObj, "\" does not exist",
 		NULL) ;
 	    return TCL_ERROR ;
 	}
@@ -5537,7 +5426,10 @@ RelationExtendCmd(
     int tupleIndex ;
     Ral_Tuple **tupleVector ;
 
-    /* relation extend relationValue tupleVarName ?attr1 expr1...attrN exprN? */
+    /*
+     * relation extend relationValue tupleVarName
+     *	    ?attr1 type1 expr1...attrN typeN exprN?
+     */
     if (objc < 4) {
 	Tcl_WrongNumArgs(interp, 2, objv,
 	    "relationValue tupleVarName ?attr1 expr1 ... attrN exprN?") ;
@@ -5554,9 +5446,10 @@ RelationExtendCmd(
 
     objc -= 4 ;
     objv += 4 ;
-    if (objc % 2 != 0) {
+    if (objc % 3 != 0) {
 	Tcl_SetStringObj(Tcl_GetObjResult(interp), 
-	    "attribute / expression arguments must be given in pairs", -1) ;
+	    "attribute / type / expression arguments must be given in triples",
+	    -1) ;
 	return TCL_ERROR ;
     }
 
@@ -5564,12 +5457,12 @@ RelationExtendCmd(
     /*
      * Make the new relation adding the extended attributes
      */
-    extRelation = relationDup(relation, objc / 2) ;
+    extRelation = relationDup(relation, objc / 3) ;
     extTupleHeading = extRelation->heading->tupleHeading ;
 
     index = relation->heading->tupleHeading->degree ;
-    for (c = objc, v = objv ; c > 0 ; c -= 2, v += 2) {
-	if (tupleHeadingInsertAttributeFromPair(interp, extTupleHeading, *v,
+    for (c = objc, v = objv ; c > 0 ; c -= 3, v += 3) {
+	if (tupleHeadingInsertAttribute(interp, extTupleHeading, *v, *(v + 1),
 	    index++) != TCL_OK) {
 	    goto errorOut ;
 	}
@@ -5594,7 +5487,7 @@ RelationExtendCmd(
 
 	index = relation->heading->tupleHeading->degree ;
 	attr = extTupleHeading->attrVector + index ;
-	for (c = objc, v = objv + 1 ; c > 0 ; c -= 2, v += 2) {
+	for (c = objc, v = objv + 2 ; c > 0 ; c -= 3, v += 3) {
 	    Tcl_Obj *exprResult ;
 
 	    if (Tcl_ExprObj(interp, *v, &exprResult) != TCL_OK) {
@@ -5941,6 +5834,56 @@ errorOut:
     tupleDelete(grpAttrTuple) ;
     relationDelete(group) ;
     return TCL_ERROR ;
+}
+
+static int
+RelationHeadingCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_Obj *relationObj ;
+    Ral_Relation *relation ;
+
+    /* relation heading relationValue */
+    if (objc != 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relationValue") ;
+	return TCL_ERROR ;
+    }
+
+    relationObj = *(objv + 2) ;
+    if (Tcl_ConvertToType(interp, relationObj, &Ral_RelationType) != TCL_OK)
+	return TCL_ERROR ;
+    relation = relationObj->internalRep.otherValuePtr ;
+
+    Tcl_SetObjResult(interp,
+	tupleHeadingAttrsToList(interp, relation->heading->tupleHeading)) ;
+    return TCL_OK ;
+}
+
+static int
+RelationIdentifiersCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_Obj *relationObj ;
+    Ral_Relation *relation ;
+
+    /* relation identifiers relationValue */
+    if (objc != 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relationValue") ;
+	return TCL_ERROR ;
+    }
+
+    relationObj = *(objv + 2) ;
+    if (Tcl_ConvertToType(interp, relationObj, &Ral_RelationType) != TCL_OK)
+	return TCL_ERROR ;
+    relation = relationObj->internalRep.otherValuePtr ;
+
+    Tcl_SetObjResult(interp,
+	relationHeadingIdsToList(interp, relation->heading)) ;
+    return TCL_OK ;
 }
 
 static int
@@ -6843,6 +6786,7 @@ RelationSummarizeCmd(
     Tcl_Obj *relObj ;
     Tcl_Obj *perObj ;
     Tcl_Obj *attrObj ;
+    Tcl_Obj *typeObj ;
     Tcl_Obj *cmdObj ;
     int cmdLength ;
     Tcl_Obj *initObj ;
@@ -6859,18 +6803,19 @@ RelationSummarizeCmd(
     int c ;
     int rCnt = 0 ;
 
-    /* relation summarize relationValue perRelation attr-type cmd initValue */
-    if (objc != 7) {
+    /* relation summarize relationValue perRelation attr type cmd initValue */
+    if (objc != 8) {
 	Tcl_WrongNumArgs(interp, 2, objv,
-	    "relationValue perRelation attr-type cmd initValue") ;
+	    "relationValue perRelation attr type cmd initValue") ;
 	return TCL_ERROR ;
     }
 
     relObj = *(objv + 2) ;
     perObj = *(objv + 3) ;
     attrObj = *(objv + 4) ;
-    cmdObj = *(objv + 5) ;
-    initObj = *(objv + 6) ;
+    typeObj = *(objv + 5) ;
+    cmdObj = *(objv + 6) ;
+    initObj = *(objv + 7) ;
 
     if (Tcl_ListObjLength(interp, cmdObj, &cmdLength) != TCL_OK) {
 	return TCL_ERROR ;
@@ -6909,15 +6854,15 @@ RelationSummarizeCmd(
     if (perTupleHeading->degree) {
 	sumHeading = relationHeadingDup(perRelation->heading, 1) ;
 	sumTupleHeading = sumHeading->tupleHeading ;
-	if (tupleHeadingInsertAttributeFromPair(interp, sumTupleHeading,
-	    attrObj, perTupleHeading->degree) != TCL_OK) {
+	if (tupleHeadingInsertAttribute(interp, sumTupleHeading, attrObj,
+	    typeObj, perTupleHeading->degree) != TCL_OK) {
 	    relationHeadingDelete(sumHeading) ;
 	    return TCL_ERROR ;
 	}
     } else {
 	sumTupleHeading = tupleHeadingNew(1) ;
-	if (tupleHeadingInsertAttributeFromPair(interp, sumTupleHeading,
-	    attrObj, 0) != TCL_OK) {
+	if (tupleHeadingInsertAttribute(interp, sumTupleHeading, attrObj,
+	    typeObj, 0) != TCL_OK) {
 	    tupleHeadingDelete(sumTupleHeading) ;
 	    return TCL_ERROR ;
 	}
@@ -7144,30 +7089,6 @@ RelationTupleCmd(
 }
 
 static int
-RelationTypeofCmd(
-    Tcl_Interp *interp,
-    int objc,
-    Tcl_Obj *const*objv)
-{
-    Tcl_Obj *relationObj ;
-    Ral_Relation *relation ;
-
-    /* relation typeof relationValue */
-    if (objc != 3) {
-	Tcl_WrongNumArgs(interp, 2, objv, "relationValue") ;
-	return TCL_ERROR ;
-    }
-
-    relationObj = *(objv + 2) ;
-    if (Tcl_ConvertToType(interp, relationObj, &Ral_RelationType) != TCL_OK)
-	return TCL_ERROR ;
-    relation = relationObj->internalRep.otherValuePtr ;
-
-    Tcl_SetObjResult(interp, relationHeadingObjNew(interp, relation->heading)) ;
-    return TCL_OK ;
-}
-
-static int
 RelationUngroupCmd(
     Tcl_Interp *interp,
     int objc,
@@ -7365,6 +7286,8 @@ static int relationCmd(
 	RELATION_EXTEND,
 	RELATION_FOREACH,
 	RELATION_GROUP,
+	RELATION_HEADING,
+	RELATION_IDENTIFIERS,
 	RELATION_INTERSECT,
 	RELATION_IS,
 	RELATION_ISEMPTY,
@@ -7380,7 +7303,6 @@ static int relationCmd(
 	RELATION_SUMMARIZE,
 	RELATION_TIMES,
 	RELATION_TUPLE,
-	RELATION_TYPEOF,
 	RELATION_UNGROUP,
 	RELATION_UNION,
     } ;
@@ -7393,6 +7315,8 @@ static int relationCmd(
 	"extend",
 	"foreach",
 	"group",
+	"heading",
+	"identifiers",
 	"intersect",
 	"is",
 	"isempty",
@@ -7408,7 +7332,6 @@ static int relationCmd(
 	"summarize",
 	"times",
 	"tuple",
-	"typeof",
 	"ungroup",
 	"union",
 	NULL
@@ -7450,6 +7373,12 @@ static int relationCmd(
 
     case RELATION_GROUP:
 	return RelationGroupCmd(interp, objc, objv) ;
+
+    case RELATION_HEADING:
+	return RelationHeadingCmd(interp, objc, objv) ;
+
+    case RELATION_IDENTIFIERS:
+	return RelationIdentifiersCmd(interp, objc, objv) ;
 
     case RELATION_INTERSECT:
 	return RelationIntersectCmd(interp, objc, objv) ;
@@ -7495,9 +7424,6 @@ static int relationCmd(
 
     case RELATION_TUPLE:
 	return RelationTupleCmd(interp, objc, objv) ;
-
-    case RELATION_TYPEOF:
-	return RelationTypeofCmd(interp, objc, objv) ;
 
     case RELATION_UNGROUP:
 	return RelationUngroupCmd(interp, objc, objv) ;

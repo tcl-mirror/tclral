@@ -9,11 +9,9 @@ The [cmd relation]
 command is part of the Tcl Relational Algebra Library (ral) package.
 The [cmd relation] command defines a set of operators on relations that
 constitute the formal algebra of relations that is supported by TclRAL.
-Note that all the operators are [emph "read only"] in the sense that
-they operate on relation values without modifying them.
-All of these operators return either a new relation or scalar value and
-do not modify the relation arguments.
-Only the [cmd relval] command can modify a relation in place.
+The algebra is patterned after that described by Date (Date, C.J.,
+[emph "An Introduction to Database Systems"], 8th ed, Pearson Education, 2004,
+ISBN 0-321-19784-4, chap. 7)
 
 [para]
 Formally a relation has a heading and a body.
@@ -44,24 +42,32 @@ All attributes of all tuples of a relation must contain a valid value of
 the data type defined for that attribute.
 [list_end]
 
+[para]
+Note that all the operators are [emph "read only"] in the sense that
+they operate on relation values without modifying them.
+All of these operators return either a new relation or scalar value and
+do not modify the relation arguments.
+Only the [cmd relval] command can modify a relation variable in place.
+
 [section "STRING REPRESENTATION"]
 Like any Tcl value, relations have a string representation.
 The string representation of a relations is a specially formatted list
-consisting of three elements:
+consisting of four elements:
 [list_begin enum]
 [enum]
 The keyword [emph Relation].
 [enum]
 The relation heading.
 [enum]
+The identifiers of the relation.
+[enum]
 The relation body.
 [list_end]
-The relation heading is itself a list consisting of two elements.
-The first element is the tuple heading for all of the tuples that
-are part of the body of the relation.
-The tuple heading format is the same as that described in the
-[cmd tuple] command.
-The second element is a list of identifiers (candidate keys) of the relation.
+The relation heading is a even numbered list consisting of alternating
+attribute names and attribute data types.
+It is the same form as a tuple heading.
+[para]
+The identifiers (candidate keys) of a relation are specified as a list.
 Each identifer list element is in turn a list containing the attribute
 names that constitute the identifier.
 Every relation must have at least on identifier.
@@ -74,7 +80,7 @@ alternately of an attribute name and an attribute value.
 The following is a literal string representation of a relation with
 one tuple in its body.
 [example_begin]
-{Relation {{{DogName string} {Breed string}} DogName} {{DogName Fido Breed Poodle}}}
+{Relation {DogName string Breed string} DogName {{DogName Fido Breed Poodle}}}
 [example_end]
 
 [section EXAMPLE]
@@ -221,7 +227,7 @@ are given in the [arg attribute] arguments.
 The body of the new relation is the same as the body of [arg relationValue]
 removing any tuples that might be duplicated as a result of removing the
 attributes.
-The [cmd eliminate] subcommand is a complement to the [cmd project] command
+The [cmd eliminate] subcommand complements the [cmd project] command
 in the sense that [cmd eliminate] specifies which attributes
 to discard and [cmd project] specifies which attribute to keep.
 
@@ -243,11 +249,12 @@ The [cmd emptyof] subcommand returns a new relation that has the same
 heading as [arg relationValue] but whose cardinality is zero.
 
 [call [cmd "::ral::relation extend"] [arg relationValue] [arg tupleVariable]\
-    [opt "attr1 expr1 attr2 expr2 ..."]]
+    [opt "attr1 type1 expr1 attr2 type2 expr2 ..."]]
 
 The [cmd extend] subcommand returns a new relation which has the same
 heading as [arg relationValue] with zero or more additional attributes.
-The first additional attribute is given by [arg attr1] and its value is
+The first additional attribute is given by [arg attr1] which has
+type [arg type1] and its value is
 set to the result returned by passing [arg expr1] to the [cmd expr] command.
 Subsequent attributes are treated similarly.
 As each tuple in the body of [arg relationValue] is considered, its
@@ -259,7 +266,7 @@ the values of the new attributes.
 
 [example {
 % relformat [relation extend [relvar set OWNER] owner\ 
-    {AgeInMonths int} {[tuple extract $owner Age] * 12}]
+    AgeInMonths int {[tuple extract $owner Age] * 12}]
 OwnerName  Age           City  AgeInMonths
    string  int         string          int
 ==========================================
@@ -303,10 +310,11 @@ Fido
 
 The [cmd group] subcommand creates a new relation from [arg relationValue]
 that contains an attribute which is of type [emph Relation].
-The [arg newattribute] argument gives the name of the attribute and
-the remaining [arg attrN] arguments give the names of attributes in
-[arg relationValue] that are to be assembled into a relation.
-The resulting relation has a heading that is the same as [arg relationValue]
+The [arg newattribute] argument gives the name of the relation valued
+attribute and
+the [arg attrN] arguments give the names of attributes in
+[arg relationValue] that are to be assembled into a relation value.
+The returned relation has a heading that is the same as [arg relationValue]
 minus the attributes given in the [arg attrN] arguments plus the
 new relation attribute given by [arg newattribute].
 The resulting body has tuples for each unique set of values for the
@@ -329,6 +337,24 @@ OwnerName     DogAcquisition
      Mike    Rover      2002
       Jim     Fred      2003
 }]
+
+[call [cmd "::ral::relation heading"] [arg relationValue]]
+
+The [cmd heading] subcommand returns tuple heading of the relation.
+This is an even numbered list consisting of alternating attribute names
+and attribute data types.
+
+[example {
+% relation heading [relvar set DOG]
+DogName string Breed string
+}]
+
+[call [cmd "::ral::relation identifiers"] [arg relationValue]]
+
+The [cmd identifiers] subcommand returns the set of identifiers for the
+relation.
+The identifiers are returned as a list each element of which is in turn
+a list of attribute names that constitute the identifer.
 
 [call [cmd "::ral::relation intersect"] [arg relationValue1]\
     [arg relationValue2] [opt "relationValue3 ..."]]
@@ -368,6 +394,9 @@ Returns 1 if [arg relationValue1] is a proper superset of [arg relationValue2].
 Returns 1 if [arg relationValue1] is a superset of [arg relationValue2].
 
 [list_end]
+
+Both [arg relationValue1] and [arg relationValue2] must be of the same
+type to be compared.
 
 [call [cmd "::ral::relation isempty"] [arg relationValue]]
 
@@ -427,8 +456,8 @@ OwnerName  DogName  Acquired      Breed
 The [cmd list] subcommand returns the body of [arg relationValue] as
 a proper Tcl list.
 [arg RelationValue] must be of degree one or an error is returned.
-The [cmd list] complementary to the [cmd tuple] subcommand in the sense
-that it provides proper Tcl list for a relation of degree one where
+The [cmd list] subcommand complementary to the [cmd tuple] subcommand
+in the sense that it provides proper Tcl list for a relation of degree one where
 the [cmd tuple] subcommand provides a single tuple for a relation of
 cardinality one.
 
@@ -474,8 +503,8 @@ The [cmd rename] subcommand returns a relation whose heading has each
 [arg oldname] attribute changed to [arg newname] and whose body is the
 same as [arg relationValue].
 An arbitrary number of [arg "oldname / newname"] pairs may be given.
-Renaming is processed from left to right and it is not an error to
-change the name of any given attribute multiple times.
+Renaming is processed from left to right in the command arguments
+and it is not an error to change the name of any given attribute multiple times.
 However, [arg oldname] must always be the name of an attribute at the
 time the rename takes place.
 The [cmd rename] subcommand is useful for manipulating the attribute names
@@ -504,9 +533,10 @@ DogName    Breed
     [arg relationValue2] [opt "attr1 attr2 ..."]]
 
 The [cmd semijoin] subcommand computes the join of [arg relationValue1]
-and [arg relationValue2] but discards all of the attributes of
-[arg relationValue2].
-The return relation has a heading the same a [arg relationValue1]
+and [arg relationValue2] but eliminates all of the attributes of
+[arg relationValue2]
+(or alternatively speaking, projecting all attributes of [arg relationValue1]).
+The returned relation has a heading the same a [arg relationValue1]
 and a body consisting of those tuples in [arg relationValue1] that
 would have been included in the natural join with [arg relationValue2].
 As with [cmd join], if the [arg attrN] arguments are missing, the
@@ -538,6 +568,8 @@ The returned relation has a heading equal to that of [arg relationValue1]
 and a body consisting of those tuples from [arg relationValue1] which would
 [emph not] have been included in the natural join of [arg relationValue1]
 and [arg relationValue2].
+The optional [arg attrN] arguments are treated in the same way as for
+the [cmd join] subcommand.
 For example, to find all dogs that have no owner:
 [example {
 relformat [relation semiminus [relvar set DOG] [relvar set OWNERSHIP]]
@@ -548,7 +580,33 @@ DogName   Breed
 }]
 
 [call [cmd "::ral::relation summarize"] [arg relationValue] [arg perRelation]\
-    [arg attr-type] [arg cmd] [arg initialValue]]
+    [arg attr] [arg type] [arg summary] [arg initialValue]]
+
+The [cmd summarize] subcommand allows for computations across sets of
+attributes.
+The [arg perRelation] must be of the same type as a projection of
+[arg relationValue].
+The returned relation has the same heading as [arg perRelation] extended
+by [arg attr].
+The [arg attr] gives the name of the new attribute.
+The name of the new attribute may not match any existing attributes in
+[arg perRelation].
+The [arg type] argument is data type of the new attribute.
+The body of the returned relation consists of all the tuples of
+[arg perRelation] with a value for the new attribute.
+That value is computed by treating [arg summmary] as a command prefix
+and invoking it for all the tuples in [arg relationValue] that
+match the corresponding attributes in [arg perRelation].
+When [arg summary] is invoked, it is given two additional arguments.
+The first argument is the value returned from the previous invocation
+of [arg summary] for the given tuple in the result.
+Upon the first invocation of [arg summary] for a tuple in the result
+[arg initialValue] is given as the first argument.
+The second argument is the tuple in [arg relationValue] that matches
+the current tuple under consideration in [arg perRelation].
+The [arg summary] command is expected to return a result of the
+same type as the new attribute and that result is passed to subsequent
+invocations of [arg summary].
 
 In this example we determine the years when dogs were acquired and the
 number of dogs acquired in each year.
@@ -559,7 +617,7 @@ proc count_tuples {value t} {
 }
 relformat [relation summarize [relvar set OWNERSHIP]\ 
     [relation project [relvar set OWNERSHIP] Acquired]\ 
-    {NumAcquired int} count_tuples 0]
+    NumAcquired int count_tuples 0]
 Acquired  NumAcquired
   string          int
 =====================
@@ -623,17 +681,6 @@ DogName      Breed  OwnerName  Age           City
 
 The [cmd tuple] subcommand returns the body of [arg relationValue] as a tuple.
 The cardinality of [arg relationValue] must be one or an error is returned.
-
-[call [cmd "::ral::relation typeof"] [arg relationValue]]
-
-The [cmd typeof] subcommand returns type of [arg relationValue].
-The type of a relation is the same as the first two elements of its
-string representation.
-
-[example {
-% relation typeof [relvar set DOG]
-Relation {{{DogName string} {Breed string}} DogName}
-}]
 
 [call [cmd "::ral::relation ungroup"] [arg relationValue] [arg attribute]]
 

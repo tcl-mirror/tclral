@@ -43,8 +43,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.2 $
-# $Date: 2004/07/10 18:02:10 $
+# $Revision: 1.3 $
+# $Date: 2004/07/24 20:17:32 $
 #  *--
 
 namespace eval ::ral {
@@ -57,38 +57,32 @@ proc ::ral::relformat {relValue {title {}}} {
 	append result $title\n
 	append result [string repeat - [string length $title]]\n
     }
-    set heading [lindex [relation typeof $relValue] 1 0]
-    foreach h $heading {
-	foreach {attr type} $h {
-	    set colWidth($attr) [string length $attr]
-	    set typeWidth [string length [lindex $type 0]]
-	    if {$typeWidth > $colWidth($attr)} {
-		set colWidth($attr) $typeWidth
-	    }
+    set heading [relation heading $relValue]
+    foreach {attr type} $heading {
+	set colWidth($attr) [string length $attr]
+	set typeWidth [string length [lindex $type 0]]
+	if {$typeWidth > $colWidth($attr)} {
+	    set colWidth($attr) $typeWidth
 	}
     }
     relation foreach t $relValue {
-	foreach h $heading {
-	    foreach {attr type} $h {
-		set v [tuple extract $t $attr]
-		switch [lindex $type 0] {
-		    Tuple -
-		    Relation {
-			set v [lindex $v 2]
-		    }
+	foreach {attr type} $heading {
+	    set v [tuple extract $t $attr]
+	    switch [lindex $type 0] {
+		Tuple -
+		Relation {
+		    set v [lindex $v 2]
 		}
-		set valueLen [string length $v]
-		if {$valueLen > $colWidth($attr)} {
-		    set colWidth($attr) $valueLen
-		}
+	    }
+	    set valueLen [string length $v]
+	    if {$valueLen > $colWidth($attr)} {
+		set colWidth($attr) $valueLen
 	    }
 	}
     }
     set fmtStr {}
-    foreach h $heading {
-	foreach {attr type} $h {
-	    append fmtStr "%$colWidth($attr)s  "
-	}
+    foreach {attr type} $heading {
+	append fmtStr "%$colWidth($attr)s  "
     }
     set fmtStr [string trimright $fmtStr]
     append fmtStr "\n"
@@ -96,19 +90,15 @@ proc ::ral::relformat {relValue {title {}}} {
     # Attributes
     set fmtCmd [list format $fmtStr]
     set fmtLine $fmtCmd
-    foreach h $heading {
-	foreach {attr type} $h {
-	    lappend fmtLine $attr
-	}
+    foreach {attr type} $heading {
+	lappend fmtLine $attr
     }
     append result [eval $fmtLine]
 
     # Types
     set fmtLine $fmtCmd
-    foreach h $heading {
-	foreach {attr type} $h {
-	    lappend fmtLine [lindex $type 0]
-	}
+    foreach {attr type} $heading {
+	lappend fmtLine [lindex $type 0]
     }
     set typesLine [eval $fmtLine]
     append result $typesLine
@@ -117,17 +107,15 @@ proc ::ral::relformat {relValue {title {}}} {
     # Values
     relation foreach t $relValue {
 	set fmtLine $fmtCmd
-	foreach h $heading {
-	    foreach {attr type} $h {
-		set v [tuple extract $t $attr]
-		switch [lindex $type 0] {
-		    Tuple -
-		    Relation {
-			set v [lindex $v 2]
-		    }
+	foreach {attr type} $heading {
+	    set v [tuple extract $t $attr]
+	    switch [lindex $type 0] {
+		Tuple -
+		Relation {
+		    set v [lindex $v 2]
 		}
-		lappend fmtLine $v
 	    }
+	    lappend fmtLine $v
 	}
 	append result [eval $fmtLine]
     }
