@@ -1,15 +1,15 @@
-[manpage_begin tuple n 0.4]
+[manpage_begin tuple n 0.6]
 [moddesc "Operators for the Tuple data type"]
-[titledesc "Operators for the Tuple data type"]
+[titledesc "Tuple Operators"]
 [copyright "2004 by G. Andrew Mangogna"]
-[require ral 0.5]
+[require ral 0.6]
 [description]
 This manpage describes the
 [cmd tuple]
 command.
 The
 [cmd tuple]
-command is part of the Relational Algebra Library (ral) package.
+command is part of the Tcl Relational Algebra Library (ral) package.
 The ral package introduces an new Tcl data type called
 [emph Tuple]
 and this command provides the operators for the Tuple data type.
