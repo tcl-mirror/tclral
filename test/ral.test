@@ -46,14 +46,15 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.19 $
-# $Date: 2004/09/20 02:15:22 $
+# $Revision: 1.20 $
+# $Date: 2004/10/04 01:23:45 $
 #  *--
 
 package require tcltest 2.2
 eval tcltest::configure $argv
-load [file join .. libral0.6[info sharedlibextension]]
-source [file join .. src ral.tcl]
+
+set auto_path [linsert $auto_path 0 [file normalize [file join .. src]]]
+package require ral 0.7
 
 namespace eval ::ral::test {
     namespace import ::tcltest::*
@@ -810,7 +811,7 @@ namespace eval ::ral::test {
 	relvar destroy X
     } -body {
 	puts -nonewline [outputChannel] [relvar dump]
-    } -output {package require ral 0.6
+    } -output {package require ral 0.7
 ::ral::relvar create X {Name string Status int} {Name}
 ::ral::relvar insert X {Name George Status 20}
 ::ral::relvar insert X {Name Fred Status 30}
@@ -826,7 +827,7 @@ namespace eval ::ral::test {
 	relvar destroy X
     } -body {
 	puts -nonewline [outputChannel] [relvar dump -schema]
-    } -output {package require ral 0.6
+    } -output {package require ral 0.7
 ::ral::relvar create X {Name string Status int} {Name}
 } -result {}
 
@@ -839,7 +840,7 @@ namespace eval ::ral::test {
 	relvar destroy X
     } -body {
 	puts -nonewline [outputChannel] [relvar dump -body]
-    } -output {package require ral 0.6
+    } -output {package require ral 0.7
 ::ral::relvar insert X {Name George Status 20}
 ::ral::relvar insert X {Name Fred Status 30}
 ::ral::relvar insert X {Name Alice Status 40}
@@ -858,7 +859,7 @@ namespace eval ::ral::test {
 	relvar destroy X Y
     } -body {
 	puts -nonewline [outputChannel] [relvar dump X]
-    } -output {package require ral 0.6
+    } -output {package require ral 0.7
 ::ral::relvar create X {Name string Status int} {Name}
 ::ral::relvar insert X {Name George Status 20}
 ::ral::relvar insert X {Name Fred Status 30}
@@ -2230,6 +2231,51 @@ string  string     int  string
 string  string     int  string
 ==============================
     S5   Adams      30  Athens}
+
+    test relvar-interp-1.0 {each interpreter has its own relvar space} -setup {
+	set interp [interp create]
+	$interp eval {
+	    set auto_path [linsert $auto_path 0\
+		[file normalize [file join .. src]]]
+	    package require ral 0.7
+	    namespace import ::ral::*
+	}
+    } -cleanup {
+	interp delete $interp
+    } -body {
+	$interp eval {relvar names}
+    } -result {}
+
+    test relvar-interp-2.0 {each interpreter has its own relvar space} -setup {
+	set interp [interp create]
+	$interp eval {
+	    set auto_path [linsert $auto_path 0\
+		[file normalize [file join .. src]]]
+	    package require ral 0.7
+	    namespace import ::ral::*
+	    relvar create M {Name string} Name {Name Andrew}
+	}
+    } -cleanup {
+	interp delete $interp
+    } -body {
+	$interp eval {relvar names}
+    } -result {M}
+
+    test relvar-interp-3.0 {each interpreter has its own relvar space} -setup {
+	set interp [interp create]
+	$interp eval {
+	    set auto_path [linsert $auto_path 0\
+		[file normalize [file join .. src]]]
+	    package require ral 0.7
+	    namespace import ::ral::*
+	    relvar create M {Name string} Name {Name Andrew}
+	}
+	relvar create M {Name string} Name {Name Andrew}
+    } -cleanup {
+	interp delete $interp
+    } -body {
+	$interp eval {relvar names}
+    } -result {M}
 
     cleanupTests
 }

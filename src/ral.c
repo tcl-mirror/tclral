@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral.c,v $
-$Revision: 1.21 $
-$Date: 2004/08/30 00:29:11 $
+$Revision: 1.22 $
+$Date: 2004/10/04 01:23:45 $
  *--
  */
 
@@ -285,6 +285,21 @@ typedef struct Ral_Relation {
 } Ral_Relation ;
 
 /*
+ * Structure to hold the information about relation variables.
+ * We create a relation variable space to hold both base relvars and
+ * virtual relvars.
+ */
+typedef enum Ral_RelvarType {
+    BaseRelvar_Type,
+    VirtualRelvar_Type,
+} Ral_RelvarType ;
+
+typedef struct Ral_Relvar {
+    Ral_RelvarType type ;
+    Tcl_Obj *value ;
+} Ral_Relvar ;
+
+/*
 EXTERNAL FUNCTION REFERENCES
 */
 
@@ -341,9 +356,10 @@ EXTERNAL DATA REFERENCES
 /*
 STATIC DATA ALLOCATION
 */
-static const char ral_version[] = "0.6" ;
+static const char ral_pkgname[] = "ral" ;
+static const char ral_version[] = "0.7" ;
 static const char ral_rcsid[] =
-    "$Id: ral.c,v 1.21 2004/08/30 00:29:11 mangoa01 Exp $" ;
+    "$Id: ral.c,v 1.22 2004/10/04 01:23:45 mangoa01 Exp $" ;
 static const char ral_copyright[] =
     "This software is copyrighted 2004 by G. Andrew Mangogna."
     "Terms and conditions for use are distributed with the source code." ;
@@ -364,8 +380,6 @@ static Tcl_ObjType Ral_RelationType = {
     UpdateStringOfRelation,
     SetRelationFromAny
 } ;
-
-static Tcl_HashTable relvarMap ;
 
 /*
 FUNCTION DEFINITIONS
@@ -3830,6 +3844,135 @@ SetRelationFromAny(
 
 /*
  * ======================================================================
+ * Relvar Access Functions
+ * ======================================================================
+ */
+
+static Ral_Relvar *
+relvarNew(
+    Ral_RelvarType type,
+    Tcl_Obj *value)
+{
+    Ral_Relvar *relvar ;
+
+    relvar = (Ral_Relvar *)ckalloc(sizeof(*relvar)) ;
+    relvar->type = type ;
+    /*
+     * Increment the reference count since we are storing a pointer to the
+     * object.
+     */
+    Tcl_IncrRefCount(relvar->value = value) ;
+    return relvar ;
+}
+
+void
+relvarDelete(
+    Ral_Relvar *relvar)
+{
+    Tcl_DecrRefCount(relvar->value) ;
+    ckfree((char *)relvar) ;
+}
+
+static void
+deleteRelvarMap(
+    ClientData clientData,
+    Tcl_Interp *interp)
+{
+    Tcl_HashTable *relvarMap = clientData ;
+    Tcl_HashEntry *entry ;
+    Tcl_HashSearch search ;
+
+    for (entry = Tcl_FirstHashEntry(relvarMap, &search) ; entry ;
+	entry = Tcl_NextHashEntry(&search)) {
+	relvarDelete(Tcl_GetHashValue(entry)) ;
+    }
+    Tcl_DeleteHashTable(relvarMap) ;
+}
+
+static Tcl_HashTable *
+relvarGetMap(
+    Tcl_Interp *interp)
+{
+    Tcl_HashTable *relvarMap ;
+
+    relvarMap = Tcl_GetAssocData(interp, ral_pkgname, NULL) ;
+    if (relvarMap == NULL) {
+	relvarMap = (Tcl_HashTable *)ckalloc(sizeof(*relvarMap)) ;
+	Tcl_InitObjHashTable(relvarMap) ;
+	Tcl_SetAssocData(interp, ral_pkgname, deleteRelvarMap, relvarMap) ;
+    }
+    return relvarMap ;
+}
+
+static int
+relvarCreate(
+    Tcl_Interp *interp,
+    Ral_RelvarType type,
+    Tcl_Obj *relvarName,
+    Tcl_Obj *relObj)
+{
+    Tcl_HashTable *relvarMap = relvarGetMap(interp) ;
+    Tcl_HashEntry *entry ;
+    int newPtr ;
+
+    entry = Tcl_CreateHashEntry(relvarMap, (char *)relvarName, &newPtr) ;
+    if (newPtr == 0) {
+	Tcl_ResetResult(interp) ;
+	Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
+	    "relvar, \"", Tcl_GetString(relvarName), "\" already exists",
+	    NULL) ;
+	return TCL_ERROR ;
+    }
+    Tcl_SetHashValue(entry, relvarNew(type, relObj)) ;
+    return TCL_OK ;
+}
+
+static void
+relvarDestroy(
+    Tcl_Interp *interp,
+    Tcl_Obj *relvarName)
+{
+    Tcl_HashTable *relvarMap = relvarGetMap(interp) ;
+    Tcl_HashEntry *entry ;
+
+    entry = Tcl_FindHashEntry(relvarMap, (char *)relvarName) ;
+    if (entry) {
+	relvarDelete(Tcl_GetHashValue(entry)) ;
+	Tcl_DeleteHashEntry(entry) ;
+    }
+}
+
+static Tcl_Obj *
+relvarFind(
+    Tcl_Interp *interp,
+    Tcl_Obj *relvarName)
+{
+    Tcl_HashTable *relvarMap = relvarGetMap(interp) ;
+    Tcl_HashEntry *entry ;
+    Tcl_Obj *relObj = NULL ;
+
+    entry = Tcl_FindHashEntry(relvarMap, (char *)relvarName) ;
+    if (entry) {
+	Ral_Relvar *relvar = Tcl_GetHashValue(entry) ;
+	relObj = relvar->value ;
+	if (relvar->type == BaseRelvar_Type &&
+	    Tcl_ConvertToType(interp, relObj, &Ral_RelationType) != TCL_OK) {
+	    return NULL ;
+	}
+    } else {
+	if (interp) {
+	    Tcl_ResetResult(interp) ;
+	    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
+		"unknown relvar, \"", Tcl_GetString(relvarName), "\"", NULL) ;
+	}
+    }
+
+    return relObj ;
+}
+
+
+/*
+ * ======================================================================
  * Tuple Sub-Command Functions
  * ======================================================================
  */
@@ -4661,37 +4804,6 @@ tupleCmd(
 
 /*
  * ======================================================================
- * Relvar Mapping Functions
- * ======================================================================
- */
-
-static Tcl_Obj *
-relvarFind(
-    Tcl_Interp *interp,
-    Tcl_Obj *relvarName)
-{
-    Tcl_HashEntry *entry ;
-    Tcl_Obj *relObj = NULL ;
-
-    entry = Tcl_FindHashEntry(&relvarMap, (char *)relvarName) ;
-    if (entry) {
-	relObj = (Tcl_Obj *)Tcl_GetHashValue(entry) ;
-	if (Tcl_ConvertToType(interp, relObj, &Ral_RelationType) != TCL_OK) {
-	    return NULL ;
-	}
-    } else {
-	if (interp) {
-	    Tcl_ResetResult(interp) ;
-	    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-		"unknown relvar, \"", Tcl_GetString(relvarName), "\"", NULL) ;
-	}
-    }
-
-    return relObj ;
-}
-
-/*
- * ======================================================================
  * Relvar Sub-Command Functions
  * ======================================================================
  */
@@ -4703,8 +4815,6 @@ RelvarCreateCmd(
     Tcl_Obj *const*objv)
 {
     Tcl_Obj *relvarName ;
-    Tcl_HashEntry *entry ;
-    int newPtr ;
     Ral_RelationHeading *heading ;
     Ral_Relation *relation ;
     Tcl_Obj *relObj ;
@@ -4736,21 +4846,10 @@ RelvarCreateCmd(
     }
 
     relObj = relationObjNew(relation) ;
-    entry = Tcl_CreateHashEntry(&relvarMap, (char *)relvarName, &newPtr) ;
-    if (newPtr == 0) {
-	Tcl_ResetResult(interp) ;
-	Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-	    "relvar, \"", Tcl_GetString(relvarName), "\" already exists",
-	    NULL) ;
+    if (relvarCreate(interp, BaseRelvar_Type, relvarName, relObj) != TCL_OK) {
 	Tcl_DecrRefCount(relObj) ;
 	return TCL_ERROR ;
     }
-    /*
-     * Increment the reference count since we are also storing a pointer
-     * to the object in the relvar hash table.
-     */
-    Tcl_IncrRefCount(relObj) ;
-    Tcl_SetHashValue(entry, relObj) ;
     /*
      * No return from "relvar create". Must use "relvar set" to access
      * the value.
@@ -4877,22 +4976,7 @@ RelvarDestroyCmd(
     objv += 2 ;
 
     while (objc-- > 0) {
-	Tcl_HashEntry *entry ;
-	Tcl_Obj *relvarObj ;
-
-	entry = Tcl_FindHashEntry(&relvarMap, (char *)*objv++) ;
-	if (entry) {
-	    relvarObj = Tcl_GetHashValue(entry) ;
-	    assert(relvarObj != NULL) ;
-	    Tcl_DecrRefCount(relvarObj) ;
-	    Tcl_DeleteHashEntry(entry) ;
-	} else {
-	    Tcl_ResetResult(interp) ;
-	    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-		"relvar, \"", nameObj, "\" does not exist",
-		NULL) ;
-	    return TCL_ERROR ;
-	}
+	relvarDestroy(interp, *objv++) ;
     }
 
     return TCL_OK ;
@@ -4918,6 +5002,7 @@ RelvarDumpCmd(
     Tcl_HashEntry *entry ;
     Tcl_HashSearch search ;
     int index ;
+    Tcl_HashTable *relvarMap = relvarGetMap(interp) ;
 
     /* relvar dump ?-schema | -body? ?pattern? */
     if (objc > 4) {
@@ -4961,8 +5046,9 @@ RelvarDumpCmd(
      * First emit a set of "relvar create" statements.
      */
     if (dumpType & schemaDump) {
-	for (entry = Tcl_FirstHashEntry(&relvarMap, &search) ; entry ;
+	for (entry = Tcl_FirstHashEntry(relvarMap, &search) ; entry ;
 	    entry = Tcl_NextHashEntry(&search)) {
+	    Ral_Relvar *relvar = Tcl_GetHashValue(entry) ;
 	    const char *relvarName ;
 	    Tcl_Obj *relObj ;
 	    Ral_Relation *relation ;
@@ -4971,13 +5057,13 @@ RelvarDumpCmd(
 	    Tcl_Obj *idObj ;
 
 	    relvarName = Tcl_GetString(
-		(Tcl_Obj *)Tcl_GetHashKey(&relvarMap, entry)) ;
+		(Tcl_Obj *)Tcl_GetHashKey(relvarMap, entry)) ;
 	    if (patternObj &&
 		!Tcl_StringMatch(relvarName, Tcl_GetString(patternObj))) {
 		continue ;
 	    }
 
-	    relObj = Tcl_GetHashValue(entry) ;
+	    relObj = relvar->value ;
 	    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationType)
 		!= TCL_OK) {
 		goto errorOut ;
@@ -5013,8 +5099,9 @@ RelvarDumpCmd(
      * the schema.
      */
     if (dumpType & bodyDump) {
-	for (entry = Tcl_FirstHashEntry(&relvarMap, &search) ; entry ;
+	for (entry = Tcl_FirstHashEntry(relvarMap, &search) ; entry ;
 	    entry = Tcl_NextHashEntry(&search)) {
+	    Ral_Relvar *relvar = Tcl_GetHashValue(entry) ;
 	    const char *relvarName ;
 	    Tcl_Obj *relObj ;
 	    Ral_Relation *relation ;
@@ -5022,13 +5109,13 @@ RelvarDumpCmd(
 	    Ral_Tuple **lastVector ;
 
 	    relvarName = Tcl_GetString(
-		(Tcl_Obj *)Tcl_GetHashKey(&relvarMap, entry)) ;
+		(Tcl_Obj *)Tcl_GetHashKey(relvarMap, entry)) ;
 	    if (patternObj &&
 		!Tcl_StringMatch(relvarName, Tcl_GetString(patternObj))) {
 		continue ;
 	    }
 
-	    relObj = Tcl_GetHashValue(entry) ;
+	    relObj = relvar->value ;
 	    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationType)
 		!= TCL_OK) {
 		goto errorOut ;
@@ -5115,6 +5202,7 @@ RelvarNamesCmd(
     Tcl_Obj *nameList ;
     Tcl_HashEntry *entry ;
     Tcl_HashSearch search ;
+    Tcl_HashTable *relvarMap = relvarGetMap(interp) ;
 
     /* relvar names ?pattern? */
     if (objc < 2 || objc > 3) {
@@ -5125,11 +5213,11 @@ RelvarNamesCmd(
     patternObj = objc == 3 ? objv[2] : NULL ;
     nameList = Tcl_NewListObj(0, NULL) ;
 
-    for (entry = Tcl_FirstHashEntry(&relvarMap, &search) ; entry ;
+    for (entry = Tcl_FirstHashEntry(relvarMap, &search) ; entry ;
 	entry = Tcl_NextHashEntry(&search)) {
 	Tcl_Obj *relvarName ;
 
-	relvarName = (Tcl_Obj *)Tcl_GetHashKey(&relvarMap, entry) ;
+	relvarName = (Tcl_Obj *)Tcl_GetHashKey(relvarMap, entry) ;
 	if (patternObj && !Tcl_StringMatch(Tcl_GetString(relvarName),
 		Tcl_GetString(patternObj))) {
 	    continue ;
@@ -5150,7 +5238,9 @@ RelvarSetCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
+    Tcl_HashTable *relvarMap = relvarGetMap(interp) ;
     Tcl_HashEntry *entry ;
+    Ral_Relvar *relvar ;
     Tcl_Obj *relVarObj ;
     Tcl_Obj *relValueObj ;
 
@@ -5160,14 +5250,15 @@ RelvarSetCmd(
 	return TCL_ERROR ;
     }
 
-    entry = Tcl_FindHashEntry(&relvarMap, (char *)objv[2]) ;
+    entry = Tcl_FindHashEntry(relvarMap, (char *)objv[2]) ;
     if (!entry) {
 	Tcl_ResetResult(interp) ;
 	Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
 	    "unknown relvar, \"", Tcl_GetString(objv[2]), "\"", NULL) ;
 	return TCL_ERROR ;
     }
-    relVarObj = Tcl_GetHashValue(entry) ;
+    relvar = Tcl_GetHashValue(entry) ;
+    relVarObj = relvar->value ;
 
     if (objc == 4) {
 	Ral_Relation *relvarRelation ;
@@ -5194,8 +5285,7 @@ RelvarSetCmd(
 	}
 
 	Tcl_DecrRefCount(relVarObj) ;
-	Tcl_IncrRefCount(relValueObj) ;
-	Tcl_SetHashValue(entry, relValueObj) ;
+	Tcl_IncrRefCount(relvar->value = relValueObj) ;
 	relVarObj = relValueObj ;
     }
 
@@ -7745,7 +7835,6 @@ Ral_Init(
 	return TCL_ERROR ;
     }
 
-    Tcl_InitObjHashTable(&relvarMap) ;
     Tcl_CreateObjCommand(interp, "::ral::relvar", relvarCmd, NULL, NULL) ;
     if (Tcl_Export(interp, ralNs, "relvar", 0) != TCL_OK) {
 	return TCL_ERROR ;
@@ -7756,7 +7845,7 @@ Ral_Init(
 	return TCL_ERROR ;
     }
 
-    Tcl_PkgProvide(interp, "ral", ral_version) ;
+    Tcl_PkgProvide(interp, ral_pkgname, ral_version) ;
 
     return TCL_OK ;
 }
