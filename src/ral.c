@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral.c,v $
-$Revision: 1.1 $
-$Date: 2004/04/22 04:50:23 $
+$Revision: 1.2 $
+$Date: 2004/04/24 06:25:46 $
  *--
  */
 
@@ -274,7 +274,7 @@ EXTERNAL DATA REFERENCES
 /*
 STATIC DATA ALLOCATION
 */
-static char rcsid[] = "@(#) $RCSfile: ral.c,v $ $Revision: 1.1 $" ;
+static char rcsid[] = "@(#) $RCSfile: ral.c,v $ $Revision: 1.2 $" ;
 
 static Tcl_ObjType Ral_TupleType = {
     "Tuple",
@@ -642,7 +642,7 @@ attributeConvertValue(
 	    Ral_Relation *relation = relationNew(attr->relationHeading) ;
 
 	    if (relationSetValuesFromString(interp, relation, objPtr)
-		== TCL_OK) {
+		!= TCL_OK) {
 		relationDelete(relation) ;
 		return TCL_ERROR ;
 	    }
@@ -3463,53 +3463,49 @@ RelvarAssignCmd(
     Tcl_Obj *const*objv)
 {
     Tcl_HashEntry *entry ;
-    Tcl_Obj *resultObj ;
+    Tcl_Obj *oldRelObj ;
+    Tcl_Obj *newRelObj ;
+    Ral_Relation *oldRelation ;
+    Ral_Relation *newRelation ;
 
-    /* relvar set relvarName ?relation? */
-    if (objc < 3 || objc > 4) {
-	Tcl_WrongNumArgs(interp, 2, objv, "relvarName ?relation?") ;
+    /* relvar assign relvarName relationValue */
+    if (objc != 4) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relvarName relationValue") ;
 	return TCL_ERROR ;
     }
-    objc -= 2 ;
-    objv += 2 ;
+    newRelObj = objv[3] ;
 
-    entry = Tcl_FindHashEntry(&relvarMap, (char *)*objv) ;
+    entry = Tcl_FindHashEntry(&relvarMap, (char *)objv[2]) ;
     if (!entry) {
 	Tcl_ResetResult(interp) ;
 	Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-	    "unknown relvar, \"", Tcl_GetString(*objv), "\"", NULL) ;
+	    "unknown relvar, \"", Tcl_GetString(objv[2]), "\"", NULL) ;
 	return TCL_ERROR ;
     }
-    resultObj = Tcl_GetHashValue(entry) ;
+    oldRelObj = Tcl_GetHashValue(entry) ;
 
-    if (objc > 1) {
-	Ral_Relation *oldRelation ;
-	Ral_Relation *newRelation ;
-
-	if (Tcl_ConvertToType(interp, resultObj, &Ral_RelationType) != TCL_OK ||
-	    Tcl_ConvertToType(interp, objv[1], &Ral_RelationType) != TCL_OK) {
-	    return TCL_ERROR ;
-	}
-
-	oldRelation = resultObj->internalRep.otherValuePtr ;
-	newRelation = objv[1]->internalRep.otherValuePtr ;
-	/*
-	 * Can only assign something of the same type.
-	 */
-	if (!relationHeadingEqual(oldRelation->heading, newRelation->heading)) {
-	    Tcl_ResetResult(interp) ;
-	    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-		"value assigned to relvar must be of the same type", NULL) ;
-	    return TCL_ERROR ;
-	}
-
-	Tcl_DecrRefCount(resultObj) ;
-	resultObj = objv[1] ;
-	Tcl_IncrRefCount(resultObj) ;
-	Tcl_SetHashValue(entry, resultObj) ;
+    if (Tcl_ConvertToType(interp, oldRelObj, &Ral_RelationType) != TCL_OK ||
+	Tcl_ConvertToType(interp, newRelObj, &Ral_RelationType) != TCL_OK) {
+	return TCL_ERROR ;
     }
 
-    Tcl_SetObjResult(interp, resultObj) ;
+    oldRelation = oldRelObj->internalRep.otherValuePtr ;
+    newRelation = newRelObj->internalRep.otherValuePtr ;
+    /*
+     * Can only assign something of the same type.
+     */
+    if (!relationHeadingEqual(oldRelation->heading, newRelation->heading)) {
+	Tcl_ResetResult(interp) ;
+	Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
+	    "value assigned to relvar must be of the same type", NULL) ;
+	return TCL_ERROR ;
+    }
+
+    Tcl_DecrRefCount(oldRelObj) ;
+    Tcl_IncrRefCount(newRelObj) ;
+    Tcl_SetHashValue(entry, newRelObj) ;
+
+    Tcl_SetObjResult(interp, newRelObj) ;
     return TCL_OK ;
 }
 
@@ -3619,11 +3615,8 @@ RelvarDeleteCmd(
 	    ++index ;
 	    ++tupleVector ;
 	}
-	if (Tcl_UnsetVar(interp, Tcl_GetString(tupleNameObj), TCL_LEAVE_ERR_MSG)
-	    != TCL_OK) {
-	    return TCL_ERROR ;
-	}
     }
+    Tcl_UnsetVar(interp, Tcl_GetString(tupleNameObj), 0) ;
 
     Tcl_DecrRefCount(tupleNameObj) ;
     Tcl_DecrRefCount(exprObj) ;
@@ -3673,6 +3666,32 @@ RelvarDumpCmd(
 }
 
 static int
+RelvarGetCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_HashEntry *entry ;
+
+    /* relvar get relvarName */
+    if (objc != 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relvarName") ;
+	return TCL_ERROR ;
+    }
+
+    entry = Tcl_FindHashEntry(&relvarMap, (char *)objv[2]) ;
+    if (!entry) {
+	Tcl_ResetResult(interp) ;
+	Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
+	    "unknown relvar, \"", Tcl_GetString(objv[2]), "\"", NULL) ;
+	return TCL_ERROR ;
+    }
+
+    Tcl_SetObjResult(interp, Tcl_GetHashValue(entry)) ;
+    return TCL_OK ;
+}
+
+static int
 RelvarInsertCmd(
     Tcl_Interp *interp,
     int objc,
@@ -3719,6 +3738,7 @@ RelvarUpdateCmd(
  * Relvar Ensemble Command Function
  * ======================================================================
  */
+
 static int
 relvarCmd(
     ClientData clientData,
@@ -3732,6 +3752,7 @@ relvarCmd(
 	RELVAR_DELETE,
 	RELVAR_DESTROY,
 	RELVAR_DUMP,
+	RELVAR_GET,
 	RELVAR_INSERT,
 	RELVAR_UPDATE
     } ;
@@ -3741,6 +3762,7 @@ relvarCmd(
 	"delete",
 	"destroy",
 	"dump",
+	"get",
 	"insert",
 	"update",
 	NULL
@@ -3774,6 +3796,9 @@ relvarCmd(
     case RELVAR_DUMP:
 	return RelvarDumpCmd(interp, objc, objv) ;
 
+    case RELVAR_GET:
+	return RelvarGetCmd(interp, objc, objv) ;
+
     case RELVAR_INSERT:
 	return RelvarInsertCmd(interp, objc, objv) ;
 
@@ -3782,6 +3807,315 @@ relvarCmd(
 
     default:
 	Tcl_Panic("unexpected relvar subcommand value") ;
+    }
+
+    /*
+     * NOT REACHED
+     */
+    return TCL_ERROR ;
+}
+
+/*
+ * ======================================================================
+ * Relation Sub-Command Functions
+ * ======================================================================
+ */
+
+static int
+RelationCardinalityCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_Obj *relationObj ;
+    Ral_Relation *relation ;
+    int nTuples ;
+
+    /* relation cardinality relValue */
+    if (objc != 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relValue") ;
+	return TCL_ERROR ;
+    }
+
+    relationObj = *(objv + 2) ;
+    if (Tcl_ConvertToType(interp, relationObj, &Ral_RelationType) != TCL_OK)
+	return TCL_ERROR ;
+    relation = relationObj->internalRep.otherValuePtr ;
+
+    Tcl_SetObjResult(interp, Tcl_NewIntObj(relation->cardinality)) ;
+    return TCL_OK ;
+}
+
+static int
+RelationDegreeCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_Obj *relationObj ;
+    Ral_Relation *relation ;
+
+    /* relation degree relValue */
+    if (objc != 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relValue") ;
+	return TCL_ERROR ;
+    }
+
+    relationObj = *(objv + 2) ;
+    if (Tcl_ConvertToType(interp, relationObj, &Ral_RelationType) != TCL_OK)
+	return TCL_ERROR ;
+    relation = relationObj->internalRep.otherValuePtr ;
+
+    Tcl_SetObjResult(interp,
+	Tcl_NewIntObj(relation->heading->tupleHeading->degree)) ;
+
+    return TCL_OK ;
+}
+
+static int
+RelationEmptyCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_Obj *relationObj ;
+    Ral_Relation *relation ;
+    int nTuples ;
+
+    /* relation empty relationValue */
+    if (objc != 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relationValue") ;
+	return TCL_ERROR ;
+    }
+
+    relationObj = *(objv + 2) ;
+    if (Tcl_ConvertToType(interp, relationObj, &Ral_RelationType) != TCL_OK)
+	return TCL_ERROR ;
+    relation = relationObj->internalRep.otherValuePtr ;
+
+    Tcl_SetObjResult(interp, Tcl_NewIntObj(relation->cardinality == 0)) ;
+    return TCL_OK ;
+}
+
+static int
+RelationTupleCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    /* relation tuple relationValue */
+    Tcl_Obj *relationObj ;
+    Ral_Relation *relation ;
+
+    if (objc != 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relationValue") ;
+	return TCL_ERROR ;
+    }
+
+    relationObj = *(objv + 2) ;
+    if (Tcl_ConvertToType(interp, relationObj, &Ral_RelationType) != TCL_OK)
+	return TCL_ERROR ;
+    relation = relationObj->internalRep.otherValuePtr ;
+    if (relation->cardinality != 1) {
+	Tcl_SetStringObj(Tcl_GetObjResult(interp), 
+	    "relation must have cardinality of one", -1) ;
+	return TCL_ERROR ;
+    }
+
+    Tcl_SetObjResult(interp, *relation->tupleVector) ;
+    return TCL_OK ;
+}
+
+static int
+RelationTypeofCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_Obj *relationObj ;
+    Ral_Relation *relation ;
+
+    /* relation typeof relationValue */
+    if (objc != 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relationValue") ;
+	return TCL_ERROR ;
+    }
+
+    relationObj = *(objv + 2) ;
+    if (Tcl_ConvertToType(interp, relationObj, &Ral_RelationType) != TCL_OK)
+	return TCL_ERROR ;
+    relation = relationObj->internalRep.otherValuePtr ;
+
+    Tcl_SetObjResult(interp, relationHeadingObjNew(interp, relation->heading)) ;
+    return TCL_OK ;
+}
+
+/*
+ * ======================================================================
+ * Relation Ensemble Command Function
+ * ======================================================================
+ */
+
+static int relationCmd(
+    ClientData clientData,
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    enum RelationSubCmds {
+	RELATION_ACCUMULATE,
+	RELATION_CARDINALITY,
+	RELATION_DEGREE,
+	RELATION_DIVIDE,
+	RELATION_ELIMINATE,
+	RELATION_EMPTY,
+	RELATION_EXTEND,
+	RELATION_FOREACH,
+	RELATION_INTERSECT,
+	RELATION_IS,
+	RELATION_JOIN,
+	RELATION_LIST,
+	RELATION_MINUS,
+	RELATION_NOTEMPTY,
+	RELATION_PROJECT,
+	RELATION_RENAME,
+	RELATION_RESTRICT,
+	RELATION_SEMIJOIN,
+	RELATION_SEMIMINUS,
+	RELATION_TIMES,
+	RELATION_TUPLE,
+	RELATION_TYPEOF,
+	RELATION_UNGROUP,
+	RELATION_UNION,
+    } ;
+    static const char *subCmds[] = {
+	"accumulate",
+	"cardinality",
+	"degree",
+	"divide",
+	"eliminate",
+	"empty",
+	"extend",
+	"foreach",
+	"intersect",
+	"is",
+	"join",
+	"list",
+	"minus",
+	"notempty",
+	"project",
+	"rename",
+	"restrict",
+	"semijoin",
+	"semiminus",
+	"times",
+	"tuple",
+	"typeof",
+	"ungroup",
+	"union",
+	NULL
+    } ;
+    /*
+	summarize
+	tclose
+	group
+     */
+
+    int index ;
+
+    if (objc < 2) {
+	Tcl_WrongNumArgs(interp, 1, objv, "subcommand ?arg? ...") ;
+	return TCL_ERROR ;
+    }
+
+    if (Tcl_GetIndexFromObj(interp, *(objv + 1), subCmds, "subcommand", 0,
+	&index) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+
+    switch ((enum RelationSubCmds)index) {
+#if 0
+    case RELATION_ACCUMULATE:
+	return RelationAccumulateCmd(interp, objc, objv) ;
+#endif
+
+    case RELATION_CARDINALITY:
+	return RelationCardinalityCmd(interp, objc, objv) ;
+
+    case RELATION_DEGREE:
+	return RelationDegreeCmd(interp, objc, objv) ;
+
+#if 0
+    case RELATION_DIVIDE:
+	return RelationDivideCmd(interp, objc, objv) ;
+
+    case RELATION_ELIMINATE:
+	return RelationEliminateCmd(interp, objc, objv) ;
+#endif
+
+    case RELATION_EMPTY:
+	return RelationEmptyCmd(interp, objc, objv) ;
+
+#if 0
+    case RELATION_EXTEND:
+	return RelationExtendCmd(interp, objc, objv) ;
+
+    case RELATION_FOREACH:
+	return RelationForeachCmd(interp, objc, objv) ;
+
+    case RELATION_INTERSECT:
+	return RelationIntersectCmd(interp, objc, objv) ;
+
+    case RELATION_IS:
+	return RelationIsCmd(interp, objc, objv) ;
+
+    case RELATION_JOIN:
+	return RelationJoinCmd(interp, objc, objv) ;
+
+    case RELATION_LIST:
+	return RelationListCmd(interp, objc, objv) ;
+
+    case RELATION_MINUS:
+	return RelationMinusCmd(interp, objc, objv) ;
+
+    case RELATION_NOTEMPTY:
+	return RelationNotemptyCmd(interp, objc, objv) ;
+
+    case RELATION_PROJECT:
+	return RelationProjectCmd(interp, objc, objv) ;
+
+    case RELATION_RENAME:
+	return RelationRenameCmd(interp, objc, objv) ;
+
+    case RELATION_RESTRICT:
+	return RelationRestrictCmd(interp, objc, objv) ;
+
+    case RELATION_SEMIJOIN:
+	return RelationSemijoinCmd(interp, objc, objv) ;
+
+    case RELATION_SEMIMINUS:
+	return RelationSemiminusCmd(interp, objc, objv) ;
+
+    case RELATION_TIMES:
+	return RelationTimesCmd(interp, objc, objv) ;
+#endif
+
+    case RELATION_TUPLE:
+	return RelationTupleCmd(interp, objc, objv) ;
+
+    case RELATION_TYPEOF:
+	return RelationTypeofCmd(interp, objc, objv) ;
+
+#if 0
+    case RELATION_UNGROUP:
+	return RelationUngroupCmd(interp, objc, objv) ;
+
+    case RELATION_UNION:
+	return RelationUnionCmd(interp, objc, objv) ;
+#endif
+
+    default:
+	Tcl_Panic("unexpected relation subcommand value") ;
     }
 
     /*
@@ -3808,21 +4142,20 @@ Ral_Init(
     Tcl_RegisterObjType(&Ral_RelationType) ;
 
     ralNs = Tcl_CreateNamespace(interp, "::ral", NULL, NULL) ;
+
     Tcl_CreateObjCommand(interp, "::ral::tuple", tupleCmd, NULL, NULL) ;
     if (Tcl_Export(interp, ralNs, "tuple", 0) != TCL_OK) {
 	return TCL_ERROR ;
     }
 
-#if 0
-    Tcl_CreateObjCommand(interp, "::ral::relation", relationCmd, NULL, NULL) ;
-    if (Tcl_Export(interp, ralNs, "relation", 0) != TCL_OK) {
-	return TCL_ERROR ;
-    }
-#endif
-
     Tcl_InitObjHashTable(&relvarMap) ;
     Tcl_CreateObjCommand(interp, "::ral::relvar", relvarCmd, NULL, NULL) ;
     if (Tcl_Export(interp, ralNs, "relvar", 0) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+
+    Tcl_CreateObjCommand(interp, "::ral::relation", relationCmd, NULL, NULL) ;
+    if (Tcl_Export(interp, ralNs, "relation", 0) != TCL_OK) {
 	return TCL_ERROR ;
     }
 
