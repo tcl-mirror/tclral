@@ -46,8 +46,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.7 $
-# $Date: 2004/05/28 05:03:03 $
+# $Revision: 1.8 $
+# $Date: 2004/05/31 20:57:09 $
 #  *--
 
 package require tcltest 2.2
@@ -115,6 +115,74 @@ namespace eval ::ral::test {
 	set cmp [tuple extract $t $attr]
 	return [expr {$cmp < $start ? $cmp : $start}]
     }
+
+    # Basic tests on the tuple string representation
+    test tuple-strrep-1.0 {no attributes} -body {
+	tuple degree {Tuple {} {}}
+    } -result 0
+
+    test tuple-strrep-2.0 {single attributes} -body {
+	tuple degree {Tuple Name {Name Fred}}
+    } -result 1
+
+    test tuple-strrep-3.0 {multiple attributes} -body {
+	tuple degree {Tuple {Name Num Street} {Name Fred Num 100 Street Main}}
+    } -result 3
+
+    test tuple-strrep-4.0 {Tuple valued attribute} -body {
+	tuple degree {Tuple {Name {Addr {Tuple {Num Street}}}}\
+	    {Name Fred Addr {Num 100 Street Main}}}
+    } -result 2
+
+    test tuple-strrep-5.0 {other data types} -body {
+	tuple degree {Tuple {Name {Status int} {Position double}}\
+	    {Name Fred Status 20 Position 1}}
+    } -result 3
+
+    test tuple-strrep-5.1 {other data types - wrong values} -body {
+	tuple degree {Tuple {Name {Status int} {Position double}}\
+	    {Name Fred Status 20.0 Position 1}}
+    } -result {expected integer but got "20.0"} -returnCodes error
+
+    test tuple-strrep-5.2 {other data types - wrong values} -body {
+	tuple degree {Tuple {Name {Status int} {Position double}}\
+	    {Name Fred Status 20 Position foo}}
+    } -result {expected floating-point number but got "foo"} -returnCodes error
+
+    test tuple-strrep-6.0 {bad format -- extra list element} -body {
+	tuple degree {Tuple Name {Name Fred} {}}
+    } -result {badly formatted tuple, "Tuple Name {Name Fred} {}"}\
+    -returnCodes error
+
+    test tuple-strrep-6.1 {bad format -- missing list element} -body {
+	tuple degree {Tuple Name}
+    } -result {badly formatted tuple, "Tuple Name"} -returnCodes error
+
+    test tuple-strrep-6.2 {bad format -- bad keyword} -body {
+	tuple degree {Tupel Name {Name Fred}}
+    } -result {bad tuple type keyword: expected, "Tuple", but got, "Tupel"}\
+    -returnCodes error
+
+    test tuple-strrep-6.3 {bad format -- bad heading} -body {
+	tuple degree {Tuple {{Name string foo}} {Name Fred}}
+    } -result {bad heading format, "Name string foo"} -returnCodes error
+
+    test tuple-strrep-6.4 {bad format -- duplicate attribute names} -body {
+	tuple degree {Tuple {{Name string} {Name int}} {Name Fred Name George}}
+    } -result {duplicate attribute name, "Name"} -returnCodes error
+
+    test tuple-strrep-6.5 {bad format -- insufficient values} -body {
+	tuple degree {Tuple {Name Num Street} {Name Fred Num 100}}
+    } -result {wrong number of attributes specified} -returnCodes error
+
+    test tuple-strrep-6.5 {bad format -- too many values} -body {
+	tuple degree {Tuple {Name Num Street}\
+	    {Name Fred Num 100 Street Main Num 200}}
+    } -result {wrong number of attributes specified} -returnCodes error
+
+    test tuple-strrep-6.5 {bad format -- value for unknown attribute} -body {
+	tuple degree {Tuple {Name Num Street} {Name Fred Num 100 City Main}}
+    } -result {unknown attribute name, "City"} -returnCodes error
 
     # Tuple Tests
 
@@ -998,19 +1066,6 @@ namespace eval ::ral::test {
 	relation eliminate $r1
     } -result {Relation {{{Name string} {Number int} {Street string} {IsMale boolean}} {{Name Number Street IsMale}}} {}}
 
-    # relation empty subcommand
-    test relation-empty-1.0 {dum relation} -body {
-	relation empty {Relation {{} {{}}} {}}
-    } -result 1
-
-    test relation-empty-2.0 {dee relation} -body {
-	relation empty {Relation {{} {{}}} {{}}}
-    } -result 0
-
-    test relation-empty-3.0 {multiple body tuples} -body {
-	relation empty [relvar get P]
-    } -result 0
-
     # relation extend subcommand
     test relation-extend-1.0 {multiple body tuples} -body {
 	set r1 {Relation {{Name {Age int}} Name}\
@@ -1064,6 +1119,15 @@ namespace eval ::ral::test {
 	}
 	set nameList
     } -result {Jones Smith Clark Adams Blake}
+
+    # relation group subcommand
+    test relation-group-1.0 {group two attributes} -body {
+	relation group [relvar get SP] PQ {P# QTY}
+    } -result {Relation {{{S# string} {PQ {Relation {{{P# string} {QTY int}} {{P# QTY}}}}}} {{S# PQ}}} {{S# S1 PQ {{P# P1 QTY 300} {P# P2 QTY 200} {P# P3 QTY 400} {P# P4 QTY 200} {P# P5 QTY 100} {P# P6 QTY 100}}} {S# S2 PQ {{P# P1 QTY 300} {P# P2 QTY 400}}} {S# S3 PQ {{P# P2 QTY 200}}} {S# S4 PQ {{P# P2 QTY 200} {P# P4 QTY 300} {P# P5 QTY 400}}}}}
+
+    test relation-group-2.0 {group two attributes} -body {
+	relation group [relvar get SP] SQ {S# QTY}
+    } -result {Relation {{{P# string} {SQ {Relation {{{S# string} {QTY int}} {{S# QTY}}}}}} {{P# SQ}}} {{P# P1 SQ {{S# S1 QTY 300} {S# S2 QTY 300}}} {P# P2 SQ {{S# S1 QTY 200} {S# S2 QTY 400} {S# S3 QTY 200} {S# S4 QTY 200}}} {P# P3 SQ {{S# S1 QTY 400}}} {P# P4 SQ {{S# S1 QTY 200} {S# S4 QTY 300}}} {P# P5 SQ {{S# S1 QTY 100} {S# S4 QTY 400}}} {P# P6 SQ {{S# S1 QTY 100}}}}}
 
     # relation intersect subcommand
     test relation-intersect-1.0 {dum relation} -body {
@@ -1416,6 +1480,32 @@ namespace eval ::ral::test {
 	relation is $r1 supersetof $r2
     } -result 0
 
+    # relation isempty subcommand
+    test relation-isempty-1.0 {dum relation} -body {
+	relation isempty {Relation {{} {{}}} {}}
+    } -result 1
+
+    test relation-isempty-2.0 {dee relation} -body {
+	relation isempty {Relation {{} {{}}} {{}}}
+    } -result 0
+
+    test relation-isempty-3.0 {multiple body tuples} -body {
+	relation isempty [relvar get P]
+    } -result 0
+
+    # relation isnotempty subcommand
+    test relation-isnotempty-1.0 {dum relation} -body {
+	relation isnotempty {Relation {{} {{}}} {}}
+    } -result 0
+
+    test relation-isnotempty-2.0 {dee relation} -body {
+	relation isnotempty {Relation {{} {{}}} {{}}}
+    } -result 1
+
+    test relation-isnotempty-3.0 {multiple body tuples} -body {
+	relation isnotempty [relvar get P]
+    } -result 1
+
     # relation join subcommand
     test relation-join-1.0 {one common attribute} -body {
 	set r1 {Relation {{{Name string} {Age int}} Name}\
@@ -1496,19 +1586,6 @@ namespace eval ::ral::test {
 	relation minus $r1 $r2
     } -result {Relation {{{Name string} {Age int} {City string}} Name}\
 	{{Name Andrew Age 30 City Sunnyvale}}}
-
-    # relation notempty subcommand
-    test relation-notempty-1.0 {dum relation} -body {
-	relation notempty {Relation {{} {{}}} {}}
-    } -result 0
-
-    test relation-notempty-2.0 {dee relation} -body {
-	relation notempty {Relation {{} {{}}} {{}}}
-    } -result 1
-
-    test relation-notempty-3.0 {multiple body tuples} -body {
-	relation notempty [relvar get P]
-    } -result 1
 
     # relation project subcommand
     test relation-project-1.0 {single attribute} -body {

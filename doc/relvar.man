@@ -1,0 +1,36 @@
+[manpage_begin relvar n 0.6]
+[moddesc "Operators for Relational Variables"]
+[titledesc "Relvar Operators"]
+[copyright "2004 by G. Andrew Mangogna"]
+[require ral 0.6]
+[description]
+This manpage describes the
+[cmd relvar]
+command.
+The
+[cmd relvar]
+command is part of the Tcl Relational Algebra Library (ral) package.
+[section OVERVIEW]
+
+[section COMMANDS]
+[list_begin definitions]
+[call [cmd "::ral::relvar assign"] [arg relationVariable]]
+
+[call [cmd "::ral::relvar create"] [arg relationVariable]]
+
+[call [cmd "::ral::relvar delete"] [arg relationVariable]]
+
+[call [cmd "::ral::relvar destroy"] [arg relationVariable]]
+
+[call [cmd "::ral::relvar dump"] [opt {-schema | -body}] [opt pattern]]
+
+[call [cmd "::ral::relvar get"] [arg relationVariable]]
+
+[call [cmd "::ral::relvar insert"] [arg relationVariable]]
+
+[call [cmd "::ral::relvar names"] [arg relationVariable]]
+
+[call [cmd "::ral::relvar update"] [arg relationVariable]]
+
+[list_end]
+[manpage_end]

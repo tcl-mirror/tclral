@@ -1,8 +1,8 @@
-[manpage_begin tuple n 0.8]
+[manpage_begin tuple n 0.6]
 [moddesc "Operators for the Tuple data type"]
 [titledesc "Tuple Operators"]
 [copyright "2004 by G. Andrew Mangogna"]
-[require ral 0.8]
+[require ral 0.6]
 [description]
 This manpage describes the
 [cmd tuple]
@@ -14,6 +14,57 @@ The ral package introduces an new Tcl data type called
 [emph Tuple]
 and this command provides the operators for the Tuple data type.
 [section OVERVIEW]
+
+Formally,
+a tuple is a set of components.
+Each component consists of an attribute name, an attribute data type
+and an attribute value.
+The attribute name may be any Tcl string, although attribute names that
+contain embedded blanks are particularly inconvenient.
+The attribute data type may be any valid Tcl internal data type.
+Tcl uses many different internal types for many different purposes.
+The ones most useful are:
+
+[list_begin bullet]
+[bullet] string
+[bullet] int
+[bullet] double
+[bullet] wideInt
+[bullet] boolean
+[bullet] list
+[bullet] Tuple
+[list_end]
+
+Any attribute value assigned to a particular attribute is coerced into the
+attribute data type for that attribute and it is an error if the value
+string assigned to an attribute does not represent a valid value of the
+attribute data type.
+
+[para]
+
+Tuples are similar in many ways to other Tcl data types such as [cmd dict],
+[cmd ::struct::record] or keyed lists from TclX.
+However, the tuple type was built to operate specfically in conjunction
+with the Relation type and does have some specific rules that the other
+types do not have.
+
+Tuples are sets of components and as such have the following rules.
+
+[list_begin bullet]
+[bullet] All attribute names must be unique.
+[bullet] The is no inherent left to right ordering in tuples.
+Clearly, the implementation may store components in a particular order
+and any string representation must have some left to right ordering to it
+(since I write in a Roman alphabet which is left to right ordered),
+but the operations on Tuples do not expose or depend upon any ordering of
+components.
+Consequently, using string and list operators on the string representation
+of a Tuple are not guaranteed to yield the correct result.
+The implementation is free to choose any internal order and any ordering
+of the string representation it wishes as long as the Tuple operators function
+as described.
+[list_end]
+
 [section {STRING REPRESENTATION}]
 Like any Tcl value, tuples have a string representation.
 The string representation of a tuple is a specially formatted list
@@ -31,8 +82,6 @@ the attribute name and attribute data type respectively. If only one
 sub-element is present, then it is take as the attribute name and the
 attribute data type is set to [emph string].
 Data types may be any valid Tcl object type.
-Although Tcl uses many different types internally,
-the most useful types are int, double, boolean, list, Tuple and Relation.
 [para]
 The tuple values are also specified by a list consisting of an even
 number of elements.
@@ -76,10 +125,10 @@ The [cmd create] subcommand creates a new tuple that has a heading
 given by the [arg heading] argument and values given by the
 [arg name-value-list] argument and returns the value of the new tuple.
 The [arg heading] is specified by a list each element of which may
-contain one or two subelements. If an element of the [arg heading] contains
-two subelements then the values of the subelement are taken as the
-attribute name and attribute data type.
-If only one subelement is given, then it is taken to be the attribute
+contain one or two subelements. If an element of the [arg heading]
+list contains two sub-elements then the first sub-element is taken as the
+attribute name and second sub-element is taken as the attribute data type.
+If only one sub-element is given, then it is taken to be the attribute
 name and the attribute data type is taken to be [emph string].
 The [arg name-value-list] must have an even number of elements and the
 elements are treated as pairs.
@@ -128,12 +177,14 @@ It is an error to attempt to eliminate attributes that are not part of
 [call [cmd "::ral::tuple extend"] [arg tupleValue] [opt [arg "name-type-value ..."]]]
 
 The [cmd extend] subcommand returns a new tuple with the same heading and
-values as [arg tupleValue] expect that the new attributes given by
-[arg name-type-value] are included.
-The [arg name-type-value] arguments are each a list consisting of two or
-three elements. If [arg name-type-value] list contains three elements then
+values as the [arg tupleValue] argument except that the new attributes given by
+the [arg name-type-value] arguments are included.
+Each [arg name-type-value] argument is a list consisting of two or
+three elements.
+If [arg name-type-value] list contains three elements then
 they are taken as a new attribute name, attribute data type and attribute
-value in that order. If only two elements are given, then they are
+value in that order.
+If only two elements are given, then they are
 taken as the attribute name and attribute value and the attribute data
 type is taken as "string".
 It is an error to attempt to [cmd extend] a tuple with an attribute name
@@ -156,22 +207,25 @@ arguments.
 The [cmd get] subcommand returns a list consisting of pairs of elements.
 The first element of each pair is an attribute name and the second
 is the attribute value.
-The form of the list is the same as that returned by [cmd "array get"]
-and accepted by [cmd "array set"].
+The form of the list is the same as that returned by the [cmd "array get"]
+command and accepted by the [cmd "array set"] command.
 The [cmd get] subcommand provides a convenient means to move tuple
 values into an array.
 
 [call [cmd "::ral::tuple project"] [arg tupleValue] [opt [arg "attr ..."]]]
 
-The [cmd project] subcommand returns a new tuple that consists of the
-attributes given the arguments and the corresponding values are taken from
-[arg tupleValue].
+The [cmd project] subcommand returns a new tuple that consists of only the
+attributes given by the [arg attr] arguments
+with the corresponding values taken from [arg tupleValue].
+It is not an error to project zero attributes (the nullary tuple projection),
+the result being the tuple with no attributes.
 
 [call [cmd "::ral::tuple rename"] [arg tupleValue] [opt [arg "oldname newname ..."]]]
 
 The [cmd rename] subcommand returns a new tuple where [arg oldname] is
 replaced by [arg newname].
-Many pairs of [arg oldname]/[arg newname] may be given.
+The [arg tupleValue] argument is not modified.
+Many pairs of [arg oldname]/[arg newname] arguments may be given.
 It is an error to attempt to given an [arg oldname] that is not an attribute
 name in the tuple or to attempt to change the name of an attribute to be
 one that already exists in the tuple.
@@ -183,7 +237,61 @@ The type of a tuple is a list consisting of the first two elements
 of the string representation of a tuple, as described above.
 
 [call [cmd "::ral::tuple unwrap"] [arg tupleValue] [arg attr]]
+
+The [cmd unwrap] subcommand creates a new tuple that expands the attributes of
+a tuple valued attribute.
+The [arg tupleValue] argument must be of Tuple type and
+the [arg attr] argument must also be of Tuple type.
+The returned tuple value will consists of all the attributes of the
+original tuple minus the [arg attr] attribute plus all the attributes
+of the [arg attr] attribute itself.
+The [cmd unwrap] subcommand is useful for [emph un-nesting] tuples that
+have tuple valued attributes.
+For example, the tuple:
+
+[example_begin]
+tuple unwrap\
+    {Tuple {{Name string} {Address {Tuple {{Num string} {Street string}}}}}\
+    {Name Fred Address {Num 100 Street Main}}} Address
+
+returns:
+
+{Tuple {{Name string} {Num string} {Street string}}\
+    {Name Fred Num 100 Street Main}}
+[example_end]
+
 [call [cmd "::ral::tuple update"] [arg tupleVarName] [arg name-value-list]]
+
+The [cmd update] subcommand modifies the values of a tuple in place.
+The [arg tupleVarName] argument is the name of a variable that contains a
+tuple value.
+The [arg name-value-list] is a list of pairs giving the attribute name and the
+new value to which that attribute is to be set.
+The command modifies the attributes in place
+and returns the updated tuple.
+
 [call [cmd "::ral::tuple wrap"] [arg tupleValue] [arg newAttr] [arg oldAttrList]]
+
+The [cmd wrap] subcommand creates a new tuple where some of the attributes
+are contained in a Tuple valued attribute.
+This command provides a means to create nested tuples, [emph i.e.]
+tuples that contain tuple valued attributes.
+The [arg tupleValue] argument must be a tuple and [arg newAttr] is the name the
+the new tuple valued attribute will be given.
+The [arg oldAttrList] argument is a list of attribute names that will be placed
+in the new tuple valued attribute.
+Referring to the example from the [cmd "tuple unwrap"] command above:
+
+[example_begin]
+tuple wrap\
+    {Tuple {{Name string} {Num string} {Street string}}\
+	{Name Fred Num 100 Street Main}} Address {Num Street}
+
+returns:
+    {Tuple {{Name string} {Address {Tuple {{Num string} {Street string}}}}}\
+    {Name Fred Address {Num 100 Street Main}}} Address
+
+[example_end]
+
 [list_end]
 [manpage_end]

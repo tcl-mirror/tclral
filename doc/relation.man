@@ -1,0 +1,70 @@
+[manpage_begin relation n 0.6]
+[moddesc "Operators for Relation Values"]
+[titledesc "Relation Operators"]
+[copyright "2004 by G. Andrew Mangogna"]
+[require ral 0.6]
+[description]
+This manpage describes the
+[cmd relation]
+command.
+The
+[cmd relation]
+command is part of the Tcl Relational Algebra Library (ral) package.
+[section OVERVIEW]
+
+[section "STRING REPRESENTATION"]
+
+[section COMMANDS]
+[list_begin definitions]
+[call [cmd "::ral::relation cardinality"] [arg relationValue]]
+
+[call [cmd "::ral::relation degree"] [arg relationValue]]
+
+[call [cmd "::ral::relation divide"] [arg relationValue]]
+
+[call [cmd "::ral::relation eliminate"] [arg relationValue]]
+
+[call [cmd "::ral::relation emptyof"] [arg relationValue]]
+
+[call [cmd "::ral::relation extend"] [arg relationValue]]
+
+[call [cmd "::ral::relation foreach"] [arg relationValue]]
+
+[call [cmd "::ral::relation group"] [arg relationValue]]
+
+[call [cmd "::ral::relation intersect"] [arg relationValue]]
+
+[call [cmd "::ral::relation is"] [arg relationValue]]
+
+[call [cmd "::ral::relation isempty"] [arg relationValue]]
+
+[call [cmd "::ral::relation isnotempty"] [arg relationValue]]
+
+[call [cmd "::ral::relation join"] [arg relationValue]]
+
+[call [cmd "::ral::relation list"] [arg relationValue]]
+
+[call [cmd "::ral::relation minus"] [arg relationValue]]
+
+[call [cmd "::ral::relation project"] [arg relationValue]]
+
+[call [cmd "::ral::relation rename"] [arg relationValue]]
+
+[call [cmd "::ral::relation restrict"] [arg relationValue]]
+
+[call [cmd "::ral::relation semijoin"] [arg relationValue]]
+
+[call [cmd "::ral::relation semiminus"] [arg relationValue]]
+
+[call [cmd "::ral::relation summarize"] [arg relationValue]]
+
+[call [cmd "::ral::relation times"] [arg relationValue]]
+
+[call [cmd "::ral::relation tuple"] [arg relationValue]]
+
+[call [cmd "::ral::relation typeof"] [arg relationValue]]
+
+[call [cmd "::ral::relation ungroup"] [arg relationValue]]
+
+[list_end]
+[manpage_end]
