@@ -1,8 +1,8 @@
-[manpage_begin tuple n 0.6]
+[manpage_begin tuple n 0.8]
 [moddesc "Operators for the Tuple data type"]
 [titledesc "Tuple Operators"]
 [copyright "2004 by G. Andrew Mangogna"]
-[require ral 0.6]
+[require ral 0.8]
 [description]
 This manpage describes the
 [cmd tuple]
@@ -92,13 +92,6 @@ type specified in the heading of the tuple.
 It is an error if conversion fails.
 It is also an error not to supply a value for every attribute or to attempt
 to supply the value of any attribute more than once.
-Because there is no inherent order to the attributes of a tuple,
-there are many ways to specify the same tuple.
-For example, the following tuples are equal.
-[example_begin]
-set t1 [lb]::ral::tuple create {{Name string} {Status int}} {Name Fred Status 20}[rb]
-set t2 [lb]::ral::tuple create {{Status int} {Name string}} {Name Fred Status 20}[rb]
-[example_end]
 
 [call [cmd "::ral::tuple degree"] [arg tupleValue]]
 
@@ -112,8 +105,13 @@ The [cmd equal] subcommands returns "1" if [arg tuple1] is equal to
 Two tuples are equal if they the same attribute names,
 the corresponding attributes have the same type and
 the corresponding attribute values are equal.
-As discussed above, the string representation of a tuple is not unique
-since there is no inherent order to the tuple attributes.
+Because there is no inherent order to the attributes of a tuple,
+there are many ways to specify the same tuple.
+For example, the following tuples are equal.
+[example_begin]
+set t1 [lb]::ral::tuple create {{Name string} {Status int}} {Name Fred Status 20}[rb]
+set t2 [lb]::ral::tuple create {{Status int} {Name string}} {Name Fred Status 20}[rb]
+[example_end]
 This implies that only [cmd "tuple equal"] can reliably determine
 tuple equality.
 Using [cmd "string equal"] to determine tuple equality is not reliable and
@@ -164,8 +162,26 @@ The [cmd get] subcommand provides a convenient means to move tuple
 values into an array.
 
 [call [cmd "::ral::tuple project"] [arg tupleValue] [opt [arg "attr ..."]]]
+
+The [cmd project] subcommand returns a new tuple that consists of the
+attributes given the arguments and the corresponding values are taken from
+[arg tupleValue].
+
 [call [cmd "::ral::tuple rename"] [arg tupleValue] [opt [arg "oldname newname ..."]]]
+
+The [cmd rename] subcommand returns a new tuple where [arg oldname] is
+replaced by [arg newname].
+Many pairs of [arg oldname]/[arg newname] may be given.
+It is an error to attempt to given an [arg oldname] that is not an attribute
+name in the tuple or to attempt to change the name of an attribute to be
+one that already exists in the tuple.
+
 [call [cmd "::ral::tuple typeof"] [arg tupleValue]]
+
+The [cmd typeof] subcommand returns the type of the given [arg tupleValue].
+The type of a tuple is a list consisting of the first two elements
+of the string representation of a tuple, as described above.
+
 [call [cmd "::ral::tuple unwrap"] [arg tupleValue] [arg attr]]
 [call [cmd "::ral::tuple update"] [arg tupleVarName] [arg name-value-list]]
 [call [cmd "::ral::tuple wrap"] [arg tupleValue] [arg newAttr] [arg oldAttrList]]
