@@ -45,16 +45,10 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral.c,v $
-$Revision: 1.15 $
-$Date: 2004/07/24 21:10:19 $
+$Revision: 1.16 $
+$Date: 2004/08/01 18:55:05 $
  *--
  */
-
-static char ral_id[] = "$Id: ral.c,v 1.15 2004/07/24 21:10:19 mangoa01 Exp $" ;
-static char ral_copyright[] =
-    "This software is copyrighted 2004 by G. Andrew Mangogna."
-    "Terms and conditions for use are distributed with the source code."
-    ;
 
 /*
 PRAGMAS
@@ -339,7 +333,12 @@ EXTERNAL DATA REFERENCES
 /*
 STATIC DATA ALLOCATION
 */
-static char rcsid[] = "@(#) $RCSfile: ral.c,v $ $Revision: 1.15 $" ;
+static const char ral_version[] = "0.6" ;
+static const char ral_rcsid[] =
+    "$Id: ral.c,v 1.16 2004/08/01 18:55:05 mangoa01 Exp $" ;
+static const char ral_copyright[] =
+    "This software is copyrighted 2004 by G. Andrew Mangogna."
+    "Terms and conditions for use are distributed with the source code." ;
 
 static Tcl_ObjType Ral_TupleType = {
     "Tuple",
@@ -4299,7 +4298,7 @@ tupleCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
-    static struct cmdMap cmdTable[] = {
+    static const struct cmdMap cmdTable[] = {
 	{"assign", TupleAssignCmd},
 	{"create", TupleCreateCmd},
 	{"degree", TupleDegreeCmd},
@@ -4594,7 +4593,8 @@ RelvarDumpCmd(
 	patternObj = objv[3] ;
     }
 
-    scriptObj = Tcl_NewStringObj("package require ral\n", -1) ;
+    scriptObj = Tcl_NewStringObj("package require ral ", -1) ;
+    Tcl_AppendStringsToObj(scriptObj, ral_version, "\n", NULL) ;
 
     /*
      * First emit a set of "relvar create" statements.
@@ -4602,17 +4602,17 @@ RelvarDumpCmd(
     if (dumpType & schemaDump) {
 	for (entry = Tcl_FirstHashEntry(&relvarMap, &search) ; entry ;
 	    entry = Tcl_NextHashEntry(&search)) {
-	    Tcl_Obj *relvarName ;
+	    const char *relvarName ;
 	    Tcl_Obj *relObj ;
 	    Ral_Relation *relation ;
 	    Ral_RelationHeading *heading ;
 	    Tcl_Obj *headObj ;
 	    Tcl_Obj *idObj ;
 
-	    relvarName = (Tcl_Obj *)Tcl_GetHashKey(&relvarMap, entry) ;
+	    relvarName = Tcl_GetString(
+		(Tcl_Obj *)Tcl_GetHashKey(&relvarMap, entry)) ;
 	    if (patternObj &&
-		!Tcl_StringMatch(Tcl_GetString(relvarName),
-		    Tcl_GetString(patternObj))) {
+		!Tcl_StringMatch(relvarName, Tcl_GetString(patternObj))) {
 		continue ;
 	    }
 
@@ -4635,8 +4635,7 @@ RelvarDumpCmd(
 	    }
 
 	    Tcl_AppendStringsToObj(scriptObj,
-		"::ral::relvar create ",
-		Tcl_GetString(relvarName),
+		"::ral::relvar create ", relvarName,
 		" {",
 		Tcl_GetString(headObj),
 		"} {",
@@ -4655,16 +4654,16 @@ RelvarDumpCmd(
     if (dumpType & bodyDump) {
 	for (entry = Tcl_FirstHashEntry(&relvarMap, &search) ; entry ;
 	    entry = Tcl_NextHashEntry(&search)) {
-	    Tcl_Obj *relvarName ;
+	    const char *relvarName ;
 	    Tcl_Obj *relObj ;
 	    Ral_Relation *relation ;
-	    int card ;
 	    Ral_Tuple **tupleVector ;
+	    Ral_Tuple **lastVector ;
 
-	    relvarName = (Tcl_Obj *)Tcl_GetHashKey(&relvarMap, entry) ;
+	    relvarName = Tcl_GetString(
+		(Tcl_Obj *)Tcl_GetHashKey(&relvarMap, entry)) ;
 	    if (patternObj &&
-		!Tcl_StringMatch(Tcl_GetString(relvarName),
-		    Tcl_GetString(patternObj))) {
+		!Tcl_StringMatch(relvarName, Tcl_GetString(patternObj))) {
 		continue ;
 	    }
 
@@ -4674,30 +4673,22 @@ RelvarDumpCmd(
 		goto errorOut ;
 	    }
 	    relation = relObj->internalRep.otherValuePtr ;
-	    if (relation->cardinality == 0) {
-		continue ;
-	    }
 
-	    Tcl_AppendStringsToObj(scriptObj,
-		"::ral::relvar insert ",
-		Tcl_GetString(relvarName),
-		NULL) ;
-
-	    for (card = relation->cardinality,
-		tupleVector = relation->tupleVector ; card > 0 ;
-		--card, ++tupleVector) {
+	    tupleVector = relation->tupleVector ;
+	    lastVector = tupleVector + relation->cardinality ;
+	    for ( ; tupleVector != lastVector ; ++tupleVector) {
 		Tcl_Obj *tupleNVList ;
 
 		tupleNVList = tupleNameValueList(interp, *tupleVector) ;
 		if (tupleNVList) {
 		    Tcl_AppendStringsToObj(scriptObj,
-			" {", Tcl_GetString(tupleNVList), "}", NULL) ;
+			"::ral::relvar insert ", relvarName,
+			" {", Tcl_GetString(tupleNVList), "}\n", NULL) ;
 		    Tcl_DecrRefCount(tupleNVList) ;
 		} else {
 		    goto errorOut ;
 		}
 	    }
-	    Tcl_AppendStringsToObj(scriptObj, "\n", NULL) ;
 	}
     }
 
@@ -4936,7 +4927,7 @@ relvarCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
-    static struct cmdMap cmdTable[] = {
+    static const struct cmdMap cmdTable[] = {
 	{"create", RelvarCreateCmd},
 	{"delete", RelvarDeleteCmd},
 	{"destroy", RelvarDestroyCmd},
@@ -7182,7 +7173,7 @@ static int relationCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
-    static struct cmdMap cmdTable[] = {
+    static const struct cmdMap cmdTable[] = {
 	{"cardinality", RelationCardinalityCmd},
 	{"degree", RelationDegreeCmd},
 	{"divide", RelationDivideCmd},
@@ -7263,7 +7254,7 @@ Ral_Init(
 	return TCL_ERROR ;
     }
 
-    Tcl_PkgProvide(interp, "ral", "0.6") ;
+    Tcl_PkgProvide(interp, "ral", ral_version) ;
 
     return TCL_OK ;
 }

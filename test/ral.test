@@ -46,8 +46,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.13 $
-# $Date: 2004/07/24 20:17:32 $
+# $Revision: 1.14 $
+# $Date: 2004/08/01 18:55:05 $
 #  *--
 
 package require tcltest 2.2
@@ -775,9 +775,11 @@ namespace eval ::ral::test {
 	relvar destroy X
     } -body {
 	puts -nonewline [outputChannel] [relvar dump]
-    } -output {package require ral
+    } -output {package require ral 0.6
 ::ral::relvar create X {Name string Status int} {Name}
-::ral::relvar insert X {Name George Status 20} {Name Fred Status 30} {Name Alice Status 40}
+::ral::relvar insert X {Name George Status 20}
+::ral::relvar insert X {Name Fred Status 30}
+::ral::relvar insert X {Name Alice Status 40}
 } -result {}
 
     test relvar-dump-2.0 {dump schema only of one relation} -setup {
@@ -789,7 +791,7 @@ namespace eval ::ral::test {
 	relvar destroy X
     } -body {
 	puts -nonewline [outputChannel] [relvar dump -schema]
-    } -output {package require ral
+    } -output {package require ral 0.6
 ::ral::relvar create X {Name string Status int} {Name}
 } -result {}
 
@@ -802,8 +804,10 @@ namespace eval ::ral::test {
 	relvar destroy X
     } -body {
 	puts -nonewline [outputChannel] [relvar dump -body]
-    } -output {package require ral
-::ral::relvar insert X {Name George Status 20} {Name Fred Status 30} {Name Alice Status 40}
+    } -output {package require ral 0.6
+::ral::relvar insert X {Name George Status 20}
+::ral::relvar insert X {Name Fred Status 30}
+::ral::relvar insert X {Name Alice Status 40}
 } -result {}
 
     test relvar-dump-4.0 {dump by pattern} -setup {
@@ -819,9 +823,11 @@ namespace eval ::ral::test {
 	relvar destroy X Y
     } -body {
 	puts -nonewline [outputChannel] [relvar dump X]
-    } -output {package require ral
+    } -output {package require ral 0.6
 ::ral::relvar create X {Name string Status int} {Name}
-::ral::relvar insert X {Name George Status 20} {Name Fred Status 30} {Name Alice Status 40}
+::ral::relvar insert X {Name George Status 20}
+::ral::relvar insert X {Name Fred Status 30}
+::ral::relvar insert X {Name Alice Status 40}
 } -result {}
 
     # relvar set subcommand
