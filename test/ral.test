@@ -46,8 +46,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.9 $
-# $Date: 2004/06/05 01:37:20 $
+# $Revision: 1.10 $
+# $Date: 2004/06/27 17:58:46 $
 #  *--
 
 package require tcltest 2.2
@@ -1052,7 +1052,17 @@ namespace eval ::ral::test {
 	    {Name Jane Street Main Number 300 IsMale false}\
 	    {Name Fred Street Maple Number 599 IsMale 1}}}
 	relation eliminate $r1 Number IsMale
-    } -result {Relation {{{Name string} {Street string}} {{Name Street}}} {{Name Andrew Street Blackwood} {Name Jane Street Main} {Name Fred Street Maple}}}
+    } -result {Relation {{{Name string} {Street string}} Name} {{Name Andrew Street Blackwood} {Name Jane Street Main} {Name Fred Street Maple}}}
+
+    test relation-eliminate-2.1 {multiple attributes} -body {
+	set r1 {Relation \
+	    {{{Name string} {Number int} {Street string} {IsMale boolean}}\
+		Name}\
+	    {{Name Andrew Number 599 Street Blackwood IsMale true}\
+	    {Name Jane Street Main Number 300 IsMale false}\
+	    {Name Fred Street Maple Number 599 IsMale 1}}}
+	relation eliminate $r1 Name Street
+    } -result {Relation {{{Number int} {IsMale boolean}} {{Number IsMale}}} {{Number 599 IsMale 1} {Number 300 IsMale 0}}}
 
     test relation-eliminate-3.0 {nullary eliminate, non-empty relation} -body {
 	set r1 {Relation \
@@ -1062,14 +1072,14 @@ namespace eval ::ral::test {
 	    {Name Jane Street Main Number 300 IsMale false}\
 	    {Name Fred Street Maple Number 599 IsMale 1}}}
 	relation eliminate $r1
-    } -result {Relation {{{Name string} {Number int} {Street string} {IsMale boolean}} {{Name Number Street IsMale}}} {{Name Andrew Number 599 Street Blackwood IsMale 1} {Name Jane Number 300 Street Main IsMale 0} {Name Fred Number 599 Street Maple IsMale 1}}}
+    } -result {Relation {{{Name string} {Number int} {Street string} {IsMale boolean}} Name} {{Name Andrew Number 599 Street Blackwood IsMale 1} {Name Jane Number 300 Street Main IsMale 0} {Name Fred Number 599 Street Maple IsMale 1}}}
 
     test relation-eliminate-4.0 {nullary eliminate, empty relation} -body {
 	set r1 {Relation \
 	    {{{Name string} {Number int} {Street string} {IsMale boolean}}\
 		Name} {}}
 	relation eliminate $r1
-    } -result {Relation {{{Name string} {Number int} {Street string} {IsMale boolean}} {{Name Number Street IsMale}}} {}}
+    } -result {Relation {{{Name string} {Number int} {Street string} {IsMale boolean}} Name} {}}
 
     # relation extend subcommand
     test relation-extend-1.0 {multiple body tuples} -body {
@@ -1657,7 +1667,17 @@ namespace eval ::ral::test {
 	    {Name Jane Street Main Number 300 IsMale false}\
 	    {Name Fred Street Maple Number 599 IsMale 1}}}
 	relation project $r1 Name Name
-    } -result {duplicate attribute name, "Name"} -returnCodes error
+    } -result {Relation {{{Name string}} Name} {{Name Andrew} {Name Jane} {Name Fred}}}
+
+    test relation-project-7.0 {reorder attributes} -body {
+	set r1 {Relation \
+	    {{{Name string} {Number int} {Street string} {IsMale boolean}}\
+		{{Number Street}}}\
+	    {{Name Andrew Number 599 Street Blackwood IsMale true}\
+	    {Name Jane Street Main Number 300 IsMale false}\
+	    {Name Fred Street Maple Number 599 IsMale 1}}}
+	relation project $r1 Number Street IsMale
+    } -result {Relation {{{Number int} {Street string} {IsMale boolean}} {{Number Street}}} {{Number 599 Street Blackwood IsMale 1} {Number 300 Street Main IsMale 0} {Number 599 Street Maple IsMale 1}}}
 
     # relation rename subcommand
     test relation-rename-1.0 {single attribute} -body {
@@ -1766,7 +1786,7 @@ namespace eval ::ral::test {
 	set sp [relvar get SP]
 	set p [relation project [relvar get P] P#]
 	relation summarize $sp $p {Total int} [list sum QTY] 0
-    } -result {Relation {{{P# string} {Total int}} {{P# Total}}} {{P# P1 Total 600} {P# P2 Total 1000} {P# P3 Total 400} {P# P4 Total 500} {P# P5 Total 500} {P# P6 Total 100}}}
+    } -result {Relation {{{P# string} {Total int}} P#} {{P# P1 Total 600} {P# P2 Total 1000} {P# P3 Total 400} {P# P4 Total 500} {P# P5 Total 500} {P# P6 Total 100}}}
 
     test relation-summarize-2.0 {summarize per dee} -body {
 	set sp [relvar get SP]
@@ -2021,11 +2041,11 @@ string
 	    suppliers concerned are colocated"
     } -result {Get all pairs of supplier numbers such that the suppliers concerned are colocated
 ---------------------------------------------------------------------------------
-    SA      SB    CITY
+    SA    CITY      SB
 string  string  string
 ======================
-    S1      S4  London
-    S2      S3   Paris}
+    S1  London      S4
+    S2   Paris      S3}
 
     test date-example-7.0 {Get supplier info for suppliers who supply part P2}\
     -body {

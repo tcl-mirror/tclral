@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral.c,v $
-$Revision: 1.10 $
-$Date: 2004/06/05 01:37:19 $
+$Revision: 1.11 $
+$Date: 2004/06/27 17:58:46 $
  *--
  */
 
@@ -87,14 +87,14 @@ typedef struct Ral_FixedIntVector {
  * There are also a number of places where a mapping between indices
  * is needed. These are held as a vector of an array of two integers.
  */
-typedef struct Ral_FixedIntMap {
+typedef struct Ral_VarIntMap {
     int allocated ;
     int count ;
     struct intmap {
 	int index1 ;
 	int index2 ;
     } *vector ;
-} Ral_FixedIntMap ;
+} Ral_VarIntMap ;
 
 /*
  * Attributes can be of either a base type supplied by Tcl or one of
@@ -145,10 +145,10 @@ typedef struct Ral_AttrOrderMap {
  * map showing the tuples that match across the join attributes.
  */
 typedef struct Ral_RelationJoinMap {
-    Ral_FixedIntMap attrMap ;	/* Attribute map that gives
+    Ral_VarIntMap attrMap ;	/* Attribute map that gives
 				 * the attribute indices in the two relations
 				 * across which the join is performed. */
-    Ral_FixedIntMap tupleMap ;	/* the tuple map giving the index in one
+    Ral_VarIntMap tupleMap ;	/* the tuple map giving the index in one
 				 * relation that matches that in another
 				 * relation */
 } Ral_RelationJoinMap ;
@@ -330,7 +330,7 @@ EXTERNAL DATA REFERENCES
 /*
 STATIC DATA ALLOCATION
 */
-static char rcsid[] = "@(#) $RCSfile: ral.c,v $ $Revision: 1.10 $" ;
+static char rcsid[] = "@(#) $RCSfile: ral.c,v $ $Revision: 1.11 $" ;
 
 static Tcl_ObjType Ral_TupleType = {
     "Tuple",
@@ -514,8 +514,8 @@ fixedIntVectorIdentityMap(
  * ======================================================================
  */
 static void
-fixedIntMapCtor(
-    Ral_FixedIntMap *map,
+varIntMapCtor(
+    Ral_VarIntMap *map,
     int maxNum)
 {
     map->allocated = maxNum ;
@@ -525,8 +525,8 @@ fixedIntMapCtor(
 }
 
 static void
-fixedIntMapDtor(
-    Ral_FixedIntMap *map)
+varIntMapDtor(
+    Ral_VarIntMap *map)
 {
     if (map->vector) {
 	ckfree((char *)map->vector) ;
@@ -999,8 +999,8 @@ relationJoinMapNew(
     Ral_RelationJoinMap *map ;
 
     map = (Ral_RelationJoinMap *)ckalloc(sizeof(*map)) ;
-    fixedIntMapCtor(&map->attrMap, nAttrs) ;
-    fixedIntMapCtor(&map->tupleMap, nTuples) ;
+    varIntMapCtor(&map->attrMap, nAttrs) ;
+    varIntMapCtor(&map->tupleMap, nTuples) ;
 
     return map ;
 }
@@ -1009,8 +1009,8 @@ static void
 relationJoinMapDelete(
     Ral_RelationJoinMap *map)
 {
-    fixedIntMapDtor(&map->attrMap) ;
-    fixedIntMapDtor(&map->tupleMap) ;
+    varIntMapDtor(&map->attrMap) ;
+    varIntMapDtor(&map->tupleMap) ;
     ckfree((char *)map) ;
 }
 
@@ -2206,6 +2206,156 @@ relationHeadingNew(
     }
 
     return heading ;
+}
+
+/*
+ * Create a new relation heading by duplicating an existing heading
+ * if all the attributes of that heading are mentioned in the retained list.
+ */
+static Ral_RelationHeading *
+relationHeadingNewRetained(
+    Ral_RelationHeading *heading,
+    Ral_TupleHeading *tupleHeading,
+    int *retainMap)
+{
+    int degree = heading->tupleHeading->degree ;
+    Ral_FixedIntVector *srcIdVector = heading->idVector ;
+    char *retainedIds ;
+    int retainedCount ;
+    int i ;
+    Ral_RelationHeading *newHeading ;
+
+    retainedIds = ckalloc(heading->idCount * sizeof(*retainedIds)) ;
+    memset(retainedIds, 0, heading->idCount * sizeof(*retainedIds)) ;
+    /*
+     * Traverse the identifers of the heading and determine if all
+     * the attributes are set in the retain map.
+     */
+    retainedCount = 0 ;
+    for (i = 0 ; i < heading->idCount ; ++i) {
+	Ral_FixedIntVector *v = srcIdVector + i ;
+	int found = 0 ;
+	int c  ;
+
+	for (c = 0 ; c < v->count ; ++c) {
+	    if (retainMap[v->vector[c]] >= 0) {
+		++found ;
+	    }
+	}
+	/*
+	 * If every attribute of this identifier was found in the retain map,
+	 * then we keep the identifier.
+	 */
+	if (found == v->count) {
+	    retainedIds[i] = 1 ;
+	    ++retainedCount ;
+	}
+    }
+
+    if (retainedCount) {
+	Ral_FixedIntVector *destIdVector ;
+
+	newHeading = relationHeadingNew(tupleHeading, retainedCount) ;
+	destIdVector = newHeading->idVector ;
+
+	/*
+	 * Construct the new identifer vectors.
+	 */
+	for (i = 0 ; i < retainedCount ; ++i) {
+	    if (retainedIds[i]) {
+		int j ;
+
+		fixedIntVectorCtor(destIdVector, srcIdVector->count) ;
+		/*
+		 * When copying the identifier index from the source
+		 * to the destination, it must be re-mapped to the
+		 * destination order.
+		 */
+		for (j = 0 ; j < srcIdVector->count ; ++j) {
+		    int srcIndex = srcIdVector->vector[j] ;
+		    assert(retainMap[srcIndex] >= 0) ;
+		    destIdVector->vector[j] = retainMap[srcIndex] ;
+		}
+		++destIdVector ;
+	    }
+	    ++srcIdVector ;
+	}
+    } else {
+	newHeading = relationHeadingNew(tupleHeading, 1) ;
+	fixedIntVectorIdentityMap(newHeading->idVector, tupleHeading->degree) ;
+    }
+
+    ckfree(retainedIds) ;
+    return newHeading ;
+}
+
+/*
+ * Create a new relation heading that is the union of two other headings.
+ */
+static Ral_RelationHeading *
+relationHeadingNewUnion(
+    Tcl_Interp *interp,
+    Ral_RelationHeading *h1,
+    Ral_RelationHeading *h2)
+{
+    Ral_TupleHeading *tupleHeading ;
+    Ral_RelationHeading *unionHeading ;
+    int h1IdCount ;
+    int h2IdCount ;
+    Ral_FixedIntVector *unionIdVect ;
+    Ral_FixedIntVector *h1IdVect ;
+    Ral_FixedIntVector *h2IdVect ;
+    int c1 ;
+    int c2 ;
+    int h1degree ;
+
+    /*
+     * Union the tuple heading.
+     */
+    tupleHeading = tupleHeadingUnion(interp, h1->tupleHeading,
+	h2->tupleHeading) ;
+    if (tupleHeading == NULL) {
+	return NULL ;
+    }
+
+    /*
+     * The identifiers are the cross project of the identifiers
+     * of the two headings.
+     */
+    h1IdCount = h1->idCount ;
+    h2IdCount = h1->idCount ;
+    unionHeading = relationHeadingNew(tupleHeading, h1IdCount * h2IdCount) ;
+
+    unionIdVect = unionHeading->idVector ;
+    h1IdVect = h1->idVector ;
+    h1degree = h1->tupleHeading->degree ;
+    /*
+     * Loop through copying the identifier indices.
+     */
+    for (c1 = 0 ; c1 < h1IdCount ; ++c1) {
+	h2IdVect = h2->idVector ;
+	for (c2 = 0 ; c2 < h2IdCount ; ++c2) {
+	    int i ;
+
+	    fixedIntVectorCtor(unionIdVect, h1IdVect->count + h2IdVect->count) ;
+	    memcpy(unionIdVect->vector, h1IdVect->vector,
+		h1IdVect->count * sizeof(*unionIdVect->vector)) ;
+	    for (i = 0 ; i < h2IdVect->count ; ++i) {
+		/*
+		 * Note that the identifier indices are offset by the
+		 * degree of the first heading. This adjusts them to
+		 * the proper value for the new heading.
+		 */
+		unionIdVect->vector[h1IdVect->count + i] =
+		    h2IdVect->vector[i] + h1degree ;
+	    }
+	    ++h2IdVect ;
+	    ++unionIdVect ;
+	}
+	++h1IdVect ;
+    }
+
+    return unionHeading ;
 }
 
 static void
@@ -3556,6 +3706,7 @@ TupleEliminateCmd(
     Ral_Tuple *tuple ;
     Ral_TupleHeading *heading ;
     char *elimMap ;
+    int elimCount ;
     int i ;
     Tcl_Obj **values ;
     Ral_TupleHeading *newHeading ;
@@ -3583,7 +3734,7 @@ TupleEliminateCmd(
     objv += 3 ;
     /*
      * Check that attributes to eliminate actually belong to the tuple.
-     * Build a mapping structure that determines if we retain the attribute.
+     * Build a mapping structure that determines if we delete the attribute.
      */
     elimMap = ckalloc(heading->degree) ;
     memset(elimMap, 0, heading->degree) ;
@@ -3599,10 +3750,25 @@ TupleEliminateCmd(
 	}
     }
     /*
+     * Do this as a separate step, just in case the same attribute
+     * is mentioned multiple times to be eliminated.
+     */
+    elimCount = 0 ;
+    for (i = 0 ; i < heading->degree ; ++i) {
+	elimCount += elimMap[i] != 0 ;
+    }
+    if (elimCount > heading->degree) {
+	Tcl_SetStringObj(Tcl_GetObjResult(interp), 
+	"attempted to eliminate more attributes than exist in the relation",
+	    -1) ;
+	ckfree((char *)elimMap) ;
+	return TCL_ERROR ;
+    }
+    /*
      * Build a new heading. It will have as many fewer attributes
      * as are listed with the command.
      */
-    newHeading = tupleHeadingNew(heading->degree - objc) ;
+    newHeading = tupleHeadingNew(heading->degree - elimCount) ;
     newTuple = tupleNew(newHeading) ;
     i = 0 ;
     for (attrIndex = 0 ; attrIndex < heading->degree; ++attrIndex) {
@@ -5136,7 +5302,7 @@ RelationDivideCmd(
      * The quotient, which has the same heading as the dividend, is then
      * computed by iterating over the dividend and for each tuple, determining
      * if all the tuples composed by combining a dividend tuple with all the
-     * divisor tuples are contained in the mediator.  If they are, the that
+     * divisor tuples are contained in the mediator.  If they are, then that
      * dividend tuple is a tuple of the quotient.
      */
 
@@ -5150,19 +5316,14 @@ RelationDivideCmd(
 	tupleHeadingCompare(dsorTupleHeading, medTupleHeading) !=
 	medTupleHeading->degree) {
 	Tcl_SetStringObj(Tcl_GetObjResult(interp), 
-"mediator heading must be the union of dividend heading and divisor heading",
-	    -1) ;
+	    "mediator heading must be the union of dividend heading and"
+	    " divisor heading", -1) ;
 	return TCL_ERROR ;
     }
     /*
      * create quotient
      */
-    quot = relationNew(relationHeadingNew(dendTupleHeading,
-	dend->heading->idCount)) ;
-    for (idIndex = 0 ; idIndex < dend->heading->idCount ; ++idIndex) {
-	fixedIntVectorCopy(&dend->heading->idVector[idIndex],
-	    &quot->heading->idVector[idIndex]) ;
-    }
+    quot = relationNew(dend->heading) ;
     relationReserve(quot, dend->cardinality) ;
     /*
      * Create an index for the mediator relation that will be used to
@@ -5260,12 +5421,11 @@ RelationEliminateCmd(
 {
     Tcl_Obj *relObj ;
     Ral_Relation *relation ;
+    Ral_RelationHeading *heading ;
     Ral_TupleHeading *tupleHeading ;
-    int elimDegree ;
     int c ;
-    int *elimMap ;
-    int elimCount ;
-    int where ;
+    int *retainMap ;
+    int retainCount ;
     Ral_TupleHeading *elimTupleHeading ;
     Ral_RelationHeading *elimHeading ;
     Ral_Relation *elimRelation ;
@@ -5283,60 +5443,49 @@ RelationEliminateCmd(
 	return TCL_ERROR ;
     }
     relation = relObj->internalRep.otherValuePtr ;
-    tupleHeading = relation->heading->tupleHeading ;
+    heading = relation->heading ;
+    tupleHeading = heading->tupleHeading ;
 
     objc -= 3 ;
     objv += 3 ;
 
-    if (objc > tupleHeading->degree) {
-	Tcl_SetStringObj(Tcl_GetObjResult(interp), 
-	"attempted to eliminate more attributes than exist in the relation",
-	    -1) ;
-	return TCL_ERROR ;
+    retainMap = (int *)ckalloc(tupleHeading->degree * sizeof(*retainMap)) ;
+    for (c = 0 ; c < tupleHeading->degree ; ++c) {
+	retainMap[c] = 1 ;
     }
-
-    elimMap = (int *)ckalloc(tupleHeading->degree * sizeof(*elimMap)) ;
-    memset(elimMap, 0, tupleHeading->degree * sizeof(*elimMap)) ;
     while (objc-- > 0) {
 	int index ;
 
 	index = tupleHeadingFindIndex(interp, tupleHeading, *objv++) ;
 	if (index < 0) {
-	    ckfree((char *)elimMap) ;
+	    ckfree((char *)retainMap) ;
 	    return TCL_ERROR ;
 	}
-	elimMap[index] = 1 ;
+	retainMap[index] = -1 ;
     }
-    elimCount = 0 ;
+    /*
+     * Do this as a separate step, just in case the same attribute
+     * is mentioned multiple times to be eliminated.
+     */
+    retainCount = 0 ;
     for (c = 0 ; c < tupleHeading->degree ; ++c) {
-	if (elimMap[c]) {
-	    ++elimCount ;
+	if (retainMap[c] >= 0) {
+	    retainMap[c] = retainCount++ ;
 	}
     }
-    elimDegree = tupleHeading->degree - elimCount ;
-    elimTupleHeading = tupleHeadingNew(elimDegree) ;
 
-    where = 0 ;
+    elimTupleHeading = tupleHeadingNew(retainCount) ;
     for (c = 0 ; c < tupleHeading->degree ; ++c) {
-	if (!(elimMap[c] || tupleHeadingCopy(interp, tupleHeading, c, c + 1,
-		elimTupleHeading, where++) == TCL_OK)) {
-	    ckfree((char *)elimMap) ;
+	if (retainMap[c] >= 0 && tupleHeadingCopy(interp, tupleHeading,
+	    c, c + 1, elimTupleHeading, retainMap[c]) != TCL_OK) {
+	    ckfree((char *)retainMap) ;
 	    tupleHeadingDelete(elimTupleHeading) ;
 	    return TCL_ERROR ;
 	}
     }
 
-    /*
-     * HERE
-     * This is probably wrong! If we are not eliminating any
-     * identifying attributes, then we should keep the identifiers
-     * of the original relation. Only if we are eliminating an attribute
-     * that is part of an identifier do we have to resort to just
-     * making every attribute part of a identifer. Same goes for
-     * "project" command.
-     */
-    elimHeading = relationHeadingNew(elimTupleHeading, 1) ;
-    fixedIntVectorIdentityMap(elimHeading->idVector, elimTupleHeading->degree) ;
+    elimHeading = relationHeadingNewRetained(heading, elimTupleHeading,
+	retainMap) ;
     elimRelation = relationNew(elimHeading) ;
     relationReserve(elimRelation, relation->cardinality) ;
 
@@ -5347,27 +5496,20 @@ RelationEliminateCmd(
 
 	srcTuple = *tupleVector ;
 	elimTuple = tupleNew(elimTupleHeading) ;
-	where = 0 ;
 	for (degree = 0 ; degree < tupleHeading->degree ; ++degree) {
-	    if (!elimMap[degree]) {
-		Tcl_IncrRefCount(elimTuple->values[where++] =
+	    if (retainMap[degree] >= 0) {
+		Tcl_IncrRefCount(elimTuple->values[retainMap[degree]] =
 		    srcTuple->values[degree]) ;
 	    }
 	}
 	if (relationAppendTuple(NULL, elimRelation, elimTuple) != TCL_OK) {
 	    tupleDelete(elimTuple) ;
-	    goto errorOut ;
 	}
     }
 
-    ckfree((char *)elimMap) ;
+    ckfree((char *)retainMap) ;
     Tcl_SetObjResult(interp, relationObjNew(elimRelation)) ;
     return TCL_OK ;
-
-errorOut:
-    ckfree((char *)elimMap) ;
-    relationDelete(elimRelation) ;
-    return TCL_ERROR ;
 }
 
 static int
@@ -6028,7 +6170,7 @@ RelationIsemptyCmd(
 	return TCL_ERROR ;
     relation = relationObj->internalRep.otherValuePtr ;
 
-    Tcl_SetObjResult(interp, Tcl_NewIntObj(relation->cardinality == 0)) ;
+    Tcl_SetObjResult(interp, Tcl_NewBooleanObj(relation->cardinality == 0)) ;
     return TCL_OK ;
 }
 
@@ -6053,7 +6195,7 @@ RelationIsnotemptyCmd(
 	return TCL_ERROR ;
     relation = relationObj->internalRep.otherValuePtr ;
 
-    Tcl_SetObjResult(interp, Tcl_NewIntObj(relation->cardinality != 0)) ;
+    Tcl_SetObjResult(interp, Tcl_NewBooleanObj(relation->cardinality != 0)) ;
     return TCL_OK ;
 }
 
@@ -6321,8 +6463,8 @@ RelationProjectCmd(
     Ral_TupleHeading *tupleHeading ;
     Ral_TupleHeading *projTupleHeading ;
     Ral_RelationHeading *projHeading ;
-    int *valueMap ;
-    int *vm ;
+    int *retainMap ;
+    int retainCount ;
     int c ;
     Tcl_Obj *const*v ;
     int card ;
@@ -6345,55 +6487,65 @@ RelationProjectCmd(
     objc -= 3 ;
     objv += 3 ;
 
-    valueMap = (int *)ckalloc(objc * sizeof(*valueMap)) ;
-    projTupleHeading = tupleHeadingNew(objc) ;
-
-    vm = valueMap ;
-    for (c = 0, v = objv ; c < objc ; ++c, ++v) {
+    retainMap = (int *)ckalloc(tupleHeading->degree * sizeof(*retainMap)) ;
+    for (c = 0 ; c < tupleHeading->degree ; ++c) {
+	retainMap[c] = -1 ;
+    }
+    while (objc-- > 0) {
 	int index ;
 
-	index = tupleHeadingFindIndex(interp, tupleHeading, *v) ;
-	if (index < 0 ||
-	    tupleHeadingCopy(interp, tupleHeading, index, index + 1,
-		projTupleHeading, c) != TCL_OK) {
-	    ckfree((char *)valueMap) ;
+	index = tupleHeadingFindIndex(interp, tupleHeading, *objv++) ;
+	if (index < 0) {
+	    ckfree((char *)retainMap) ;
+	    return TCL_ERROR ;
+	}
+	retainMap[index] = 1 ;
+    }
+    /*
+     * Do this as a separate step, just in case the same attribute
+     * is mentioned multiple times to be projected.
+     */
+    retainCount = 0 ;
+    for (c = 0 ; c < tupleHeading->degree ; ++c) {
+	if (retainMap[c] >= 0) {
+	    retainMap[c] = retainCount++ ;
+	}
+    }
+
+    projTupleHeading = tupleHeadingNew(retainCount) ;
+    for (c = 0 ; c < tupleHeading->degree ; ++c) {
+	if (retainMap[c] >= 0 && tupleHeadingCopy(interp, tupleHeading,
+	    c, c + 1, projTupleHeading, retainMap[c]) != TCL_OK) {
+	    ckfree((char *)retainMap) ;
 	    tupleHeadingDelete(projTupleHeading) ;
 	    return TCL_ERROR ;
 	}
-	*vm++ = index ;
     }
 
-    /*
-     * HERE
-     * This is probably wrong! If we are not eliminating any
-     * identifying attributes, then we should keep the identifiers
-     * of the original relation. Only if we are eliminating an attribute
-     * that is part of an identifier do we have to resort to just
-     * making every attribute part of a identifer. Same goes for
-     * "eliminate" command.
-     */
-    projHeading = relationHeadingNew(projTupleHeading, 1) ;
-    fixedIntVectorIdentityMap(projHeading->idVector, projTupleHeading->degree) ;
+    projHeading = relationHeadingNewRetained(heading, projTupleHeading,
+	retainMap) ;
     projRelation = relationNew(projHeading) ;
     relationReserve(projRelation, relation->cardinality) ;
 
     for (card = relation->cardinality, tupleVector = relation->tupleVector ;
 	card > 0 ; --card, ++tupleVector) {
-	Ral_Tuple *srcTuple = *tupleVector ;
+	Ral_Tuple *srcTuple ;
 	int degree ;
 
+	srcTuple = *tupleVector ;
 	projTuple = tupleNew(projTupleHeading) ;
-	for (degree = 0, vm = valueMap ; degree < projTupleHeading->degree ;
-	    ++degree, ++vm) {
-	    Tcl_IncrRefCount(projTuple->values[degree] =
-		srcTuple->values[*vm]) ;
+	for (degree = 0 ; degree < tupleHeading->degree ; ++degree) {
+	    if (retainMap[degree] >= 0) {
+		Tcl_IncrRefCount(projTuple->values[retainMap[degree]] =
+		    srcTuple->values[degree]) ;
+	    }
 	}
 	if (relationAppendTuple(NULL, projRelation, projTuple) != TCL_OK) {
 	    tupleDelete(projTuple) ;
 	}
     }
 
-    ckfree((char *)valueMap) ;
+    ckfree((char *)retainMap) ;
     Tcl_SetObjResult(interp, relationObjNew(projRelation)) ;
     return TCL_OK ;
 }
@@ -6759,37 +6911,49 @@ RelationSummarizeCmd(
     if (tupleHeadingCompare(perTupleHeading, tupleHeading) !=
 	perTupleHeading->degree) {
 	Tcl_SetStringObj(Tcl_GetObjResult(interp), 
-	"the \"per\" relation heading must be a subset of summarized relation",
-	    -1) ;
+	    "the \"per\" relation heading must be a subset of the summarized"
+	    " relation", -1) ;
 	return TCL_ERROR ;
     }
 
     /*
      * Construct the heading for the result. It the heading of the
      * "per" relation plus the summary attribute.
+     * We much check if we are summarizing over the "DEE" relation.
+     * In that case the only attribute of the result will be the
+     * summarizing attribute and it then must be the only attribute of
+     * the single identifier of the result.
      */
-    sumTupleHeading = tupleHeadingNew(perTupleHeading->degree + 1) ;
-    if (tupleHeadingCopy(interp, perTupleHeading, 0, perTupleHeading->degree,
-	    sumTupleHeading, 0) != TCL_OK ||
-	tupleHeadingInsertAttributeFromPair(interp, sumTupleHeading, attrObj,
-	    perTupleHeading->degree) != TCL_OK) {
-	tupleHeadingDelete(sumTupleHeading) ;
-	return TCL_ERROR ;
+    if (perTupleHeading->degree) {
+	sumHeading = relationHeadingDup(perRelation->heading, 1) ;
+	sumTupleHeading = sumHeading->tupleHeading ;
+	if (tupleHeadingInsertAttributeFromPair(interp, sumTupleHeading,
+	    attrObj, perTupleHeading->degree) != TCL_OK) {
+	    relationHeadingDelete(sumHeading) ;
+	    return TCL_ERROR ;
+	}
+    } else {
+	sumTupleHeading = tupleHeadingNew(1) ;
+	if (tupleHeadingInsertAttributeFromPair(interp, sumTupleHeading,
+	    attrObj, 0) != TCL_OK) {
+	    tupleHeadingDelete(sumTupleHeading) ;
+	    return TCL_ERROR ;
+	}
+	sumHeading = relationHeadingNew(sumTupleHeading, 1) ;
+	fixedIntVectorIdentityMap(sumHeading->idVector, 1) ;
     }
 
     sumAttribute = sumTupleHeading->attrVector + perTupleHeading->degree ;
     if (attributeConvertValue(interp, sumAttribute, initObj) != TCL_OK) {
-	tupleHeadingDelete(sumTupleHeading) ;
+	relationHeadingDelete(sumHeading) ;
 	return TCL_ERROR ;
     }
 
-    sumHeading = relationHeadingNew(sumTupleHeading, 1) ;
-    fixedIntVectorIdentityMap(sumHeading->idVector, sumTupleHeading->degree) ;
     sumRelation = relationNew(sumHeading) ;
     relationReserve(sumRelation, perRelation->cardinality) ;
 
     /*
-     * Create a vector containing a copy of initialization object. This
+     * Create a vector containing a copy of the initialization object. This
      * will be used to accumulate the result of the command evaluation.
      */
     summaryVector = (Tcl_Obj **)ckalloc(perRelation->cardinality *
@@ -6901,13 +7065,8 @@ RelationTimesCmd(
     Ral_Relation *r1 ;
     Tcl_Obj *r2Obj ;
     Ral_Relation *r2 ;
-    Ral_TupleHeading *tupleHeading ;
-    Ral_RelationHeading *relationHeading ;
+    Ral_RelationHeading *prodHeading ;
     Ral_Relation *product ;
-    int r1c ;
-    Tcl_Obj **r1v ;
-    int r2c ;
-    Tcl_Obj **r2v ;
 
     /* relation times relation1 relation2 ? ... ? */
     if (objc < 4) {
@@ -6926,19 +7085,12 @@ RelationTimesCmd(
     }
     r2 = r2Obj->internalRep.otherValuePtr ;
 
-    tupleHeading = tupleHeadingUnion(interp, r1->heading->tupleHeading,
-	r2->heading->tupleHeading) ;
-    if (tupleHeading == NULL) {
+    prodHeading = relationHeadingNewUnion(interp, r1->heading, r2->heading) ;
+    if (prodHeading == NULL) {
 	return TCL_ERROR ;
     }
 
-    relationHeading = relationHeadingNew(tupleHeading, 1) ;
-    /*
-     * One identifier consisting of all the attributes.
-     */
-    fixedIntVectorIdentityMap(relationHeading->idVector, tupleHeading->degree) ;
-
-    product = relationNew(relationHeading) ;
+    product = relationNew(prodHeading) ;
     relationReserve(product, r1->cardinality * r2->cardinality) ;
 
     if (relationMultTuples(interp, product, r1, r2) != TCL_OK) {
@@ -6956,21 +7108,13 @@ RelationTimesCmd(
 	}
 	r2 = r2Obj->internalRep.otherValuePtr ;
 
-	tupleHeading = tupleHeadingUnion(interp, r1->heading->tupleHeading,
-	    r2->heading->tupleHeading) ;
-	if (tupleHeading == NULL) {
+	prodHeading = relationHeadingNewUnion(interp, r1->heading,
+	    r2->heading) ;
+	if (prodHeading == NULL) {
 	    return TCL_ERROR ;
 	}
 
-	/*
-	 * HERE -- do something about the identifiers.
-	 * One identifier consisting of all the attributes.
-	 */
-	relationHeading = relationHeadingNew(tupleHeading, 1) ;
-	fixedIntVectorIdentityMap(relationHeading->idVector,
-	    tupleHeading->degree) ;
-
-	product = relationNew(relationHeading) ;
+	product = relationNew(prodHeading) ;
 	relationReserve(product, r1->cardinality * r2->cardinality) ;
 
 	if (relationMultTuples(interp, product, r1, r2) != TCL_OK) {
@@ -6983,8 +7127,6 @@ RelationTimesCmd(
     Tcl_SetObjResult(interp, relationObjNew(product)) ;
     return TCL_OK ;
 
-errorOut2:
-    relationDelete(r1) ;
 errorOut:
     relationDelete(product) ;
     return TCL_ERROR ;

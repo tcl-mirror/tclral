@@ -26,13 +26,20 @@ Tcl uses many different internal types for many different purposes.
 The ones most useful are:
 
 [list_begin bullet]
-[bullet] string
-[bullet] int
-[bullet] double
-[bullet] wideInt
-[bullet] boolean
-[bullet] list
-[bullet] Tuple
+[bullet]
+string
+[bullet]
+int
+[bullet]
+double
+[bullet]
+wideInt
+[bullet]
+boolean
+[bullet]
+list
+[bullet]
+Tuple
 [list_end]
 
 Any attribute value assigned to a particular attribute is coerced into the
@@ -51,8 +58,10 @@ types do not have.
 Tuples are sets of components and as such have the following rules.
 
 [list_begin bullet]
-[bullet] All attribute names must be unique.
-[bullet] The is no inherent left to right ordering in tuples.
+[bullet]
+All attribute names must be unique.
+[bullet]
+The is no inherent left to right ordering in tuples.
 Clearly, the implementation may store components in a particular order
 and any string representation must have some left to right ordering to it
 (since I write in a Roman alphabet which is left to right ordered),
@@ -70,9 +79,12 @@ Like any Tcl value, tuples have a string representation.
 The string representation of a tuple is a specially formatted list
 consisting of three elements:
 [list_begin enum]
-[enum] The keyword [emph Tuple].
-[enum] The tuple heading.
-[enum] The tuple values.
+[enum]
+The keyword [emph Tuple].
+[enum]
+The tuple heading.
+[enum]
+The tuple values.
 [list_end]
 The tuple heading is itself a list whose elements give the attribute names
 and attribute data types of the tuple.
@@ -294,4 +306,8 @@ returns:
 [example_end]
 
 [list_end]
+
+[see_also relvar relation]
+
+[keywords tuple relation relvar]
 [manpage_end]
