@@ -1,6 +1,54 @@
 #!/bin/bash
 # \
 exec wish "$0" "$@"
+# This software is copyrighted 2004 by G. Andrew Mangogna.  The following
+# terms apply to all files associated with the software unless explicitly
+# disclaimed in individual files.
+# 
+# The authors hereby grant permission to use, copy, modify, distribute,
+# and license this software and its documentation for any purpose, provided
+# that existing copyright notices are retained in all copies and that this
+# notice is included verbatim in any distributions. No written agreement,
+# license, or royalty fee is required for any of the authorized uses.
+# Modifications to this software may be copyrighted by their authors and
+# need not follow the licensing terms described here, provided that the
+# new terms are clearly indicated on the first page of each file where
+# they apply.
+# 
+# IN NO EVENT SHALL THE AUTHORS OR DISTRIBUTORS BE LIABLE TO ANY PARTY FOR
+# DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING
+# OUT OF THE USE OF THIS SOFTWARE, ITS DOCUMENTATION, OR ANY DERIVATIVES
+# THEREOF, EVEN IF THE AUTHORS HAVE BEEN ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
+# 
+# THE AUTHORS AND DISTRIBUTORS SPECIFICALLY DISCLAIM ANY WARRANTIES,
+# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.  THIS SOFTWARE
+# IS PROVIDED ON AN "AS IS" BASIS, AND THE AUTHORS AND DISTRIBUTORS HAVE
+# NO OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS,
+# OR MODIFICATIONS.
+# 
+# GOVERNMENT USE: If you are acquiring this software on behalf of the
+# U.S. government, the Government shall have only "Restricted Rights"
+# in the software and related documentation as defined in the Federal
+# Acquisition Regulations (FARs) in Clause 52.227.19 (c) (2).  If you
+# are acquiring the software on behalf of the Department of Defense,
+# the software shall be classified as "Commercial Computer Software"
+# and the Government shall have only "Restricted Rights" as defined in
+# Clause 252.227-7013 (c) (1) of DFARs.  Notwithstanding the foregoing,
+# the authors grant the U.S. Government and others acting in its behalf
+# permission to use and distribute the software in accordance with the
+# terms specified in this license.
+# 
+#  *++
+# MODULE:
+# 
+# ABSTRACT:
+# 
+# $RCSfile: ralview.tcl,v $
+# $Revision: 1.2 $
+# $Date: 2004/08/01 18:53:05 $
+#  *--
 
 lappend auto_path [file join .. src]
 
@@ -18,9 +66,15 @@ namespace eval ::ralview {
 	{{Tcl Scripts} .tcl}
 	{{All Files} *}
     }
+
+    option add *background ivory1
+    option add *activeBackground ivory2
+    option add *Table.borderWidth 1
+    option add *Table.highlightThickness 2
+    option add *Table.font {Courier 14}
 }
 
-proc ::ralview::main {} {
+proc ::ralview::main {{filename {}}} {
     set mf_menu {
 	"&File" {} {} 0 {
 	    {command "&New" {} "Create a new data set" {Ctrl n}\
@@ -98,8 +152,11 @@ proc ::ralview::main {} {
 	-helptext "Paste clipboard to selection"\
 	{expand}$tb_opts
     pack $bbox -side left -anchor w
-
     pack $mainframe -fill both -expand yes
+
+    if {[string length $filename]} {
+	openfile $filename
+    }
 
     return
 }
@@ -133,23 +190,7 @@ proc ::ralview::openmenu {} {
     }
 
     . configure -cursor watch
-
-    clearDataDisplay
-    if {[catch [list namespace eval :: source $filename] msg]} {
-	MessageDlg::create .openerror -icon error -type ok -message $msg
-	return
-    }
-
-    variable mainframe
-    set frame [$mainframe getframe]
-    variable notebook
-    set notebook [NoteBook $frame.nb]
-    showRelVars $notebook
-
-    $notebook compute_size
-    pack $notebook -expand yes -fill both -padx 4 -pady 4
-    $notebook raise [$notebook page 0]
-
+    openfile $filename
     . configure -cursor ""
 
     return
@@ -207,14 +248,15 @@ proc ::ralview::createRelationWindow {win relation} {
 
     set reltab [table $win\
 	-roworigin -2\
-	-colorigin 0\
+	-colorigin -1\
 	-titlerows 2\
-	-titlecols 0\
+	-titlecols 1\
 	-colstretchmode unset\
 	-rows [expr {[relation cardinality $relation] + 3}]\
 	-cols [relation degree $relation]\
 	-width 0\
 	-height 0\
+	-flashmode on\
 	-selectmode extended\
 	-variable ::ralview::tab$win]
 
@@ -225,6 +267,7 @@ proc ::ralview::createRelationWindow {win relation} {
 	    set attrType [dict get $typeMap $attrName]
 	    set col [dict get $colMap $attrName]
 
+	    set tableArray($rowCntr,-1) $rowCntr
 	    set value [tuple extract $t $attrName]
 	    set tableArray($rowCntr,$col) $value
 	    set valueType [lindex $attrType 0]
@@ -246,6 +289,18 @@ proc ::ralview::createRelationWindow {win relation} {
 	}
 	incr rowCntr
     }
+
+    # Some configuration
+    $reltab tag config title\
+	-relief groove\
+	-fg sienna\
+	-bg beige\
+	-font {Courier 12 bold}
+    $reltab tag config sel\
+	-bg ivory2
+    $reltab tag config active\
+	-bg ivory3
+    $reltab width -1 4
 
     return $reltab
 }
@@ -281,7 +336,11 @@ proc ::ralview::createTupleWindow {win tuple} {
 		-padx 2\
 		-pady 2
 	} elseif {$valType eq "Relation"} {
-	    # HERE
+	    $tuptab window configure 0,$col\
+		-window [createRelationWindow $tuptab.tuple_$col $value]\
+		-sticky news\
+		-padx 2\
+		-pady 2
 	}
 	incr col
     }
@@ -314,6 +373,25 @@ proc ::ralview::copymenu {} {
 proc ::ralview::pastemenu {} {
 }
 
+proc ::ralview::openfile {filename} {
+    clearDataDisplay
+    if {[catch [list namespace eval :: source $filename] msg]} {
+	MessageDlg::create .openerror -icon error -type ok -message $msg
+	return
+    }
+
+    variable mainframe
+    set frame [$mainframe getframe]
+    variable notebook
+    set notebook [NoteBook $frame.nb]
+    showRelVars $notebook
+
+    $notebook compute_size
+    pack $notebook -expand yes -fill both -padx 4 -pady 4
+    $notebook raise [$notebook page 0]
+    return
+}
+
 proc ::ralview::clearDataDisplay {} {
     variable mainframe
     set frame [$mainframe getframe]
@@ -322,4 +400,4 @@ proc ::ralview::clearDataDisplay {} {
     return
 }
 
-::ralview::main
+::ralview::main [lindex $argv 0]
