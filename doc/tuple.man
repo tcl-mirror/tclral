@@ -15,6 +15,46 @@ The ral package introduces an new Tcl data type called
 and this command provides the operators for the Tuple data type.
 [section OVERVIEW]
 [section {STRING REPRESENTATION}]
+Like any Tcl value, tuples have a string representation.
+The string representation of a tuple is a specially formatted list
+consisting of three elements:
+[list_begin enum]
+[enum] The keyword [emph Tuple].
+[enum] The tuple heading.
+[enum] The tuple values.
+[list_end]
+The tuple heading is itself a list whose elements give the attribute names
+and attribute data types of the tuple.
+Each heading element consists of further sub-elements.
+If the heading element list consists of two sub-elements then they are
+the attribute name and attribute data type respectively. If only one
+sub-element is present, then it is take as the attribute name and the
+attribute data type is set to [emph string].
+Data types may be any valid Tcl object type.
+Although Tcl uses many different types internally,
+the most useful types are int, double, boolean, list, Tuple and Relation.
+[para]
+The tuple values are also specified by a list consisting of an even
+number of elements.
+This list is of the same form as that accepted by the [cmd "array set"]
+command.
+The even indexed elements are attribute names and the odd index elements
+give the corresponding attribute value.
+[para]
+The following is a literal string representation of a tuple with
+three attributes.
+[example_begin]
+{Tuple {{Name string} {Breed string} {Age int}} {Name Fido Breed Terrier Age 2}}
+[example_end]
+By taking advantage of the fact that strings are very common and have a
+special place in Tcl, the above example could also be written as:
+[example_begin]
+{Tuple {Name Breed {Age int}} {Name Fido Breed Terrier Age 2}}
+[example_end]
+[para]
+These examples demonstrate the fact that the string representation of
+a tuple is [emph not] unique.
+
 [section COMMANDS]
 [list_begin definitions]
 [call [cmd "::ral::tuple assign"] [arg tupleValue]]

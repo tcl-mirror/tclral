@@ -34,7 +34,12 @@ Andrew Mangogna
 24 March 2004
 \layout Abstract
 
-ABSTRACT
+This paper introduces some of the concepts of the Relational Model of Data
+ and shows how those concepts are reflected in the Tcl Relational Algebra
+ Library.
+ Examples are given to demonstrate a programming style that is oriented
+ to using TclRAL to solve problems where the data has been modeled in a
+ relational fashion.
 \layout Standard
 
 
@@ -45,11 +50,341 @@ ABSTRACT
 
 \layout Section
 
-Introduction
+What is the Relational Model of Data?
+\layout Standard
+
+The Relation Model is the application of set theory and predicate logic
+ to data management.
+\begin_inset Foot
+collapsed true
+
+\layout Standard
+
+Put in reference here
+\end_inset 
+
+ It was originally formulated by E.F.
+ Codd in 1969-1970.
+\begin_inset Foot
+collapsed true
+
+\layout Standard
+
+E.F.
+ Codd, 
+\emph on 
+A Relational Model of Data for Large Shared Data Banks
+\emph default 
+, CACM 13, No.
+ 6, June 1970.
+\end_inset 
+
+ Date gives five components of the relational model\SpecialChar \@.
+
+\begin_inset Foot
+collapsed true
+
+\layout Standard
+
+C.J.
+ Date, 
+\emph on 
+An Introduction to Database Systems
+\emph default 
+, 8th Edition, Addison-Wesley, 2004, ISBN 0-321-19784-4, p 64.
+\end_inset 
+
+
+\layout Enumerate
+
+An open-ended collection of scalar types.
+\layout Enumerate
+
+A relation type generator.
+\layout Enumerate
+
+Relation variables.
+\layout Enumerate
+
+A Relational assignment operation.
+\layout Enumerate
+
+An open-ended collection of relational operators.
+\layout Standard
+
+The relational model is concerned about three aspects of data:
+\layout Enumerate
+
+Data structure.
+\layout Enumerate
+
+Data integrity.
+\layout Enumerate
+
+Data manipulation.
+\layout Standard
+
+Although, the relational model is usually discussed in the context of Relational
+ Database Management Systems (RDMS), in truth it is a very general and formal
+ means of describing data that operates at a logical level independent of
+ any particular database.
+ In this paper we will discuss the relational model in terms of a set of
+ formalizism to describe a problem domain and then give some examples on
+ how implementations may be formulated in the relational algebra.
+ Specifically we will present the examples in TclRAL.
+\layout Section
+
+What is a Tuple?
+\layout Standard
+
+To start understanding the components of the relational model some preliminaries
+ are necessary.
+ Tuples are the basic components of a relation so we will start there.
+ A 
+\series bold 
+tuple value
+\series default 
+ is a set of tuple components.
+ Each tuple component consists of an
+\series bold 
+ attribute
+\series default 
+ 
+\series bold 
+name
+\series default 
+, a 
+\series bold 
+data type
+\series default 
+ and a 
+\series bold 
+value
+\series default 
+.
+ Within a given tuple all attribute names must be unique.
+ Each attribute has a data type, 
+\emph on 
+e.g.
+
+\emph default 
+ int, and the value of the attribute must match the data type of the attribute.
+ There are a few very important properties of tuples that need to be mentioned.
+\layout Enumerate
+
+Every tuple contains exactly one value (of the appropriate type) for each
+ attribute.
+ There is no concept of a NULL value, although the empty string is a valid
+ value for an attribute of type string.
+\layout Enumerate
+
+There is no left-to-right ordering of attributes in tuples despite the fact
+ that a definite left to right ordering is necessary when the tuple is represent
+ed in text.
+ Tuples are mathematical sets and thus have no implied ordering.
+\layout Enumerate
+
+Every subset of attributes of a tuple is also a tuple.
+ This includes also the tuple that contains no attributes.
+\layout Subsection
+
+TclRAL Syntax
+\layout Standard
+
+In the Tcl Relational Algebra Library (TclRAL), a tuple can be represented
+ as a string just like any other Tcl entity.
+ For tuples, the string representation is that of a three element list.
+ The three elements are:
+\layout Enumerate
+
+The keyword 
+\noun on 
+Tuple
+\noun default 
+.
+\layout Enumerate
+
+A list of attribute name / data type pairs.
+\layout Enumerate
+
+A list of attribute name attribute value pairs.
+\layout Standard
+
+So for example, the statement,
+\layout Verbatim
+
+set t {Tuple {{Name string} {Breed string} {Age int}} {Name Fido Breed Terrier
+ Age 2}}
+\layout Standard
+
+sets the variable 
+\family typewriter 
+t
+\family default 
+ to a string that is a list of three elements that are formatted in such
+ a manner that it can be used as a tuple in the proper context.
+ The data type names must be valid Tcl data types as used internally.
+ Tcl has many data types, but the most useful in this context are probable
+ the simple ones, such as string, int, double and list.
+ It is possible to have a Tuple valued attribute.
+ In recognition of the special status of the string type in Tcl, a literal
+ tuple can omit the data type specification and string will be assumed.
+ So the above example could also have been written as:
+\layout Verbatim
+
+set t {Tuple {Name Breed {Age int}} {Name Fido Breed Terrier Age 2}}
+\layout Standard
+
+Also, since the ordering of attribute names is not significant when specifying
+ the attribute values, the above tuple could also have been written as:
+\layout Verbatim
+
+set t {Tuple {Name Breed {Age int}} {Age 2 Name Fido Breed Terrier}}
+\layout Standard
+
+This property leads to the natural conclusion that the string representation
+ of a tuple is not unique.
+ There turns out to be many different strings that will result in the same
+ tuple.
+ This is really no different than the case with integers since 
+\begin_inset Quotes eld
+\end_inset 
+
+0x10
+\begin_inset Quotes erd
+\end_inset 
+
+ and 
+\begin_inset Quotes eld
+\end_inset 
+
+16
+\begin_inset Quotes erd
+\end_inset 
+
+ will result in the same integer value.
+ The point here is that although tuples may be represented as strings, they
+ should not be operated on with string operators.
+ Indeed there is an entire set of operators suppied by TclRAL for the purpose
+ of manipulating tuple values.
+\layout Subsection
+
+Tuple Operations
+\layout Standard
+
+TclRAL defines the following operations on tuples:
+\layout Itemize
+
+create
+\layout Itemize
+
+get
+\layout Itemize
+
+equal
+\layout Itemize
+
+degree
+\layout Itemize
+
+extract
+\layout Itemize
+
+assign
+\layout Itemize
+
+wrap
+\layout Itemize
+
+unwrap
+\layout Subsubsection
+
+tuple create
+\layout Standard
+
+The command 
+\noun on 
+tuple create
+\noun default 
+ creates a tuple and avoids some the nastyness of Tcl list syntax.
+ Our previous example could be written:
+\layout Verbatim
+
+package require ral
+\layout Verbatim
+
+namespace import ::ral::tuple
+\layout Verbatim
+
+set t [tuple create {Name Breed {Age int}} {Name Fido Breed Terrier Age
+ 2}]
+\layout Standard
+
+In future examples we will forgo the package and namespace import commands
+ to shorten the text with the understanding that it is necessary to reference
+ the package to obtain the commands and to import the commands if the full
+ namespace qualified command name is to be shortened.
+\layout Standard
+
+Notice that the values of a tuple are set by using a list with an even number
+ of elements that alternate the attribute name and it value.
+ This is the same type of list used by the 
+\family typewriter 
+array set
+\family default 
+ and 
+\family typewriter 
+array get
+\family default 
+ commands.
+ This makes for an easy correspondence between tuples and arrays, as in:
+\layout Verbatim
+
+set dog(Name) Fido
+\layout Verbatim
+
+set dog(Breed) Terrier
+\layout Verbatim
+
+set dog(Age) 2
+\layout Verbatim
+
+set t [tuple create {Name Breed {Age int} [array get dog]]
+\layout Subsubsection
+
+tuple get
+\layout Standard
+
+The correspondence between tuples and arrays is also made easier with the
+ 
+\noun on 
+tuple get
+\noun default 
+ command.
+ This retrieves the values of the tuple in a form suitable for use by the
+ 
+\family typewriter 
+array set
+\family default 
+ command.
+ So,
+\layout Verbatim
+
+set t [tuple create {Name Breed {Age int}} {Name Fido Breed Terrier Age
+ 2}]
+\layout Verbatim
+
+array set dog [tuple get $t]
+\layout Standard
+
+will set the dog variable to be an array as we saw above.
 \layout Section
 
 What is a Relation?
 \layout Subsection
 
 Relations as Predicates
+\layout Section
+
+A Dog of an Example
 \the_end

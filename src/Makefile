@@ -44,13 +44,13 @@
 # ABSTRACT:
 # 
 # $RCSfile: Makefile,v $
-# $Revision: 1.3 $
-# $Date: 2004/04/26 04:13:08 $
+# $Revision: 1.4 $
+# $Date: 2004/05/09 20:17:20 $
 #  *--
 
 TCLBASE = /usr/local/ActiveTcl
 
-CFLAGS = -g -I$(TCLBASE)/include
+CFLAGS = -g -I$(TCLBASE)/include -Werror-implicit-function-declaration
 LDFLAGS = -shared -g
 LOADLIBES = -L$(TCLBASE)/lib
 LDLIBS = -ltclstub8.5
