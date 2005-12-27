@@ -1,5 +1,5 @@
 /*
-This software is copyrighted 2004 by G. Andrew Mangogna.  The following
+This software is copyrighted 2005 by G. Andrew Mangogna.  The following
 terms apply to all files associated with the software unless explicitly
 disclaimed in individual files.
 
@@ -41,16 +41,18 @@ terms specified in this license.
 /*
  *++
 MODULE:
-    ral.c -- source for the TclRAL Relational Algebra library.
+
+$RCSfile: ral_utils.c,v $
+$Revision: 1.1 $
+$Date: 2005/12/27 23:17:19 $
 
 ABSTRACT:
-    This file contains the "C" source to an extension of the TCL
-    language that provides an implementation of the Relational
-    Algebra.
 
-$RCSfile: ral.c,v $
-$Revision: 1.24 $
-$Date: 2005/12/27 23:17:19 $
+MODIFICATION HISTORY:
+$Log: ral_utils.c,v $
+Revision 1.1  2005/12/27 23:17:19  mangoa01
+Update to the new spilt out file structure.
+
  *--
  */
 
@@ -61,16 +63,8 @@ PRAGMAS
 /*
 INCLUDE FILES
 */
-#include "tcl.h"
-#include "ral_tuplecmd.h"
-
-/*
- * We use Tcl_CreateNamespace() and Tcl_Export().
- * Before 8.4, they not part of the supported external interface.
- */
-#if TCL_MINOR_VERSION <= 4
-#   include "tclInt.h"
-#endif
+#include "ral_utils.h"
+#include <string.h>
 
 /*
 MACRO DEFINITIONS
@@ -93,44 +87,49 @@ EXTERNAL DATA REFERENCES
 */
 
 /*
+EXTERNAL DATA DEFINITIONS
+*/
+
+/*
 STATIC DATA ALLOCATION
 */
-static const char ral_pkgname[] = "ral" ;
-static const char ral_version[] = "0.8" ;
-static const char ral_rcsid[] =
-    "$Id: ral.c,v 1.24 2005/12/27 23:17:19 mangoa01 Exp $" ;
-static const char ral_copyright[] =
-    "This software is copyrighted 2004, 2005 by G. Andrew Mangogna."
-    "Terms and conditions for use are distributed with the source code." ;
+static const char rcsid[] = "@(#) $RCSfile: ral_utils.c,v $ $Revision: 1.1 $" ;
 
 /*
 FUNCTION DEFINITIONS
 */
 
 /*
- * ======================================================================
- * Initialization Function
- * ======================================================================
+ * Ral_ObjEqual
+
+ * Compare two objects. The comparison is based on comparing the string
+ * representation of the objects.
+
+ * Returns 1 if the objects are equal, 0 otherwise.
+ */
+
+/*
+ * There's a problem here. Tuples and relations cannot compared based
+ * on their string representations.
  */
 
 int
-Ral_Init(
-    Tcl_Interp * interp)
+Ral_ObjEqual(
+    Tcl_Obj *o1,	/* first object pointer to compare */
+    Tcl_Obj *o2)	/* second object pointer to compare */
 {
-    Tcl_Namespace *ralNs ;
+    const char *s1 ;
+    int l1 ;
+    const char *s2 ;
+    int l2 ;
 
-    Tcl_InitStubs(interp, TCL_VERSION, 0) ;
-
-    Tcl_RegisterObjType(&Ral_TupleObjType) ;
-
-    ralNs = Tcl_CreateNamespace(interp, "::ral", NULL, NULL) ;
-
-    Tcl_CreateObjCommand(interp, "::ral::tuple", tupleCmd, NULL, NULL) ;
-    if (Tcl_Export(interp, ralNs, "tuple", 0) != TCL_OK) {
-	return TCL_ERROR ;
+    if (o1 == o2) {
+	return 1 ;
     }
-
-    Tcl_PkgProvide(interp, ral_pkgname, ral_version) ;
-
-    return TCL_OK ;
+    s1 = Tcl_GetStringFromObj(o1, &l1) ;
+    s2 = Tcl_GetStringFromObj(o2, &l2) ;
+    if (l1 != l2) {
+	return 0 ;
+    }
+    return memcmp(s1, s2, l1) == 0 ;
 }

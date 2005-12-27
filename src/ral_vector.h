@@ -1,5 +1,5 @@
 /*
-This software is copyrighted 2004 by G. Andrew Mangogna.  The following
+This software is copyrighted 2005 by G. Andrew Mangogna.  The following
 terms apply to all files associated with the software unless explicitly
 disclaimed in individual files.
 
@@ -41,18 +41,16 @@ terms specified in this license.
 /*
  *++
 MODULE:
-    ral.c -- source for the TclRAL Relational Algebra library.
 
 ABSTRACT:
-    This file contains the "C" source to an extension of the TCL
-    language that provides an implementation of the Relational
-    Algebra.
 
-$RCSfile: ral.c,v $
-$Revision: 1.24 $
+$RCSfile: ral_vector.h,v $
+$Revision: 1.1 $
 $Date: 2005/12/27 23:17:19 $
  *--
  */
+#ifndef _ral_vector_h_
+#define _ral_vector_h_
 
 /*
 PRAGMAS
@@ -61,76 +59,66 @@ PRAGMAS
 /*
 INCLUDE FILES
 */
-#include "tcl.h"
-#include "ral_tuplecmd.h"
-
-/*
- * We use Tcl_CreateNamespace() and Tcl_Export().
- * Before 8.4, they not part of the supported external interface.
- */
-#if TCL_MINOR_VERSION <= 4
-#   include "tclInt.h"
-#endif
+#include <stdio.h>
 
 /*
 MACRO DEFINITIONS
 */
 
 /*
-TYPE DEFINITIONS
+FORWARD CLASS REFERENCES
 */
 
 /*
-EXTERNAL FUNCTION REFERENCES
+TYPE DECLARATIONS
 */
 
+typedef int Ral_IntVectorValueType ;
+typedef Ral_IntVectorValueType *Ral_IntVectorIter ;
+typedef struct Ral_IntVector {
+    Ral_IntVectorIter start ;
+    Ral_IntVectorIter finish ;
+    Ral_IntVectorIter endStorage ;
+} *Ral_IntVector ;
+
 /*
-FORWARD FUNCTION REFERENCES
+FUNCTION DECLARATIONS
 */
 
-/*
-EXTERNAL DATA REFERENCES
-*/
+extern Ral_IntVector Ral_IntVectorNew(unsigned, Ral_IntVectorValueType) ;
+extern void Ral_IntVectorDelete(Ral_IntVector) ;
 
-/*
-STATIC DATA ALLOCATION
-*/
-static const char ral_pkgname[] = "ral" ;
-static const char ral_version[] = "0.8" ;
-static const char ral_rcsid[] =
-    "$Id: ral.c,v 1.24 2005/12/27 23:17:19 mangoa01 Exp $" ;
-static const char ral_copyright[] =
-    "This software is copyrighted 2004, 2005 by G. Andrew Mangogna."
-    "Terms and conditions for use are distributed with the source code." ;
+extern Ral_IntVectorIter Ral_IntVectorBegin(Ral_IntVector) ;
+extern Ral_IntVectorIter Ral_IntVectorEnd(Ral_IntVector) ;
 
-/*
-FUNCTION DEFINITIONS
-*/
+extern unsigned Ral_IntVectorSize(Ral_IntVector) ;
+extern unsigned Ral_IntVectorCapacity(Ral_IntVector) ;
+extern void Ral_IntVectorReserve(Ral_IntVector, unsigned) ;
 
-/*
- * ======================================================================
- * Initialization Function
- * ======================================================================
- */
+extern int Ral_IntVectorEmpty(Ral_IntVector) ;
+extern void Ral_IntVectorFill(Ral_IntVector, Ral_IntVectorValueType) ;
 
-int
-Ral_Init(
-    Tcl_Interp * interp)
-{
-    Tcl_Namespace *ralNs ;
+extern Ral_IntVectorValueType Ral_IntVectorFetch(Ral_IntVector, unsigned) ;
+extern void Ral_IntVectorStore(Ral_IntVector, unsigned,
+    Ral_IntVectorValueType) ;
+extern Ral_IntVectorValueType Ral_IntVectorFront(Ral_IntVector) ;
+extern Ral_IntVectorValueType Ral_IntVectorBack(Ral_IntVector) ;
+extern void Ral_IntVectorPushBack(Ral_IntVector, Ral_IntVectorValueType) ;
+extern void Ral_IntVectorPopBack(Ral_IntVector) ;
+extern Ral_IntVectorIter Ral_IntVectorInsert(Ral_IntVector, Ral_IntVectorIter,
+    unsigned, Ral_IntVectorValueType) ;
+extern Ral_IntVectorIter Ral_IntVectorErase(Ral_IntVector, Ral_IntVectorIter,
+    Ral_IntVectorIter) ;
 
-    Tcl_InitStubs(interp, TCL_VERSION, 0) ;
+extern void Ral_IntVectorSort(Ral_IntVector) ;
+extern Ral_IntVectorIter Ral_IntVectorFind(Ral_IntVector,
+    Ral_IntVectorValueType) ;
+extern int Ral_IntVectorEqual(Ral_IntVector, Ral_IntVector) ;
+extern Ral_IntVectorIter Ral_IntVectorCopy(Ral_IntVector, Ral_IntVectorIter,
+    Ral_IntVectorIter, Ral_IntVector, Ral_IntVectorIter) ;
 
-    Tcl_RegisterObjType(&Ral_TupleObjType) ;
+extern void Ral_IntVectorPrint(Ral_IntVector, Ral_IntVectorIter, FILE *) ;
+extern const char *Ral_IntVectorVersion(void) ;
 
-    ralNs = Tcl_CreateNamespace(interp, "::ral", NULL, NULL) ;
 
-    Tcl_CreateObjCommand(interp, "::ral::tuple", tupleCmd, NULL, NULL) ;
-    if (Tcl_Export(interp, ralNs, "tuple", 0) != TCL_OK) {
-	return TCL_ERROR ;
-    }
-
-    Tcl_PkgProvide(interp, ral_pkgname, ral_version) ;
-
-    return TCL_OK ;
-}
+#endif /* _ral_vector_h_ */

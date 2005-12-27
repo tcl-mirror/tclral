@@ -1,5 +1,5 @@
 /*
-This software is copyrighted 2004 by G. Andrew Mangogna.  The following
+This software is copyrighted 2005 by G. Andrew Mangogna.  The following
 terms apply to all files associated with the software unless explicitly
 disclaimed in individual files.
 
@@ -41,18 +41,16 @@ terms specified in this license.
 /*
  *++
 MODULE:
-    ral.c -- source for the TclRAL Relational Algebra library.
 
 ABSTRACT:
-    This file contains the "C" source to an extension of the TCL
-    language that provides an implementation of the Relational
-    Algebra.
 
-$RCSfile: ral.c,v $
-$Revision: 1.24 $
+$RCSfile: ral_utils.h,v $
+$Revision: 1.1 $
 $Date: 2005/12/27 23:17:19 $
  *--
  */
+#ifndef _ral_utils_h_
+#define _ral_utils_h_
 
 /*
 PRAGMAS
@@ -62,75 +60,24 @@ PRAGMAS
 INCLUDE FILES
 */
 #include "tcl.h"
-#include "ral_tuplecmd.h"
-
-/*
- * We use Tcl_CreateNamespace() and Tcl_Export().
- * Before 8.4, they not part of the supported external interface.
- */
-#if TCL_MINOR_VERSION <= 4
-#   include "tclInt.h"
-#endif
 
 /*
 MACRO DEFINITIONS
 */
 
 /*
-TYPE DEFINITIONS
+FORWARD CLASS REFERENCES
 */
 
 /*
-EXTERNAL FUNCTION REFERENCES
+TYPE DECLARATIONS
 */
 
 /*
-FORWARD FUNCTION REFERENCES
+FUNCTION DECLARATIONS
 */
 
-/*
-EXTERNAL DATA REFERENCES
-*/
+extern int Ral_ObjEqual(Tcl_Obj *, Tcl_Obj *) ;
 
-/*
-STATIC DATA ALLOCATION
-*/
-static const char ral_pkgname[] = "ral" ;
-static const char ral_version[] = "0.8" ;
-static const char ral_rcsid[] =
-    "$Id: ral.c,v 1.24 2005/12/27 23:17:19 mangoa01 Exp $" ;
-static const char ral_copyright[] =
-    "This software is copyrighted 2004, 2005 by G. Andrew Mangogna."
-    "Terms and conditions for use are distributed with the source code." ;
 
-/*
-FUNCTION DEFINITIONS
-*/
-
-/*
- * ======================================================================
- * Initialization Function
- * ======================================================================
- */
-
-int
-Ral_Init(
-    Tcl_Interp * interp)
-{
-    Tcl_Namespace *ralNs ;
-
-    Tcl_InitStubs(interp, TCL_VERSION, 0) ;
-
-    Tcl_RegisterObjType(&Ral_TupleObjType) ;
-
-    ralNs = Tcl_CreateNamespace(interp, "::ral", NULL, NULL) ;
-
-    Tcl_CreateObjCommand(interp, "::ral::tuple", tupleCmd, NULL, NULL) ;
-    if (Tcl_Export(interp, ralNs, "tuple", 0) != TCL_OK) {
-	return TCL_ERROR ;
-    }
-
-    Tcl_PkgProvide(interp, ral_pkgname, ral_version) ;
-
-    return TCL_OK ;
-}
+#endif /* _ral_utils_h_ */

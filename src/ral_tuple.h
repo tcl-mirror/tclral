@@ -1,5 +1,5 @@
 /*
-This software is copyrighted 2004 by G. Andrew Mangogna.  The following
+This software is copyrighted 2005 by G. Andrew Mangogna.  The following
 terms apply to all files associated with the software unless explicitly
 disclaimed in individual files.
 
@@ -41,18 +41,16 @@ terms specified in this license.
 /*
  *++
 MODULE:
-    ral.c -- source for the TclRAL Relational Algebra library.
 
 ABSTRACT:
-    This file contains the "C" source to an extension of the TCL
-    language that provides an implementation of the Relational
-    Algebra.
 
-$RCSfile: ral.c,v $
-$Revision: 1.24 $
+$RCSfile: ral_tuple.h,v $
+$Revision: 1.1 $
 $Date: 2005/12/27 23:17:19 $
  *--
  */
+#ifndef _ral_tuple_h_
+#define _ral_tuple_h_
 
 /*
 PRAGMAS
@@ -62,75 +60,78 @@ PRAGMAS
 INCLUDE FILES
 */
 #include "tcl.h"
-#include "ral_tuplecmd.h"
-
-/*
- * We use Tcl_CreateNamespace() and Tcl_Export().
- * Before 8.4, they not part of the supported external interface.
- */
-#if TCL_MINOR_VERSION <= 4
-#   include "tclInt.h"
-#endif
+#include "ral_tupleheading.h"
+#include <stdio.h>
 
 /*
 MACRO DEFINITIONS
 */
 
 /*
-TYPE DEFINITIONS
+FORWARD CLASS REFERENCES
 */
 
 /*
-EXTERNAL FUNCTION REFERENCES
+TYPE DECLARATIONS
 */
 
-/*
-FORWARD FUNCTION REFERENCES
-*/
 
 /*
-EXTERNAL DATA REFERENCES
-*/
-
-/*
-STATIC DATA ALLOCATION
-*/
-static const char ral_pkgname[] = "ral" ;
-static const char ral_version[] = "0.8" ;
-static const char ral_rcsid[] =
-    "$Id: ral.c,v 1.24 2005/12/27 23:17:19 mangoa01 Exp $" ;
-static const char ral_copyright[] =
-    "This software is copyrighted 2004, 2005 by G. Andrew Mangogna."
-    "Terms and conditions for use are distributed with the source code." ;
-
-/*
-FUNCTION DEFINITIONS
-*/
-
-/*
- * ======================================================================
- * Initialization Function
- * ======================================================================
+ * A Tuple type is a tuple heading combined with a list of values, one for each
+ * attribute.
+ *
+ * The string representation of a "Tuple" is a specially formed list.  The list
+ * consists of three elements:
+ *
+ * 1. The keyword "Tuple".
+ *
+ * 2. A heading definition.
+ *
+ * 3. A value definition.
+ *
+ * The keyword distinguishes the string as a Tuple.  The heading is as
+ * described above.  The heading consists of a list Attribute Name and Data
+ * Type pairs.  The value definition is also a list consisting of Attribute
+ * Name / Attribute Value pairs.
+ * E.G.
+ *	{Tuple {Name string Street int Wage double}\
+ *	{Name Andrew Street Blackwood Wage 5.74}}
+ *
+ * Internally tuples are reference counted. The same tuple is sometimes
+ * referenced by many different relations.
  */
 
-int
-Ral_Init(
-    Tcl_Interp * interp)
-{
-    Tcl_Namespace *ralNs ;
+typedef struct Ral_Tuple {
+    int refCount ;		/* Reference Count */
+    Ral_TupleHeading heading ;	/* Pointer to Tuple heading */
+    Tcl_Obj **values ;		/* Pointer to an array of values.
+				 * The size of the array is the same as the
+				 * degree of the heading */
+} *Ral_Tuple ;
 
-    Tcl_InitStubs(interp, TCL_VERSION, 0) ;
+typedef enum {
+    AttributeUpdated = 0,
+    NoSuchAttribute,
+    BadValueType
+} Ral_TupleUpdateStatus ;
 
-    Tcl_RegisterObjType(&Ral_TupleObjType) ;
+/*
+FUNCTION DECLARATIONS
+*/
 
-    ralNs = Tcl_CreateNamespace(interp, "::ral", NULL, NULL) ;
+extern Ral_Tuple Ral_TupleNew(Ral_TupleHeading) ;
+extern void Ral_TupleDelete(Ral_Tuple) ;
+extern void Ral_TupleReference(Ral_Tuple) ;
+extern void Ral_TupleUnreference(Ral_Tuple) ;
+extern unsigned Ral_TupleDegree(Ral_Tuple) ;
+extern int Ral_TupleEqual(Ral_Tuple, Ral_Tuple) ;
+extern Ral_TupleUpdateStatus Ral_TupleUpdateAttrValue(Ral_Tuple,
+    const char *, Tcl_Obj *) ;
+extern Tcl_Obj *Ral_TupleGetAttrValue(Ral_Tuple, const char *) ;
+extern int Ral_TupleCopy(Ral_Tuple, Ral_TupleHeadingIter,
+    Ral_TupleHeadingIter, Ral_Tuple) ;
+extern Ral_Tuple Ral_TupleDuplicate(Ral_Tuple) ;
+extern void Ral_TuplePrint(Ral_Tuple, FILE *) ;
+extern const char *Ral_TupleVersion(void) ;
 
-    Tcl_CreateObjCommand(interp, "::ral::tuple", tupleCmd, NULL, NULL) ;
-    if (Tcl_Export(interp, ralNs, "tuple", 0) != TCL_OK) {
-	return TCL_ERROR ;
-    }
-
-    Tcl_PkgProvide(interp, ral_pkgname, ral_version) ;
-
-    return TCL_OK ;
-}
+#endif /* _ral_tuple_h_ */

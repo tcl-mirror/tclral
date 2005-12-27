@@ -1,5 +1,5 @@
 /*
-This software is copyrighted 2004 by G. Andrew Mangogna.  The following
+This software is copyrighted 2005 by G. Andrew Mangogna.  The following
 terms apply to all files associated with the software unless explicitly
 disclaimed in individual files.
 
@@ -41,18 +41,16 @@ terms specified in this license.
 /*
  *++
 MODULE:
-    ral.c -- source for the TclRAL Relational Algebra library.
 
 ABSTRACT:
-    This file contains the "C" source to an extension of the TCL
-    language that provides an implementation of the Relational
-    Algebra.
 
-$RCSfile: ral.c,v $
-$Revision: 1.24 $
+$RCSfile: ral_attribute.h,v $
+$Revision: 1.1 $
 $Date: 2005/12/27 23:17:19 $
  *--
  */
+#ifndef _ral_attribute_h_
+#define _ral_attribute_h_
 
 /*
 PRAGMAS
@@ -62,75 +60,68 @@ PRAGMAS
 INCLUDE FILES
 */
 #include "tcl.h"
-#include "ral_tuplecmd.h"
-
-/*
- * We use Tcl_CreateNamespace() and Tcl_Export().
- * Before 8.4, they not part of the supported external interface.
- */
-#if TCL_MINOR_VERSION <= 4
-#   include "tclInt.h"
-#endif
 
 /*
 MACRO DEFINITIONS
 */
 
 /*
-TYPE DEFINITIONS
+FORWARD CLASS REFERENCES
 */
 
 /*
-EXTERNAL FUNCTION REFERENCES
+TYPE DECLARATIONS
 */
 
 /*
-FORWARD FUNCTION REFERENCES
-*/
+ * Attributes can be of either a base type supplied by Tcl or one of
+ * the generated types of Tuple or Relation.
+ */
+typedef enum Ral_AttrDataType {
+    Tcl_Type,
+    Tuple_Type,
+    Relation_Type
+} Ral_AttrDataType ;
 
 /*
-EXTERNAL DATA REFERENCES
-*/
-
-/*
-STATIC DATA ALLOCATION
-*/
-static const char ral_pkgname[] = "ral" ;
-static const char ral_version[] = "0.8" ;
-static const char ral_rcsid[] =
-    "$Id: ral.c,v 1.24 2005/12/27 23:17:19 mangoa01 Exp $" ;
-static const char ral_copyright[] =
-    "This software is copyrighted 2004, 2005 by G. Andrew Mangogna."
-    "Terms and conditions for use are distributed with the source code." ;
-
-/*
-FUNCTION DEFINITIONS
-*/
-
-/*
- * ======================================================================
- * Initialization Function
- * ======================================================================
+ * An Attribute is an association of name to data type.  Name is just a simple
+ * string. Data type is either one of the "known" Tcl data types or it can be a
+ * "Tuple" or "Relation" type.  For the cases of "Tuple" or "Relation" these
+ * types are not of constant structure. So for them we need a reference to the
+ * headings that describe the details of the particular Tuple or Relation to
+ * which this attribute refers.
  */
 
-int
-Ral_Init(
-    Tcl_Interp * interp)
-{
-    Tcl_Namespace *ralNs ;
+typedef struct Ral_Attribute {
+    const char *name ;
+    Ral_AttrDataType attrType ;
+    union {
+	Tcl_ObjType *tclType ;
+	struct Ral_TupleHeading *tupleHeading ;
+	struct Ral_RelationHeading *relationHeading ;
+    } ;
+} *Ral_Attribute ;
 
-    Tcl_InitStubs(interp, TCL_VERSION, 0) ;
+/*
+FUNCTION DECLARATIONS
+*/
 
-    Tcl_RegisterObjType(&Ral_TupleObjType) ;
+extern Ral_Attribute Ral_AttributeNewTclType(const char *, Tcl_ObjType *) ;
+extern Ral_Attribute Ral_AttributeNewTupleType(const char *,
+    struct Ral_TupleHeading *) ;
+extern Ral_Attribute Ral_AttributeNewRelationType(const char *,
+    struct Ral_RelationHeading *) ;
+extern Ral_Attribute Ral_AttributeNewFromObjs(Tcl_Interp *, Tcl_Obj *,
+    Tcl_Obj*) ;
+extern int Ral_AttributeConvertValueToType(Tcl_Interp *, Ral_Attribute,
+    Tcl_Obj *) ;
+extern void Ral_AttributeDelete(Ral_Attribute) ;
+extern Ral_Attribute Ral_AttributeCopy(Ral_Attribute) ;
+extern Ral_Attribute Ral_AttributeRename(Ral_Attribute, const char *) ;
+extern int Ral_AttributeEqual(Ral_Attribute, Ral_Attribute) ;
+extern int Ral_AttributeScanName(Ral_Attribute, int *) ;
+extern int Ral_AttributeConvertName(Ral_Attribute, char *, int) ;
+extern int Ral_AttributeScanType(Ral_Attribute, int **) ;
+extern int Ral_AttributeConvertType(Ral_Attribute, char *, int *) ;
 
-    ralNs = Tcl_CreateNamespace(interp, "::ral", NULL, NULL) ;
-
-    Tcl_CreateObjCommand(interp, "::ral::tuple", tupleCmd, NULL, NULL) ;
-    if (Tcl_Export(interp, ralNs, "tuple", 0) != TCL_OK) {
-	return TCL_ERROR ;
-    }
-
-    Tcl_PkgProvide(interp, ral_pkgname, ral_version) ;
-
-    return TCL_OK ;
-}
+#endif /* _ral_attribute_h_ */
