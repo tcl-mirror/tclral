@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.h,v $
-$Revision: 1.1 $
-$Date: 2005/12/27 23:17:19 $
+$Revision: 1.2 $
+$Date: 2006/01/02 01:39:29 $
  *--
  */
 #ifndef _ral_attribute_h_
@@ -103,6 +103,29 @@ typedef struct Ral_Attribute {
 } *Ral_Attribute ;
 
 /*
+ * Data structure to hold scan flags.
+ */
+typedef struct Ral_AttributeScanFlags {
+    int nameFlags ;		/* Scan flags for the attribute name. */
+    int nameLength ;		/* Length of name */
+    unsigned typeFlagsCount ;	/* Number of scan flags allocated in the
+				 * following union. 0 ==> a simple Tcl type
+				 * that has no recursive structure. >0 ==>
+				 * that there is an array of flag structures
+				 * pointed to by the union. */
+    union {
+	int tclTypeFlags ;	/* Simple Tcl types need only an integer to
+				 * hold the scan flags for the type name */
+	struct Ral_AttributeScanFlags *generatedTypeFlags ; /* complex types
+				 * consist of a set of attributes and
+				 * therefore needs an array of scan flags. */
+    } ;				/* Scan flags for the attribute type. */
+    int typeLength ;		/* Length of the type name */
+    int valueFlags ;		/* Scan flags for the attribute value */
+    int valueLength ;		/* Length of the attribute value */
+} *Ral_AttributeScanFlags ;
+
+/*
 FUNCTION DECLARATIONS
 */
 
@@ -119,9 +142,16 @@ extern void Ral_AttributeDelete(Ral_Attribute) ;
 extern Ral_Attribute Ral_AttributeCopy(Ral_Attribute) ;
 extern Ral_Attribute Ral_AttributeRename(Ral_Attribute, const char *) ;
 extern int Ral_AttributeEqual(Ral_Attribute, Ral_Attribute) ;
-extern int Ral_AttributeScanName(Ral_Attribute, int *) ;
-extern int Ral_AttributeConvertName(Ral_Attribute, char *, int) ;
-extern int Ral_AttributeScanType(Ral_Attribute, int **) ;
-extern int Ral_AttributeConvertType(Ral_Attribute, char *, int *) ;
+extern int Ral_AttributeScanName(Ral_Attribute, Ral_AttributeScanFlags) ;
+extern int Ral_AttributeConvertName(Ral_Attribute, char *,
+    Ral_AttributeScanFlags) ;
+extern int Ral_AttributeScanType(Ral_Attribute, Ral_AttributeScanFlags) ;
+extern int Ral_AttributeConvertType(Ral_Attribute, char *,
+    Ral_AttributeScanFlags) ;
+extern int Ral_AttributeScanValue(Ral_Attribute, Tcl_Obj *,
+    Ral_AttributeScanFlags) ;
+extern int Ral_AttributeConvertValue(Ral_Attribute, Tcl_Obj *, char *,
+    Ral_AttributeScanFlags) ;
+extern void Ral_AttributeScanFlagsFree(unsigned, Ral_AttributeScanFlags) ;
 
 #endif /* _ral_attribute_h_ */

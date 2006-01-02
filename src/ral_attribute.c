@@ -43,13 +43,16 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_attribute.c,v $
-$Revision: 1.1 $
-$Date: 2005/12/27 23:17:19 $
+$Revision: 1.2 $
+$Date: 2006/01/02 01:39:29 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_attribute.c,v $
+Revision 1.2  2006/01/02 01:39:29  mangoa01
+Tuple commands now operate properly. Fixed problems of constructing the string representation when there were tuple valued attributes.
+
 Revision 1.1  2005/12/27 23:17:19  mangoa01
 Update to the new spilt out file structure.
 
@@ -98,7 +101,9 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.1 $" ;
+static const char openList[] = "{" ;
+static const char closeList[] = "}" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.2 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -375,74 +380,176 @@ Ral_AttributeEqual(
 int
 Ral_AttributeScanName(
     Ral_Attribute a,
-    int *flagsPtr)
+    Ral_AttributeScanFlags flags)
 {
-    return Tcl_ScanElement(a->name, flagsPtr) ;
+    return flags->nameLength = Tcl_ScanElement(a->name, &flags->nameFlags) ;
 }
 
 int
 Ral_AttributeConvertName(
     Ral_Attribute a,
     char *dst,
-    int flags)
+    Ral_AttributeScanFlags flags)
 {
-    return Tcl_ConvertElement(a->name, dst, flags) ;
+    return Tcl_ConvertElement(a->name, dst, flags->nameFlags) ;
 }
 
 int
 Ral_AttributeScanType(
     Ral_Attribute a,
-    int **flagsHandle)
+    Ral_AttributeScanFlags flags)
 {
-    int count ;
+    int length = 0 ;
 
     switch (a->attrType) {
-    case Tcl_Type: {
-	int *flagsPtr ;
-
-	flagsPtr = (int *)ckalloc(sizeof(*flagsPtr)) ;
-	count = Tcl_ScanElement(a->tclType->name, flagsPtr) ;
-	*flagsHandle = flagsPtr ;
+    case Tcl_Type:
+	flags->typeFlagsCount = 0 ;
+	flags->typeLength = Tcl_ScanElement(a->tclType->name,
+	    &flags->tclTypeFlags) ;
 	break ;
-    }
 
     case Tuple_Type:
-	Tcl_Panic("Ral_AttributeScanType: unsupported Tuple type") ;
+	/*
+	 * Allocate an array of scan flag structures to hold the flags for the
+	 * attribute names / types that are in the tuple.
+	 */
+	flags->typeFlagsCount = Ral_TupleHeadingSize(a->tupleHeading) ;
+	flags->generatedTypeFlags = (Ral_AttributeScanFlags)ckalloc(
+	    flags->typeFlagsCount * sizeof(*flags)) ;
+	flags->typeLength = Ral_TupleHeadingScan(a->tupleHeading,
+	    flags->generatedTypeFlags) ;
+	/*
+	 * When attributes are of a nested type, this will be enclosed
+	 * as a list element.
+	 */
+	length += sizeof(openList) - 1 + sizeof(closeList) - 1 ;
+	break ;
 
     case Relation_Type:
 	Tcl_Panic("Ral_AttributeScanType: unsupported Relation type") ;
+	break ;
 
     default:
 	Tcl_Panic("Ral_AttributeScanType: unknown attribute type: %d",
 	    a->attrType) ;
     }
-    return count ;
+    length += flags->typeLength ;
+
+    return length ;
 }
 
 int
 Ral_AttributeConvertType(
     Ral_Attribute a,
     char *dst,
-    int *flagsHandle)
+    Ral_AttributeScanFlags flags)
 {
     int count ;
 
     switch (a->attrType) {
     case Tcl_Type:
-	count = Tcl_ConvertElement(a->tclType->name, dst, *flagsHandle) ;
+	count = Tcl_ConvertElement(a->tclType->name, dst, flags->tclTypeFlags) ;
 	break ;
 
-    case Tuple_Type:
-	Tcl_Panic("Ral_AttributeScanType: unsupported Tuple type") ;
+    case Tuple_Type: {
+	char *p = dst ;
+
+	strcpy(p, openList) ;
+	p += sizeof(openList) - 1 ;
+	p += Ral_TupleHeadingConvert(a->tupleHeading, p,
+	    flags->generatedTypeFlags) ;
+	strcpy(p, closeList) ;
+	p += sizeof(closeList) - 1 ;
+	count = p - dst ;
+    }
+	break ;
 
     case Relation_Type:
 	Tcl_Panic("Ral_AttributeScanType: unsupported Relation type") ;
+	break ;
 
     default:
 	Tcl_Panic("Ral_AttributeScanType: unknown attribute type: %d",
 	    a->attrType) ;
     }
 
-    ckfree((char *)flagsHandle) ;
     return count ;
+}
+
+int
+Ral_AttributeScanValue(
+    Ral_Attribute a,
+    Tcl_Obj *value,
+    Ral_AttributeScanFlags flags)
+{
+    int length = 0 ;
+
+    switch (a->attrType) {
+    case Tcl_Type:
+	flags->valueLength = Tcl_ScanElement(Tcl_GetString(value),
+	    &flags->valueFlags) ;
+	break ;
+
+    case Tuple_Type:
+	flags->valueLength = Ral_TupleScanValue(
+	    value->internalRep.otherValuePtr, flags->generatedTypeFlags) ;
+	length += sizeof(openList) - 1 + sizeof(closeList) - 1 ;
+	break ;
+
+    case Relation_Type:
+	Tcl_Panic("Ral_AttributeScanValue: unsupported Relation type") ;
+	break ;
+
+    default:
+	Tcl_Panic("Ral_AttributeScanValue: unknown attribute type: %d",
+	    a->attrType) ;
+    }
+    length += flags->valueLength ;
+
+    return length ;
+}
+
+int
+Ral_AttributeConvertValue(
+    Ral_Attribute a,
+    Tcl_Obj *value,
+    char *dst,
+    Ral_AttributeScanFlags flags)
+{
+    char *p = dst ;
+
+    switch (a->attrType) {
+    case Tcl_Type:
+	p += Tcl_ConvertElement(Tcl_GetString(value), p, flags->valueFlags) ;
+	break ;
+
+    case Tuple_Type:
+	p += Ral_TupleConvertValue(value->internalRep.otherValuePtr,
+	    p, flags->generatedTypeFlags) ;
+	break ;
+
+    case Relation_Type:
+	break ;
+
+    default:
+	Tcl_Panic("Ral_AttributeConvertValue: unknown attribute type: %d",
+	    a->attrType) ;
+    }
+
+    return p - dst ;
+}
+
+void
+Ral_AttributeScanFlagsFree(
+    unsigned count,
+    Ral_AttributeScanFlags flags)
+{
+    while (count-- != 0) {
+	if (flags->typeFlagsCount) {
+	    Ral_AttributeScanFlagsFree(flags->typeFlagsCount,
+		flags->generatedTypeFlags) ;
+	}
+    }
+
+    ckfree((char *)flags) ;
 }

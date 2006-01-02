@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuple.h,v $
-$Revision: 1.1 $
-$Date: 2005/12/27 23:17:19 $
+$Revision: 1.2 $
+$Date: 2006/01/02 01:39:29 $
  *--
  */
 #ifndef _ral_tuple_h_
@@ -60,6 +60,7 @@ PRAGMAS
 INCLUDE FILES
 */
 #include "tcl.h"
+#include "ral_attribute.h"
 #include "ral_tupleheading.h"
 #include <stdio.h>
 
@@ -131,6 +132,10 @@ extern Tcl_Obj *Ral_TupleGetAttrValue(Ral_Tuple, const char *) ;
 extern int Ral_TupleCopy(Ral_Tuple, Ral_TupleHeadingIter,
     Ral_TupleHeadingIter, Ral_Tuple) ;
 extern Ral_Tuple Ral_TupleDuplicate(Ral_Tuple) ;
+extern int Ral_TupleScanValue(Ral_Tuple, Ral_AttributeScanFlags) ;
+extern int Ral_TupleConvertValue(Ral_Tuple, char *, Ral_AttributeScanFlags) ;
+extern int Ral_TupleScan(Ral_Tuple, Ral_AttributeScanFlags *) ;
+extern int Ral_TupleConvert(Ral_Tuple, char *, Ral_AttributeScanFlags) ;
 extern void Ral_TuplePrint(Ral_Tuple, FILE *) ;
 extern const char *Ral_TupleVersion(void) ;
 

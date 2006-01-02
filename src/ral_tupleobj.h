@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleobj.h,v $
-$Revision: 1.1 $
-$Date: 2005/12/27 23:17:19 $
+$Revision: 1.2 $
+$Date: 2006/01/02 01:39:29 $
  *--
  */
 #ifndef _ral_tupleobj_h_
@@ -60,6 +60,7 @@ PRAGMAS
 INCLUDE FILES
 */
 #include "tcl.h"
+#include "ral_tupleheading.h"
 #include "ral_tuple.h"
 
 /*
@@ -73,6 +74,15 @@ FORWARD CLASS REFERENCES
 /*
 TYPE DECLARATIONS
 */
+typedef enum Ral_TupleError {
+    UNKNOWN_ATTR,
+    HEADING_ERR,
+    FORMAT_ERR,
+    DUPLICATE_ATTR,
+    BAD_VALUE,
+    BAD_KEYWORD,
+    WRONG_NUM_ATTRS,
+} Ral_TupleError ;
 
 /*
 EXTERNAL DATA REFERENCES
@@ -84,7 +94,9 @@ FUNCTION DECLARATIONS
 */
 
 extern Tcl_Obj *Ral_TupleNewObj(Ral_Tuple) ;
+extern Ral_TupleHeading Ral_TupleHeadingNewFromObj(Tcl_Interp *, Tcl_Obj *) ;
 extern int Ral_TupleSetValuesFromObj(Ral_Tuple, Tcl_Interp *, Tcl_Obj *) ;
 extern const char *Ral_TupleObjVersion(void) ;
+extern void Ral_TupleObjSetError(Tcl_Interp *, Ral_TupleError, const char *) ;
 
 #endif /* _ral_tupleobj_h_ */

@@ -43,13 +43,16 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_tupleheading.c,v $
-$Revision: 1.1 $
-$Date: 2005/12/27 23:17:19 $
+$Revision: 1.2 $
+$Date: 2006/01/02 01:39:29 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_tupleheading.c,v $
+Revision 1.2  2006/01/02 01:39:29  mangoa01
+Tuple commands now operate properly. Fixed problems of constructing the string representation when there were tuple valued attributes.
+
 Revision 1.1  2005/12/27 23:17:19  mangoa01
 Update to the new spilt out file structure.
 
@@ -96,7 +99,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tupleheading.c,v $ $Revision: 1.1 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tupleheading.c,v $ $Revision: 1.2 $" ;
 
 static const char tupleKeyword[] = "Tuple {" ;
 static const char closeList[] = "}" ;
@@ -119,58 +122,6 @@ Ral_TupleHeadingNew(
     h->endStorage = h->start + size ;
     Tcl_InitHashTable(&h->nameMap, TCL_STRING_KEYS) ;
     return h ;
-}
-
-Ral_TupleHeading
-Ral_TupleHeadingNewFromObj(
-    Tcl_Interp *interp,
-    Tcl_Obj *objPtr)
-{
-    int objc ;
-    Tcl_Obj **objv ;
-    Ral_TupleHeading heading ;
-
-    /*
-     * Since the string representation of a Heading is a list of pairs,
-     * we can use the list object functions to do the heavy lifting here.
-     */
-    if (Tcl_ListObjGetElements(interp, objPtr, &objc, &objv) != TCL_OK) {
-	return NULL ;
-    }
-    if (objc % 2 != 0) {
-	if (interp) {
-	    Tcl_ResetResult(interp) ;
-	    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-		"bad heading format, \"", Tcl_GetString(objPtr), "\"", NULL) ;
-	}
-	return NULL ;
-    }
-    heading = Ral_TupleHeadingNew((unsigned)(objc / 2)) ;
-    /*
-     * Iterate through the list adding each element as an attribute to
-     * a newly created Heading.
-     */
-    for ( ; objc > 0 ; objc -= 2, objv += 2) {
-	Ral_Attribute attr ;
-	Ral_TupleHeadingIter iter ;
-
-	attr = Ral_AttributeNewFromObjs(interp, *objv, *(objv + 1)) ;
-	if (attr == NULL) {
-	    Ral_TupleHeadingDelete(heading) ;
-	    return NULL ;
-	}
-	iter = Ral_TupleHeadingPushBack(heading, attr) ;
-	if (iter == Ral_TupleHeadingEnd(heading)) {
-	    Tcl_ResetResult(interp) ;
-	    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-		"duplicate attribute name, \"", attr->name, "\"", NULL) ;
-	    Ral_AttributeDelete(attr) ;
-	    Ral_TupleHeadingDelete(heading) ;
-	    return NULL ;
-	}
-    }
-
-    return heading ;
 }
 
 void
@@ -403,33 +354,17 @@ Ral_TupleHeadingIndexOf(
 int
 Ral_TupleHeadingScan(
     Ral_TupleHeading h,
-    Ral_TupleHeadingScanFlags *flags)
+    Ral_AttributeScanFlags flags)
 {
-    int allocSize ;
     Ral_TupleHeadingIter i ;
     int length = 1 ; /* for the NUL terminator */
-    Ral_TupleHeadingScanFlags flagHandle ;
-    unsigned headingSize = Ral_TupleHeadingSize(h) ;
-    int attrCount = 0 ;
 
     /*
      * The keyword part of the heading.
      * N.B. here and below all the "-1"'s remove counting the NUL terminator
-     * on the character strings.
+     * on the statically allocated character strings.
      */
     length += sizeof(tupleKeyword) - 1 ;
-
-    /*
-     * Allocate memory to hold the scan flag info.
-     */
-    assert(flags != NULL) ;
-    allocSize = sizeof(*flagHandle) +
-	headingSize * sizeof(flagHandle->nameFlags) +
-	headingSize * sizeof(flagHandle->typeFlags) ;
-    *flags = flagHandle = (Ral_TupleHeadingScanFlags)ckalloc(allocSize) ;
-    memset(flagHandle, 0, allocSize) ;
-    flagHandle->nameFlags = (int *)(flagHandle + 1) ;
-    flagHandle->typeFlags = (int **)(flagHandle->nameFlags + headingSize) ;
 
     for (i = h->start ; i < h->finish ; ++i) {
 	Ral_Attribute a = *i ;
@@ -438,11 +373,9 @@ Ral_TupleHeadingScan(
 	 * +1 to account for the space that needs to separate elements
 	 * in the resulting list.
 	 */
-	length += Ral_AttributeScanName(a, flagHandle->nameFlags + attrCount)
-	    + 1 ;
-	length += Ral_AttributeScanType(a, flagHandle->typeFlags + attrCount)
-	    + 1 ;
-	++attrCount ;
+	length += Ral_AttributeScanName(a, flags) + 1 ;
+	length += Ral_AttributeScanType(a, flags) + 1 ;
+	++flags ;
     }
     length += sizeof(closeList) - 1 ;
 
@@ -453,14 +386,10 @@ int
 Ral_TupleHeadingConvert(
     Ral_TupleHeading h,
     char *dst,
-    Ral_TupleHeadingScanFlags flags)
+    Ral_AttributeScanFlags flags)
 {
     char *p = dst ;
     Ral_TupleHeadingIter i ;
-    int attrCount = 0 ;
-    int **typeFlags ;
-
-    assert(flags != NULL) ;
 
     /*
      * Copy in the "Tuple" keyword.
@@ -471,29 +400,22 @@ Ral_TupleHeadingConvert(
     for (i = h->start ; i < h->finish ; ++i) {
 	Ral_Attribute a = *i ;
 
-	p += Ral_AttributeConvertName(a, p, flags->nameFlags[attrCount]) ;
+	p += Ral_AttributeConvertName(a, p, flags) ;
 	*p++ = ' ' ;
-	p += Ral_AttributeConvertType(a, p, flags->typeFlags[attrCount]) ;
+	p += Ral_AttributeConvertType(a, p, flags) ;
 	*p++ = ' ' ;
-	++attrCount ;
+	++flags ;
     }
     /*
-     * Overwrite any trailing blank.
+     * Overwrite any trailing blank. There will be no trailing blank if the
+     * heading didn't have any attributes.
      */
-    if (attrCount) {
+    if (!Ral_TupleHeadingEmpty(h)) {
 	--p ;
     }
     strcpy(p, closeList) ; /* NUL terminates the result */
     p += sizeof(closeList) - 1 ;
 
-#if 0
-    for (typeFlags = flags->typeFlags ; attrCount-- > 0 ; ++typeFlags) {
-	if (*typeFlags) {
-	    ckfree((char *)*typeFlags) ;
-	}
-    }
-#endif
-    ckfree((char *)flags) ;
     return p - dst ;
 }
 
@@ -504,11 +426,16 @@ char *
 Ral_TupleHeadingToString(
     Ral_TupleHeading h)
 {
-    Ral_TupleHeadingScanFlags flags ;
+    unsigned size = Ral_TupleHeadingSize(h) ;
+    Ral_AttributeScanFlags flags ;
     char *str ;
 
-    str = ckalloc(Ral_TupleHeadingScan(h, &flags)) ;
+    flags = (Ral_AttributeScanFlags)ckalloc(size * sizeof(*flags)) ;
+
+    str = ckalloc(Ral_TupleHeadingScan(h, flags)) ;
     Ral_TupleHeadingConvert(h, str, flags) ;
+
+    Ral_AttributeScanFlagsFree(size, flags) ;
 
     return str ;
 }

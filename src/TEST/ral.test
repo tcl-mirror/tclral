@@ -1,0 +1,538 @@
+#!/bin/sh
+# \
+exec tclsh "$0" "$@"
+# This software is copyrighted 2004, 2005 by G. Andrew Mangogna.  The following
+# terms apply to all files associated with the software unless explicitly
+# disclaimed in individual files.
+# 
+# The authors hereby grant permission to use, copy, modify, distribute,
+# and license this software and its documentation for any purpose, provided
+# that existing copyright notices are retained in all copies and that this
+# notice is included verbatim in any distributions. No written agreement,
+# license, or royalty fee is required for any of the authorized uses.
+# Modifications to this software may be copyrighted by their authors and
+# need not follow the licensing terms described here, provided that the
+# new terms are clearly indicated on the first page of each file where
+# they apply.
+# 
+# IN NO EVENT SHALL THE AUTHORS OR DISTRIBUTORS BE LIABLE TO ANY PARTY FOR
+# DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING
+# OUT OF THE USE OF THIS SOFTWARE, ITS DOCUMENTATION, OR ANY DERIVATIVES
+# THEREOF, EVEN IF THE AUTHORS HAVE BEEN ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
+# 
+# THE AUTHORS AND DISTRIBUTORS SPECIFICALLY DISCLAIM ANY WARRANTIES,
+# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.  THIS SOFTWARE
+# IS PROVIDED ON AN "AS IS" BASIS, AND THE AUTHORS AND DISTRIBUTORS HAVE
+# NO OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS,
+# OR MODIFICATIONS.
+# 
+# GOVERNMENT USE: If you are acquiring this software on behalf of the
+# U.S. government, the Government shall have only "Restricted Rights"
+# in the software and related documentation as defined in the Federal
+# Acquisition Regulations (FARs) in Clause 52.227.19 (c) (2).  If you
+# are acquiring the software on behalf of the Department of Defense,
+# the software shall be classified as "Commercial Computer Software"
+# and the Government shall have only "Restricted Rights" as defined in
+# Clause 252.227-7013 (c) (1) of DFARs.  Notwithstanding the foregoing,
+# the authors grant the U.S. Government and others acting in its behalf
+# permission to use and distribute the software in accordance with the
+# terms specified in this license.
+# 
+#  *++
+# MODULE:
+#   ral.test -- test cases for the Tcl Relational Algebra Library
+# 
+# ABSTRACT:
+#   This file contains a set of test cases suitable for execution via
+#   "tcltest" to test the code associated with the TCL Relational
+#   Algebra library.
+# 
+# $RCSfile: ral.test,v $
+# $Revision: 1.1 $
+# $Date: 2006/01/02 01:39:29 $
+#  *--
+
+package require tcltest 2.2
+eval tcltest::configure $argv
+
+global env
+set env(LD_LIBRARY_PATH) [file normalize ..]:/usr/local/ActiveTcl/lib
+set ::auto_path [linsert $::auto_path 0 [file normalize ..]]
+package require ral 0.8
+
+namespace eval ::ral::test {
+    namespace import ::tcltest::*
+    namespace import ::ral::*
+
+    # Basic tests on the tuple string representation
+    test tuple-strrep-1.0 {no attributes} -body {
+	tuple degree {Tuple {} {}}
+    } -result 0
+
+    test tuple-strrep-2.0 {single attributes} -body {
+	tuple degree {Tuple {Name string} {Name Fred}}
+    } -result 1
+
+    test tuple-strrep-3.0 {multiple attributes} -body {
+	tuple degree {Tuple {Name string Num int Street string}\
+	    {Name Fred Num 100 Street Main}}
+    } -result 3
+
+    test tuple-strrep-4.0 {Tuple valued attribute} -body {
+	tuple degree {Tuple {Name string Addr {Tuple {Num int Street string}}}\
+	    {Name Fred Addr {Num 100 Street Main}}}
+    } -result 2
+
+    test tuple-strrep-5.0 {other data types} -body {
+	tuple degree {Tuple {Name string Status int Position double}\
+	    {Name Fred Status 20 Position 1}}
+    } -result 3
+
+    test tuple-strrep-5.1 {other data types - wrong values} -body {
+	tuple degree {Tuple {Name string Status int Position double}\
+	    {Name Fred Status 20.0 Position 1}}
+    } -result {bad value type for value, "20.0"} -returnCodes error
+
+    test tuple-strrep-5.2 {other data types - wrong values} -body {
+	tuple degree {Tuple {Name string Status int Position double}\
+	    {Name Fred Status 20 Position foo}}
+    } -result {bad value type for value, "foo"} -returnCodes error
+
+    test tuple-strrep-6.0 {bad format -- extra list element} -body {
+	tuple degree {Tuple {Name string} {Name Fred} {}}
+    } -result {bad tuple value format, "Tuple {Name string} {Name Fred} {}"}\
+    -returnCodes error
+
+    test tuple-strrep-6.1 {bad format -- missing list element} -body {
+	tuple degree {Tuple Name}
+    } -result {bad tuple value format, "Tuple Name"} -returnCodes error
+
+    test tuple-strrep-6.2 {bad format -- bad keyword} -body {
+	tuple degree {Tupel {Name string} {Name Fred}}
+    } -result {bad tuple type keyword, "Tupel"}\
+    -returnCodes error
+
+    test tuple-strrep-6.3 {bad format -- bad heading} -body {
+	tuple degree {Tuple {Name string foo} {Name Fred}}
+    } -result {bad tuple heading format, "Name string foo"} -returnCodes error
+
+    test tuple-strrep-6.4 {bad format -- duplicate attribute names} -body {
+	tuple degree {Tuple {Name string Name int} {Name Fred Name George}}
+    } -result {duplicate attribute name, "Name"} -returnCodes error
+
+    test tuple-strrep-6.5 {bad format -- insufficient values} -body {
+	tuple degree {Tuple {Name string Num int Street string}\
+	    {Name Fred Num 100}}
+    } -result {wrong number of attributes specified, "Name Fred Num 100"}\
+    -returnCodes error
+
+    test tuple-strrep-6.6 {bad format -- too many values} -body {
+	tuple degree {Tuple {Name string Num int Street string}\
+	    {Name Fred Num 100 Street Main Num 200}}
+    } -result {wrong number of attributes specified,\
+	"Name Fred Num 100 Street Main Num 200"}\
+    -returnCodes error
+
+    test tuple-strrep-6.7 {bad format -- value for unknown attribute} -body {
+	tuple degree {Tuple {Name string Num int Street string}\
+	    {Name Fred Num 100 City Main}}
+    } -result {unknown attribute name, "City"} -returnCodes error
+
+    # Tuple Tests
+
+    # tuple assign subcommand
+    test tuple-assign-1.0 {single attribute} -body {
+	tuple assign {Tuple {Name string} {Name Andrew}}
+	expr {$Name eq "Andrew"}
+    } -result 1
+
+    test tuple-assign-2.0 {multiple attributes} -body {
+	tuple assign {Tuple {Name string Age int} {Name Andrew Age 20}}
+	expr {$Name eq "Andrew" && $Age == 20}
+    } -result 1
+
+    test tuple-assign-3.0 {no attributes} -body {
+	tuple assign {Tuple {} {}}
+    } -result 0
+
+    # tuple create subcommand
+    test tuple-create-1.0 {single attribute} -body {
+	tuple create {Name string} {Name Andrew}
+    } -result {Tuple {Name string} {Name Andrew}}
+
+    test tuple-create-2.0 {multiple attributes} -body {
+	set h {Name string Age int}
+	tuple create $h {Name Andrew Age 20}
+    } -result {Tuple {Name string Age int} {Name Andrew Age 20}}
+
+    test tuple-create-3.0 {bad format} -body {
+	set h {Name string Age int}
+	tuple create $h {Name Andrew foo}
+    } -result {bad tuple value format, "Name Andrew foo"} -returnCodes error
+
+    test tuple-create-4.0 {unknown attribute} -body {
+	set h {Name string Age int}
+	tuple create $h {Name Andrew foo 20}
+    } -result {unknown attribute name, "foo"} -returnCodes error
+
+    test tuple-create-5.0 {bad value type} -body {
+	set h {Name string Age int}
+	tuple create $h {Name Andrew Age foo}
+    } -result {bad value type for value, "foo"} -returnCodes error
+
+    test tuple-create-6.0 {multiple assignment} -body {
+	set h {Name string Age int}
+	tuple create $h {Name Andrew Name foo}
+    } -result {duplicate attribute name, "Name"} -returnCodes error
+
+    test tuple-create-7.0 {different ordering} -body {
+	set h {Name string Age int}
+	tuple create $h {Age 20 Name Andrew}
+    } -result {Tuple {Name string Age int} {Name Andrew Age 20}}
+
+    test tuple-create-8.0 {empty tuple} -body {
+	tuple create {} {}
+    } -result {Tuple {} {}}
+
+    # tuple degree subcommand
+    test tuple-degree-1.0 {single attribute} -body {
+	tuple degree {Tuple {Name string} {Name Andrew}}
+    } -result 1
+
+    test tuple-degree-2.0 {multiple attributes} -body {
+	tuple degree {Tuple {Name string Age int} {Age 20 Name Andrew}}
+    } -result 2
+
+    test tuple-degree-3.0 {empty tuple} -body {
+	tuple degree {Tuple {} {}}
+    } -result 0
+
+    # tuple eliminate subcommand
+    test tuple-eliminate-1.0 {single attribute} -body {
+	tuple eliminate {Tuple {Name string} {Name Andrew}} Name
+    } -result {Tuple {} {}}
+
+    test tuple-eliminate-2.0 {multiple attributes} -body {
+	tuple eliminate {Tuple {Name string Age int Size double}\
+	    {Name Andrew Age 20 Size 1.0}} Age Size
+    } -result {Tuple {Name string} {Name Andrew}}
+
+    test tuple-eliminate-3.0 {non-existent attribute} -body {
+	tuple eliminate {Tuple {Name string Age int Size double}\
+	    {Name Andrew Age 20 Size 1.0}} foo
+    } -result {unknown attribute name, "foo"} -returnCodes error
+
+    # tuple equal subcommand
+    test tuple-equal-1.0 {single attribute, match} -body {
+	set t1 {Tuple {Name string} {Name Andrew}}
+	set t2 {Tuple {Name string} {Name Andrew}}
+	tuple equal $t1 $t2
+    } -result 1
+
+    test tuple-equal-2.0 {multiple attributes, match} -body {
+	set t1 {Tuple {Name string Age int} {Age 20 Name Andrew}}
+	set t2 {Tuple {Name string Age int} {Name Andrew Age 20}}
+	tuple equal $t1 $t2
+    } -result 1
+
+    test tuple-equal-3.0 {single attribute, value mismatch} -body {
+	set t1 {Tuple {Name string} {Name Andrew}}
+	set t2 {Tuple {Name string} {Name George}}
+	tuple equal $t1 $t2
+    } -result 0
+
+    test tuple-equal-4.0 {single attribute, attribute name mismatch} -body {
+	set t1 {Tuple {Name string} {Name Andrew}}
+	set t2 {Tuple {name string} {name George}}
+	tuple equal $t1 $t2
+    } -result 0
+
+    test tuple-equal-5.0 {single attribute, type mismatch} -body {
+	set t1 {Tuple {Name string} {Name 20}}
+	set t2 {Tuple {Name int} {Name 40}}
+	tuple equal $t1 $t2
+    } -result 0
+
+    test tuple-equal-6.0 {multiple attributes, value mismatch} -body {
+	set t1 {Tuple {Name string Age int} {Age 20 Name Andrew}}
+	set t2 {Tuple {Name string Age int} {Name Andrew Age 30}}
+	tuple equal $t1 $t2
+    } -result 0
+
+    test tuple-equal-7.0 {multiple attributes, match, out of order} -body {
+	set t1 {Tuple {Name string Age int Size double}\
+	    {Name Andrew Age 20 Size 1.0}}
+	set t2 {Tuple {Size double Name string Age int}\
+	    {Name Andrew Age 20 Size 1.0}}
+	tuple equal $t1 $t2
+    } -result 1
+
+    test tuple-equal-8.0 {multiple attributes, match, value variations} -body {
+	set t1 {Tuple {Name string Age int Size double}\
+	    {Name Andrew Age 0x20 Size 12.30}}
+	set t2 {Tuple {Size double Name string Age int}\
+	    {Name Andrew Age 32 Size 1.23e1}}
+	tuple equal $t1 $t2
+    } -result 1
+
+    # tuple extend subcommand
+    test tuple-extend-1.0 {single attribute} -body {
+	set t {Tuple {Name string} {Name Andrew}}
+	tuple extend $t {Age int 20}
+    } -result {Tuple {Name string Age int} {Name Andrew Age 20}}
+
+    test tuple-extend-2.0 {multiple attributes} -body {
+	set t {Tuple {Name string} {Name Andrew}}
+	tuple extend $t {Age int 20} {Size double 1.3}
+    } -result {Tuple {Name string Age int Size double}\
+	{Name Andrew Age 20 Size 1.3}}
+
+    test tuple-extend-3.0 {duplicate name} -body {
+	set t {Tuple {Name string} {Name Andrew}}
+	tuple extend $t {Name int 20}
+    } -result {duplicate attribute name, "Name"} -returnCodes error
+
+    test tuple-extend-4.0 {bad value} -body {
+	set t {Tuple {Name string} {Name Andrew}}
+	tuple extend $t {Age int foo}
+    } -result {expected integer but got "foo"} -returnCodes error
+
+    test tuple-extend-5.0 {bad type} -body {
+	set t {Tuple {Name string} {Name Andrew}}
+	tuple extend $t {Age foo foo}
+    } -result {unknown data type, "foo"} -returnCodes error
+
+    # tuple extract subcommand
+    test tuple-extract-1.0 {single attribute} -body {
+	set t {Tuple {Name string} {Name Andrew}}
+	tuple extract $t Name
+    } -result {Andrew}
+
+    test tuple-extract-2.0 {multiple attributes} -body {
+	set t {Tuple {Name string Age int Size double}\
+	    {Name Andrew Age 20 Size 1.3}}
+	tuple extract $t Age Size
+    } -result {20 1.3}
+
+    test tuple-extract-3.0 {unknown attribute} -body {
+	set t {Tuple {Name string Age int Size double}\
+	    {Name Andrew Age 20 Size 1.3}}
+	tuple extract $t foo
+    } -result {unknown attribute name, "foo"} -returnCodes error
+
+    # tuple get subcommand
+    test tuple-get-1.0 {single attribute} -body {
+	tuple get {Tuple {Name string} {Name Andrew}}
+    } -result {Name Andrew}
+
+    test tuple-get-2.0 {multiple attributes} -body {
+	tuple get {Tuple {Name string Age int Size double}\
+	    {Name Andrew Age 20 Size 1.3}}
+    } -result {Name Andrew Age 20 Size 1.3}
+
+    # tuple heading subcommand
+    test tuple-heading-1.0 {single attribute} -setup {
+	set t [tuple create {Name string} {Name Andrew}]
+    } -body {
+	tuple heading $t
+    } -result {Tuple {Name string}}
+
+    test tuple-heading-2.0 {multiple attributes} -setup {
+	set t [tuple create {Name string Age int Size double}\
+	    {Name Andrew Age 20 Size 3.0}]
+    } -body {
+	tuple heading $t
+    } -result {Tuple {Name string Age int Size double}}
+
+    # tuple project subcommand
+    test tuple-project-1.0 {single attribute} -body {
+	set t {Tuple {Name string} {Name Andrew}}
+	tuple project $t Name
+    } -result {Tuple {Name string} {Name Andrew}}
+
+    test tuple-project-2.0 {multiple attributes} -body {
+	set t {Tuple {Name string Age int Size double}\
+	    {Name Andrew Age 20 Size 1.3}}
+	tuple project $t Name Age
+    } -result {Tuple {Name string Age int} {Name Andrew Age 20}}
+
+    test tuple-project-3.0 {project nothing} -body {
+	set t {Tuple {Name string Age int} {Name Andrew Age 20}}
+	tuple project $t
+    } -result {Tuple {} {}}
+
+    test tuple-project-4.0 {project everything} -body {
+	set t {Tuple {Name string Age int} {Name Andrew Age 20}}
+	tuple project $t Name Age
+    } -result {Tuple {Name string Age int} {Name Andrew Age 20}}
+
+    test tuple-project-5.0 {unknown attribute} -body {
+	set t {Tuple {Name string Age int} {Name Andrew Age 20}}
+	tuple project $t foo
+    } -result {unknown attribute name, "foo"} -returnCodes 1
+
+    # tuple rename subcommand
+    test tuple-rename-1.0 {single attribute} -setup {
+	set t [tuple create {Name string} {Name Andrew}]
+    } -body {
+	tuple rename $t Name Age
+    } -result {Tuple {Age string} {Age Andrew}}
+
+    test tuple-rename-2.0 {multiple attributes} -setup {
+	set t [tuple create {Name string Age int} {Name Andrew Age 20}]
+    } -body {
+	tuple rename $t Name foo
+    } -result {Tuple {foo string Age int} {foo Andrew Age 20}}
+
+    test tuple-rename-3.0 {unknown attribute} -setup {
+	set t [tuple create {Name string Age int} {Name Andrew Age 20}]
+    } -body {
+	tuple rename $t foo Name
+    } -result {unknown attribute name, "foo"} -returnCodes error
+
+    test tuple-rename-4.0 {unpaired attributes} -setup {
+	set t [tuple create {Name string Age int} {Name Andrew Age 20}]
+    } -body {
+	tuple rename $t foo Name bar
+    } -result {oldname / newname arguments must come in pairs}\
+    -returnCodes error
+
+    test tuple-rename-5.0 {multiple renamings} -setup {
+	set t [tuple create {Name string Age int} {Name Andrew Age 20}]
+    } -body {
+	tuple rename $t Age bar Name foo
+    } -result {Tuple {foo string bar int} {foo Andrew bar 20}}
+
+    test tuple-rename-6.0 {same attribute, multiple renamings} -setup {
+	set t [tuple create {Name string Age int} {Name Andrew Age 20}]
+    } -body {
+	tuple rename $t Name foo foo bar bar baz
+    } -result {Tuple {baz string Age int} {baz Andrew Age 20}}
+
+    test tuple-rename-7.0 {existing attribute} -setup {
+	set t [tuple create {Name string Age int} {Name Andrew Age 20}]
+    } -body {
+	tuple rename $t Name Age
+    } -result {duplicate attribute name, "Age"} -returnCodes error
+
+    # tuple unwrap subcommand
+    test tuple-unwrap-1.0 {unwrap multiple attributes} -setup {
+	set t [tuple create\
+	    {Name string\
+		Address {Tuple {Number int Street string City string}}}\
+	    {Name Andrew Address {Number 599 Street Blackwood City Sunnyvale}}]
+    } -body {
+	tuple unwrap $t Address
+    } -result {Tuple {Name string Number int Street string City string}\
+	{Name Andrew Number 599 Street Blackwood City Sunnyvale}}
+
+    test tuple-unwrap-2.0 {unwrap single attribute} -setup {
+	set t [tuple create\
+	    {Name string Address {Tuple {Number int}}}\
+	    {Name Andrew Address {Number 599}}]
+    } -body {
+	tuple unwrap $t Address
+    } -result {Tuple {Name string Number int} {Name Andrew Number 599}}
+
+    test tuple-unwrap-3.0 {unknown unwrap attribute} -setup {
+	set t [tuple create\
+	    {Name string\
+		Address {Tuple {Number int Street string City string}}}\
+	    {Name Andrew Address {Number 599 Street Blackwood City Sunnyvale}}]
+    } -body {
+	tuple unwrap $t foo
+    } -result {unknown attribute name, "foo"} -returnCodes error
+
+    test tuple-unwrap-4.0 {non-tuple unwrap attribute} -setup {
+	set t [tuple create\
+	    {Name string\
+		Address {Tuple {Number int Street string City string}}}\
+	    {Name Andrew Address {Number 599 Street Blackwood City Sunnyvale}}]
+    } -body {
+	tuple unwrap $t Name
+    } -result {attribute, "Name", is not of type Tuple} -returnCodes error
+
+    # tuple update subcommand
+    test tuple-update-1.0 {single attribute} -setup {
+	set t [tuple create {Name string Age int Size double}\
+	    {Name Andrew Age 20 Size 3.0}]
+    } -body {
+	tuple update t {Age 40}
+    } -result {Tuple {Name string Age int Size double}\
+	    {Name Andrew Age 40 Size 3.0}}
+
+    test tuple-update-2.0 {multiple attributes} -setup {
+	set t [tuple create {Name string Age int Size double}\
+	    {Name Andrew Age 20 Size 3.0}]
+    } -body {
+	tuple update t {Age 40 Size 33.0}
+    } -result {Tuple {Name string Age int Size double}\
+	    {Name Andrew Age 40 Size 33.0}}
+
+    test tuple-update-3.0 {unknown attribute} -setup {
+	set t [tuple create {Name string Age int Size double}\
+	    {Name Andrew Age 20 Size 3.0}]
+    } -body {
+	tuple update t {foo 40}
+    } -result {unknown attribute name, "foo"} -returnCodes error
+
+    test tuple-update-4.0 {bad type} -setup {
+	set t [tuple create {Name string Age int Size double}\
+	    {Name Andrew Age 20 Size 3.0}]
+    } -body {
+	tuple update t {Age foo}
+    } -result {bad value type for value, "foo"} -returnCodes error
+
+    # tuple wrap subcommand
+    test tuple-wrap-1.0 {wrap 1 attribute} -setup {
+	set t [tuple create {Name string Age int Size double}\
+	    {Age 20 Name Andrew Size 3.0}]
+    } -body {
+	tuple wrap $t Props {Age}
+    } -result {Tuple {Name string Size double Props {Tuple {Age int}}}\
+	{Name Andrew Size 3.0 Props {Age 20}}}
+
+    test tuple-wrap-2.0 {wrap multiple attributes} -setup {
+	set t [tuple create {Name string Age int Size double}\
+	    {Age 20 Name Andrew Size 3.0}]
+    } -body {
+	tuple wrap $t Props {Age Size}
+    } -result {Tuple {Name string Props {Tuple {Age int Size double}}}\
+	{Name Andrew Props {Age 20 Size 3.0}}}
+
+    test tuple-wrap-3.0 {wrap all attributes} -setup {
+	set t [tuple create {Name string Age int Size double}\
+	    {Age 20 Name Andrew Size 3.0}]
+    } -body {
+	tuple wrap $t Props {Name Age Size}
+    } -result {Tuple {Props {Tuple {Name string Age int Size double}}}\
+	{Props {Name Andrew Age 20 Size 3.0}}}
+
+    test tuple-wrap-4.0 {non-existent attribute to wrap} -setup {
+	set t [tuple create {Name string Age int Size double}\
+	    {Age 20 Name Andrew Size 3.0}]
+    } -body {
+	tuple wrap $t Props {foo}
+    } -result {unknown attribute name, "foo"} -returnCodes error
+
+    test tuple-wrap-5.0 {wrap same attribute multiple times} -setup {
+	set t [tuple create {Name string Age int Size double}\
+	    {Age 20 Name Andrew Size 3.0}]
+    } -body {
+	tuple wrap $t Props {Name Age Name}
+    } -result {duplicate attribute name, "Name"} -returnCodes error
+
+    test tuple-wrap-6.0 {wrap attribute is a duplicate} -setup {
+	set t [tuple create {Name string Age int Size double}\
+	    {Age 20 Name Andrew Size 3.0}]
+    } -body {
+	tuple wrap $t Size {Name Age}
+    } -result {duplicate attribute name, "Size"} -returnCodes error
+
+
+    cleanupTests
+}
+
+namespace delete ::ral::test

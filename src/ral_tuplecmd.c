@@ -43,13 +43,16 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_tuplecmd.c,v $
-$Revision: 1.1 $
-$Date: 2005/12/27 23:17:19 $
+$Revision: 1.2 $
+$Date: 2006/01/02 01:39:29 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_tuplecmd.c,v $
+Revision 1.2  2006/01/02 01:39:29  mangoa01
+Tuple commands now operate properly. Fixed problems of constructing the string representation when there were tuple valued attributes.
+
 Revision 1.1  2005/12/27 23:17:19  mangoa01
 Update to the new spilt out file structure.
 
@@ -110,7 +113,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tuplecmd.c,v $ $Revision: 1.1 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tuplecmd.c,v $ $Revision: 1.2 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -178,6 +181,12 @@ Ral_TupleCmdVersion(void)
 
 /*
  * tuple assign tupleValue
+ *
+ * Assign the values of the tuple attributes to Tcl variables that are
+ * the same name as the attribute names.
+ *
+ * Returns the degree of the tuple which is the number of variable assignment
+ * made.
  */
 static int
 TupleAssignCmd(
@@ -220,6 +229,12 @@ TupleAssignCmd(
 
 /*
  * tuple create heading name-value-list
+ *
+ * Create a tuple given the heading and an alternating list of
+ * attribute name / value pairs. The heading must be an alternating
+ * list of attribute name / type pairs.
+ *
+ * Returns the tuple.
  */
 static int
 TupleCreateCmd(
@@ -336,10 +351,7 @@ TupleEliminateCmd(
 
 	if (attrIndex < 0) {
 	    Ral_IntVectorDelete(elimMap) ;
-	    Tcl_ResetResult(interp) ;
-	    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-		"unknown attribute name, \"", attrName, "\"", NULL) ;
-	    Tcl_SetErrorCode(interp, "RAL", "UNKNOWN_ATTR", attrName, NULL) ;
+	    Ral_TupleObjSetError(interp, UNKNOWN_ATTR, attrName) ;
 	    return TCL_ERROR ;
 	} else {
 	    assert(attrIndex < degree) ;
@@ -476,10 +488,7 @@ TupleExtendCmd(
 	char *oldHeadingStr = Ral_TupleHeadingToString(heading) ;
 
 	Ral_TupleHeadingDelete(newHeading) ;
-	Tcl_ResetResult(interp) ;
-	Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-	    "cannot duplicate tuple heading, \"", oldHeadingStr, "\"", NULL) ;
-	Tcl_SetErrorCode(interp, "RAL", "HEADING_ERR", oldHeadingStr, NULL) ;
+	Ral_TupleObjSetError(interp, HEADING_ERR, oldHeadingStr) ;
 	ckfree(oldHeadingStr) ;
 	return TCL_ERROR ;
     }
@@ -509,12 +518,7 @@ TupleExtendCmd(
 	    goto errorOut ;
 	}
 	if (elemc != 3) {
-	    Tcl_ResetResult(interp) ;
-	    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-		"bad name-type-value format, \"", Tcl_GetString(*objv), "\"",
-		NULL) ;
-	    Tcl_SetErrorCode(interp, "RAL", "FORMAT_ERR", Tcl_GetString(*objv),
-		NULL) ;
+	    Ral_TupleObjSetError(interp, FORMAT_ERR, Tcl_GetString(*objv)) ;
 	    goto errorOut ;
 	}
 	attr = Ral_AttributeNewFromObjs(interp, elemv[0], elemv[1]) ;
@@ -524,11 +528,7 @@ TupleExtendCmd(
 	hiter = Ral_TupleHeadingPushBack(newHeading, attr) ;
 	if (hiter == Ral_TupleHeadingEnd(newHeading)) {
 	    char *attrName = Tcl_GetString(elemv[0]) ;
-
-	    Tcl_ResetResult(interp) ;
-	    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-		"duplicate attribute name, \"", attrName, "\"", NULL) ;
-	    Tcl_SetErrorCode(interp, "RAL", "DUPLICATE_ATTR", attrName, NULL) ;
+	    Ral_TupleObjSetError(interp, DUPLICATE_ATTR, attrName) ;
 	    goto errorOut ;
 	}
 
@@ -578,10 +578,7 @@ TupleExtractCmd(
 	attrName = Tcl_GetString(*objv) ;
 	attrIndex = Ral_TupleHeadingIndexOf(heading, attrName) ;
 	if (attrIndex < 0) {
-	    Tcl_ResetResult(interp) ;
-	    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-		"unknown attribute name, \"", attrName, "\"", NULL) ;
-	    Tcl_SetErrorCode(interp, "RAL", "UNKNOWN_ATTR", attrName, NULL) ;
+	    Ral_TupleObjSetError(interp, UNKNOWN_ATTR, attrName) ;
 	    return TCL_ERROR ;
 	}
 	resultObj = tuple->values[attrIndex] ;
@@ -591,11 +588,7 @@ TupleExtractCmd(
 	    attrName = Tcl_GetString(*objv++) ;
 	    attrIndex = Ral_TupleHeadingIndexOf(heading, attrName) ;
 	    if (attrIndex < 0) {
-		Tcl_ResetResult(interp) ;
-		Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-		    "unknown attribute name, \"", attrName, "\"", NULL) ;
-		Tcl_SetErrorCode(interp, "RAL", "UNKNOWN_ATTR", attrName,
-		    NULL) ;
+		Ral_TupleObjSetError(interp, UNKNOWN_ATTR, attrName) ;
 		goto errorOut ;
 	    }
 	    if (Tcl_ListObjAppendElement(interp, resultObj,
@@ -861,10 +854,7 @@ TupleUnwrapCmd(
     tupleAttrName = Tcl_GetString(objv[3]) ;
     tupleAttrIter = Ral_TupleHeadingFind(heading, tupleAttrName) ;
     if (tupleAttrIter == Ral_TupleHeadingEnd(heading)) {
-	Tcl_ResetResult(interp) ;
-	Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-	    "unknown attribute name, \"", tupleAttrName, "\"", NULL) ;
-	Tcl_SetErrorCode(interp, "RAL", "UNKNOWN_ATTR", tupleAttrName, NULL) ;
+	Ral_TupleObjSetError(interp, UNKNOWN_ATTR, tupleAttrName) ;
 	return TCL_ERROR ;
     }
     /*
@@ -984,21 +974,22 @@ TupleUpdateCmd(
 	Ral_TupleUpdateStatus status ;
 
 	status = Ral_TupleUpdateAttrValue(tuple, attrName, *(elemv + 1)) ;
-	if (status != AttributeUpdated) {
-	    Tcl_ResetResult(interp) ;
-	    if (status == NoSuchAttribute) {
-		Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-		    "unknown attribute name, \"", attrName, "\"", NULL) ;
-		Tcl_SetErrorCode(interp, "RAL", "UNKNOWN_ATTR", attrName,
-		    NULL) ;
-	    } else if (status == BadValueType) {
-		Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-		    "bad value type for value, \"",
-		    Tcl_GetString(*(elemv + 1)), "\"", NULL) ;
-	    } else {
-		Tcl_Panic("unknown tuple update status, \"%d\"", status) ;
-	    }
+	switch (status) {
+	case AttributeUpdated:
+	    break ;
+
+	case NoSuchAttribute:
+	    Ral_TupleObjSetError(interp, UNKNOWN_ATTR, attrName) ;
 	    return TCL_ERROR ;
+
+	case BadValueType:
+	    Ral_TupleObjSetError(interp, BAD_VALUE,
+		Tcl_GetString(*(elemv + 1))) ;
+	    return TCL_ERROR ;
+
+	default:
+	    Tcl_Panic("unknown tuple update status, \"%d\"", status) ;
+	    break ;
 	}
     }
 
@@ -1070,17 +1061,11 @@ TupleWrapCmd(
 	attrIter = Ral_TupleHeadingFind(heading, attrName) ;
 	if (attrIter == hend) {
 	    Ral_TupleDelete(wrapTuple) ;
-	    Tcl_ResetResult(interp) ;
-	    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-		"unknown attribute name, \"", attrName, "\"", NULL) ;
-	    Tcl_SetErrorCode(interp, "RAL", "UNKNOWN_ATTR", attrName, NULL) ;
+	    Ral_TupleObjSetError(interp, UNKNOWN_ATTR, attrName) ;
 	    return TCL_ERROR ;
 	}
 	if (!Ral_TupleCopy(tuple, attrIter, attrIter + 1, wrapTuple)) {
-	    Tcl_ResetResult(interp) ;
-	    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-		"duplicate attribute name, \"", attrName, "\"", NULL) ;
-	    Tcl_SetErrorCode(interp, "RAL", "DUPLICATE_ATTR", attrName, NULL) ;
+	    Ral_TupleObjSetError(interp, DUPLICATE_ATTR, attrName) ;
 	    return TCL_ERROR ;
 	}
     }
@@ -1121,10 +1106,7 @@ TupleWrapCmd(
     newAttr = Ral_AttributeNewTupleType(newAttrName, wrapHeading) ;
     newAttrIter = Ral_TupleHeadingPushBack(newHeading, newAttr) ;
     if (newAttrIter == Ral_TupleHeadingEnd(newHeading)) {
-	Tcl_ResetResult(interp) ;
-	Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-	    "duplicate attribute name, \"", newAttrName, "\"", NULL) ;
-	Tcl_SetErrorCode(interp, "RAL", "DUPLICATE_ATTR", newAttrName, NULL) ;
+	Ral_TupleObjSetError(interp, DUPLICATE_ATTR, newAttrName) ;
 	goto errorOut ;
     }
 

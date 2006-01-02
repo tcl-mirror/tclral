@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleheading.h,v $
-$Revision: 1.1 $
-$Date: 2005/12/27 23:17:19 $
+$Revision: 1.2 $
+$Date: 2006/01/02 01:39:29 $
  *--
  */
 #ifndef _ral_tupleheading_h_
@@ -108,20 +108,10 @@ typedef struct Ral_TupleHeading {
 } *Ral_TupleHeading ;
 
 /*
- * Data structure used to hold Scan / Convert flags.
- */
-typedef struct Ral_TupleHeadingScanFlags {
-    int *nameFlags ;
-    int **typeFlags ;
-} *Ral_TupleHeadingScanFlags ;
-
-
-/*
 FUNCTION DECLARATIONS
 */
 
 extern Ral_TupleHeading Ral_TupleHeadingNew(unsigned) ;
-extern Ral_TupleHeading Ral_TupleHeadingNewFromObj(Tcl_Interp *, Tcl_Obj *) ;
 extern void Ral_TupleHeadingDelete(Ral_TupleHeading) ;
 extern void Ral_TupleHeadingReference(Ral_TupleHeading) ;
 extern void Ral_TupleHeadingUnreference(Ral_TupleHeading) ;
@@ -140,9 +130,9 @@ extern Ral_TupleHeadingIter Ral_TupleHeadingPushBack(Ral_TupleHeading,
 extern Ral_TupleHeadingIter Ral_TupleHeadingFind(Ral_TupleHeading,
     const char *) ;
 extern int Ral_TupleHeadingIndexOf(Ral_TupleHeading, const char *) ;
-extern int Ral_TupleHeadingScan(Ral_TupleHeading, Ral_TupleHeadingScanFlags *) ;
+extern int Ral_TupleHeadingScan(Ral_TupleHeading, Ral_AttributeScanFlags) ;
 extern int Ral_TupleHeadingConvert(Ral_TupleHeading, char *,
-    Ral_TupleHeadingScanFlags) ;
+    Ral_AttributeScanFlags) ;
 extern char *Ral_TupleHeadingToString(Ral_TupleHeading) ;
 extern void Ral_TupleHeadingPrint(Ral_TupleHeading, Ral_TupleHeadingIter,
     FILE *) ;

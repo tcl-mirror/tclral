@@ -43,13 +43,16 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_tupleobj.c,v $
-$Revision: 1.1 $
-$Date: 2005/12/27 23:17:19 $
+$Revision: 1.2 $
+$Date: 2006/01/02 01:39:29 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_tupleobj.c,v $
+Revision 1.2  2006/01/02 01:39:29  mangoa01
+Tuple commands now operate properly. Fixed problems of constructing the string representation when there were tuple valued attributes.
+
 Revision 1.1  2005/12/27 23:17:19  mangoa01
 Update to the new spilt out file structure.
 
@@ -112,7 +115,7 @@ Tcl_ObjType Ral_TupleObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tupleobj.c,v $ $Revision: 1.1 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tupleobj.c,v $ $Revision: 1.2 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -127,6 +130,52 @@ Ral_TupleNewObj(
     Ral_TupleReference(objPtr->internalRep.otherValuePtr = tuple) ;
     Tcl_InvalidateStringRep(objPtr) ;
     return objPtr ;
+}
+
+Ral_TupleHeading
+Ral_TupleHeadingNewFromObj(
+    Tcl_Interp *interp,
+    Tcl_Obj *objPtr)
+{
+    int objc ;
+    Tcl_Obj **objv ;
+    Ral_TupleHeading heading ;
+
+    /*
+     * Since the string representation of a Heading is a list of pairs,
+     * we can use the list object functions to do the heavy lifting here.
+     */
+    if (Tcl_ListObjGetElements(interp, objPtr, &objc, &objv) != TCL_OK) {
+	return NULL ;
+    }
+    if (objc % 2 != 0) {
+	Ral_TupleObjSetError(interp, HEADING_ERR, Tcl_GetString(objPtr)) ;
+	return NULL ;
+    }
+    heading = Ral_TupleHeadingNew((unsigned)(objc / 2)) ;
+    /*
+     * Iterate through the list adding each element as an attribute to
+     * a newly created Heading.
+     */
+    for ( ; objc > 0 ; objc -= 2, objv += 2) {
+	Ral_Attribute attr ;
+	Ral_TupleHeadingIter iter ;
+
+	attr = Ral_AttributeNewFromObjs(interp, *objv, *(objv + 1)) ;
+	if (attr == NULL) {
+	    Ral_TupleHeadingDelete(heading) ;
+	    return NULL ;
+	}
+	iter = Ral_TupleHeadingPushBack(heading, attr) ;
+	if (iter == Ral_TupleHeadingEnd(heading)) {
+	    Ral_TupleObjSetError(interp, DUPLICATE_ATTR, attr->name) ;
+	    Ral_AttributeDelete(attr) ;
+	    Ral_TupleHeadingDelete(heading) ;
+	    return NULL ;
+	}
+    }
+
+    return heading ;
 }
 
 /*
@@ -147,19 +196,11 @@ Ral_TupleSetValuesFromObj(
 	return TCL_ERROR ;
     }
     if (elemc % 2 != 0) {
-	if (interp) {
-	    Tcl_ResetResult(interp) ;
-	    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-		"list must have an even number of elements", NULL) ;
-	}
+	Ral_TupleObjSetError(interp, FORMAT_ERR, Tcl_GetString(objPtr)) ;
 	return TCL_ERROR ;
     }
     if (elemc / 2 != Ral_TupleDegree(tuple)) {
-	if (interp) {
-	    Tcl_ResetResult(interp) ;
-	    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-		"wrong number of attributes specified", NULL) ;
-	}
+	Ral_TupleObjSetError(interp, WRONG_NUM_ATTRS, Tcl_GetString(objPtr)) ;
 	return TCL_ERROR ;
     }
     /*
@@ -174,35 +215,31 @@ Ral_TupleSetValuesFromObj(
 	Ral_TupleUpdateStatus status ;
 
 	if (hindex < 0) {
-	    Tcl_ResetResult(interp) ;
-	    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-		"unknown attribute name, \"", attrName, "\"", NULL) ;
+	    Ral_TupleObjSetError(interp, UNKNOWN_ATTR, attrName) ;
 	    goto errorOut ;
 	} else if (Ral_IntVectorFetch(attrStatus, hindex)) {
-	    Tcl_ResetResult(interp) ;
-	    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-		"attempted to update the value of attribute, \"",
-		attrName, "\" more than once", NULL) ;
+	    Ral_TupleObjSetError(interp, DUPLICATE_ATTR, attrName) ;
 	    goto errorOut ;
 	}
 	Ral_IntVectorStore(attrStatus, hindex, 1) ;
 
 	status = Ral_TupleUpdateAttrValue(tuple, attrName, *(elemv + 1)) ;
-	if (status != AttributeUpdated) {
-	    if (interp) {
-		Tcl_ResetResult(interp) ;
-		if (status == NoSuchAttribute) {
-		    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-			"unknown attribute name, \"", attrName, "\"", NULL) ;
-		} else if (status == BadValueType) {
-		    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-			"bad value type for value, \"",
-			Tcl_GetString(*(elemv + 1)), "\"", NULL) ;
-		} else {
-		    Tcl_Panic("unknown tuple update status, \"%d\"", status) ;
-		}
-	    }
+	switch (status) {
+	case AttributeUpdated:
+	    break ;
+
+	case NoSuchAttribute:
+	    Ral_TupleObjSetError(interp, UNKNOWN_ATTR, attrName) ;
 	    goto errorOut ;
+
+	case BadValueType:
+	    Ral_TupleObjSetError(interp, BAD_VALUE,
+		Tcl_GetString(*(elemv + 1))) ;
+	    goto errorOut ;
+
+	default:
+	    Tcl_Panic("unknown tuple update status, \"%d\"", status) ;
+	    break ;
 	}
     }
 
@@ -218,6 +255,44 @@ const char *
 Ral_TupleObjVersion(void)
 {
     return rcsid ;
+}
+
+void
+Ral_TupleObjSetError(
+    Tcl_Interp *interp,
+    Ral_TupleError error,
+    const char *param)
+{
+    /*
+     * These must be in the same order as the encoding of the Ral_TupleError
+     * enumeration.
+     */
+    static const char *resultStrings[] = {
+	"unknown attribute name",
+	"bad tuple heading format",
+	"bad tuple value format",
+	"duplicate attribute name",
+	"bad value type for value",
+	"bad tuple type keyword",
+	"wrong number of attributes specified",
+    } ;
+    static const char *errorStrings[] = {
+	"UNKNOWN_ATTR",
+	"HEADING_ERR",
+	"FORMAT_ERR",
+	"DUPLICATE_ATTR",
+	"BAD_VALUE",
+	"BAD_KEYWORD",
+	"WRONG_NUM_ATTRS",
+    } ;
+
+    if (interp) {
+	Tcl_ResetResult(interp) ;
+	Tcl_AppendStringsToObj(Tcl_GetObjResult(interp), resultStrings[error],
+	    ", \"", param, "\"", NULL) ;
+	Tcl_SetErrorCode(interp, "RAL", "TUPLE", errorStrings[error], param,
+	    NULL) ;
+    }
 }
 
 /*
@@ -276,101 +351,31 @@ static void
 UpdateStringOfTuple(
     Tcl_Obj *objPtr)
 {
-    static const char openList[] = " {" ;
-    static const char closeList[] = "}" ;
-
-    Ral_Tuple tuple ;
-    Ral_TupleHeading heading ;
+    Ral_Tuple tuple = objPtr->internalRep.otherValuePtr ;
+    Ral_AttributeScanFlags scanFlags ;
     int length ;
-    Ral_TupleHeadingScanFlags headingFlags ;
-    unsigned size ;
-    int *flagVect ;
-    int *flagPtr ;
-    Ral_TupleHeadingIter hIter ;
-    Ral_TupleHeadingIter hEnd ;
-    Tcl_Obj **v ;
-    char *dst ;
-
-    tuple = objPtr->internalRep.otherValuePtr ;
-    heading = tuple->heading ;
 
     /*
      * First phase is to scan the tuple header and values to compute the
      * amount of space required to hold the string representation. Compare
      * here with the way the internal "list" type accomplishes this.
+     * N.B. that Ral_TupleScan allocates the memory to hold the scan flags
+     * and this must be freed below.
      */
-
-    /*
-     * The tuple header has a function that does the work.
-     */
-    length = Ral_TupleHeadingScan(heading, &headingFlags) ;
-
-    /*
-     * The tuple values part of the list is alternating attribute
-     * names and values. Here we set up to use Tcl_ScanElement().
-     */
-    size = Ral_TupleHeadingSize(heading) ;
-    /* Need flags for attribute names and values */
-    flagPtr = flagVect = (int *)ckalloc(sizeof(*flagVect) * size * 2) ;
-
-    hEnd = Ral_TupleHeadingEnd(heading) ;
-    v = tuple->values ;
-
-    /*
-     * Iterate through the values and compute the space needed for
-     * the attribute names and values.
-     */
-    /*
-     * N.B. here and below all the "-1"'s remove counting the NUL terminator
-     * on the statically allocated character strings.
-     */
-    length += sizeof(openList) - 1 ;
-    for (hIter = Ral_TupleHeadingBegin(heading) ; hIter != hEnd ; ++hIter) {
-	Ral_Attribute a = *hIter ;
-
-	/* +1 for the space between list elements */
-	length += Ral_AttributeScanName(a, flagPtr++) + 1 ;
-	length += Tcl_ScanElement(Tcl_GetString(*v++), flagPtr++) + 1 ;
-    }
-    length += sizeof(closeList) - 1 ;
-
+    length = Ral_TupleScan(tuple, &scanFlags) ;
     /*
      * Second phase is to allocate the memory and generate the string rep
      * into the object structure.
      */
-
-    objPtr->bytes = dst = ckalloc(length + 1) ; /* +1 for the NUL terminator */
+    objPtr->bytes = ckalloc(length + 1) ; /* +1 for the NUL terminator */
     /*
-     * Copy in the Tuple Heading.
+     * Convert the Tuple into a string.
      */
-    dst += Ral_TupleHeadingConvert(heading, dst, headingFlags) ;
+    objPtr->length = Ral_TupleConvert(tuple, objPtr->bytes, scanFlags) ;
     /*
-     * The next element is the attribute / value pairs list.
+     * Done with the scan flags.
      */
-    strcpy(dst, openList) ;
-    dst += sizeof(openList) - 1 ;
-    v = tuple->values ;
-    flagPtr = flagVect ;
-    for (hIter = Ral_TupleHeadingBegin(heading) ; hIter != hEnd ; ++hIter) {
-	Ral_Attribute a = *hIter ;
-
-	dst += Ral_AttributeConvertName(a, dst, *flagPtr++) ;
-	*dst++ = ' ' ;
-	dst += Tcl_ConvertElement(Tcl_GetString(*v++), dst, *flagPtr++) ;
-	*dst++ = ' ' ;
-    }
-    /* Done with the scan flags. */
-    ckfree((char *)flagVect) ;
-    /* Get rid of trailing blank, but only for non-empty headings */
-    if (Ral_TupleHeadingSize(heading)) {
-	--dst ;
-    }
-    /*
-     * Note that copying in the closing brace also NUL terminates the result.
-     */
-    strcpy(dst, closeList) ;
-    dst += sizeof(closeList) - 1 ;
-    objPtr->length = dst - objPtr->bytes ;
+    Ral_AttributeScanFlagsFree(Ral_TupleDegree(tuple), scanFlags) ;
 }
 
 static int
@@ -387,16 +392,11 @@ SetTupleFromAny(
 	return TCL_ERROR ;
     }
     if (objc != 3) {
-	Tcl_ResetResult(interp) ;
-	Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-	    "badly formatted tuple, \"", Tcl_GetString(objPtr), "\"", NULL) ;
+	Ral_TupleObjSetError(interp, FORMAT_ERR, Tcl_GetString(objPtr)) ;
 	return TCL_ERROR ;
     }
     if (strcmp(Ral_TupleObjType.name, Tcl_GetString(*objv)) != 0) {
-	Tcl_ResetResult(interp) ;
-	Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-	    "bad tuple type keyword: expected, \"", Ral_TupleObjType.name,
-	    "\", but got, \"", Tcl_GetString(*objv), "\"", NULL) ;
+	Ral_TupleObjSetError(interp, BAD_KEYWORD, Tcl_GetString(*objv)) ;
 	return TCL_ERROR ;
     }
 
