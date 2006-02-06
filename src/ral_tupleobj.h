@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleobj.h,v $
-$Revision: 1.2 $
-$Date: 2006/01/02 01:39:29 $
+$Revision: 1.3 $
+$Date: 2006/02/06 05:02:45 $
  *--
  */
 #ifndef _ral_tupleobj_h_
@@ -82,6 +82,7 @@ typedef enum Ral_TupleError {
     BAD_VALUE,
     BAD_KEYWORD,
     WRONG_NUM_ATTRS,
+    BAD_PAIRS_LIST,
 } Ral_TupleError ;
 
 /*
@@ -95,7 +96,10 @@ FUNCTION DECLARATIONS
 
 extern Tcl_Obj *Ral_TupleNewObj(Ral_Tuple) ;
 extern Ral_TupleHeading Ral_TupleHeadingNewFromObj(Tcl_Interp *, Tcl_Obj *) ;
-extern int Ral_TupleSetValuesFromObj(Ral_Tuple, Tcl_Interp *, Tcl_Obj *) ;
+extern int Ral_TupleSetFromObj(Ral_Tuple, Tcl_Interp *, Tcl_Obj *) ;
+extern int Ral_TupleUpdateFromObj(Ral_Tuple, Tcl_Interp *, Tcl_Obj *) ;
+extern int Ral_TupleUpdateAttrFromObj(Ral_Tuple, Tcl_Interp *, Tcl_Obj *,
+    Tcl_Obj *) ;
 extern const char *Ral_TupleObjVersion(void) ;
 extern void Ral_TupleObjSetError(Tcl_Interp *, Ral_TupleError, const char *) ;
 

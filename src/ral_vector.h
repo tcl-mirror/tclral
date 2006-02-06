@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_vector.h,v $
-$Revision: 1.1 $
-$Date: 2005/12/27 23:17:19 $
+$Revision: 1.2 $
+$Date: 2006/02/06 05:02:45 $
  *--
  */
 #ifndef _ral_vector_h_
@@ -86,6 +86,7 @@ FUNCTION DECLARATIONS
 */
 
 extern Ral_IntVector Ral_IntVectorNew(unsigned, Ral_IntVectorValueType) ;
+extern Ral_IntVector Ral_IntVectorNewEmpty(unsigned) ;
 extern void Ral_IntVectorDelete(Ral_IntVector) ;
 
 extern Ral_IntVectorIter Ral_IntVectorBegin(Ral_IntVector) ;
@@ -110,14 +111,17 @@ extern Ral_IntVectorIter Ral_IntVectorInsert(Ral_IntVector, Ral_IntVectorIter,
 extern Ral_IntVectorIter Ral_IntVectorErase(Ral_IntVector, Ral_IntVectorIter,
     Ral_IntVectorIter) ;
 
+extern int Ral_IntVectorSetAdd(Ral_IntVector, Ral_IntVectorValueType) ;
+
 extern void Ral_IntVectorSort(Ral_IntVector) ;
 extern Ral_IntVectorIter Ral_IntVectorFind(Ral_IntVector,
     Ral_IntVectorValueType) ;
 extern int Ral_IntVectorEqual(Ral_IntVector, Ral_IntVector) ;
+extern int Ral_IntVectorSubsetOf(Ral_IntVector, Ral_IntVector) ;
 extern Ral_IntVectorIter Ral_IntVectorCopy(Ral_IntVector, Ral_IntVectorIter,
     Ral_IntVectorIter, Ral_IntVector, Ral_IntVectorIter) ;
 
-extern void Ral_IntVectorPrint(Ral_IntVector, Ral_IntVectorIter, FILE *) ;
+extern const char *Ral_IntVectorPrint(Ral_IntVector, Ral_IntVectorIter) ;
 extern const char *Ral_IntVectorVersion(void) ;
 
 

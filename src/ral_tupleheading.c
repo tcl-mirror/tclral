@@ -43,13 +43,18 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_tupleheading.c,v $
-$Revision: 1.2 $
-$Date: 2006/01/02 01:39:29 $
+$Revision: 1.3 $
+$Date: 2006/02/06 05:02:45 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_tupleheading.c,v $
+Revision 1.3  2006/02/06 05:02:45  mangoa01
+Started on relation heading and other code refactoring.
+This is a checkpoint after a number of added files and changes
+to tuple heading code.
+
 Revision 1.2  2006/01/02 01:39:29  mangoa01
 Tuple commands now operate properly. Fixed problems of constructing the string representation when there were tuple valued attributes.
 
@@ -99,7 +104,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tupleheading.c,v $ $Revision: 1.2 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tupleheading.c,v $ $Revision: 1.3 $" ;
 
 static const char tupleKeyword[] = "Tuple {" ;
 static const char closeList[] = "}" ;
@@ -164,17 +169,17 @@ Ral_TupleHeadingAppend(
 
     if (first > src->finish) {
 	Tcl_Panic(
-	"Ral_TupleHeadingCopy: out of bounds access at source offset \"%d\"",
+	"Ral_TupleHeadingAppend: out of bounds access at source offset \"%d\"",
 	    first - src->start) ;
     }
     if (last > src->finish) {
 	Tcl_Panic(
-	"Ral_TupleHeadingCopy: out of bounds access at source offset \"%d\"",
+	"Ral_TupleHeadingAppend: out of bounds access at source offset \"%d\"",
 	    last - src->start) ;
     }
     n = last - first ;
     if (dst->finish + n > dst->endStorage) {
-	Tcl_Panic("Ral_TupleHeadingCopy: overflow of copy destination") ;
+	Tcl_Panic("Ral_TupleHeadingAppend: overflow of destination") ;
     }
 
     for ( ; n ; --n) {
@@ -246,6 +251,21 @@ Ral_TupleHeadingEnd(
     Ral_TupleHeading h)
 {
     return h->finish ;
+}
+
+Ral_Attribute
+Ral_TupleHeadingFetch(
+    Ral_TupleHeading h,
+    int index)
+{
+    Ral_TupleHeadingIter i = h->start + index ;
+
+    if (i >= h->finish) {
+	Tcl_Panic(
+	    "Ral_TupleHeadingFetch: out of bounds access at offset \"%d\"",
+	    index) ;
+    }
+    return *i ;
 }
 
 Ral_TupleHeadingIter
@@ -351,6 +371,103 @@ Ral_TupleHeadingIndexOf(
     return e ?  (int)Tcl_GetHashValue(e) : -1 ;
 }
 
+/*
+ * Create a new tuple heading that is the union of two headings.
+ */
+Ral_TupleHeading
+Ral_TupleHeadingUnion(
+    Ral_TupleHeading h1,
+    Ral_TupleHeading h2)
+{
+    Ral_TupleHeading unionHeading ;
+    Ral_TupleHeadingIter h2End ;
+    Ral_TupleHeadingIter h2Iter ;
+
+    /*
+     * The maximum size of the union is the sum of the sizes of the
+     * two components.
+     */
+    unionHeading = Ral_TupleHeadingNew(Ral_TupleHeadingSize(h1) +
+	Ral_TupleHeadingSize(h2)) ;
+
+    /*
+     * Copy in the first heading.
+     */
+    if (!Ral_TupleHeadingAppend(h1, Ral_TupleHeadingBegin(h1),
+	    Ral_TupleHeadingEnd(h1), unionHeading)) {
+	Ral_TupleHeadingDelete(unionHeading) ;
+	return NULL ;
+    }
+    /*
+     * Iterate through the second heading and push on the attributes.
+     * Unlike a normal set union, it is important that there be no
+     * common attributes between the two headings that are components
+     * of the union.
+     */
+    h2End = Ral_TupleHeadingEnd(h2) ;
+    for (h2Iter = Ral_TupleHeadingBegin(h2) ; h2Iter != h2End ; ++h2Iter) {
+	Ral_TupleHeadingIter i =
+	    Ral_TupleHeadingPushBack(unionHeading, Ral_AttributeCopy(*h2Iter)) ;
+	if (i == Ral_TupleHeadingEnd(unionHeading)) {
+	    Ral_TupleHeadingDelete(unionHeading) ;
+	    return NULL ;
+	}
+    }
+
+    return unionHeading ;
+}
+
+/*
+ * Create a new tuple heading that is the intersection of two headings.
+ */
+Ral_TupleHeading
+Ral_TupleHeadingIntersect(
+    Ral_TupleHeading h1,
+    Ral_TupleHeading h2)
+{
+    Ral_TupleHeading intersectHeading ;
+    unsigned h1Size = Ral_TupleHeadingSize(h1) ;
+    unsigned h2Size = Ral_TupleHeadingSize(h2) ;
+    Ral_TupleHeadingIter h1End ;
+    Ral_TupleHeadingIter h1Iter ;
+    Ral_TupleHeadingIter h2End ;
+
+    /*
+     * The maximum size of the intersection is the smaller of the sum of the
+     * sizes of the two components.
+     */
+    intersectHeading = Ral_TupleHeadingNew(h1Size < h2Size ? h1Size : h2Size) ;
+
+    /*
+     * Iterate through the first heading finding those attributes that also
+     * exist in the second heading. If the attribute is contained in both tuple
+     * headings, then it is placed in the intersection.
+     */
+    h1End = Ral_TupleHeadingEnd(h1) ;
+    h2End = Ral_TupleHeadingEnd(h2) ;
+    for (h1Iter = Ral_TupleHeadingBegin(h1) ; h1Iter != h1End ; ++h1Iter) {
+	Ral_Attribute h1Attr = *h1Iter ;
+	Ral_TupleHeadingIter found = Ral_TupleHeadingFind(h2, h1Attr->name) ;
+
+	/*
+	 * N.B. we wish the names to match and the attributes to be
+	 * otherwise equal.
+	 */
+	if (found != h2End && Ral_AttributeEqual(*found, h1Attr)) {
+	    Ral_TupleHeadingIter place =
+		Ral_TupleHeadingPushBack(intersectHeading,
+		Ral_AttributeCopy(*found)) ;
+
+	    if (place == Ral_TupleHeadingEnd(intersectHeading)) {
+		Ral_TupleHeadingDelete(intersectHeading) ;
+		return NULL ;
+	    }
+	}
+    }
+
+    return intersectHeading ;
+}
+
 int
 Ral_TupleHeadingScan(
     Ral_TupleHeading h,
@@ -438,18 +555,6 @@ Ral_TupleHeadingToString(
     Ral_AttributeScanFlagsFree(size, flags) ;
 
     return str ;
-}
-
-void
-Ral_TupleHeadingPrint(
-    Ral_TupleHeading h,
-    Ral_TupleHeadingIter first,
-    FILE *f)
-{
-    for ( ; first < h->finish ; ++first) {
-	Ral_Attribute a = *first ;
-	fprintf(f, "%d: %s\n", Ral_TupleHeadingIndexOf(h, a->name), a->name) ;
-    }
 }
 
 const char *

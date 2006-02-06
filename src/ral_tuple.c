@@ -43,13 +43,18 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_tuple.c,v $
-$Revision: 1.2 $
-$Date: 2006/01/02 01:39:29 $
+$Revision: 1.3 $
+$Date: 2006/02/06 05:02:45 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_tuple.c,v $
+Revision 1.3  2006/02/06 05:02:45  mangoa01
+Started on relation heading and other code refactoring.
+This is a checkpoint after a number of added files and changes
+to tuple heading code.
+
 Revision 1.2  2006/01/02 01:39:29  mangoa01
 Tuple commands now operate properly. Fixed problems of constructing the string representation when there were tuple valued attributes.
 
@@ -100,7 +105,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList[] = "{" ;
 static const char closeList[] = "}" ;
-static const char rcsid[] = "@(#) $RCSfile: ral_tuple.c,v $ $Revision: 1.2 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tuple.c,v $ $Revision: 1.3 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -190,7 +195,6 @@ Ral_TupleEqual(
     if (tuple1 == tuple2) {
 	return 1 ;
     }
-
     /*
      * For tuples to be equal they must have equal headings.
      */
@@ -199,7 +203,6 @@ Ral_TupleEqual(
     if (!Ral_TupleHeadingEqual(h1, h2)) {
 	return 0 ;
     }
-
     /*
      * Match the values. We iterate on the first tuple, using the
      * attribute name to find the proper index into the second tuple.
@@ -210,7 +213,6 @@ Ral_TupleEqual(
     e1 = Ral_TupleHeadingEnd(h1) ;
     for (b1 = Ral_TupleHeadingBegin(h1) ; b1 != e1 ; ++b1) {
 	int i2 = Ral_TupleHeadingIndexOf(h2, (*b1)->name) ;
-
 	/*
 	 * Since the two headings are equal, we must be able to find
 	 * each attribute.

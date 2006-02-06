@@ -10,6 +10,8 @@ main(
     int argc,
     char **argv)
 {
+    Tcl_Interp *interp ;
+    Tcl_ObjType *strType ;
     Ral_Attribute a1 ;
     Ral_Attribute a2 ;
     Ral_Attribute a3 ;
@@ -19,12 +21,16 @@ main(
     Tcl_Obj *v1 ;
     Ral_TupleUpdateStatus s1 ;
 
+    interp = Tcl_CreateInterp() ;
+    Tcl_InitMemory(interp) ;
+
+    strType = Tcl_GetObjType("string") ;
     logInfo("creating \"attr1\"") ;
-    a1 = Ral_AttributeNewTclType("attr1", NULL) ;
+    a1 = Ral_AttributeNewTclType("attr1", strType) ;
     logInfo("creating \"attr2\"") ;
-    a2 = Ral_AttributeNewTclType("attr2", NULL) ;
+    a2 = Ral_AttributeNewTclType("attr2", strType) ;
     logInfo("creating \"attr3\"") ;
-    a3 = Ral_AttributeNewTclType("attr3", NULL) ;
+    a3 = Ral_AttributeNewTclType("attr3", strType) ;
 
     logInfo("creating tuple heading") ;
     h1 = Ral_TupleHeadingNew(3) ;

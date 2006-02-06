@@ -43,13 +43,18 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_vector.c,v $
-$Revision: 1.1 $
-$Date: 2005/12/27 23:17:19 $
+$Revision: 1.2 $
+$Date: 2006/02/06 05:02:45 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_vector.c,v $
+Revision 1.2  2006/02/06 05:02:45  mangoa01
+Started on relation heading and other code refactoring.
+This is a checkpoint after a number of added files and changes
+to tuple heading code.
+
 Revision 1.1  2005/12/27 23:17:19  mangoa01
 Update to the new spilt out file structure.
 
@@ -95,7 +100,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_vector.c,v $ $Revision: 1.1 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_vector.c,v $ $Revision: 1.2 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -113,6 +118,20 @@ Ral_IntVectorNew(
 	size * sizeof(Ral_IntVectorValueType)) ;
     v->finish = v->endStorage = v->start + size ;
     Ral_IntVectorFill(v, value) ;
+
+    return v ;
+}
+
+Ral_IntVector
+Ral_IntVectorNewEmpty(
+    unsigned size)
+{
+    Ral_IntVector v ;
+
+    v = (Ral_IntVector)ckalloc(sizeof(*v)) ;
+    v->finish = v->start = (Ral_IntVectorIter)ckalloc(
+	size * sizeof(Ral_IntVectorValueType)) ;
+    v->endStorage = v->start + size ;
 
     return v ;
 }
@@ -238,7 +257,12 @@ Ral_IntVectorPushBack(
 {
     if (v->finish >= v->endStorage) {
 	unsigned oldCapacity = Ral_IntVectorCapacity(v) ;
-	Ral_IntVectorReserve(v, oldCapacity + oldCapacity / 2) ;
+	/*
+	 * Increase the capacity by half again. +1 to make sure
+	 * we allocate at least one slot if this is the first time
+	 * we are pushing onto an empty vector.
+	 */
+	Ral_IntVectorReserve(v, oldCapacity + oldCapacity / 2 + 1) ;
     }
     *v->finish++ = value ;
 }
@@ -325,6 +349,15 @@ int_ind_compare(
     return *i1 - *i2 ;
 }
 
+int
+Ral_IntVectorSetAdd(
+    Ral_IntVector v,
+    Ral_IntVectorValueType value)
+{
+    return Ral_IntVectorFind(v, value) == v->finish ?
+	(Ral_IntVectorPushBack(v, value), 1) : 0 ;
+}
+
 void
 Ral_IntVectorSort(
     Ral_IntVector v)
@@ -363,6 +396,27 @@ Ral_IntVectorEqual(
     return equals ;
 }
 
+/*
+ * Determine if "v1" is a subset (possibly improper) of "v2".
+ */
+int
+Ral_IntVectorSubsetOf(
+    Ral_IntVector v1,
+    Ral_IntVector v2)
+{
+    int found = 0 ;
+    Ral_IntVectorIter end1 = Ral_IntVectorEnd(v1) ;
+    Ral_IntVectorIter end2 = Ral_IntVectorEnd(v2) ;
+    Ral_IntVectorIter iter1 ;
+
+    for (iter1 = Ral_IntVectorBegin(v1) ; iter1 != end1 ; ++iter1) {
+	Ral_IntVectorIter iter2 = Ral_IntVectorFind(v2, *iter1) ;
+	found += iter2 != end2 ;
+    }
+
+    return found == Ral_IntVectorSize(v1) ;
+}
+
 Ral_IntVectorIter
 Ral_IntVectorCopy(
     Ral_IntVector src,
@@ -396,16 +450,26 @@ Ral_IntVectorCopy(
     return pos ;
 }
 
-void
+const char *
 Ral_IntVectorPrint(
     Ral_IntVector v,
-    Ral_IntVectorIter first,
-    FILE *s)
+    Ral_IntVectorIter first)
 {
+    static char buf[BUFSIZ] ;
+
+    char *s = buf ;
     int n ;
+
     for (n = first - v->start ; first != v->finish ; ++first) {
-	fprintf(s, "%d: %d\n", n++, *first) ;
+	s += snprintf(s, sizeof(buf) - (s - buf), "%d: %d\n", n++, *first) ;
     }
+
+    if (s != buf) {
+	--s ;
+    }
+    *s++ = '\0' ;
+
+    return buf ;
 }
 
 const char *

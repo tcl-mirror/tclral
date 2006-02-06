@@ -43,13 +43,18 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_tupleobj.c,v $
-$Revision: 1.2 $
-$Date: 2006/01/02 01:39:29 $
+$Revision: 1.3 $
+$Date: 2006/02/06 05:02:45 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_tupleobj.c,v $
+Revision 1.3  2006/02/06 05:02:45  mangoa01
+Started on relation heading and other code refactoring.
+This is a checkpoint after a number of added files and changes
+to tuple heading code.
+
 Revision 1.2  2006/01/02 01:39:29  mangoa01
 Tuple commands now operate properly. Fixed problems of constructing the string representation when there were tuple valued attributes.
 
@@ -115,7 +120,7 @@ Tcl_ObjType Ral_TupleObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tupleobj.c,v $ $Revision: 1.2 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tupleobj.c,v $ $Revision: 1.3 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -183,7 +188,7 @@ Ral_TupleHeadingNewFromObj(
  * must be given for every attribute.
  */
 int
-Ral_TupleSetValuesFromObj(
+Ral_TupleSetFromObj(
     Ral_Tuple tuple,
     Tcl_Interp *interp,
     Tcl_Obj *objPtr)
@@ -204,15 +209,14 @@ Ral_TupleSetValuesFromObj(
 	return TCL_ERROR ;
     }
     /*
-     * Go through the attribute / value pairs updating the tuple values.
-     * We must make sure that each attribute is assigned to exactly once.
-     * We use a vector to keep track of this.
+     * Go through the attribute / value pairs making sure that that each
+     * attribute is mentioned exactly once.  We use a vector to keep track of
+     * this.
      */
     attrStatus = Ral_IntVectorNew(Ral_TupleDegree(tuple), 0) ;
     for ( ; elemc > 0 ; elemc -= 2, elemv += 2) {
 	const char *attrName = Tcl_GetString(*elemv) ;
 	int hindex = Ral_TupleHeadingIndexOf(tuple->heading, attrName) ;
-	Ral_TupleUpdateStatus status ;
 
 	if (hindex < 0) {
 	    Ral_TupleObjSetError(interp, UNKNOWN_ATTR, attrName) ;
@@ -222,33 +226,70 @@ Ral_TupleSetValuesFromObj(
 	    goto errorOut ;
 	}
 	Ral_IntVectorStore(attrStatus, hindex, 1) ;
-
-	status = Ral_TupleUpdateAttrValue(tuple, attrName, *(elemv + 1)) ;
-	switch (status) {
-	case AttributeUpdated:
-	    break ;
-
-	case NoSuchAttribute:
-	    Ral_TupleObjSetError(interp, UNKNOWN_ATTR, attrName) ;
-	    goto errorOut ;
-
-	case BadValueType:
-	    Ral_TupleObjSetError(interp, BAD_VALUE,
-		Tcl_GetString(*(elemv + 1))) ;
-	    goto errorOut ;
-
-	default:
-	    Tcl_Panic("unknown tuple update status, \"%d\"", status) ;
-	    break ;
-	}
     }
-
     Ral_IntVectorDelete(attrStatus) ;
-    return TCL_OK ;
+
+    /*
+     * Once we've established that all the attributes are in the list,
+     * then the normal update function assigns the values to the attributes.
+     */
+    return Ral_TupleUpdateFromObj(tuple, interp, objPtr) ;
 
 errorOut:
     Ral_IntVectorDelete(attrStatus) ;
     return TCL_ERROR ;
+}
+
+/*
+ * For update purposes, we do not insist that every attribute be set.
+ */
+int
+Ral_TupleUpdateFromObj(
+    Ral_Tuple tuple,
+    Tcl_Interp *interp,
+    Tcl_Obj *objPtr)
+{
+    int elemc ;
+    Tcl_Obj **elemv ;
+
+    if (Tcl_ListObjGetElements(interp, objPtr, &elemc, &elemv) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    if (elemc % 2 != 0) {
+	Ral_TupleObjSetError(interp, FORMAT_ERR, Tcl_GetString(objPtr)) ;
+	return TCL_ERROR ;
+    }
+    /*
+     * Go through the attribute / value pairs updating the attribute values.
+     */
+    for ( ; elemc > 0 ; elemc -= 2, elemv += 2) {
+	if (Ral_TupleUpdateAttrFromObj(tuple, interp, *elemv, *(elemv + 1))
+	    != TCL_OK) {
+	    return TCL_ERROR ;
+	}
+    }
+
+    return TCL_OK ;
+}
+
+int
+Ral_TupleUpdateAttrFromObj(
+    Ral_Tuple tuple,
+    Tcl_Interp *interp,
+    Tcl_Obj *attrObj,
+    Tcl_Obj *valueObj)
+{
+    const char *attrName = Tcl_GetString(attrObj) ;
+    Ral_TupleUpdateStatus status ;
+
+    status = Ral_TupleUpdateAttrValue(tuple, attrName, valueObj) ;
+    if (status == NoSuchAttribute) {
+	Ral_TupleObjSetError(interp, UNKNOWN_ATTR, attrName) ;
+    } else if (status == BadValueType) {
+	Ral_TupleObjSetError(interp, BAD_VALUE, Tcl_GetString(valueObj)) ;
+    }
+
+    return status == AttributeUpdated ? TCL_OK : TCL_ERROR ;
 }
 
 const char *
@@ -275,6 +316,7 @@ Ral_TupleObjSetError(
 	"bad value type for value",
 	"bad tuple type keyword",
 	"wrong number of attributes specified",
+	"bad list of pairs"
     } ;
     static const char *errorStrings[] = {
 	"UNKNOWN_ATTR",
@@ -284,6 +326,7 @@ Ral_TupleObjSetError(
 	"BAD_VALUE",
 	"BAD_KEYWORD",
 	"WRONG_NUM_ATTRS",
+	"BAD_PAIRS_LIST",
     } ;
 
     if (interp) {
@@ -406,7 +449,7 @@ SetTupleFromAny(
     }
 
     tuple = Ral_TupleNew(heading) ;
-    if (Ral_TupleSetValuesFromObj(tuple, interp, *(objv + 2)) != TCL_OK) {
+    if (Ral_TupleSetFromObj(tuple, interp, *(objv + 2)) != TCL_OK) {
 	Ral_TupleDelete(tuple) ;
 	return TCL_ERROR ;
     }

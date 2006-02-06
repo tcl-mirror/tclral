@@ -42,15 +42,22 @@ terms specified in this license.
  *++
 MODULE:
 
+$RCSfile: ral_relationobj.c,v $
+$Revision: 1.1 $
+$Date: 2006/02/06 05:02:45 $
+
 ABSTRACT:
 
-$RCSfile: ral_relationheading.h,v $
-$Revision: 1.2 $
-$Date: 2006/02/06 05:02:45 $
+MODIFICATION HISTORY:
+$Log: ral_relationobj.c,v $
+Revision 1.1  2006/02/06 05:02:45  mangoa01
+Started on relation heading and other code refactoring.
+This is a checkpoint after a number of added files and changes
+to tuple heading code.
+
+
  *--
  */
-#ifndef _ral_relationheading_h_
-#define _ral_relationheading_h_
 
 /*
 PRAGMAS
@@ -59,54 +66,45 @@ PRAGMAS
 /*
 INCLUDE FILES
 */
-#include "ral_tupleheading.h"
-#include "ral_vector.h"
-#include <stdio.h>
+#include "ral_relationobj.h"
 
 /*
 MACRO DEFINITIONS
 */
 
 /*
-FORWARD CLASS REFERENCES
+TYPE DEFINITIONS
 */
 
 /*
-TYPE DECLARATIONS
+EXTERNAL FUNCTION REFERENCES
 */
 
 /*
- * A Relation Heading is a Tuple Heading with the addition of identifiers.
- * Identifiers are sub sets of attributes for which the tuples may not have
- * duplicated values.
- */
-typedef struct Ral_RelationHeading {
-    int refCount ;			/* Relation headings are reference
-					 * counted. */
-    Ral_TupleHeading tupleHeading ;	/* The Tuple heading that describes
-					 * all of the tuples contained in the
-					 * relation */
-    int idCount ;			/* The number of identfiers */
-    Ral_IntVector *identifiers ;	/* An array of vectors holding the
-					 * identifiers. Identifiers are a vector
-					 * of offsets into the Tuple Heading
-					 * giving the attributes that
-					 * constitute the identifier. */
-} *Ral_RelationHeading ;
-
-/*
-FUNCTION DECLARATIONS
+FORWARD FUNCTION REFERENCES
 */
 
-extern Ral_RelationHeading Ral_RelationHeadingNew(Ral_TupleHeading, int) ;
-extern void Ral_RelationHeadingDelete(Ral_RelationHeading) ;
-extern void Ral_RelationHeadingReference(Ral_RelationHeading) ;
-extern void Ral_RelationHeadingUnreference(Ral_RelationHeading) ;
-extern int Ral_RelationHeadingEqual(Ral_RelationHeading, Ral_RelationHeading) ;
-extern int Ral_RelationHeadingAddIdentifier(Ral_RelationHeading, int,
-    Ral_IntVector) ;
-extern Ral_RelationHeading Ral_RelationHeadingUnion(Ral_RelationHeading,
-    Ral_RelationHeading) ;
-extern const char *Ral_RelationHeadingVersion(void) ;
+/*
+EXTERNAL DATA REFERENCES
+*/
 
-#endif /* _ral_relationheading_h_ */
+/*
+EXTERNAL DATA DEFINITIONS
+*/
+
+/*
+STATIC DATA ALLOCATION
+*/
+static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.1 $" ;
+
+/*
+FUNCTION DEFINITIONS
+*/
+
+Ral_RelationHeading
+Ral_RelationHeadingNewFromObj(
+    Tcl_Interp *interp,
+    Tcl_Obj *objPtr)
+{
+    return NULL ;
+}

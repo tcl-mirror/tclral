@@ -43,13 +43,18 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_attribute.c,v $
-$Revision: 1.2 $
-$Date: 2006/01/02 01:39:29 $
+$Revision: 1.3 $
+$Date: 2006/02/06 05:02:45 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_attribute.c,v $
+Revision 1.3  2006/02/06 05:02:45  mangoa01
+Started on relation heading and other code refactoring.
+This is a checkpoint after a number of added files and changes
+to tuple heading code.
+
 Revision 1.2  2006/01/02 01:39:29  mangoa01
 Tuple commands now operate properly. Fixed problems of constructing the string representation when there were tuple valued attributes.
 
@@ -73,6 +78,7 @@ INCLUDE FILES
 #include "ral_tupleheading.h"
 #include "ral_relationheading.h"
 #include "ral_tupleobj.h"
+#include "ral_relationobj.h"
 
 /*
 MACRO DEFINITIONS
@@ -103,7 +109,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList[] = "{" ;
 static const char closeList[] = "}" ;
-static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.2 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.3 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -231,7 +237,7 @@ Ral_AttributeConvertValueToType(
 	if (objPtr->typePtr != &Ral_TupleObjType) {
 	    Ral_Tuple tuple = Ral_TupleNew(attr->tupleHeading) ;
 
-	    if (Ral_TupleSetValuesFromObj(tuple, interp, objPtr) != TCL_OK) {
+	    if (Ral_TupleSetFromObj(tuple, interp, objPtr) != TCL_OK) {
 		Ral_TupleDelete(tuple) ;
 		return TCL_ERROR ;
 	    }
@@ -552,4 +558,37 @@ Ral_AttributeScanFlagsFree(
     }
 
     ckfree((char *)flags) ;
+}
+
+/*
+ * Returned string must be freed by the caller.
+ */
+char *
+Ral_AttributeToString(
+    Ral_Attribute a)
+{
+    Ral_AttributeScanFlags flags ;
+    int size ;
+    char *str ;
+    char *s ;
+
+    flags = (Ral_AttributeScanFlags)ckalloc(sizeof(*flags)) ;
+
+    size = Ral_AttributeScanName(a, flags) + Ral_AttributeScanType(a, flags) ;
+    size += 1 ;
+    s = str = ckalloc(size) ;
+    s += Ral_AttributeConvertName(a, s, flags) ;
+    *s++ = ' ' ;
+    Ral_AttributeConvertType(a, s, flags) ;
+
+    Ral_AttributeScanFlagsFree(1, flags) ;
+
+    return str ;
+}
+
+
+const char *
+Ral_AttributeVersion(void)
+{
+    return rcsid ;
 }

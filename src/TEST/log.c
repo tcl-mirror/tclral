@@ -29,7 +29,6 @@ logMsg(
     va_start(ap, fmt) ;
     vlogMsg(label, fmt, ap) ;
     va_end(ap) ;
-    ++nInfo ;
 }
 
 void

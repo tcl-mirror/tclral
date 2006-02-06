@@ -44,13 +44,13 @@ MODULE:
 
 ABSTRACT:
 
-$RCSfile: ral_relationheading.h,v $
-$Revision: 1.2 $
+$RCSfile: ral_relation.h,v $
+$Revision: 1.1 $
 $Date: 2006/02/06 05:02:45 $
  *--
  */
-#ifndef _ral_relationheading_h_
-#define _ral_relationheading_h_
+#ifndef _ral_relation_h_
+#define _ral_relation_h_
 
 /*
 PRAGMAS
@@ -59,8 +59,8 @@ PRAGMAS
 /*
 INCLUDE FILES
 */
-#include "ral_tupleheading.h"
-#include "ral_vector.h"
+#include "ral_relationheading.h"
+#include "ral_tuple.h"
 #include <stdio.h>
 
 /*
@@ -76,37 +76,55 @@ TYPE DECLARATIONS
 */
 
 /*
- * A Relation Heading is a Tuple Heading with the addition of identifiers.
- * Identifiers are sub sets of attributes for which the tuples may not have
- * duplicated values.
+ * A Relation type consists of a heading with a body.  A body consists
+ * of zero or more tuples.
+
+ * The external string representation of a "Relation" is a specially
+ * formatted list. The list consists of four elements.
+ *
+ * 1. The keyword "Relation".
+ *
+ * 2. A tuple heading. A tuple heading is a list of Name / Type pairs as
+ *    described above.
+ *
+ * 3. A list of identifiers. Each identifier is in turn a list of attribute
+ *    names that constitute the identifier
+ *
+ * 4. A list of tuple values. Each element of the list is a set of
+ *    Attribute Name / Attribute Value pairs.
+ * E.G.
+ *    {Relation {{{Name string} {Number int} {Wage double}} {{Name}}}\
+ *    {{Name Andrew Number 200 Wage 5.75}\
+ *     {Name George Number 174 Wage 10.25}}}
+ * is a Relation consisting of a body which has two tuples.
+ *
+ * All tuples in a relation must have the same heading and all tuples in a
+ * relation must be unique.  We build hash tables for the identifiers that can
+ * be used as indices into the tuple storage of a Relation.
  */
-typedef struct Ral_RelationHeading {
-    int refCount ;			/* Relation headings are reference
-					 * counted. */
-    Ral_TupleHeading tupleHeading ;	/* The Tuple heading that describes
-					 * all of the tuples contained in the
-					 * relation */
-    int idCount ;			/* The number of identfiers */
-    Ral_IntVector *identifiers ;	/* An array of vectors holding the
-					 * identifiers. Identifiers are a vector
-					 * of offsets into the Tuple Heading
-					 * giving the attributes that
-					 * constitute the identifier. */
-} *Ral_RelationHeading ;
+
+typedef struct Ral_Relation {
+    Ral_RelationHeading heading ;   /* The relation heading */
+    Ral_Tuple *startTuples ;	    /* Tuple values are stored in a dynamic
+				     * vector of tuple pointers. We use the
+				     * usual start, finish, end pointers to
+				     * manipulate the vector.
+				     * Cf. Ral_IntVector */
+    Ral_Tuple *finishTuples ;
+    Ral_Tuple *endTuples ;
+    Tcl_HashTable *indexVector ;    /* A vector of hash tables that map the
+				     * the values of identifying attributes
+				     * to the index in the tuple vector where
+				     * the corresponding tuple is found.
+				     * There is one hash table for each
+				     * identifier, i.e. "indexVector" points
+				     * to an array of "heading->idCount" hash
+				     * tables. */
+} *Ral_Relation ;
 
 /*
 FUNCTION DECLARATIONS
 */
+extern const char * Ral_RelationVersion(void) ;
 
-extern Ral_RelationHeading Ral_RelationHeadingNew(Ral_TupleHeading, int) ;
-extern void Ral_RelationHeadingDelete(Ral_RelationHeading) ;
-extern void Ral_RelationHeadingReference(Ral_RelationHeading) ;
-extern void Ral_RelationHeadingUnreference(Ral_RelationHeading) ;
-extern int Ral_RelationHeadingEqual(Ral_RelationHeading, Ral_RelationHeading) ;
-extern int Ral_RelationHeadingAddIdentifier(Ral_RelationHeading, int,
-    Ral_IntVector) ;
-extern Ral_RelationHeading Ral_RelationHeadingUnion(Ral_RelationHeading,
-    Ral_RelationHeading) ;
-extern const char *Ral_RelationHeadingVersion(void) ;
-
-#endif /* _ral_relationheading_h_ */
+#endif /* _ral_relation_h_ */

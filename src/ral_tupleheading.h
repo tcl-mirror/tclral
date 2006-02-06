@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleheading.h,v $
-$Revision: 1.2 $
-$Date: 2006/01/02 01:39:29 $
+$Revision: 1.3 $
+$Date: 2006/02/06 05:02:45 $
  *--
  */
 #ifndef _ral_tupleheading_h_
@@ -59,7 +59,6 @@ PRAGMAS
 /*
 INCLUDE FILES
 */
-#include "tcl.h"
 #include "ral_attribute.h"
 #include <stdio.h>
 
@@ -125,17 +124,20 @@ extern Ral_TupleHeadingIter Ral_TupleHeadingBegin(Ral_TupleHeading) ;
 extern Ral_TupleHeadingIter Ral_TupleHeadingEnd(Ral_TupleHeading) ;
 extern Ral_TupleHeadingIter Ral_TupleHeadingStore(Ral_TupleHeading,
     Ral_TupleHeadingIter, Ral_Attribute) ;
+extern Ral_Attribute Ral_TupleHeadingFetch(Ral_TupleHeading, int) ;
 extern Ral_TupleHeadingIter Ral_TupleHeadingPushBack(Ral_TupleHeading,
     Ral_Attribute) ;
 extern Ral_TupleHeadingIter Ral_TupleHeadingFind(Ral_TupleHeading,
     const char *) ;
 extern int Ral_TupleHeadingIndexOf(Ral_TupleHeading, const char *) ;
+extern Ral_TupleHeading Ral_TupleHeadingUnion(Ral_TupleHeading,
+    Ral_TupleHeading) ;
+extern Ral_TupleHeading Ral_TupleHeadingIntersect(Ral_TupleHeading,
+    Ral_TupleHeading) ;
 extern int Ral_TupleHeadingScan(Ral_TupleHeading, Ral_AttributeScanFlags) ;
 extern int Ral_TupleHeadingConvert(Ral_TupleHeading, char *,
     Ral_AttributeScanFlags) ;
 extern char *Ral_TupleHeadingToString(Ral_TupleHeading) ;
-extern void Ral_TupleHeadingPrint(Ral_TupleHeading, Ral_TupleHeadingIter,
-    FILE *) ;
 extern const char *Ral_TupleHeadingVersion(void) ;
 
 #endif /* _ral_tupleheading_h_ */

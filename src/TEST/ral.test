@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.1 $
-# $Date: 2006/01/02 01:39:29 $
+# $Revision: 1.2 $
+# $Date: 2006/02/06 05:02:46 $
 #  *--
 
 package require tcltest 2.2
@@ -371,7 +371,7 @@ namespace eval ::ral::test {
     test tuple-project-5.0 {unknown attribute} -body {
 	set t {Tuple {Name string Age int} {Name Andrew Age 20}}
 	tuple project $t foo
-    } -result {unknown attribute name, "foo"} -returnCodes 1
+    } -result {unknown attribute name, "foo"} -returnCodes error
 
     # tuple rename subcommand
     test tuple-rename-1.0 {single attribute} -setup {
@@ -396,7 +396,7 @@ namespace eval ::ral::test {
 	set t [tuple create {Name string Age int} {Name Andrew Age 20}]
     } -body {
 	tuple rename $t foo Name bar
-    } -result {oldname / newname arguments must come in pairs}\
+    } -result {bad list of pairs, "for oldname / newname arguments"}\
     -returnCodes error
 
     test tuple-rename-5.0 {multiple renamings} -setup {
@@ -452,7 +452,8 @@ namespace eval ::ral::test {
 	    {Name Andrew Address {Number 599 Street Blackwood City Sunnyvale}}]
     } -body {
 	tuple unwrap $t Name
-    } -result {attribute, "Name", is not of type Tuple} -returnCodes error
+    } -result {bad value type for value,\
+	"attribute to unwrap must be of Tuple type"} -returnCodes error
 
     # tuple update subcommand
     test tuple-update-1.0 {single attribute} -setup {

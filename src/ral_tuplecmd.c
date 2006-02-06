@@ -43,13 +43,18 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_tuplecmd.c,v $
-$Revision: 1.2 $
-$Date: 2006/01/02 01:39:29 $
+$Revision: 1.3 $
+$Date: 2006/02/06 05:02:45 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_tuplecmd.c,v $
+Revision 1.3  2006/02/06 05:02:45  mangoa01
+Started on relation heading and other code refactoring.
+This is a checkpoint after a number of added files and changes
+to tuple heading code.
+
 Revision 1.2  2006/01/02 01:39:29  mangoa01
 Tuple commands now operate properly. Fixed problems of constructing the string representation when there were tuple valued attributes.
 
@@ -113,7 +118,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tuplecmd.c,v $ $Revision: 1.2 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tuplecmd.c,v $ $Revision: 1.3 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -256,7 +261,7 @@ TupleCreateCmd(
     }
 
     tuple = Ral_TupleNew(heading) ;
-    if (Ral_TupleSetValuesFromObj(tuple, interp, *(objv + 3)) != TCL_OK) {
+    if (Ral_TupleSetFromObj(tuple, interp, *(objv + 3)) != TCL_OK) {
 	Ral_TupleDelete(tuple) ;
 	return TCL_ERROR ;
     }
@@ -726,9 +731,7 @@ TupleProjectCmd(
 	hiter = Ral_TupleHeadingFind(heading, attrName) ;
 
 	if (hiter == hend) {
-	    Tcl_ResetResult(interp) ;
-	    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-		"unknown attribute name, \"", attrName, "\"", NULL) ;
+	    Ral_TupleObjSetError(interp, UNKNOWN_ATTR, attrName) ;
 	    goto errorOut ;
 	}
 	Ral_TupleHeadingPushBack(newHeading, Ral_AttributeCopy(*hiter)) ;
@@ -771,9 +774,8 @@ TupleRenameCmd(
     objc -= 3 ;
     objv += 3 ;
     if (objc % 2 != 0) {
-	Tcl_ResetResult(interp) ;
-	Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-	    "oldname / newname arguments must come in pairs", NULL) ;
+	Ral_TupleObjSetError(interp, BAD_PAIRS_LIST,
+	    "for oldname / newname arguments") ;
 	return TCL_ERROR ;
     }
 
@@ -787,18 +789,14 @@ TupleRenameCmd(
 
 	hiter =Ral_TupleHeadingFind(newHeading, oldAttrName) ;
 	if (hiter == hend) {
-	    Tcl_ResetResult(interp) ;
-	    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-		"unknown attribute name, \"", oldAttrName, "\"", NULL) ;
+	    Ral_TupleObjSetError(interp, UNKNOWN_ATTR, oldAttrName) ;
 	    goto errorOut ;
 	}
 
 	hiter = Ral_TupleHeadingStore(newHeading, hiter,
 	    Ral_AttributeRename(*hiter, newAttrName)) ;
 	if (hiter == hend) {
-	    Tcl_ResetResult(interp) ;
-	    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-		"duplicate attribute name, \"", newAttrName, "\"", NULL) ;
+	    Ral_TupleObjSetError(interp, DUPLICATE_ATTR, newAttrName) ;
 	    goto errorOut ;
 	}
     }
@@ -862,9 +860,8 @@ TupleUnwrapCmd(
      */
     tupleAttr = *tupleAttrIter ;
     if (tupleAttr->attrType != Tuple_Type) {
-	Tcl_ResetResult(interp) ;
-	Tcl_AppendStringsToObj(Tcl_GetObjResult(interp), "attribute, \"",
-	    tupleAttrName, "\", is not of type Tuple", NULL) ;
+	Ral_TupleObjSetError(interp, BAD_VALUE,
+	    "attribute to unwrap must be of Tuple type") ;
 	return TCL_ERROR ;
     }
     /*
@@ -903,10 +900,7 @@ TupleUnwrapCmd(
 	    Ral_TupleHeadingEnd(unTuple->heading), newTuple) &&
 	Ral_TupleCopy(tuple, tupleAttrIter + 1, Ral_TupleHeadingEnd(heading),
 	    newTuple))) {
-	Tcl_ResetResult(interp) ;
-	Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-	    "attribute name conflict while unwrapping attribute, \"",
-	    tupleAttrName, "\"", NULL) ;
+	Ral_TupleObjSetError(interp, DUPLICATE_ATTR, "while unwrapping tuple") ;
 	Ral_TupleDelete(newTuple) ;
 	return TCL_ERROR ;
     }
@@ -923,8 +917,6 @@ TupleUpdateCmd(
 {
     Tcl_Obj *tupleObj ;
     Ral_Tuple tuple ;
-    int elemc ;
-    Tcl_Obj **elemv ;
 
     /* tuple update tupleVar name-value-list */
     if (objc != 4) {
@@ -953,44 +945,8 @@ TupleUpdateCmd(
     tuple = tupleObj->internalRep.otherValuePtr ;
     assert(tuple->refCount == 1) ;
 
-    /*
-     * Split the update list into it component attribute name / value parts.
-     * Insist that the number of list elements is even.
-     */
-    if (Tcl_ListObjGetElements(interp, objv[3], &elemc, &elemv) != TCL_OK) {
+    if (Ral_TupleUpdateFromObj(tuple, interp, objv[3]) != TCL_OK) {
 	return TCL_ERROR ;
-    }
-    if (elemc % 2 != 0) {
-	Tcl_ResetResult(interp) ;
-	Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-	    "name / value list must have an even number of elements", NULL) ;
-	return TCL_ERROR ;
-    }
-    /*
-     * For each name / value pair, update the value in the tuple.
-     */
-    for ( ; elemc > 0 ; elemc -= 2, elemv += 2) {
-	const char *attrName = Tcl_GetString(*elemv) ;
-	Ral_TupleUpdateStatus status ;
-
-	status = Ral_TupleUpdateAttrValue(tuple, attrName, *(elemv + 1)) ;
-	switch (status) {
-	case AttributeUpdated:
-	    break ;
-
-	case NoSuchAttribute:
-	    Ral_TupleObjSetError(interp, UNKNOWN_ATTR, attrName) ;
-	    return TCL_ERROR ;
-
-	case BadValueType:
-	    Ral_TupleObjSetError(interp, BAD_VALUE,
-		Tcl_GetString(*(elemv + 1))) ;
-	    return TCL_ERROR ;
-
-	default:
-	    Tcl_Panic("unknown tuple update status, \"%d\"", status) ;
-	    break ;
-	}
     }
 
     Tcl_SetObjResult(interp, tupleObj) ;
@@ -1044,8 +1000,9 @@ TupleWrapCmd(
     heading = tuple->heading ;
     degree = Ral_TupleDegree(tuple) ;
     if (elemc > degree) {
-	Tcl_SetStringObj(Tcl_GetObjResult(interp), 
-	    "attempt to wrap more attributes than exist in the tuple", -1) ;
+	Ral_TupleObjSetError(interp, WRONG_NUM_ATTRS,
+	    "attempt to wrap more attributes than exist in the tuple") ;
+	return TCL_ERROR ;
     }
 
     /*
@@ -1110,12 +1067,8 @@ TupleWrapCmd(
 	goto errorOut ;
     }
 
-    if (Ral_TupleUpdateAttrValue(newTuple, newAttrName, wrapTupleObj) !=
-	AttributeUpdated) {
-	Tcl_ResetResult(interp) ;
-	Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-	    "failed to update value for attribute, \"", newAttrName, "\"",
-	    NULL) ;
+    if (Ral_TupleUpdateAttrFromObj(newTuple, interp, newAttrNameObj,
+	wrapTupleObj) != TCL_OK) {
 	goto errorOut ;
     }
 	
