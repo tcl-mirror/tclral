@@ -43,13 +43,17 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_relationobj.c,v $
-$Revision: 1.1 $
-$Date: 2006/02/06 05:02:45 $
+$Revision: 1.2 $
+$Date: 2006/02/20 20:15:07 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_relationobj.c,v $
+Revision 1.2  2006/02/20 20:15:07  mangoa01
+Now able to convert strings to relations and vice versa including
+tuple and relation valued attributes.
+
 Revision 1.1  2006/02/06 05:02:45  mangoa01
 Started on relation heading and other code refactoring.
 This is a checkpoint after a number of added files and changes
@@ -66,7 +70,13 @@ PRAGMAS
 /*
 INCLUDE FILES
 */
+#include "ral_utils.h"
 #include "ral_relationobj.h"
+#include "ral_relation.h"
+#include "ral_tupleobj.h"
+
+#include <assert.h>
+#include <string.h>
 
 /*
 MACRO DEFINITIONS
@@ -83,6 +93,10 @@ EXTERNAL FUNCTION REFERENCES
 /*
 FORWARD FUNCTION REFERENCES
 */
+static void FreeRelationInternalRep(Tcl_Obj *) ;
+static void DupRelationInternalRep(Tcl_Obj *, Tcl_Obj *) ;
+static void UpdateStringOfRelation(Tcl_Obj *) ;
+static int SetRelationFromAny(Tcl_Interp *, Tcl_Obj *) ;
 
 /*
 EXTERNAL DATA REFERENCES
@@ -92,19 +106,360 @@ EXTERNAL DATA REFERENCES
 EXTERNAL DATA DEFINITIONS
 */
 
+Tcl_ObjType Ral_RelationObjType = {
+    "Relation",
+    FreeRelationInternalRep,
+    DupRelationInternalRep,
+    UpdateStringOfRelation,
+    SetRelationFromAny
+} ;
+
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.1 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.2 $" ;
 
 /*
 FUNCTION DEFINITIONS
 */
 
+int
+Ral_RelationObjConvert(
+    Ral_RelationHeading heading,
+    Tcl_Interp *interp,
+    Tcl_Obj *value,
+    Tcl_Obj *objPtr)
+{
+    /*
+     * Create the relation and set the values of the tuples from the object.
+     * The object must be a list of tuple values.
+     */
+    Ral_Relation relation = Ral_RelationNew(heading) ;
+
+    if (Ral_RelationSetFromObj(relation, interp, value) != TCL_OK) {
+	Ral_RelationDelete(relation) ;
+	return TCL_ERROR ;
+    }
+    /*
+     * Discard the old internal representation.
+     */
+    if (objPtr->typePtr && objPtr->typePtr->freeIntRepProc) {
+	objPtr->typePtr->freeIntRepProc(objPtr) ;
+    }
+    /*
+     * Invalidate the string representation.  There are several string reps
+     * that will map to the same relation and we want to force a new string rep
+     * to be generated in order to obtain the canonical string form.
+     */
+    Tcl_InvalidateStringRep(objPtr) ;
+    /*
+     * Install the new internal representation.
+     */
+    objPtr->typePtr = &Ral_RelationObjType ;
+    objPtr->internalRep.otherValuePtr = relation ;
+
+    return TCL_OK ;
+}
+
+
 Ral_RelationHeading
-Ral_RelationHeadingNewFromObj(
+Ral_RelationHeadingNewFromObjs(
+    Tcl_Interp *interp,
+    Tcl_Obj *headingObj,
+    Tcl_Obj *identObj)
+{
+    Ral_TupleHeading tupleHeading ;
+    Ral_RelationHeading heading ;
+    int idc ;
+    Tcl_Obj **idv ;
+    int idNum ;
+
+    /*
+     * Create the tuple heading.
+     */
+    tupleHeading = Ral_TupleHeadingNewFromObj(interp, headingObj) ;
+    if (!tupleHeading) {
+	return NULL ;
+    }
+    /*
+     * The identifiers are also in a list.
+     */
+    if (Tcl_ListObjGetElements(interp, identObj, &idc, &idv) != TCL_OK) {
+	Ral_TupleHeadingDelete(tupleHeading) ;
+	return NULL ;
+    }
+    /*
+     * If a relation has any attributes, then it must also have
+     * an identifier.
+     */
+    if (idc == 0) {
+	Ral_RelationObjSetError(interp, REL_NO_IDENTIFIER, NULL) ;
+	Ral_TupleHeadingDelete(tupleHeading) ;
+	return NULL ;
+    }
+
+    /*
+     * We now know the number of identifers and can create the
+     * relation heading.
+     */
+    heading = Ral_RelationHeadingNew(tupleHeading, idc) ;
+    /*
+     * Iterate over the identifier elements and insert them
+     * into the heading.
+     */
+    for (idNum = 0 ; idNum < idc ; ++idNum) {
+	/*
+	 * Iterate over the members of each identifier.
+	 */
+	int elemc ;
+	Tcl_Obj **elemv ;
+	Ral_IntVector id ;
+
+	if (Tcl_ListObjGetElements(interp, *idv++, &elemc, &elemv) != TCL_OK) {
+	    Ral_RelationHeadingDelete(heading) ;
+	    return NULL ;
+	}
+	/*
+	 * Vector to hold the attribute indices that constitute the
+	 * identifier.
+	 */
+	id = Ral_IntVectorNewEmpty(elemc) ;
+	/*
+	 * Find the attribute in the tuple heading and build up a
+	 * vector to install in the relation heading.
+	 */
+	while (elemc-- > 0) {
+	    const char *attrName = Tcl_GetString(*elemv++) ;
+	    int index = Ral_TupleHeadingIndexOf(tupleHeading, attrName) ;
+
+	    if (index < 0) {
+		Ral_RelationObjSetError(interp, REL_UNKNOWN_ATTR, attrName) ;
+		Ral_RelationHeadingDelete(heading) ;
+		return NULL ;
+	    }
+	    /*
+	     * The indices in an identifier must form a set, i.e. you
+	     * cannot have a duplicate attribute in a list of attributes
+	     * that is intended to be an identifier of a relation.
+	     */
+	    if (!Ral_IntVectorSetAdd(id, index)) {
+		Ral_RelationObjSetError(interp, REL_DUP_ATTR_IN_ID, attrName) ;
+		Ral_RelationHeadingDelete(heading) ;
+		return NULL ;
+	    }
+	}
+	/*
+	 * Add the set of attribute indices as an identifier. Adding
+	 * the vector checks that we do not have a subset dependency.
+	 */
+	if (!Ral_RelationHeadingAddIdentifier(heading, idNum, id)) {
+	    Ral_RelationObjSetError(interp, REL_IDENTIFIER_SUBSET, NULL) ;
+	    Ral_RelationHeadingDelete(heading) ;
+	    return NULL ;
+	}
+    }
+
+    return heading ;
+}
+
+int
+Ral_RelationSetFromObj(
+    Ral_Relation relation,
+    Tcl_Interp *interp,
+    Tcl_Obj *tupleList)
+{
+    int elemc ;
+    Tcl_Obj **elemv ;
+
+    if (Tcl_ListObjGetElements(interp, tupleList, &elemc, &elemv) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+
+    /*
+     * Reserve the required storage so as not to reallocate during the
+     * insertions.
+     */
+    Ral_RelationReserve(relation, elemc) ;
+
+    while (elemc-- > 0) {
+	if (Ral_RelationInsertTupleObj(relation, interp, *elemv++) != TCL_OK) {
+	    return TCL_ERROR ;
+	}
+    }
+
+    return TCL_OK ;
+}
+
+int
+Ral_RelationInsertTupleObj(
+    Ral_Relation relation,
+    Tcl_Interp *interp,
+    Tcl_Obj *tupleObj)
+{
+    Ral_Tuple tuple ;
+
+    /*
+     * Make the new tuple refer to the heading contained in the relation.
+     */
+    tuple = Ral_TupleNew(relation->heading->tupleHeading) ;
+    /*
+     * Set the values of the attributes from the list of attribute / value
+     * pairs.
+     */
+    if (Ral_TupleSetFromObj(tuple, interp, tupleObj) != TCL_OK) {
+	Ral_TupleDelete(tuple) ;
+	return TCL_ERROR ;
+    }
+    /*
+     * Insert the tuple into the relation.
+     */
+    if (!Ral_RelationPushBack(relation, tuple)) {
+	Ral_RelationObjSetError(interp, REL_DUPLICATE_TUPLE,
+	    Tcl_GetString(tupleObj)) ;
+	Ral_TupleDelete(tuple) ;
+	return TCL_ERROR ;
+    }
+
+    return TCL_OK ;
+}
+
+const char *
+Ral_RelationObjVersion(void)
+{
+    return rcsid ;
+}
+
+void
+Ral_RelationObjSetError(
+    Tcl_Interp *interp,
+    Ral_RelationError error,
+    const char *param)
+{
+    /*
+     * These must be in the same order as the encoding of the Ral_RelationError
+     * enumeration.
+     */
+    static const char *resultStrings[] = {
+	"bad relation value format",
+	"bad relation type keyword",
+	"relations of non-zero degree must have at least one identifier",
+	"identifiers must have at least one attribute",
+	"identifiers must not be subsets of other identifiers",
+	"duplicate attribute name in identifier attribute set",
+	"unknown attribute name",
+	"duplicate tuple",
+
+	"bad relation heading format",
+	"duplicate attribute name",
+	"bad value type for value",
+	"wrong number of attributes specified",
+	"bad list of pairs"
+    } ;
+    static const char *errorStrings[] = {
+	"FORMAT_ERR",
+	"BAD_KEYWORD",
+	"NO_IDENTIFIER",
+	"IDENTIFIER_FORMAT",
+	"IDENTIFIER_SUBSET",
+	"DUP_ATTR_IN_ID",
+	"UNKNOWN_ATTR",
+	"DUPLICATE_TUPLE",
+
+	"HEADING_ERR",
+	"DUPLICATE_ATTR",
+	"BAD_VALUE",
+	"WRONG_NUM_ATTRS",
+	"BAD_PAIRS_LIST",
+    } ;
+
+    Ral_ObjSetError(interp, "RELATION", resultStrings[error],
+	errorStrings[error], param) ;
+}
+
+/*
+ * ======================================================================
+ * Functions to Support the Relation type
+ * ======================================================================
+ */
+
+static void
+FreeRelationInternalRep(
+    Tcl_Obj *objPtr)
+{
+    assert(objPtr->typePtr == &Ral_RelationObjType) ;
+    Ral_RelationDelete(objPtr->internalRep.otherValuePtr) ;
+    objPtr->typePtr = objPtr->internalRep.otherValuePtr = NULL ;
+}
+
+static void
+DupRelationInternalRep(
+    Tcl_Obj *srcPtr,
+    Tcl_Obj *dupPtr)
+{
+    Ral_Relation srcRelation ;
+    Ral_Relation dupRelation ;
+
+    assert(srcPtr->typePtr == &Ral_RelationObjType) ;
+    srcRelation = srcPtr->internalRep.otherValuePtr ;
+
+    dupRelation = Ral_RelationDup(srcRelation) ;
+    if (dupRelation) {
+	dupPtr->internalRep.otherValuePtr = dupRelation ;
+	dupPtr->typePtr = &Ral_RelationObjType ;
+    }
+}
+
+static void
+UpdateStringOfRelation(
+    Tcl_Obj *objPtr)
+{
+    Ral_Relation relation = objPtr->internalRep.otherValuePtr ;
+    Ral_RelationScanFlags scanFlags ;
+    int length ;
+
+    /*
+     * Scan the relation.
+     */
+    length = Ral_RelationScan(relation, &scanFlags) ;
+    /*
+     * Allocate the memory to store the string representation.
+     */
+    objPtr->bytes = ckalloc(length) ;
+    /*
+     * Convert the Relation into a string.
+     */
+    objPtr->length = Ral_RelationConvert(relation, objPtr->bytes, scanFlags) ;
+}
+
+static int
+SetRelationFromAny(
     Tcl_Interp *interp,
     Tcl_Obj *objPtr)
 {
-    return NULL ;
+    int objc ;
+    Tcl_Obj **objv ;
+    Ral_RelationHeading heading ;
+
+    if (Tcl_ListObjGetElements(interp, objPtr, &objc, &objv) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    if (objc != 4) {
+	Ral_RelationObjSetError(interp, REL_FORMAT_ERR, Tcl_GetString(objPtr)) ;
+	return TCL_ERROR ;
+    }
+    if (strcmp(Ral_RelationObjType.name, Tcl_GetString(*objv)) != 0) {
+	Ral_RelationObjSetError(interp, REL_BAD_KEYWORD, Tcl_GetString(*objv)) ;
+	return TCL_ERROR ;
+    }
+    /*
+     * Create the heading from the external representation.
+     */
+    heading = Ral_RelationHeadingNewFromObjs(interp, objv[1], objv[2]) ;
+    if (!heading) {
+	return TCL_ERROR ;
+    }
+
+    Ral_RelationObjConvert(heading, interp, objv[3], objPtr) ;
+
+    return TCL_OK ;
 }

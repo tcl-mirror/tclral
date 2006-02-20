@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationobj.h,v $
-$Revision: 1.1 $
-$Date: 2006/02/06 05:02:45 $
+$Revision: 1.2 $
+$Date: 2006/02/20 20:15:07 $
  *--
  */
 #ifndef _ral_relationobj_h_
@@ -61,6 +61,7 @@ INCLUDE FILES
 */
 #include "tcl.h"
 #include "ral_relationheading.h"
+#include "ral_relation.h"
 #include <stdio.h>
 
 /*
@@ -74,12 +75,41 @@ FORWARD CLASS REFERENCES
 /*
 TYPE DECLARATIONS
 */
+typedef enum Ral_RelationError {
+    REL_FORMAT_ERR,
+    REL_BAD_KEYWORD,
+    REL_NO_IDENTIFIER,
+    REL_IDENTIFIER_FORMAT,
+    REL_IDENTIFIER_SUBSET,
+    REL_DUP_ATTR_IN_ID,
+    REL_UNKNOWN_ATTR,
+    REL_DUPLICATE_TUPLE,
+
+
+    REL_HEADING_ERR,
+    REL_DUPLICATE_ATTR,
+    REL_BAD_VALUE,
+    REL_WRONG_NUM_ATTRS,
+    REL_BAD_PAIRS_LIST,
+} Ral_RelationError ;
+
+/*
+EXTERNAL DATA REFERENCES
+*/
+extern Tcl_ObjType Ral_RelationObjType ;
 
 /*
 FUNCTION DECLARATIONS
 */
 
-extern Ral_RelationHeading Ral_RelationHeadingNewFromObj(Tcl_Interp *,
+extern int Ral_RelationObjConvert(Ral_RelationHeading, Tcl_Interp *, Tcl_Obj *,
     Tcl_Obj *) ;
+extern Ral_RelationHeading Ral_RelationHeadingNewFromObjs(Tcl_Interp *,
+    Tcl_Obj *, Tcl_Obj *) ;
+extern int Ral_RelationSetFromObj(Ral_Relation, Tcl_Interp *, Tcl_Obj *) ;
+extern int Ral_RelationInsertTupleObj(Ral_Relation, Tcl_Interp *, Tcl_Obj *) ;
+extern const char *Ral_RelationObjVersion(void) ;
+extern void Ral_RelationObjSetError(Tcl_Interp *, Ral_RelationError,
+    const char *) ;
 
 #endif /* _ral_relationobj_h_ */

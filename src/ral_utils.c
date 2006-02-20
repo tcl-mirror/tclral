@@ -43,13 +43,17 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_utils.c,v $
-$Revision: 1.1 $
-$Date: 2005/12/27 23:17:19 $
+$Revision: 1.2 $
+$Date: 2006/02/20 20:15:10 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_utils.c,v $
+Revision 1.2  2006/02/20 20:15:10  mangoa01
+Now able to convert strings to relations and vice versa including
+tuple and relation valued attributes.
+
 Revision 1.1  2005/12/27 23:17:19  mangoa01
 Update to the new spilt out file structure.
 
@@ -93,7 +97,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_utils.c,v $ $Revision: 1.1 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_utils.c,v $ $Revision: 1.2 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -132,4 +136,20 @@ Ral_ObjEqual(
 	return 0 ;
     }
     return memcmp(s1, s2, l1) == 0 ;
+}
+
+void
+Ral_ObjSetError(
+    Tcl_Interp *interp,
+    const char *cmdName,
+    const char *errorResult,
+    const char *errorCode,
+    const char *param)
+{
+    if (interp) {
+	Tcl_ResetResult(interp) ;
+	Tcl_AppendStringsToObj(Tcl_GetObjResult(interp), errorResult,
+	    ", \"", param, "\"", NULL) ;
+	Tcl_SetErrorCode(interp, "RAL", cmdName, errorCode, param, NULL) ;
+    }
 }

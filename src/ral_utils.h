@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_utils.h,v $
-$Revision: 1.1 $
-$Date: 2005/12/27 23:17:19 $
+$Revision: 1.2 $
+$Date: 2006/02/20 20:15:10 $
  *--
  */
 #ifndef _ral_utils_h_
@@ -78,6 +78,8 @@ FUNCTION DECLARATIONS
 */
 
 extern int Ral_ObjEqual(Tcl_Obj *, Tcl_Obj *) ;
+extern void Ral_ObjSetError(Tcl_Interp *, const char *, const char *,
+    const char *, const char *) ;
 
 
 #endif /* _ral_utils_h_ */

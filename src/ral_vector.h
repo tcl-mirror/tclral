@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_vector.h,v $
-$Revision: 1.2 $
-$Date: 2006/02/06 05:02:45 $
+$Revision: 1.3 $
+$Date: 2006/02/20 20:15:11 $
  *--
  */
 #ifndef _ral_vector_h_
@@ -85,29 +85,30 @@ typedef struct Ral_IntVector {
 FUNCTION DECLARATIONS
 */
 
-extern Ral_IntVector Ral_IntVectorNew(unsigned, Ral_IntVectorValueType) ;
-extern Ral_IntVector Ral_IntVectorNewEmpty(unsigned) ;
+extern Ral_IntVector Ral_IntVectorNew(int, Ral_IntVectorValueType) ;
+extern Ral_IntVector Ral_IntVectorNewEmpty(int) ;
+extern Ral_IntVector Ral_IntVectorDup(Ral_IntVector) ;
 extern void Ral_IntVectorDelete(Ral_IntVector) ;
 
 extern Ral_IntVectorIter Ral_IntVectorBegin(Ral_IntVector) ;
 extern Ral_IntVectorIter Ral_IntVectorEnd(Ral_IntVector) ;
 
-extern unsigned Ral_IntVectorSize(Ral_IntVector) ;
-extern unsigned Ral_IntVectorCapacity(Ral_IntVector) ;
-extern void Ral_IntVectorReserve(Ral_IntVector, unsigned) ;
+extern int Ral_IntVectorSize(Ral_IntVector) ;
+extern int Ral_IntVectorCapacity(Ral_IntVector) ;
+extern void Ral_IntVectorReserve(Ral_IntVector, int) ;
 
 extern int Ral_IntVectorEmpty(Ral_IntVector) ;
 extern void Ral_IntVectorFill(Ral_IntVector, Ral_IntVectorValueType) ;
 
-extern Ral_IntVectorValueType Ral_IntVectorFetch(Ral_IntVector, unsigned) ;
-extern void Ral_IntVectorStore(Ral_IntVector, unsigned,
+extern Ral_IntVectorValueType Ral_IntVectorFetch(Ral_IntVector, int) ;
+extern void Ral_IntVectorStore(Ral_IntVector, int,
     Ral_IntVectorValueType) ;
 extern Ral_IntVectorValueType Ral_IntVectorFront(Ral_IntVector) ;
 extern Ral_IntVectorValueType Ral_IntVectorBack(Ral_IntVector) ;
 extern void Ral_IntVectorPushBack(Ral_IntVector, Ral_IntVectorValueType) ;
 extern void Ral_IntVectorPopBack(Ral_IntVector) ;
 extern Ral_IntVectorIter Ral_IntVectorInsert(Ral_IntVector, Ral_IntVectorIter,
-    unsigned, Ral_IntVectorValueType) ;
+    int, Ral_IntVectorValueType) ;
 extern Ral_IntVectorIter Ral_IntVectorErase(Ral_IntVector, Ral_IntVectorIter,
     Ral_IntVectorIter) ;
 

@@ -43,13 +43,17 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_vector.c,v $
-$Revision: 1.2 $
-$Date: 2006/02/06 05:02:45 $
+$Revision: 1.3 $
+$Date: 2006/02/20 20:15:10 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_vector.c,v $
+Revision 1.3  2006/02/20 20:15:10  mangoa01
+Now able to convert strings to relations and vice versa including
+tuple and relation valued attributes.
+
 Revision 1.2  2006/02/06 05:02:45  mangoa01
 Started on relation heading and other code refactoring.
 This is a checkpoint after a number of added files and changes
@@ -100,7 +104,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_vector.c,v $ $Revision: 1.2 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_vector.c,v $ $Revision: 1.3 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -108,7 +112,7 @@ FUNCTION DEFINITIONS
 
 Ral_IntVector
 Ral_IntVectorNew(
-    unsigned size,
+    int size,
     Ral_IntVectorValueType value)
 {
     Ral_IntVector v ;
@@ -124,7 +128,7 @@ Ral_IntVectorNew(
 
 Ral_IntVector
 Ral_IntVectorNewEmpty(
-    unsigned size)
+    int size)
 {
     Ral_IntVector v ;
 
@@ -134,6 +138,21 @@ Ral_IntVectorNewEmpty(
     v->endStorage = v->start + size ;
 
     return v ;
+}
+
+Ral_IntVector
+Ral_IntVectorDup(
+    Ral_IntVector v)
+{
+    int size = Ral_IntVectorSize(v) ;
+    int bytes = size * sizeof(Ral_IntVectorValueType) ;
+    Ral_IntVector dupV ;
+
+    dupV = (Ral_IntVector)ckalloc(sizeof(*dupV)) ;
+    dupV->start = (Ral_IntVectorIter)ckalloc(bytes) ;
+    dupV->finish = dupV->endStorage = dupV->start + size ;
+    memcpy(dupV->start, v->start, bytes) ;
+    return dupV ;
 }
 
 void
@@ -158,27 +177,27 @@ Ral_IntVectorEnd(
     return v->finish ;
 }
 
-unsigned
+int
 Ral_IntVectorSize(
     Ral_IntVector v)
 {
-    return (unsigned)(v->finish - v->start) ;
+    return (int)(v->finish - v->start) ;
 }
 
-unsigned
+int
 Ral_IntVectorCapacity(
     Ral_IntVector v)
 {
-    return (unsigned)(v->endStorage - v->start) ;
+    return (int)(v->endStorage - v->start) ;
 }
 
 void
 Ral_IntVectorReserve(
     Ral_IntVector v,
-    unsigned size)
+    int size)
 {
     if (Ral_IntVectorCapacity(v) < size) {
-	unsigned oldSize = Ral_IntVectorSize(v) ;
+	int oldSize = Ral_IntVectorSize(v) ;
 	v->start = (Ral_IntVectorIter)ckrealloc((char *)v->start, 
 	    size * sizeof(Ral_IntVectorValueType)) ;
 	v->finish = v->start + oldSize ;
@@ -208,7 +227,7 @@ Ral_IntVectorFill(
 int
 Ral_IntVectorFetch(
     Ral_IntVector v,
-    unsigned at)
+    int at)
 {
     if (v->start + at >= v->finish) {
 	Tcl_Panic("Ral_IntVectorFetch: out of bounds access at offset \"%d\"",
@@ -220,7 +239,7 @@ Ral_IntVectorFetch(
 void
 Ral_IntVectorStore(
     Ral_IntVector v,
-    unsigned at,
+    int at,
     Ral_IntVectorValueType value)
 {
     if (v->start + at >= v->finish) {
@@ -256,7 +275,7 @@ Ral_IntVectorPushBack(
     Ral_IntVectorValueType value)
 {
     if (v->finish >= v->endStorage) {
-	unsigned oldCapacity = Ral_IntVectorCapacity(v) ;
+	int oldCapacity = Ral_IntVectorCapacity(v) ;
 	/*
 	 * Increase the capacity by half again. +1 to make sure
 	 * we allocate at least one slot if this is the first time
@@ -281,11 +300,11 @@ Ral_IntVectorIter
 Ral_IntVectorInsert(
     Ral_IntVector v,
     Ral_IntVectorIter pos,
-    unsigned n,
+    int n,
     Ral_IntVectorValueType value)
 {
-    unsigned size ;
-    unsigned capacity ;
+    int size ;
+    int capacity ;
     int offset ;
 
     if (pos > v->finish) {
@@ -387,7 +406,7 @@ Ral_IntVectorEqual(
     Ral_IntVector v2)
 {
     int equals = 0 ;
-    unsigned v1Size = Ral_IntVectorSize(v1) ;
+    int v1Size = Ral_IntVectorSize(v1) ;
     if (v1Size == Ral_IntVectorSize(v2) &&
 	memcmp(v1->start, v2->start, v1Size * sizeof(Ral_IntVectorValueType))
 	    == 0) {

@@ -43,13 +43,17 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_tupleheading.c,v $
-$Revision: 1.3 $
-$Date: 2006/02/06 05:02:45 $
+$Revision: 1.4 $
+$Date: 2006/02/20 20:15:10 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_tupleheading.c,v $
+Revision 1.4  2006/02/20 20:15:10  mangoa01
+Now able to convert strings to relations and vice versa including
+tuple and relation valued attributes.
+
 Revision 1.3  2006/02/06 05:02:45  mangoa01
 Started on relation heading and other code refactoring.
 This is a checkpoint after a number of added files and changes
@@ -104,7 +108,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tupleheading.c,v $ $Revision: 1.3 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tupleheading.c,v $ $Revision: 1.4 $" ;
 
 static const char tupleKeyword[] = "Tuple {" ;
 static const char closeList[] = "}" ;
@@ -115,10 +119,10 @@ FUNCTION DEFINITIONS
 
 Ral_TupleHeading
 Ral_TupleHeadingNew(
-    unsigned size)
+    int size)
 {
     Ral_TupleHeading h ;
-    unsigned memSize ;
+    int memSize ;
 
     memSize = sizeof(*h) + size * sizeof(Ral_Attribute) ;
     h = (Ral_TupleHeading)ckalloc(memSize) ;
@@ -127,6 +131,22 @@ Ral_TupleHeadingNew(
     h->endStorage = h->start + size ;
     Tcl_InitHashTable(&h->nameMap, TCL_STRING_KEYS) ;
     return h ;
+}
+
+Ral_TupleHeading
+Ral_TupleHeadingDup(
+    Ral_TupleHeading srcHeading)
+{
+    Ral_TupleHeading dupHeading ;
+    int appended ;
+
+    dupHeading = Ral_TupleHeadingNew(Ral_TupleHeadingSize(srcHeading)) ;
+    appended = Ral_TupleHeadingAppend(srcHeading,
+	Ral_TupleHeadingBegin(srcHeading),
+	Ral_TupleHeadingEnd(srcHeading), dupHeading) ;
+    assert(appended != 0) ;
+
+    return dupHeading ;
 }
 
 void
@@ -183,7 +203,7 @@ Ral_TupleHeadingAppend(
     }
 
     for ( ; n ; --n) {
-	Ral_Attribute a = Ral_AttributeCopy(*first++) ;
+	Ral_Attribute a = Ral_AttributeDup(*first++) ;
 	Ral_TupleHeadingIter i = Ral_TupleHeadingPushBack(dst, a) ;
 	if (i == dst->finish) {
 	    /* push back failed */
@@ -218,14 +238,14 @@ Ral_TupleHeadingEqual(
     return 1 ;
 }
 
-unsigned
+int
 Ral_TupleHeadingSize(
     Ral_TupleHeading h)
 {
     return h->finish - h->start ;
 }
 
-unsigned
+int
 Ral_TupleHeadingCapacity(
     Ral_TupleHeading h)
 {
@@ -291,8 +311,8 @@ Ral_TupleHeadingStore(
     if (isNewEntry) {
 	Ral_Attribute oldAttr = *i ;
 	Tcl_HashEntry *oldEntry ;
-	unsigned oldIndex ;
-	unsigned currIndex ;
+	int oldIndex ;
+	int currIndex ;
 
 	oldEntry = Tcl_FindHashEntry(&h->nameMap, oldAttr->name) ;
 	if (oldEntry == NULL) {
@@ -300,8 +320,8 @@ Ral_TupleHeadingStore(
     "Ral_TupleHeadingStore: cannot find attribute name, \"%s\", in hash table",
 		oldAttr->name) ;
 	}
-	oldIndex = (unsigned)Tcl_GetHashValue(oldEntry) ;
-	currIndex = (unsigned)(i - Ral_TupleHeadingBegin(h)) ;
+	oldIndex = (int)Tcl_GetHashValue(oldEntry) ;
+	currIndex = (int)(i - Ral_TupleHeadingBegin(h)) ;
 	if (oldIndex != currIndex) {
 	    Tcl_Panic(
 	    "Ral_TupleHeadingStore: inconsistent index, expected %u, got %u",
@@ -357,7 +377,7 @@ Ral_TupleHeadingFind(
     Tcl_HashEntry *e ;
 
     e = Tcl_FindHashEntry(&h->nameMap, name) ;
-    return e ?  h->start + (unsigned)Tcl_GetHashValue(e) : h->finish ;
+    return e ?  h->start + (int)Tcl_GetHashValue(e) : h->finish ;
 }
 
 int
@@ -407,7 +427,7 @@ Ral_TupleHeadingUnion(
     h2End = Ral_TupleHeadingEnd(h2) ;
     for (h2Iter = Ral_TupleHeadingBegin(h2) ; h2Iter != h2End ; ++h2Iter) {
 	Ral_TupleHeadingIter i =
-	    Ral_TupleHeadingPushBack(unionHeading, Ral_AttributeCopy(*h2Iter)) ;
+	    Ral_TupleHeadingPushBack(unionHeading, Ral_AttributeDup(*h2Iter)) ;
 	if (i == Ral_TupleHeadingEnd(unionHeading)) {
 	    Ral_TupleHeadingDelete(unionHeading) ;
 	    return NULL ;
@@ -426,8 +446,8 @@ Ral_TupleHeadingIntersect(
     Ral_TupleHeading h2)
 {
     Ral_TupleHeading intersectHeading ;
-    unsigned h1Size = Ral_TupleHeadingSize(h1) ;
-    unsigned h2Size = Ral_TupleHeadingSize(h2) ;
+    int h1Size = Ral_TupleHeadingSize(h1) ;
+    int h2Size = Ral_TupleHeadingSize(h2) ;
     Ral_TupleHeadingIter h1End ;
     Ral_TupleHeadingIter h1Iter ;
     Ral_TupleHeadingIter h2End ;
@@ -456,7 +476,7 @@ Ral_TupleHeadingIntersect(
 	if (found != h2End && Ral_AttributeEqual(*found, h1Attr)) {
 	    Ral_TupleHeadingIter place =
 		Ral_TupleHeadingPushBack(intersectHeading,
-		Ral_AttributeCopy(*found)) ;
+		Ral_AttributeDup(*found)) ;
 
 	    if (place == Ral_TupleHeadingEnd(intersectHeading)) {
 		Ral_TupleHeadingDelete(intersectHeading) ;
@@ -471,11 +491,11 @@ Ral_TupleHeadingIntersect(
 int
 Ral_TupleHeadingScan(
     Ral_TupleHeading h,
-    Ral_AttributeScanFlags flags)
+    Ral_TupleScanFlags flags)
 {
     Ral_TupleHeadingIter i ;
+    Ral_AttributeScanFlags attrFlag = flags->attrFlags ;
     int length = 1 ; /* for the NUL terminator */
-
     /*
      * The keyword part of the heading.
      * N.B. here and below all the "-1"'s remove counting the NUL terminator
@@ -485,15 +505,15 @@ Ral_TupleHeadingScan(
 
     for (i = h->start ; i < h->finish ; ++i) {
 	Ral_Attribute a = *i ;
-
 	/*
 	 * +1 to account for the space that needs to separate elements
 	 * in the resulting list.
 	 */
-	length += Ral_AttributeScanName(a, flags) + 1 ;
-	length += Ral_AttributeScanType(a, flags) + 1 ;
-	++flags ;
+	length += Ral_AttributeScanName(a, attrFlag) + 1 ;
+	length += Ral_AttributeScanType(a, attrFlag) + 1 ;
+	++attrFlag ;
     }
+
     length += sizeof(closeList) - 1 ;
 
     return length ;
@@ -503,10 +523,11 @@ int
 Ral_TupleHeadingConvert(
     Ral_TupleHeading h,
     char *dst,
-    Ral_AttributeScanFlags flags)
+    Ral_TupleScanFlags flags)
 {
     char *p = dst ;
     Ral_TupleHeadingIter i ;
+    Ral_AttributeScanFlags attrFlag = flags->attrFlags ;
 
     /*
      * Copy in the "Tuple" keyword.
@@ -517,11 +538,11 @@ Ral_TupleHeadingConvert(
     for (i = h->start ; i < h->finish ; ++i) {
 	Ral_Attribute a = *i ;
 
-	p += Ral_AttributeConvertName(a, p, flags) ;
+	p += Ral_AttributeConvertName(a, p, attrFlag) ;
 	*p++ = ' ' ;
-	p += Ral_AttributeConvertType(a, p, flags) ;
+	p += Ral_AttributeConvertType(a, p, attrFlag) ;
 	*p++ = ' ' ;
-	++flags ;
+	++attrFlag ;
     }
     /*
      * Overwrite any trailing blank. There will be no trailing blank if the
@@ -536,25 +557,49 @@ Ral_TupleHeadingConvert(
     return p - dst ;
 }
 
-/*
- * Returned string must be freed by the caller.
- */
-char *
-Ral_TupleHeadingToString(
-    Ral_TupleHeading h)
+void
+Ral_TupleHeadingPrint(
+    Ral_TupleHeading h,
+    const char *format,
+    FILE *f)
 {
-    unsigned size = Ral_TupleHeadingSize(h) ;
-    Ral_AttributeScanFlags flags ;
-    char *str ;
+    Ral_TupleScanFlags flags = Ral_TupleScanFlagsAlloc(h) ;
+    char *str = ckalloc(Ral_TupleHeadingScan(h, flags)) ;
 
-    flags = (Ral_AttributeScanFlags)ckalloc(size * sizeof(*flags)) ;
-
-    str = ckalloc(Ral_TupleHeadingScan(h, flags)) ;
     Ral_TupleHeadingConvert(h, str, flags) ;
+    fprintf(f, format, str) ;
+    ckfree(str) ;
+    Ral_TupleScanFlagsFree(flags) ;
+}
 
-    Ral_AttributeScanFlagsFree(size, flags) ;
+Ral_TupleScanFlags
+Ral_TupleScanFlagsAlloc(
+    Ral_TupleHeading heading)
+{
+    int degree = Ral_TupleHeadingSize(heading) ;
+    int nBytes ;
+    Ral_TupleScanFlags flags ;
 
-    return str ;
+    nBytes = sizeof(*flags) + degree * sizeof(*flags->attrFlags) ;
+    flags = (Ral_TupleScanFlags)ckalloc(nBytes) ;
+    memset(flags, 0, nBytes) ;
+    flags->degree = degree ;
+    flags->attrFlags = (Ral_AttributeScanFlags)(flags + 1) ;
+    return flags ;
+}
+
+void
+Ral_TupleScanFlagsFree(
+    Ral_TupleScanFlags flags)
+{
+    int degree = flags->degree ;
+    struct Ral_AttributeScanFlags *attrFlags = flags->attrFlags ;
+
+    assert(attrFlags != NULL) ;
+    while (degree-- > 0) {
+	Ral_AttributeScanFlagsFree(attrFlags++) ;
+    }
+    ckfree((char *)flags) ;
 }
 
 const char *

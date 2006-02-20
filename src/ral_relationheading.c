@@ -43,13 +43,17 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_relationheading.c,v $
-$Revision: 1.2 $
-$Date: 2006/02/06 05:02:45 $
+$Revision: 1.3 $
+$Date: 2006/02/20 20:15:07 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_relationheading.c,v $
+Revision 1.3  2006/02/20 20:15:07  mangoa01
+Now able to convert strings to relations and vice versa including
+tuple and relation valued attributes.
+
 Revision 1.2  2006/02/06 05:02:45  mangoa01
 Started on relation heading and other code refactoring.
 This is a checkpoint after a number of added files and changes
@@ -99,7 +103,11 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.2 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.3 $" ;
+
+static const char relationKeyword[] = "Relation" ;
+static const char openList[] = "{" ;
+static const char closeList[] = "}" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -130,6 +138,30 @@ Ral_RelationHeadingNew(
      */
 
     return heading ;
+}
+
+Ral_RelationHeading
+Ral_RelationHeadingDup(
+    Ral_RelationHeading srcHeading)
+{
+    Ral_TupleHeading tupleHeading ;
+    Ral_RelationHeading dupHeading ;
+    int idCount = srcHeading->idCount ;
+    Ral_IntVector *srcIds = srcHeading->identifiers ;
+    Ral_IntVector *dstIds ;
+
+    tupleHeading = Ral_TupleHeadingDup(srcHeading->tupleHeading) ;
+    if (!tupleHeading) {
+	return NULL ;
+    }
+
+    dupHeading = Ral_RelationHeadingNew(tupleHeading, idCount) ;
+    dstIds = dupHeading->identifiers ;
+    while (idCount-- > 0) {
+	*dstIds++ = Ral_IntVectorDup(*srcIds++) ;
+    }
+
+    return dupHeading ;
 }
 
 void
@@ -292,9 +324,8 @@ Ral_RelationHeadingAddIdentifier(
     int idNum,
     Ral_IntVector id)
 {
-    int idCount ;
-    Ral_IntVector *idArray ;
-    int found ;
+    int idCount = heading->idCount ;
+    Ral_IntVector *idArray = heading->identifiers ;
 
     assert (idNum < heading->idCount) ;
     assert (heading->identifiers[idNum] == NULL) ;
@@ -308,16 +339,13 @@ Ral_RelationHeadingAddIdentifier(
      * and make sure that the new one is not equal to or a subset of
      * an existing identifier.
      */
-    idArray = heading->identifiers ;
-    found = 0 ;
-    for (idCount = heading->idCount ; idCount > 0 ; --idCount) {
+    while (idCount-- > 0) {
 	Ral_IntVector headingId = *idArray++ ;
 
 	if (headingId && Ral_IntVectorSubsetOf(id, headingId)) {
 	    return 0 ;
 	}
     }
-
     /*
      * Take possession of the identifier vector.
      */
@@ -333,7 +361,7 @@ Ral_RelationHeadingUnion(
     Ral_RelationHeading h1,
     Ral_RelationHeading h2)
 {
-    unsigned h1Size = Ral_TupleHeadingSize(h1->tupleHeading) ;
+    int h1Size = Ral_TupleHeadingSize(h1->tupleHeading) ;
     Ral_TupleHeading unionTupleHeading ;
     Ral_RelationHeading unionRelationHeading ;
     int c1 ;
@@ -399,6 +427,256 @@ Ral_RelationHeadingUnion(
     }
 
     return unionRelationHeading ;
+}
+
+int
+Ral_RelationHeadingScan(
+    Ral_RelationHeading h,
+    Ral_RelationScanFlags flags)
+{
+    Ral_TupleHeading tupleHeading = h->tupleHeading ;
+    Ral_TupleHeadingIter thIter ;
+    Ral_TupleHeadingIter thEnd ;
+    Ral_AttributeScanFlags attrFlag = flags->attrFlags ;
+    int idCount = h->idCount ;
+    Ral_AttributeScanFlags idFlag = flags->idFlags ;
+    Ral_IntVector *ids = h->identifiers ;
+    int length = 1 ; /* for the NUL terminator */
+    /*
+     * The keyword part of the heading.
+     * N.B. here and below all the "-1"'s remove counting the NUL terminator
+     * on the statically allocated character strings.
+     */
+    length += sizeof(relationKeyword) - 1 ;
+    length += 1 ; /* separating space */
+    /*
+     * Next scan the heading.
+     */
+    assert(flags->degree == Ral_TupleHeadingSize(tupleHeading)) ;
+    length += sizeof(openList) - 1 ;
+    thEnd = Ral_TupleHeadingEnd(tupleHeading) ;
+    for (thIter = Ral_TupleHeadingBegin(tupleHeading) ; thIter != thEnd ;
+	++thIter) {
+	Ral_Attribute attr = *thIter ;
+	/*
+	 * +1 to account for the space that needs to separate elements
+	 * in the resulting list.
+	 */
+	length += Ral_AttributeScanName(attr, attrFlag) + 1 ;
+	length += Ral_AttributeScanType(attr, attrFlag) + 1 ;
+	++attrFlag ;
+    }
+    length += sizeof(closeList) - 1 ;
+    /*
+     * Scan the identifiers
+     */
+    length += 1 ; /* separating space */
+    length += sizeof(openList) - 1 ;
+    while (idCount-- > 0) {
+	Ral_IntVector id = *ids++ ;
+	Ral_IntVectorIter end = Ral_IntVectorEnd(id) ;
+	int nIdAttrs = Ral_IntVectorSize(id) ;
+	Ral_IntVectorIter iter ;
+
+	if (nIdAttrs != 1) {
+	    length += sizeof(openList) - 1 ;
+	}
+	for (iter = Ral_IntVectorBegin(id) ; iter != end ; ++iter) {
+	    Ral_Attribute attr = Ral_TupleHeadingFetch(tupleHeading, *iter) ;
+	    length += Ral_AttributeScanName(attr, idFlag) + 1 ;
+	    idFlag->type = Tcl_Type ; /* attribute names are always simple */
+	    ++idFlag ;
+	}
+	if (Ral_IntVectorSize(id) != 0) {
+	    length -= 1 ;
+	}
+	if (nIdAttrs != 1) {
+	    length += sizeof(closeList) - 1 ;
+	    length += 1 ; /* separating space */
+	}
+	length += 1 ; /* separating space */
+    }
+    if (h->idCount > 0) {
+	length -= 1 ; /* remove trailing space */
+    }
+    length += sizeof(closeList) - 1 ;
+
+    return length ;
+}
+
+int
+Ral_RelationHeadingConvert(
+    Ral_RelationHeading h,
+    char *dst,
+    Ral_RelationScanFlags flags)
+{
+    char *p = dst ;
+    Ral_TupleHeading tupleHeading = h->tupleHeading ;
+    Ral_TupleHeadingIter thIter ;
+    Ral_TupleHeadingIter thEnd ;
+    Ral_AttributeScanFlags attrFlag = flags->attrFlags ;
+    int idCount = h->idCount ;
+    Ral_AttributeScanFlags idFlag = flags->idFlags ;
+    Ral_IntVector *ids = h->identifiers ;
+
+    /*
+     * Copy in the "Relation" keyword.
+     */
+    strcpy(p, relationKeyword) ;
+    p += sizeof(relationKeyword) - 1 ;
+    /*
+     * Add the heading.
+     */
+    assert(flags->degree == Ral_TupleHeadingSize(tupleHeading)) ;
+    *p++ = ' ' ;
+    strcpy(p, openList) ;
+    p += sizeof(openList) - 1 ;
+    thEnd = Ral_TupleHeadingEnd(tupleHeading) ;
+    for (thIter = Ral_TupleHeadingBegin(tupleHeading) ; thIter != thEnd ;
+	++thIter) {
+	Ral_Attribute attr = *thIter ;
+	p += Ral_AttributeConvertName(attr, p, attrFlag) ;
+	*p++ = ' ' ;
+	p += Ral_AttributeConvertType(attr, p, attrFlag) ;
+	*p++ = ' ' ;
+	++attrFlag ;
+    }
+    /*
+     * Overwrite any trailing blank. There will be no trailing blank if the
+     * heading didn't have any attributes.
+     */
+    if (!Ral_TupleHeadingEmpty(tupleHeading)) {
+	--p ;
+    }
+    strcpy(p, closeList) ;
+    p += sizeof(closeList) - 1 ;
+    /*
+     * Add the identifiers.
+     */
+    *p++ = ' ' ;
+    strcpy(p, openList) ;
+    p += sizeof(openList) - 1 ;
+    while (idCount-- > 0) {
+	Ral_IntVector id = *ids++ ;
+	Ral_IntVectorIter end = Ral_IntVectorEnd(id) ;
+	int nIdAttrs = Ral_IntVectorSize(id) ;
+	Ral_IntVectorIter iter ;
+
+	if (nIdAttrs != 1) {
+	    strcpy(p, openList) ;
+	    p += sizeof(openList) - 1 ;
+	}
+	for (iter = Ral_IntVectorBegin(id) ; iter != end ; ++iter) {
+	    Ral_Attribute attr = Ral_TupleHeadingFetch(tupleHeading, *iter) ;
+
+	    p += Ral_AttributeConvertName(attr, p, idFlag++) ;
+	    *p++ = ' ' ;
+	}
+	if (Ral_IntVectorSize(id) != 0) {
+	    --p ;
+	}
+	if (nIdAttrs != 1) {
+	    strcpy(p, closeList) ;
+	    p += sizeof(closeList) - 1 ;
+	}
+	*p++ = ' ' ;
+    }
+    /*
+     * Overwrite any trailing blank. There will be no trailing blank if the
+     * heading didn't have any identifiers.
+     */
+    if (h->idCount > 0) {
+	--p ;
+    }
+    strcpy(p, closeList) ; /* NUL terminates the result */
+    p += sizeof(closeList) - 1 ;
+
+    return p - dst ;
+}
+
+void
+Ral_RelationHeadingPrint(
+    Ral_RelationHeading h,
+    const char *format,
+    FILE *f)
+{
+    Ral_RelationScanFlags flags = Ral_RelationScanFlagsAlloc(h, 0) ;
+    char *str = ckalloc(Ral_RelationHeadingScan(h, flags)) ;
+
+    Ral_RelationHeadingConvert(h, str, flags) ;
+    fprintf(f, format, str) ;
+    ckfree(str) ;
+    Ral_RelationScanFlagsFree(flags) ;
+}
+
+Ral_RelationScanFlags
+Ral_RelationScanFlagsAlloc(
+    Ral_RelationHeading h,
+    int cardinality)
+{
+    int degree = Ral_TupleHeadingSize(h->tupleHeading) ;
+    int nBytes ;
+    Ral_RelationScanFlags flags ;
+    Ral_IntVector *ids = h->identifiers ;
+    int idCount = h->idCount ;
+    int nIds = 0 ;
+
+    flags = (Ral_RelationScanFlags)ckalloc(sizeof(*flags)) ;
+
+    flags->degree = degree ;
+    nBytes = flags->degree * sizeof(*flags->attrFlags) ;
+    flags->attrFlags = (Ral_AttributeScanFlags)ckalloc(nBytes) ;
+    memset(flags->attrFlags, 0, nBytes) ;
+
+    /*
+     * Count the number of distinct attributes used as identifiers.
+     */
+    while (idCount-- > 0) {
+	nIds += Ral_IntVectorSize(*ids++) ;
+    }
+    flags->idCount = nIds ;
+    nBytes = nIds * sizeof(*flags->idFlags) ;
+    flags->idFlags = (Ral_AttributeScanFlags)ckalloc(nBytes) ;
+    memset(flags->idFlags, 0, nBytes) ;
+
+    flags->cardinality = cardinality ;
+    nBytes = flags->degree * cardinality * sizeof(*flags->valueFlags) ;
+    flags->valueFlags = (Ral_AttributeScanFlags)ckalloc(nBytes) ;
+    memset(flags->valueFlags, 0, nBytes) ;
+
+    return flags ;
+}
+
+void
+Ral_RelationScanFlagsFree(
+    Ral_RelationScanFlags flags)
+{
+    int degree = flags->degree ;
+    Ral_AttributeScanFlags attrFlags = flags->attrFlags ;
+    int idCount = flags->idCount ;
+    Ral_AttributeScanFlags idFlags = flags->idFlags ;
+    int nValues = degree * flags->cardinality ;
+    Ral_AttributeScanFlags valueFlags = flags->valueFlags ;
+
+    assert(attrFlags != NULL) ;
+    while (degree-- > 0) {
+	Ral_AttributeScanFlagsFree(attrFlags++) ;
+    }
+    ckfree((char *)flags->attrFlags) ;
+
+    assert(flags->idFlags != NULL) ;
+    while (idCount-- > 0) {
+	Ral_AttributeScanFlagsFree(idFlags++) ;
+    }
+    ckfree((char *)flags->idFlags) ;
+
+    assert(flags->valueFlags != NULL) ;
+    while (nValues-- > 0) {
+	Ral_AttributeScanFlagsFree(valueFlags++) ;
+    }
+    ckfree((char *)flags->valueFlags) ;
+
+    ckfree((char *)flags) ;
 }
 
 const char *

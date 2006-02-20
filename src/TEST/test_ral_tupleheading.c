@@ -25,7 +25,6 @@ main(
     Ral_TupleHeading v4 ;
     Ral_TupleHeading v5 ;
     Ral_TupleHeadingIter i1 ;
-    char *headingString ;
 
     interp = Tcl_CreateInterp() ;
     Tcl_InitMemory(interp) ;
@@ -58,9 +57,8 @@ main(
     logTest(Ral_TupleHeadingStore(v1, Ral_TupleHeadingBegin(v1) + 1, a3) 
 	!= Ral_TupleHeadingEnd(v1), 1) ;
 
-    headingString = Ral_TupleHeadingToString(v1) ;
-    logInfo("v1 as string = \"%s\"", headingString) ;
-    ckfree(headingString) ;
+    logInfo("printing v1") ;
+    Ral_TupleHeadingPrint(v1, "%s\n", stdout) ;
 
     logInfo("creating \"attr1\"") ;
     a4 = Ral_AttributeNewTclType("attr1", strType) ;
@@ -79,9 +77,9 @@ main(
     v3 = Ral_TupleHeadingUnion(v1, v2) ;
     logTest(v3 != NULL, 1) ;
     logTest(Ral_TupleHeadingSize(v3), vcapacity + 3) ;
-    headingString = Ral_TupleHeadingToString(v3) ;
-    logInfo("v3 as string = \"%s\"", headingString) ;
-    ckfree(headingString) ;
+
+    logInfo("printing v3") ;
+    Ral_TupleHeadingPrint(v3, "%s\n", stdout) ;
 
     /*
      * Test intersect.
@@ -95,9 +93,8 @@ main(
     v5 = Ral_TupleHeadingIntersect(v2, v4) ;
     logTest(v5 != NULL, 1) ;
     logTest(Ral_TupleHeadingSize(v5), 2) ;
-    headingString = Ral_TupleHeadingToString(v5) ;
-    logInfo("v5 as string = \"%s\"", headingString) ;
-    ckfree(headingString) ;
+    logInfo("printing v5") ;
+    Ral_TupleHeadingPrint(v5, "%s\n", stdout) ;
 
     Ral_TupleHeadingUnreference(v1) ;
     Ral_TupleHeadingUnreference(v2) ;

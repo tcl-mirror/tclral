@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.2 $
-# $Date: 2006/02/06 05:02:46 $
+# $Revision: 1.3 $
+# $Date: 2006/02/20 20:15:11 $
 #  *--
 
 package require tcltest 2.2
@@ -531,6 +531,128 @@ namespace eval ::ral::test {
     } -body {
 	tuple wrap $t Size {Name Age}
     } -result {duplicate attribute name, "Size"} -returnCodes error
+
+    # relation shimmering tests
+    test relation-shimmer-1.0 {dum relation} -body {
+	set r {Relation {} {{}} {}}
+	relation cardinality $r
+	string length $r
+	set r
+    } -result {Relation {} {{}} {}}
+
+    test relation-shimmer-2.0 {dee relation} -body {
+	set r {Relation {} {{}} {{}}}
+	relation cardinality $r
+	string length $r
+	set r
+    } -result {Relation {} {{}} {{}}}
+
+    test relation-shimmer-3.0 {degree 1, cardinality 0} -body {
+	set r {Relation {a1 string} a1 {}}
+	relation cardinality $r
+	string length $r
+	set r
+    } -result {Relation {a1 string} {a1} {}}
+
+    test relation-shimmer-3.1 {degree 1, cardinality 1} -body {
+	set r {Relation {a1 string} a1 {{a1 foo}}}
+	relation cardinality $r
+	string length $r
+	set r
+    } -result {Relation {a1 string} {a1} {{a1 foo}}}
+
+    test relation-shimmer-3.2 {degree 1, cardinality 2} -body {
+	set r {Relation {a1 string} a1 {{a1 foo} {a1 bar}}}
+	relation cardinality $r
+	string length $r
+	set r
+    } -result {Relation {a1 string} {a1} {{a1 foo} {a1 bar}}}
+
+    test relation-shimmer-4.0 {tuple attr, degree 1, cardinality 0} -body {
+	set r {Relation {a1 {Tuple {t1 string t2 string}}} {a1} {}}
+	relation cardinality $r
+	string length $r
+	set r
+    } -result {Relation {a1 {Tuple {t1 string t2 string}}} {a1} {}}
+
+    test relation-shimmer-4.1 {tuple attr, degree 1, cardinality 1} -body {
+	set r {Relation {a1 {Tuple {t1 string t2 string}}} {a1} {{a1 {t1 foo t2 bar}}}}
+	relation cardinality $r
+	string length $r
+	set r
+    } -result {Relation {a1 {Tuple {t1 string t2 string}}} {a1} {{a1 {t1 foo t2 bar}}}}
+
+    test relation-shimmer-4.2 {tuple attr, degree 1, cardinality 2} -body {
+	set r {Relation {a1 {Tuple {t1 string t2 string}}} {a1} {{a1 {t1 foo t2 bar}} {a1 {t1 foo2 t2 bar2}}}}
+	relation cardinality $r
+	string length $r
+	set r
+    } -result {Relation {a1 {Tuple {t1 string t2 string}}} {a1} {{a1 {t1 foo t2 bar}} {a1 {t1 foo2 t2 bar2}}}}
+
+    test relation-shimmer-5.0 {relation attr, degree 1, cardinality 0} -body {
+	set r {Relation {a1 {Relation {t1 string t2 string} {t1}}} {a1} {}}
+	relation cardinality $r
+	string length $r
+	set r
+    } -result {Relation {a1 {Relation {t1 string t2 string} {t1}}} {a1} {}}
+
+    test relation-shimmer-5.1 {relation attr, degree 1, cardinality 1} -body {
+	set r {Relation {a1 {Relation {t1 string t2 string} {t1}}} {a1} {{a1 {{t1 foo t2 bar}}}}}
+	relation cardinality $r
+	string length $r
+	set r
+    } -result {Relation {a1 {Relation {t1 string t2 string} {t1}}} {a1} {{a1 {{t1 foo t2 bar}}}}}
+
+    test relation-shimmer-5.2 {relation attr, degree 1, cardinality 1} -body {
+	set r {Relation {a1 {Relation {t1 string t2 string} {t1}}} {a1} {{a1 {{t1 foo t2 bar} {t1 foo2 t2 bar2}}}}}
+	relation cardinality $r
+	string length $r
+	set r
+    } -result {Relation {a1 {Relation {t1 string t2 string} {t1}}} {a1} {{a1 {{t1 foo t2 bar} {t1 foo2 t2 bar2}}}}}
+
+    # relation cardinality subcommand
+    test relation-cardinality-1.0 {dum relation} -body {
+	relation cardinality {Relation {} {{}} {}}
+    } -result 0
+
+    test relation-cardinality-2.0 {dee relation} -body {
+	relation cardinality {Relation {} {{}} {{}}}
+    } -result 1
+
+    test relation-cardinality-3.0 {relation with 1 attribute} -body {
+	relation cardinality {Relation {a1 string} {a1} {}}
+    } -result 0
+
+    test relation-cardinality-3.0 {relation with 4 attributes} -body {
+	relation cardinality\
+	    {Relation {S# string SNAME string STATUS int CITY string}\
+	    S#\
+	    {{S# S1 SNAME Smith STATUS 20 CITY London}\
+	    {S# S2 SNAME Jones STATUS 10 CITY Paris}\
+	    {S# S3 SNAME Blake STATUS 30 CITY Paris}\
+	    {S# S4 SNAME Clark STATUS 20 CITY London}\
+	    {S# S5 SNAME Adams STATUS 30 CITY Athens}}}
+    } -result 5
+
+    # relation degree subcommand
+    test relation-degree-1.0 {dum relation} -body {
+	relation degree {Relation {} {{}} {}}
+    } -result 0
+
+    test relation-degree-2.0 {single attribute} -body {
+	relation degree {Relation {Name string} Name {}}
+    } -result 1
+
+    test relation-degree-3.0 {multiple attributes} -body {
+	relation degree\
+	    {Relation {S# string SNAME string STATUS int CITY string}\
+	    S#\
+	    {{S# S1 SNAME Smith STATUS 20 CITY London}\
+	    {S# S2 SNAME Jones STATUS 10 CITY Paris}\
+	    {S# S3 SNAME Blake STATUS 30 CITY Paris}\
+	    {S# S4 SNAME Clark STATUS 20 CITY London}\
+	    {S# S5 SNAME Adams STATUS 30 CITY Athens}}}
+    } -result 4
 
 
     cleanupTests

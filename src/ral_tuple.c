@@ -43,13 +43,17 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_tuple.c,v $
-$Revision: 1.3 $
-$Date: 2006/02/06 05:02:45 $
+$Revision: 1.4 $
+$Date: 2006/02/20 20:15:07 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_tuple.c,v $
+Revision 1.4  2006/02/20 20:15:07  mangoa01
+Now able to convert strings to relations and vice versa including
+tuple and relation valued attributes.
+
 Revision 1.3  2006/02/06 05:02:45  mangoa01
 Started on relation heading and other code refactoring.
 This is a checkpoint after a number of added files and changes
@@ -105,7 +109,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList[] = "{" ;
 static const char closeList[] = "}" ;
-static const char rcsid[] = "@(#) $RCSfile: ral_tuple.c,v $ $Revision: 1.3 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tuple.c,v $ $Revision: 1.4 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -170,7 +174,7 @@ Ral_TupleUnreference(
     }
 }
 
-unsigned
+int
 Ral_TupleDegree(
     Ral_Tuple tuple)
 {
@@ -345,7 +349,7 @@ Ral_TupleCopy(
 }
 
 Ral_Tuple
-Ral_TupleDuplicate(
+Ral_TupleDup(
     Ral_Tuple src)
 {
     Ral_TupleHeading srcHeading = src->heading ;
@@ -363,115 +367,31 @@ Ral_TupleDuplicate(
 }
 
 int
-Ral_TupleScanValue(
-    Ral_Tuple tuple,
-    Ral_AttributeScanFlags flags)
-{
-    int length ;
-    Ral_TupleHeading heading = tuple->heading ;
-    Tcl_Obj **values = tuple->values ;
-    Ral_TupleHeadingIter hIter ;
-    Ral_TupleHeadingIter hEnd ;
-
-    /*
-     * N.B. here and below all the "-1"'s remove counting the NUL terminator
-     * on the statically allocated character strings.
-     */
-    length = sizeof(openList) - 1 ;
-    hEnd = Ral_TupleHeadingEnd(heading) ;
-    for (hIter = Ral_TupleHeadingBegin(heading) ; hIter != hEnd ; ++hIter) {
-	Ral_Attribute a = *hIter ;
-	Tcl_Obj *v = *values++ ;
-
-	length += Ral_AttributeScanName(a, flags) + 1 ; /* +1 for space */
-	length += Ral_AttributeScanValue(a, v, flags) + 1 ;
-	++flags ;
-    }
-    length += sizeof(closeList) - 1 ;
-
-    return length ;
-}
-
-int
-Ral_TupleConvertValue(
-    Ral_Tuple tuple,
-    char *dst,
-    Ral_AttributeScanFlags flags)
-{
-    char *p = dst ;
-    Ral_TupleHeading heading = tuple->heading ;
-    Tcl_Obj **values = tuple->values ;
-    Ral_TupleHeadingIter hIter ;
-    Ral_TupleHeadingIter hEnd ;
-
-    /*
-     * N.B. here and below all the "-1"'s remove counting the NUL terminator
-     * on the statically allocated character strings.
-     */
-    strcpy(p, openList) ;
-    p += sizeof(openList) - 1 ;
-    hEnd = Ral_TupleHeadingEnd(heading) ;
-    for (hIter = Ral_TupleHeadingBegin(heading) ; hIter != hEnd ; ++hIter) {
-	Ral_Attribute a = *hIter ;
-	Tcl_Obj *v = *values++ ;
-
-	p += Ral_AttributeConvertName(a, p, flags) ;
-	*p++ = ' ' ;
-	p += Ral_AttributeConvertValue(a, v, p, flags) ;
-	*p++ = ' ' ;
-
-	++flags ;
-    }
-    /*
-     * Remove the trailing space. Check that the tuple actually had
-     * some attributes!
-     */
-    if (Ral_TupleDegree(tuple)) {
-	--p ;
-    }
-    strcpy(p, closeList) ;
-    p += sizeof(closeList) - 1 ;
-
-    return p - dst ;
-}
-
-int
 Ral_TupleScan(
     Ral_Tuple tuple,
-    Ral_AttributeScanFlags *flags)
+    Ral_TupleScanFlags *flags)
 {
     Ral_TupleHeading heading = tuple->heading ;
-    Ral_AttributeScanFlags scanFlags ;
-    int length ;
+    Ral_TupleScanFlags scanFlags ;
 
     /*
-     * To scan the tuple, we need an array of attribute scan flags
-     * that is the same size as the tuple.
+     * To scan the tuple, we need a set of flags to hold the scan info.
      */
-    *flags = scanFlags =
-	(Ral_AttributeScanFlags)ckalloc(Ral_TupleHeadingSize(heading) *
-	    sizeof(*scanFlags)) ;
-
+    *flags = scanFlags = Ral_TupleScanFlagsAlloc(heading) ;
     /*
-     * The tuple header has a function that does the work of gathering
-     * the information on the attribute names and type name strings.
+     * Scan the header and value.
      */
-    length = Ral_TupleHeadingScan(heading, scanFlags) ;
-    length += 1 ; /* +1 for the separating space */
-    /*
-     * Now we need to scan all the values, computing the length and
-     * recording the scan flags for the values.
-     */
-    length += Ral_TupleScanValue(tuple, scanFlags) ;
-
-    return length ;
+    return
+	Ral_TupleHeadingScan(heading, scanFlags) +
+	Ral_TupleScanValue(tuple, scanFlags) +
+	1 ; /* +1 for the separating space between the header and value */
 }
 
 int
 Ral_TupleConvert(
     Ral_Tuple tuple,
     char *dst,
-    Ral_AttributeScanFlags scanFlags)
+    Ral_TupleScanFlags scanFlags)
 {
     char *p = dst ;
 
@@ -487,6 +407,87 @@ Ral_TupleConvert(
      * Convert the body.
      */
     p += Ral_TupleConvertValue(tuple, p, scanFlags) ;
+    /*
+     * Finished with the flags.
+     */
+    Ral_TupleScanFlagsFree(scanFlags) ;
+
+    return p - dst ;
+}
+
+int
+Ral_TupleScanValue(
+    Ral_Tuple tuple,
+    Ral_TupleScanFlags flags)
+{
+    int length ;
+    Ral_TupleHeading heading = tuple->heading ;
+    Tcl_Obj **values = tuple->values ;
+    Ral_AttributeScanFlags attrFlag = flags->attrFlags ;
+    Ral_TupleHeadingIter hIter ;
+    Ral_TupleHeadingIter hEnd ;
+
+    /*
+     * N.B. here and below all the "-1"'s remove counting the NUL terminator
+     * on the statically allocated character strings.
+     */
+    length = sizeof(openList) - 1 ;
+    hEnd = Ral_TupleHeadingEnd(heading) ;
+    for (hIter = Ral_TupleHeadingBegin(heading) ; hIter != hEnd ; ++hIter) {
+	Ral_Attribute a = *hIter ;
+	Tcl_Obj *v = *values++ ;
+
+	assert(v != NULL) ;
+	length += Ral_AttributeScanName(a, attrFlag) + 1 ; /* +1 for space */
+	length += Ral_AttributeScanValue(a, v, attrFlag) + 1 ;
+	++attrFlag ;
+    }
+    length += sizeof(closeList) - 1 ;
+
+    return length ;
+}
+
+int
+Ral_TupleConvertValue(
+    Ral_Tuple tuple,
+    char *dst,
+    Ral_TupleScanFlags flags)
+{
+    char *p = dst ;
+    Ral_TupleHeading heading = tuple->heading ;
+    Tcl_Obj **values = tuple->values ;
+    Ral_AttributeScanFlags attrFlag = flags->attrFlags ;
+    Ral_TupleHeadingIter hIter ;
+    Ral_TupleHeadingIter hEnd ;
+
+    /*
+     * N.B. here and below all the "-1"'s remove counting the NUL terminator
+     * on the statically allocated character strings.
+     */
+    strcpy(p, openList) ;
+    p += sizeof(openList) - 1 ;
+    hEnd = Ral_TupleHeadingEnd(heading) ;
+    for (hIter = Ral_TupleHeadingBegin(heading) ; hIter != hEnd ; ++hIter) {
+	Ral_Attribute a = *hIter ;
+	Tcl_Obj *v = *values++ ;
+
+	assert(v != NULL) ;
+	p += Ral_AttributeConvertName(a, p, attrFlag) ;
+	*p++ = ' ' ;
+	p += Ral_AttributeConvertValue(a, v, p, attrFlag) ;
+	*p++ = ' ' ;
+
+	++attrFlag ;
+    }
+    /*
+     * Remove the trailing space. Check that the tuple actually had
+     * some attributes!
+     */
+    if (Ral_TupleDegree(tuple)) {
+	--p ;
+    }
+    strcpy(p, closeList) ;
+    p += sizeof(closeList) - 1 ;
 
     return p - dst ;
 }
@@ -494,23 +495,16 @@ Ral_TupleConvert(
 void
 Ral_TuplePrint(
     Ral_Tuple tuple,
+    const char *format,
     FILE *f)
 {
-    Ral_TupleHeading h = tuple->heading ;
-    Ral_TupleHeadingIter i ;
-    Ral_TupleHeadingIter end = Ral_TupleHeadingEnd(h) ;
-    Tcl_Obj **v = tuple->values ;
-    int valueIndex = 0 ;
+    Ral_TupleScanFlags flags ;
+    char *str ;
 
-    for (i = Ral_TupleHeadingBegin(h) ; i != end ; ++i) {
-	Ral_Attribute a = *i ;
-	Tcl_Obj *value = v[valueIndex] ;
-
-	fprintf(f, "%d: %s ==> %s\n", valueIndex, a->name,
-	    value ?  Tcl_GetString(v[valueIndex]) : "none") ;
-
-	++valueIndex ;
-    }
+    str = ckalloc(Ral_TupleScan(tuple, &flags)) ;
+    Ral_TupleConvert(tuple, str, flags) ;
+    fprintf(f, format, str) ;
+    ckfree(str) ;
 }
 
 const char *

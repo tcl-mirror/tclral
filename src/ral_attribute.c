@@ -43,13 +43,17 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_attribute.c,v $
-$Revision: 1.3 $
-$Date: 2006/02/06 05:02:45 $
+$Revision: 1.4 $
+$Date: 2006/02/20 20:15:07 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_attribute.c,v $
+Revision 1.4  2006/02/20 20:15:07  mangoa01
+Now able to convert strings to relations and vice versa including
+tuple and relation valued attributes.
+
 Revision 1.3  2006/02/06 05:02:45  mangoa01
 Started on relation heading and other code refactoring.
 This is a checkpoint after a number of added files and changes
@@ -109,7 +113,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList[] = "{" ;
 static const char closeList[] = "}" ;
-static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.3 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.4 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -191,7 +195,7 @@ Ral_AttributeNewFromObjs(
 	}
     } else if (strcmp("Relation", typeName) == 0 && typec == 3) {
 	Ral_RelationHeading heading =
-	    Ral_RelationHeadingNewFromObj(interp, *(typev + 1)) ;
+	    Ral_RelationHeadingNewFromObjs(interp, typev[1], typev[2]) ;
 
 	if (heading) {
 	    attribute = Ral_AttributeNewRelationType(attrName, heading) ;
@@ -223,69 +227,28 @@ Ral_AttributeConvertValueToType(
     Ral_Attribute attr,
     Tcl_Obj *objPtr)
 {
+    int result = TCL_OK ;
+
     switch (attr->attrType) {
     case Tcl_Type:
-	if (Tcl_ConvertToType(interp, objPtr, attr->tclType) != TCL_OK) {
-	    return TCL_ERROR ;
-	}
-	if (strcmp(attr->tclType->name, "string") != 0) {
+	result = Tcl_ConvertToType(interp, objPtr, attr->tclType) ;
+	if (result == TCL_OK && strcmp(attr->tclType->name, "string") != 0) {
 	    Tcl_InvalidateStringRep(objPtr) ;
 	}
 	break ;
 
     case Tuple_Type:
 	if (objPtr->typePtr != &Ral_TupleObjType) {
-	    Ral_Tuple tuple = Ral_TupleNew(attr->tupleHeading) ;
-
-	    if (Ral_TupleSetFromObj(tuple, interp, objPtr) != TCL_OK) {
-		Ral_TupleDelete(tuple) ;
-		return TCL_ERROR ;
-	    }
-	    /*
-	     * Discard the old internal representation.
-	     */
-	    if (objPtr->typePtr && objPtr->typePtr->freeIntRepProc) {
-		objPtr->typePtr->freeIntRepProc(objPtr) ;
-	    }
-	    /*
-	     * Invalidate the string representation.
-	     */
-	    Tcl_InvalidateStringRep(objPtr) ;
-	    /*
-	     * Install the new internal representation.
-	     */
-	    objPtr->typePtr = &Ral_TupleObjType ;
-	    objPtr->internalRep.otherValuePtr = tuple ;
+	    result = Ral_TupleObjConvert(attr->tupleHeading, interp, objPtr,
+		objPtr) ;
 	}
 	break ;
 
     case Relation_Type:
-#if 0 /* HERE -- awaiting further relation implementation */
-	if (objPtr->typePtr != &Ral_RelationType) {
-	    Ral_Relation relation = Ral_RelationNew(attr->relationHeading) ;
-
-	    if (Ral_RelationSetValuesFromObj(interp, relation, objPtr)
-		!= TCL_OK) {
-		Ral_RelationDelete(relation) ;
-		return TCL_ERROR ;
-	    }
-	    /*
-	     * Discard the old internal representation.
-	     */
-	    if (objPtr->typePtr && objPtr->typePtr->freeIntRepProc) {
-		objPtr->typePtr->freeIntRepProc(objPtr) ;
-	    }
-	    /*
-	     * Invalidate the string representation.
-	     */
-	    Tcl_InvalidateStringRep(objPtr) ;
-	    /*
-	     * Install the new internal representation.
-	     */
-	    objPtr->typePtr = &Ral_RelationType ;
-	    objPtr->internalRep.otherValuePtr = relation ;
+	if (objPtr->typePtr != &Ral_RelationObjType) {
+	    result = Ral_RelationObjConvert(attr->relationHeading, interp,
+		objPtr, objPtr) ;
 	}
-#endif
 	break ;
 
     default:
@@ -293,7 +256,7 @@ Ral_AttributeConvertValueToType(
 	break ;
     }
 
-    return TCL_OK ;
+    return result ;
 }
 
 void
@@ -304,7 +267,7 @@ Ral_AttributeDelete(
 }
 
 Ral_Attribute
-Ral_AttributeCopy(
+Ral_AttributeDup(
     Ral_Attribute a)
 {
     switch (a->attrType) {
@@ -318,7 +281,7 @@ Ral_AttributeCopy(
 	return Ral_AttributeNewRelationType(a->name, a->relationHeading) ;
 
     default:
-	Tcl_Panic("Ral_AttributeCopy: unknown attribute type: %d",
+	Tcl_Panic("Ral_AttributeDup: unknown attribute type: %d",
 	    a->attrType) ;
     }
     /* Not reached */
@@ -341,7 +304,7 @@ Ral_AttributeRename(
 	return Ral_AttributeNewRelationType(newName, a->relationHeading) ;
 
     default:
-	Tcl_Panic("Ral_AttributeCopy: unknown attribute type: %d",
+	Tcl_Panic("Ral_AttributeRename: unknown attribute type: %d",
 	    a->attrType) ;
     }
     /* Not reached */
@@ -405,11 +368,9 @@ Ral_AttributeScanType(
     Ral_Attribute a,
     Ral_AttributeScanFlags flags)
 {
-    int length = 0 ;
-
     switch (a->attrType) {
     case Tcl_Type:
-	flags->typeFlagsCount = 0 ;
+	flags->type = Tcl_Type ;
 	flags->typeLength = Tcl_ScanElement(a->tclType->name,
 	    &flags->tclTypeFlags) ;
 	break ;
@@ -419,29 +380,32 @@ Ral_AttributeScanType(
 	 * Allocate an array of scan flag structures to hold the flags for the
 	 * attribute names / types that are in the tuple.
 	 */
-	flags->typeFlagsCount = Ral_TupleHeadingSize(a->tupleHeading) ;
-	flags->generatedTypeFlags = (Ral_AttributeScanFlags)ckalloc(
-	    flags->typeFlagsCount * sizeof(*flags)) ;
+	flags->type = Tuple_Type ;
+	flags->tupleFlags = Ral_TupleScanFlagsAlloc(a->tupleHeading) ;
 	flags->typeLength = Ral_TupleHeadingScan(a->tupleHeading,
-	    flags->generatedTypeFlags) ;
+	    flags->tupleFlags) ;
 	/*
 	 * When attributes are of a nested type, this will be enclosed
 	 * as a list element.
 	 */
-	length += sizeof(openList) - 1 + sizeof(closeList) - 1 ;
+	flags->typeLength += sizeof(openList) - 1 + sizeof(closeList) - 1 ;
 	break ;
 
     case Relation_Type:
-	Tcl_Panic("Ral_AttributeScanType: unsupported Relation type") ;
+	flags->type = Relation_Type ;
+	flags->relationFlags = Ral_RelationScanFlagsAlloc(a->relationHeading,
+	    0) ;
+	flags->typeLength = Ral_RelationHeadingScan(a->relationHeading,
+	    flags->relationFlags) ;
+	flags->typeLength += sizeof(openList) - 1 + sizeof(closeList) - 1 ;
 	break ;
 
     default:
 	Tcl_Panic("Ral_AttributeScanType: unknown attribute type: %d",
 	    a->attrType) ;
     }
-    length += flags->typeLength ;
 
-    return length ;
+    return flags->typeLength ;
 }
 
 int
@@ -462,16 +426,24 @@ Ral_AttributeConvertType(
 
 	strcpy(p, openList) ;
 	p += sizeof(openList) - 1 ;
-	p += Ral_TupleHeadingConvert(a->tupleHeading, p,
-	    flags->generatedTypeFlags) ;
+	p += Ral_TupleHeadingConvert(a->tupleHeading, p, flags->tupleFlags) ;
 	strcpy(p, closeList) ;
 	p += sizeof(closeList) - 1 ;
 	count = p - dst ;
     }
 	break ;
 
-    case Relation_Type:
-	Tcl_Panic("Ral_AttributeScanType: unsupported Relation type") ;
+    case Relation_Type: {
+	char *p = dst ;
+
+	strcpy(p, openList) ;
+	p += sizeof(openList) - 1 ;
+	p += Ral_RelationHeadingConvert(a->relationHeading, p,
+	    flags->relationFlags) ;
+	strcpy(p, closeList) ;
+	p += sizeof(closeList) - 1 ;
+	count = p - dst ;
+    }
 	break ;
 
     default:
@@ -488,31 +460,37 @@ Ral_AttributeScanValue(
     Tcl_Obj *value,
     Ral_AttributeScanFlags flags)
 {
-    int length = 0 ;
-
     switch (a->attrType) {
     case Tcl_Type:
+	flags->type = Tcl_Type ;
 	flags->valueLength = Tcl_ScanElement(Tcl_GetString(value),
-	    &flags->valueFlags) ;
+	    &flags->tclValueFlags) ;
 	break ;
 
     case Tuple_Type:
+	flags->type = Tuple_Type ;
+	flags->tupleFlags = Ral_TupleScanFlagsAlloc(a->tupleHeading) ;
 	flags->valueLength = Ral_TupleScanValue(
-	    value->internalRep.otherValuePtr, flags->generatedTypeFlags) ;
-	length += sizeof(openList) - 1 + sizeof(closeList) - 1 ;
+	    value->internalRep.otherValuePtr, flags->tupleFlags) ;
 	break ;
 
-    case Relation_Type:
-	Tcl_Panic("Ral_AttributeScanValue: unsupported Relation type") ;
+    case Relation_Type: {
+	Ral_Relation relation = value->internalRep.otherValuePtr ;
+
+	flags->type = Relation_Type ;
+	flags->relationFlags = Ral_RelationScanFlagsAlloc(a->relationHeading,
+	    Ral_RelationCardinality(relation)) ;
+	flags->valueLength = Ral_RelationScanValue(relation,
+	    flags->relationFlags) ;
+    }
 	break ;
 
     default:
 	Tcl_Panic("Ral_AttributeScanValue: unknown attribute type: %d",
 	    a->attrType) ;
     }
-    length += flags->valueLength ;
 
-    return length ;
+    return flags->valueLength ;
 }
 
 int
@@ -522,19 +500,22 @@ Ral_AttributeConvertValue(
     char *dst,
     Ral_AttributeScanFlags flags)
 {
-    char *p = dst ;
+    int length ;
 
     switch (a->attrType) {
     case Tcl_Type:
-	p += Tcl_ConvertElement(Tcl_GetString(value), p, flags->valueFlags) ;
+	length = Tcl_ConvertElement(Tcl_GetString(value), dst,
+	    flags->tclValueFlags) ;
 	break ;
 
     case Tuple_Type:
-	p += Ral_TupleConvertValue(value->internalRep.otherValuePtr,
-	    p, flags->generatedTypeFlags) ;
+	length = Ral_TupleConvertValue(value->internalRep.otherValuePtr,
+	    dst, flags->tupleFlags) ;
 	break ;
 
     case Relation_Type:
+	length = Ral_RelationConvertValue(value->internalRep.otherValuePtr,
+	    dst, flags->relationFlags) ;
 	break ;
 
     default:
@@ -542,22 +523,29 @@ Ral_AttributeConvertValue(
 	    a->attrType) ;
     }
 
-    return p - dst ;
+    return length ;
 }
 
 void
 Ral_AttributeScanFlagsFree(
-    unsigned count,
     Ral_AttributeScanFlags flags)
 {
-    while (count-- != 0) {
-	if (flags->typeFlagsCount) {
-	    Ral_AttributeScanFlagsFree(flags->typeFlagsCount,
-		flags->generatedTypeFlags) ;
-	}
-    }
+    switch (flags->type) {
+    case Tcl_Type:
+	break ;
 
-    ckfree((char *)flags) ;
+    case Tuple_Type:
+	Ral_TupleScanFlagsFree(flags->tupleFlags) ;
+	break ;
+
+    case Relation_Type:
+	Ral_RelationScanFlagsFree(flags->relationFlags) ;
+	break ;
+
+    default:
+	Tcl_Panic("Ral_AttributeScanFlagsFree: unknown flags type: %d",
+	    flags->type) ;
+    }
 }
 
 /*
@@ -581,7 +569,7 @@ Ral_AttributeToString(
     *s++ = ' ' ;
     Ral_AttributeConvertType(a, s, flags) ;
 
-    Ral_AttributeScanFlagsFree(1, flags) ;
+    Ral_AttributeScanFlagsFree(flags) ;
 
     return str ;
 }

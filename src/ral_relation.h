@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.h,v $
-$Revision: 1.1 $
-$Date: 2006/02/06 05:02:45 $
+$Revision: 1.2 $
+$Date: 2006/02/20 20:15:07 $
  *--
  */
 #ifndef _ral_relation_h_
@@ -61,6 +61,8 @@ INCLUDE FILES
 */
 #include "ral_relationheading.h"
 #include "ral_tuple.h"
+#include "ral_attribute.h"
+
 #include <stdio.h>
 
 /*
@@ -85,7 +87,7 @@ TYPE DECLARATIONS
  * 1. The keyword "Relation".
  *
  * 2. A tuple heading. A tuple heading is a list of Name / Type pairs as
- *    described above.
+ *    described for the Tuple type.
  *
  * 3. A list of identifiers. Each identifier is in turn a list of attribute
  *    names that constitute the identifier
@@ -103,15 +105,16 @@ TYPE DECLARATIONS
  * be used as indices into the tuple storage of a Relation.
  */
 
+typedef Ral_Tuple *Ral_RelationIter ;
 typedef struct Ral_Relation {
     Ral_RelationHeading heading ;   /* The relation heading */
-    Ral_Tuple *startTuples ;	    /* Tuple values are stored in a dynamic
+    Ral_RelationIter start ;	    /* Tuple values are stored in a dynamic
 				     * vector of tuple pointers. We use the
 				     * usual start, finish, end pointers to
 				     * manipulate the vector.
-				     * Cf. Ral_IntVector */
-    Ral_Tuple *finishTuples ;
-    Ral_Tuple *endTuples ;
+				     * Cf. Ral_IntVector and Ral_TupleHeading */
+    Ral_RelationIter finish ;
+    Ral_RelationIter endStorage ;
     Tcl_HashTable *indexVector ;    /* A vector of hash tables that map the
 				     * the values of identifying attributes
 				     * to the index in the tuple vector where
@@ -125,6 +128,25 @@ typedef struct Ral_Relation {
 /*
 FUNCTION DECLARATIONS
 */
+
+extern Ral_Relation Ral_RelationNew(Ral_RelationHeading) ;
+extern Ral_Relation Ral_RelationDup(Ral_Relation) ;
+extern void Ral_RelationDelete(Ral_Relation) ;
+extern Ral_RelationIter Ral_RelationBegin(Ral_Relation) ;
+extern Ral_RelationIter Ral_RelationEnd(Ral_Relation) ;
+extern int Ral_RelationCardinality(Ral_Relation) ;
+extern int Ral_RelationCapacity(Ral_Relation) ;
+extern void Ral_RelationReserve(Ral_Relation, int) ;
+extern int Ral_RelationDegree(Ral_Relation) ;
+extern int Ral_RelationPushBack(Ral_Relation, Ral_Tuple) ;
+
+extern int Ral_RelationScan(Ral_Relation, Ral_RelationScanFlags *) ;
+extern int Ral_RelationConvert(Ral_Relation, char *, Ral_RelationScanFlags) ;
+extern int Ral_RelationScanValue(Ral_Relation, Ral_RelationScanFlags) ;
+extern int Ral_RelationConvertValue(Ral_Relation, char *,
+    Ral_RelationScanFlags) ;
+extern void Ral_RelationPrint(Ral_Relation, const char *, FILE *) ;
+
 extern const char * Ral_RelationVersion(void) ;
 
 #endif /* _ral_relation_h_ */

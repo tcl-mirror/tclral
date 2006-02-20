@@ -43,8 +43,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: Makefile,v $
-# $Revision: 1.2 $
-# $Date: 2006/02/06 05:02:46 $
+# $Revision: 1.3 $
+# $Date: 2006/02/20 20:15:11 $
 #  *--
 
 PROGS = \
@@ -54,6 +54,7 @@ PROGS = \
     test_ral_tuple \
     test_ral_tupleobj \
     test_ral_relationheading \
+    test_ral_relation \
     $(NULL)
 
 # This is set up to use either 8.4 or 8.5. Just uncomment the one
@@ -101,6 +102,9 @@ test_ral_tupleobj : test_ral_tupleobj.c libraltest.a ../libral0.8.so
 
 test_ral_relationheading : test_ral_relationheading.c libraltest.a\
 	../libral0.8.so
+	$(CC) $(CFLAGS) $^ $(LOADLIBES) -lral0.8 -ltcl8.5 libraltest.a -o $@
+
+test_ral_relation : test_ral_relation.c libraltest.a ../libral0.8.so
 	$(CC) $(CFLAGS) $^ $(LOADLIBES) -lral0.8 -ltcl8.5 libraltest.a -o $@
 
 libraltest.a : libraltest.a(log.o)

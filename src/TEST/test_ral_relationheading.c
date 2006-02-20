@@ -40,6 +40,9 @@ main(
     Ral_IntVectorStore(v1, 0, Ral_TupleHeadingIndexOf(t1, "attr1")) ;
     logTest(Ral_RelationHeadingAddIdentifier(r1, 0, v1), 1) ;
 
+    logInfo("printing first relation heading") ;
+    Ral_RelationHeadingPrint(r1, "%s\n", stdout) ;
+
     logInfo("creating second relation heading") ;
     t2 = Ral_TupleHeadingNew(3) ;
     Ral_TupleHeadingPushBack(t2, Ral_AttributeNewTclType("attr2", strType)) ;
@@ -52,17 +55,26 @@ main(
     logInfo("testing for heading equality") ;
     logTest(Ral_RelationHeadingEqual(r1,r2), 1) ;
 
+    logInfo("printing second relation heading") ;
+    Ral_RelationHeadingPrint(r2, "%s\n", stdout) ;
+
     logInfo("creating third relation heading") ;
     t3 = Ral_TupleHeadingNew(3) ;
     Ral_TupleHeadingPushBack(t3, Ral_AttributeNewTclType("attr3", strType)) ;
     Ral_TupleHeadingPushBack(t3, Ral_AttributeNewTclType("attr1", strType)) ;
     Ral_TupleHeadingPushBack(t3, Ral_AttributeNewTclType("attr2", strType)) ;
     r3 = Ral_RelationHeadingNew(t3, 1) ;
-    v3 = Ral_IntVectorNew(1, -1) ;
+
+    v3 = Ral_IntVectorNew(2, -1) ;
     Ral_IntVectorStore(v3, 0, Ral_TupleHeadingIndexOf(t3, "attr2")) ;
+    Ral_IntVectorStore(v3, 1, Ral_TupleHeadingIndexOf(t3, "attr3")) ;
+
     logTest(Ral_RelationHeadingAddIdentifier(r3, 0, v3), 1) ;
     logInfo("testing for heading inequality") ;
     logTest(Ral_RelationHeadingEqual(r1,r3), 0) ;
+
+    logInfo("printing third relation heading") ;
+    Ral_RelationHeadingPrint(r3, "%s\n", stdout) ;
 
     Ral_RelationHeadingUnreference(r1) ;
     Ral_RelationHeadingUnreference(r2) ;

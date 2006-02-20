@@ -45,12 +45,12 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuplecmd.h,v $
-$Revision: 1.1 $
-$Date: 2005/12/27 23:17:19 $
+$Revision: 1.2 $
+$Date: 2006/02/20 20:15:10 $
  *--
  */
-#ifndef _raltuplecmd_h_
-#define _raltuplecmd_h_
+#ifndef _ral_tuplecmd_h_
+#define _ral_tuplecmd_h_
 
 /*
 PRAGMAS
@@ -85,4 +85,4 @@ FUNCTION DECLARATIONS
 extern int tupleCmd(ClientData, Tcl_Interp *, int, Tcl_Obj *const*) ;
 extern const char *Ral_TupleCmdVersion(void) ;
 
-#endif /* _raltuplecmd_h_ */
+#endif /* _ral_tuplecmd_h_ */

@@ -43,13 +43,17 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_tupleobj.c,v $
-$Revision: 1.3 $
-$Date: 2006/02/06 05:02:45 $
+$Revision: 1.4 $
+$Date: 2006/02/20 20:15:10 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_tupleobj.c,v $
+Revision 1.4  2006/02/20 20:15:10  mangoa01
+Now able to convert strings to relations and vice versa including
+tuple and relation valued attributes.
+
 Revision 1.3  2006/02/06 05:02:45  mangoa01
 Started on relation heading and other code refactoring.
 This is a checkpoint after a number of added files and changes
@@ -72,11 +76,13 @@ PRAGMAS
 INCLUDE FILES
 */
 #include "tcl.h"
+#include "ral_utils.h"
 #include "ral_vector.h"
 #include "ral_tupleobj.h"
 #include "ral_tuple.h"
-#include <string.h>
+
 #include <assert.h>
+#include <string.h>
 
 /*
 MACRO DEFINITIONS
@@ -120,14 +126,14 @@ Tcl_ObjType Ral_TupleObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tupleobj.c,v $ $Revision: 1.3 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tupleobj.c,v $ $Revision: 1.4 $" ;
 
 /*
 FUNCTION DEFINITIONS
 */
 
 Tcl_Obj *
-Ral_TupleNewObj(
+Ral_TupleObjNew(
     Ral_Tuple tuple)
 {
     Tcl_Obj *objPtr = Tcl_NewObj() ;
@@ -135,6 +141,40 @@ Ral_TupleNewObj(
     Ral_TupleReference(objPtr->internalRep.otherValuePtr = tuple) ;
     Tcl_InvalidateStringRep(objPtr) ;
     return objPtr ;
+}
+
+int
+Ral_TupleObjConvert(
+    Ral_TupleHeading heading,
+    Tcl_Interp *interp,
+    Tcl_Obj *value,
+    Tcl_Obj *objPtr)
+{
+    Ral_Tuple tuple = Ral_TupleNew(heading) ;
+
+    if (Ral_TupleSetFromObj(tuple, interp, value) != TCL_OK) {
+	Ral_TupleDelete(tuple) ;
+	return TCL_ERROR ;
+    }
+    /*
+     * Discard the old internal representation.
+     */
+    if (objPtr->typePtr && objPtr->typePtr->freeIntRepProc) {
+	objPtr->typePtr->freeIntRepProc(objPtr) ;
+    }
+    /*
+     * Invalidate the string representation.  There are several string reps
+     * that will map to the same tuple and we want to force a new string rep to
+     * be generated in order to obtain the canonical string form.
+     */
+    Tcl_InvalidateStringRep(objPtr) ;
+    /*
+     * Install the new internal representation.
+     */
+    objPtr->typePtr = &Ral_TupleObjType ;
+    Ral_TupleReference(objPtr->internalRep.otherValuePtr = tuple) ;
+
+    return TCL_OK ;
 }
 
 Ral_TupleHeading
@@ -154,10 +194,10 @@ Ral_TupleHeadingNewFromObj(
 	return NULL ;
     }
     if (objc % 2 != 0) {
-	Ral_TupleObjSetError(interp, HEADING_ERR, Tcl_GetString(objPtr)) ;
+	Ral_TupleObjSetError(interp, TUP_HEADING_ERR, Tcl_GetString(objPtr)) ;
 	return NULL ;
     }
-    heading = Ral_TupleHeadingNew((unsigned)(objc / 2)) ;
+    heading = Ral_TupleHeadingNew(objc / 2) ;
     /*
      * Iterate through the list adding each element as an attribute to
      * a newly created Heading.
@@ -173,7 +213,7 @@ Ral_TupleHeadingNewFromObj(
 	}
 	iter = Ral_TupleHeadingPushBack(heading, attr) ;
 	if (iter == Ral_TupleHeadingEnd(heading)) {
-	    Ral_TupleObjSetError(interp, DUPLICATE_ATTR, attr->name) ;
+	    Ral_TupleObjSetError(interp, TUP_DUPLICATE_ATTR, attr->name) ;
 	    Ral_AttributeDelete(attr) ;
 	    Ral_TupleHeadingDelete(heading) ;
 	    return NULL ;
@@ -201,11 +241,12 @@ Ral_TupleSetFromObj(
 	return TCL_ERROR ;
     }
     if (elemc % 2 != 0) {
-	Ral_TupleObjSetError(interp, FORMAT_ERR, Tcl_GetString(objPtr)) ;
+	Ral_TupleObjSetError(interp, TUP_FORMAT_ERR, Tcl_GetString(objPtr)) ;
 	return TCL_ERROR ;
     }
     if (elemc / 2 != Ral_TupleDegree(tuple)) {
-	Ral_TupleObjSetError(interp, WRONG_NUM_ATTRS, Tcl_GetString(objPtr)) ;
+	Ral_TupleObjSetError(interp, TUP_WRONG_NUM_ATTRS,
+	    Tcl_GetString(objPtr)) ;
 	return TCL_ERROR ;
     }
     /*
@@ -219,10 +260,10 @@ Ral_TupleSetFromObj(
 	int hindex = Ral_TupleHeadingIndexOf(tuple->heading, attrName) ;
 
 	if (hindex < 0) {
-	    Ral_TupleObjSetError(interp, UNKNOWN_ATTR, attrName) ;
+	    Ral_TupleObjSetError(interp, TUP_UNKNOWN_ATTR, attrName) ;
 	    goto errorOut ;
 	} else if (Ral_IntVectorFetch(attrStatus, hindex)) {
-	    Ral_TupleObjSetError(interp, DUPLICATE_ATTR, attrName) ;
+	    Ral_TupleObjSetError(interp, TUP_DUPLICATE_ATTR, attrName) ;
 	    goto errorOut ;
 	}
 	Ral_IntVectorStore(attrStatus, hindex, 1) ;
@@ -256,7 +297,7 @@ Ral_TupleUpdateFromObj(
 	return TCL_ERROR ;
     }
     if (elemc % 2 != 0) {
-	Ral_TupleObjSetError(interp, FORMAT_ERR, Tcl_GetString(objPtr)) ;
+	Ral_TupleObjSetError(interp, TUP_FORMAT_ERR, Tcl_GetString(objPtr)) ;
 	return TCL_ERROR ;
     }
     /*
@@ -284,9 +325,9 @@ Ral_TupleUpdateAttrFromObj(
 
     status = Ral_TupleUpdateAttrValue(tuple, attrName, valueObj) ;
     if (status == NoSuchAttribute) {
-	Ral_TupleObjSetError(interp, UNKNOWN_ATTR, attrName) ;
+	Ral_TupleObjSetError(interp, TUP_UNKNOWN_ATTR, attrName) ;
     } else if (status == BadValueType) {
-	Ral_TupleObjSetError(interp, BAD_VALUE, Tcl_GetString(valueObj)) ;
+	Ral_TupleObjSetError(interp, TUP_BAD_VALUE, Tcl_GetString(valueObj)) ;
     }
 
     return status == AttributeUpdated ? TCL_OK : TCL_ERROR ;
@@ -329,13 +370,8 @@ Ral_TupleObjSetError(
 	"BAD_PAIRS_LIST",
     } ;
 
-    if (interp) {
-	Tcl_ResetResult(interp) ;
-	Tcl_AppendStringsToObj(Tcl_GetObjResult(interp), resultStrings[error],
-	    ", \"", param, "\"", NULL) ;
-	Tcl_SetErrorCode(interp, "RAL", "TUPLE", errorStrings[error], param,
-	    NULL) ;
-    }
+    Ral_ObjSetError(interp, "TUPLE", resultStrings[error], errorStrings[error],
+	param) ;
 }
 
 /*
@@ -364,61 +400,31 @@ DupTupleInternalRep(
     assert(srcPtr->typePtr == &Ral_TupleObjType) ;
     srcTuple = srcPtr->internalRep.otherValuePtr ;
 
-    dupTuple = Ral_TupleDuplicate(srcTuple) ;
+    dupTuple = Ral_TupleDup(srcTuple) ;
     Ral_TupleReference(dupPtr->internalRep.otherValuePtr = dupTuple) ;
     dupPtr->typePtr = &Ral_TupleObjType ;
 }
 
-/*
- * The string representation of a "Tuple" is a specially formed list.  The list
- * consists of three elements:
- *
- * 1. A heading definition.
- *
- * 2. A value definition.
- *
- * The heading consists of a two element list, the first element being the
- * keyword "Tuple" to distinguish the type and the second element being a list
- * Attribute Name and Data Type pairs.  The value definition is also a list
- * consisting of Attribute Name / Attribute Value pairs. A tuple value is then
- * the concatenation of these two lists to yield a list of three elements.
- * e.g.
- *	{Tuple {Name string Street int Wage double}\
- *	{Name Andrew Street Blackwood Wage 5.74}}
- * So to convert the internal representation to a string the strategy is
- * to use Tcl_ScanElement and Tcl_ConvertElement to generate the proper list
- * representation. There are Tuple Header functions to do deal with the
- * header part of the tuple.
- */
 static void
 UpdateStringOfTuple(
     Tcl_Obj *objPtr)
 {
     Ral_Tuple tuple = objPtr->internalRep.otherValuePtr ;
-    Ral_AttributeScanFlags scanFlags ;
+    Ral_TupleScanFlags scanFlags ;
     int length ;
 
     /*
-     * First phase is to scan the tuple header and values to compute the
-     * amount of space required to hold the string representation. Compare
-     * here with the way the internal "list" type accomplishes this.
-     * N.B. that Ral_TupleScan allocates the memory to hold the scan flags
-     * and this must be freed below.
+     * Scan the tuple.
      */
     length = Ral_TupleScan(tuple, &scanFlags) ;
     /*
-     * Second phase is to allocate the memory and generate the string rep
-     * into the object structure.
+     * Allocate the memory for the string representation.
      */
     objPtr->bytes = ckalloc(length + 1) ; /* +1 for the NUL terminator */
     /*
      * Convert the Tuple into a string.
      */
     objPtr->length = Ral_TupleConvert(tuple, objPtr->bytes, scanFlags) ;
-    /*
-     * Done with the scan flags.
-     */
-    Ral_AttributeScanFlagsFree(Ral_TupleDegree(tuple), scanFlags) ;
 }
 
 static int
@@ -429,47 +435,22 @@ SetTupleFromAny(
     int objc ;
     Tcl_Obj **objv ;
     Ral_TupleHeading heading ;
-    Ral_Tuple tuple ;
 
     if (Tcl_ListObjGetElements(interp, objPtr, &objc, &objv) != TCL_OK) {
 	return TCL_ERROR ;
     }
     if (objc != 3) {
-	Ral_TupleObjSetError(interp, FORMAT_ERR, Tcl_GetString(objPtr)) ;
+	Ral_TupleObjSetError(interp, TUP_FORMAT_ERR, Tcl_GetString(objPtr)) ;
 	return TCL_ERROR ;
     }
     if (strcmp(Ral_TupleObjType.name, Tcl_GetString(*objv)) != 0) {
-	Ral_TupleObjSetError(interp, BAD_KEYWORD, Tcl_GetString(*objv)) ;
+	Ral_TupleObjSetError(interp, TUP_BAD_KEYWORD, Tcl_GetString(*objv)) ;
 	return TCL_ERROR ;
     }
 
-    heading = Ral_TupleHeadingNewFromObj(interp, *(objv + 1)) ;
+    heading = Ral_TupleHeadingNewFromObj(interp, objv[1]) ;
     if (!heading) {
 	return TCL_ERROR ;
     }
-
-    tuple = Ral_TupleNew(heading) ;
-    if (Ral_TupleSetFromObj(tuple, interp, *(objv + 2)) != TCL_OK) {
-	Ral_TupleDelete(tuple) ;
-	return TCL_ERROR ;
-    }
-    /*
-     * Discard the old internal representation.
-     */
-    if (objPtr->typePtr && objPtr->typePtr->freeIntRepProc) {
-	objPtr->typePtr->freeIntRepProc(objPtr) ;
-    }
-    /*
-     * Invalidate the string representation.  There are several string reps
-     * that will map to the same tuple and we want to force a new string rep to
-     * be generated in order to obtain the canonical string form.
-     */
-    Tcl_InvalidateStringRep(objPtr) ;
-    /*
-     * Install the new internal representation.
-     */
-    objPtr->typePtr = &Ral_TupleObjType ;
-    Ral_TupleReference(objPtr->internalRep.otherValuePtr = tuple) ;
-
-    return TCL_OK ;
+    return Ral_TupleObjConvert(heading, interp, objv[2], objPtr) ;
 }

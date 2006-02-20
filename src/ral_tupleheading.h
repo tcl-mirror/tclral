@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleheading.h,v $
-$Revision: 1.3 $
-$Date: 2006/02/06 05:02:45 $
+$Revision: 1.4 $
+$Date: 2006/02/20 20:15:10 $
  *--
  */
 #ifndef _ral_tupleheading_h_
@@ -106,18 +106,24 @@ typedef struct Ral_TupleHeading {
 					 * name*/
 } *Ral_TupleHeading ;
 
+typedef struct Ral_TupleScanFlags {
+    int degree ;
+    struct Ral_AttributeScanFlags *attrFlags ;
+} *Ral_TupleScanFlags ;
+
 /*
 FUNCTION DECLARATIONS
 */
 
-extern Ral_TupleHeading Ral_TupleHeadingNew(unsigned) ;
+extern Ral_TupleHeading Ral_TupleHeadingNew(int) ;
+extern Ral_TupleHeading Ral_TupleHeadingDup(Ral_TupleHeading) ;
 extern void Ral_TupleHeadingDelete(Ral_TupleHeading) ;
 extern void Ral_TupleHeadingReference(Ral_TupleHeading) ;
 extern void Ral_TupleHeadingUnreference(Ral_TupleHeading) ;
 extern int Ral_TupleHeadingAppend(Ral_TupleHeading, Ral_TupleHeadingIter,
     Ral_TupleHeadingIter, Ral_TupleHeading) ;
-extern unsigned Ral_TupleHeadingSize(Ral_TupleHeading) ;
-extern unsigned Ral_TupleHeadingCapacity(Ral_TupleHeading) ;
+extern int Ral_TupleHeadingSize(Ral_TupleHeading) ;
+extern int Ral_TupleHeadingCapacity(Ral_TupleHeading) ;
 extern int Ral_TupleHeadingEmpty(Ral_TupleHeading) ;
 extern int Ral_TupleHeadingEqual(Ral_TupleHeading, Ral_TupleHeading) ;
 extern Ral_TupleHeadingIter Ral_TupleHeadingBegin(Ral_TupleHeading) ;
@@ -134,10 +140,12 @@ extern Ral_TupleHeading Ral_TupleHeadingUnion(Ral_TupleHeading,
     Ral_TupleHeading) ;
 extern Ral_TupleHeading Ral_TupleHeadingIntersect(Ral_TupleHeading,
     Ral_TupleHeading) ;
-extern int Ral_TupleHeadingScan(Ral_TupleHeading, Ral_AttributeScanFlags) ;
+extern int Ral_TupleHeadingScan(Ral_TupleHeading, Ral_TupleScanFlags) ;
 extern int Ral_TupleHeadingConvert(Ral_TupleHeading, char *,
-    Ral_AttributeScanFlags) ;
-extern char *Ral_TupleHeadingToString(Ral_TupleHeading) ;
+    Ral_TupleScanFlags) ;
+extern void Ral_TupleHeadingPrint(Ral_TupleHeading, const char *, FILE *) ;
+extern Ral_TupleScanFlags Ral_TupleScanFlagsAlloc(Ral_TupleHeading) ;
+extern void Ral_TupleScanFlagsFree(Ral_TupleScanFlags) ;
 extern const char *Ral_TupleHeadingVersion(void) ;
 
 #endif /* _ral_tupleheading_h_ */

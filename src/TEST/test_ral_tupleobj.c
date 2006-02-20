@@ -55,7 +55,7 @@ main(
     Ral_TupleUpdateAttrValue(t1, "attr3", Tcl_NewStringObj("a3", -1)) ;
 
     logInfo("creating object from tuple") ;
-    t1obj = Ral_TupleNewObj(t1) ;
+    t1obj = Ral_TupleObjNew(t1) ;
     logInfo("tuple = \"%s\"", Tcl_GetString(t1obj)) ;
 
     logInfo("creating tuple object from a string") ;

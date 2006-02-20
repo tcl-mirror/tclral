@@ -42,11 +42,12 @@ main(
     flags = (Ral_AttributeScanFlags)ckalloc(sizeof(*flags)) ;
     aValueStr = ckalloc(Ral_AttributeScanValue(a2, attrValue, flags)) ;
     Ral_AttributeConvertValue(a2, attrValue, aValueStr, flags) ;
-    Ral_AttributeScanFlagsFree(1, flags) ;
+    Ral_AttributeScanFlagsFree(flags) ;
+    ckfree((char *)flags) ;
     logInfo("attribute value = \"%s\"", aValueStr) ;
     ckfree(aValueStr) ;
 
-    a3 = Ral_AttributeCopy(a1) ;
+    a3 = Ral_AttributeDup(a1) ;
     logTest(Ral_AttributeEqual(a1, a3), 1) ;
 
     Ral_AttributeDelete(a1) ;
