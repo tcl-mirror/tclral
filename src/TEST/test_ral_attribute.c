@@ -19,7 +19,8 @@ main(
     Tcl_Obj *attrType ;
     Tcl_Obj *attrValue ;
     char * a2Str ;
-    Ral_AttributeScanFlags flags ;
+    Ral_AttributeTypeScanFlags typeFlags ;
+    Ral_AttributeValueScanFlags valueFlags ;
     char * aValueStr ;
 
     interp = Tcl_CreateInterp() ;
@@ -39,11 +40,14 @@ main(
     logInfo("attribute created from objs = \"%s\"", a2Str) ;
     ckfree(a2Str) ;
 
-    flags = (Ral_AttributeScanFlags)ckalloc(sizeof(*flags)) ;
-    aValueStr = ckalloc(Ral_AttributeScanValue(a2, attrValue, flags)) ;
-    Ral_AttributeConvertValue(a2, attrValue, aValueStr, flags) ;
-    Ral_AttributeScanFlagsFree(flags) ;
-    ckfree((char *)flags) ;
+    Ral_AttributeScanName(a2, &typeFlags) ;
+    Ral_AttributeScanType(a2, &typeFlags) ;
+    aValueStr = ckalloc(Ral_AttributeScanValue(a2, attrValue, &typeFlags,
+	&valueFlags)) ;
+    Ral_AttributeConvertValue(a2, attrValue, aValueStr, &typeFlags,
+	&valueFlags) ;
+    Ral_AttributeTypeScanFlagsFree(&typeFlags) ;
+    Ral_AttributeValueScanFlagsFree(&valueFlags) ;
     logInfo("attribute value = \"%s\"", aValueStr) ;
     ckfree(aValueStr) ;
 

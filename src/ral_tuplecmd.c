@@ -43,13 +43,19 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_tuplecmd.c,v $
-$Revision: 1.4 $
-$Date: 2006/02/20 20:15:08 $
+$Revision: 1.5 $
+$Date: 2006/02/26 04:57:53 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_tuplecmd.c,v $
+Revision 1.5  2006/02/26 04:57:53  mangoa01
+Reworked the conversion from internal form to a string yet again.
+This design is better and more recursive in nature.
+Added additional code to the "relation" commands.
+Now in a position to finish off the remaining relation commands.
+
 Revision 1.4  2006/02/20 20:15:08  mangoa01
 Now able to convert strings to relations and vice versa including
 tuple and relation valued attributes.
@@ -122,7 +128,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tuplecmd.c,v $ $Revision: 1.4 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tuplecmd.c,v $ $Revision: 1.5 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -666,8 +672,6 @@ TupleHeadingCmd(
 {
     Tcl_Obj *tupleObj ;
     Ral_Tuple tuple ;
-    Ral_TupleHeading heading ;
-    Ral_TupleScanFlags flags ;
     char *strRep ;
     Tcl_Obj *resultObj ;
 
@@ -681,12 +685,8 @@ TupleHeadingCmd(
 	return TCL_ERROR ;
     }
     tuple = tupleObj->internalRep.otherValuePtr ;
-    heading = tuple->heading ;
 
-    flags = Ral_TupleScanFlagsAlloc(heading) ;
-    strRep = ckalloc(Ral_TupleHeadingScan(heading, flags)) ;
-    Ral_TupleHeadingConvert(heading, strRep, flags) ;
-    Ral_TupleScanFlagsFree(flags) ;
+    strRep = Ral_TupleHeadingStringOf(tuple->heading) ;
     resultObj = Tcl_NewStringObj(strRep, -1) ;
     ckfree(strRep) ;
 

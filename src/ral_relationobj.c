@@ -43,13 +43,19 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_relationobj.c,v $
-$Revision: 1.2 $
-$Date: 2006/02/20 20:15:07 $
+$Revision: 1.3 $
+$Date: 2006/02/26 04:57:53 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_relationobj.c,v $
+Revision 1.3  2006/02/26 04:57:53  mangoa01
+Reworked the conversion from internal form to a string yet again.
+This design is better and more recursive in nature.
+Added additional code to the "relation" commands.
+Now in a position to finish off the remaining relation commands.
+
 Revision 1.2  2006/02/20 20:15:07  mangoa01
 Now able to convert strings to relations and vice versa including
 tuple and relation valued attributes.
@@ -117,11 +123,22 @@ Tcl_ObjType Ral_RelationObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.2 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.3 $" ;
 
 /*
 FUNCTION DEFINITIONS
 */
+
+Tcl_Obj *
+Ral_RelationObjNew(
+    Ral_Relation relation)
+{
+    Tcl_Obj *objPtr = Tcl_NewObj() ;
+    objPtr->typePtr = &Ral_RelationObjType ;
+    objPtr->internalRep.otherValuePtr = relation ;
+    Tcl_InvalidateStringRep(objPtr) ;
+    return objPtr ;
+}
 
 int
 Ral_RelationObjConvert(
@@ -413,22 +430,8 @@ static void
 UpdateStringOfRelation(
     Tcl_Obj *objPtr)
 {
-    Ral_Relation relation = objPtr->internalRep.otherValuePtr ;
-    Ral_RelationScanFlags scanFlags ;
-    int length ;
-
-    /*
-     * Scan the relation.
-     */
-    length = Ral_RelationScan(relation, &scanFlags) ;
-    /*
-     * Allocate the memory to store the string representation.
-     */
-    objPtr->bytes = ckalloc(length) ;
-    /*
-     * Convert the Relation into a string.
-     */
-    objPtr->length = Ral_RelationConvert(relation, objPtr->bytes, scanFlags) ;
+    objPtr->bytes = Ral_RelationStringOf(objPtr->internalRep.otherValuePtr) ;
+    objPtr->length = strlen(objPtr->bytes) ;
 }
 
 static int

@@ -43,13 +43,19 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_tupleobj.c,v $
-$Revision: 1.4 $
-$Date: 2006/02/20 20:15:10 $
+$Revision: 1.5 $
+$Date: 2006/02/26 04:57:53 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_tupleobj.c,v $
+Revision 1.5  2006/02/26 04:57:53  mangoa01
+Reworked the conversion from internal form to a string yet again.
+This design is better and more recursive in nature.
+Added additional code to the "relation" commands.
+Now in a position to finish off the remaining relation commands.
+
 Revision 1.4  2006/02/20 20:15:10  mangoa01
 Now able to convert strings to relations and vice versa including
 tuple and relation valued attributes.
@@ -126,7 +132,7 @@ Tcl_ObjType Ral_TupleObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tupleobj.c,v $ $Revision: 1.4 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tupleobj.c,v $ $Revision: 1.5 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -409,22 +415,8 @@ static void
 UpdateStringOfTuple(
     Tcl_Obj *objPtr)
 {
-    Ral_Tuple tuple = objPtr->internalRep.otherValuePtr ;
-    Ral_TupleScanFlags scanFlags ;
-    int length ;
-
-    /*
-     * Scan the tuple.
-     */
-    length = Ral_TupleScan(tuple, &scanFlags) ;
-    /*
-     * Allocate the memory for the string representation.
-     */
-    objPtr->bytes = ckalloc(length + 1) ; /* +1 for the NUL terminator */
-    /*
-     * Convert the Tuple into a string.
-     */
-    objPtr->length = Ral_TupleConvert(tuple, objPtr->bytes, scanFlags) ;
+    objPtr->bytes = Ral_TupleStringOf(objPtr->internalRep.otherValuePtr) ;
+    objPtr->length = strlen(objPtr->bytes) ;
 }
 
 static int

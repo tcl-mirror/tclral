@@ -43,13 +43,19 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_attribute.c,v $
-$Revision: 1.4 $
-$Date: 2006/02/20 20:15:07 $
+$Revision: 1.5 $
+$Date: 2006/02/26 04:57:53 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_attribute.c,v $
+Revision 1.5  2006/02/26 04:57:53  mangoa01
+Reworked the conversion from internal form to a string yet again.
+This design is better and more recursive in nature.
+Added additional code to the "relation" commands.
+Now in a position to finish off the remaining relation commands.
+
 Revision 1.4  2006/02/20 20:15:07  mangoa01
 Now able to convert strings to relations and vice versa including
 tuple and relation valued attributes.
@@ -113,7 +119,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList[] = "{" ;
 static const char closeList[] = "}" ;
-static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.4 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.5 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -333,10 +339,11 @@ Ral_AttributeEqual(
 	return a1->tclType == a2->tclType ;
 
     case Tuple_Type:
-	return a1->tupleHeading == a2->tupleHeading ;
+	return Ral_TupleHeadingEqual(a1->tupleHeading, a2->tupleHeading) ;
 
     case Relation_Type:
-	return a1->relationHeading == a2->relationHeading ;
+	return Ral_RelationHeadingEqual(a1->relationHeading,
+	    a2->relationHeading) ;
 
     default:
 	Tcl_Panic("Ral_AttributeEqual: unknown attribute type: %d",
@@ -349,8 +356,9 @@ Ral_AttributeEqual(
 int
 Ral_AttributeScanName(
     Ral_Attribute a,
-    Ral_AttributeScanFlags flags)
+    Ral_AttributeTypeScanFlags *flags)
 {
+    flags->attrType = a->attrType ;
     return flags->nameLength = Tcl_ScanElement(a->name, &flags->nameFlags) ;
 }
 
@@ -358,7 +366,7 @@ int
 Ral_AttributeConvertName(
     Ral_Attribute a,
     char *dst,
-    Ral_AttributeScanFlags flags)
+    Ral_AttributeTypeScanFlags *flags)
 {
     return Tcl_ConvertElement(a->name, dst, flags->nameFlags) ;
 }
@@ -366,38 +374,24 @@ Ral_AttributeConvertName(
 int
 Ral_AttributeScanType(
     Ral_Attribute a,
-    Ral_AttributeScanFlags flags)
+    Ral_AttributeTypeScanFlags *flags)
 {
+    int length ;
+
+    flags->attrType = a->attrType ;
     switch (a->attrType) {
     case Tcl_Type:
-	flags->type = Tcl_Type ;
-	flags->typeLength = Tcl_ScanElement(a->tclType->name,
-	    &flags->tclTypeFlags) ;
+	length = Tcl_ScanElement(a->tclType->name, &flags->simpleFlags) ;
 	break ;
 
     case Tuple_Type:
-	/*
-	 * Allocate an array of scan flag structures to hold the flags for the
-	 * attribute names / types that are in the tuple.
-	 */
-	flags->type = Tuple_Type ;
-	flags->tupleFlags = Ral_TupleScanFlagsAlloc(a->tupleHeading) ;
-	flags->typeLength = Ral_TupleHeadingScan(a->tupleHeading,
-	    flags->tupleFlags) ;
-	/*
-	 * When attributes are of a nested type, this will be enclosed
-	 * as a list element.
-	 */
-	flags->typeLength += sizeof(openList) - 1 + sizeof(closeList) - 1 ;
+	length = Ral_TupleHeadingScan(a->tupleHeading, flags) ;
+	length += sizeof(openList) - 1 + sizeof(closeList) - 1;
 	break ;
 
     case Relation_Type:
-	flags->type = Relation_Type ;
-	flags->relationFlags = Ral_RelationScanFlagsAlloc(a->relationHeading,
-	    0) ;
-	flags->typeLength = Ral_RelationHeadingScan(a->relationHeading,
-	    flags->relationFlags) ;
-	flags->typeLength += sizeof(openList) - 1 + sizeof(closeList) - 1 ;
+	length = Ral_RelationHeadingScan(a->relationHeading, flags) ;
+	length += sizeof(openList) - 1 + sizeof(closeList) - 1;
 	break ;
 
     default:
@@ -405,20 +399,20 @@ Ral_AttributeScanType(
 	    a->attrType) ;
     }
 
-    return flags->typeLength ;
+    return length ;
 }
 
 int
 Ral_AttributeConvertType(
     Ral_Attribute a,
     char *dst,
-    Ral_AttributeScanFlags flags)
+    Ral_AttributeTypeScanFlags *flags)
 {
-    int count ;
+    int length ;
 
     switch (a->attrType) {
     case Tcl_Type:
-	count = Tcl_ConvertElement(a->tclType->name, dst, flags->tclTypeFlags) ;
+	length = Tcl_ConvertElement(a->tclType->name, dst, flags->simpleFlags) ;
 	break ;
 
     case Tuple_Type: {
@@ -426,10 +420,10 @@ Ral_AttributeConvertType(
 
 	strcpy(p, openList) ;
 	p += sizeof(openList) - 1 ;
-	p += Ral_TupleHeadingConvert(a->tupleHeading, p, flags->tupleFlags) ;
+	p += Ral_TupleHeadingConvert(a->tupleHeading, p, flags) ;
 	strcpy(p, closeList) ;
-	p += sizeof(closeList) - 1 ;
-	count = p - dst ;
+	p += sizeof(closeList) - 1;
+	length = p - dst ;
     }
 	break ;
 
@@ -438,11 +432,10 @@ Ral_AttributeConvertType(
 
 	strcpy(p, openList) ;
 	p += sizeof(openList) - 1 ;
-	p += Ral_RelationHeadingConvert(a->relationHeading, p,
-	    flags->relationFlags) ;
+	p += Ral_RelationHeadingConvert(a->relationHeading, p, flags) ;
 	strcpy(p, closeList) ;
-	p += sizeof(closeList) - 1 ;
-	count = p - dst ;
+	p += sizeof(closeList) - 1;
+	length = p - dst ;
     }
 	break ;
 
@@ -451,38 +444,33 @@ Ral_AttributeConvertType(
 	    a->attrType) ;
     }
 
-    return count ;
+    return length ;
 }
 
 int
 Ral_AttributeScanValue(
     Ral_Attribute a,
     Tcl_Obj *value,
-    Ral_AttributeScanFlags flags)
+    Ral_AttributeTypeScanFlags *typeFlags,
+    Ral_AttributeValueScanFlags *valueFlags)
 {
+    int length ;
+
+    valueFlags->attrType = a->attrType ;
     switch (a->attrType) {
     case Tcl_Type:
-	flags->type = Tcl_Type ;
-	flags->valueLength = Tcl_ScanElement(Tcl_GetString(value),
-	    &flags->tclValueFlags) ;
+	length = Tcl_ScanElement(Tcl_GetString(value),
+	    &valueFlags->simpleFlags) ;
 	break ;
 
     case Tuple_Type:
-	flags->type = Tuple_Type ;
-	flags->tupleFlags = Ral_TupleScanFlagsAlloc(a->tupleHeading) ;
-	flags->valueLength = Ral_TupleScanValue(
-	    value->internalRep.otherValuePtr, flags->tupleFlags) ;
+	length = Ral_TupleScanValue(value->internalRep.otherValuePtr,
+	    typeFlags, valueFlags) ;
 	break ;
 
-    case Relation_Type: {
-	Ral_Relation relation = value->internalRep.otherValuePtr ;
-
-	flags->type = Relation_Type ;
-	flags->relationFlags = Ral_RelationScanFlagsAlloc(a->relationHeading,
-	    Ral_RelationCardinality(relation)) ;
-	flags->valueLength = Ral_RelationScanValue(relation,
-	    flags->relationFlags) ;
-    }
+    case Relation_Type:
+	length = Ral_RelationScanValue(value->internalRep.otherValuePtr,
+	    typeFlags, valueFlags) ;
 	break ;
 
     default:
@@ -490,7 +478,7 @@ Ral_AttributeScanValue(
 	    a->attrType) ;
     }
 
-    return flags->valueLength ;
+    return length ;
 }
 
 int
@@ -498,24 +486,25 @@ Ral_AttributeConvertValue(
     Ral_Attribute a,
     Tcl_Obj *value,
     char *dst,
-    Ral_AttributeScanFlags flags)
+    Ral_AttributeTypeScanFlags *typeFlags,
+    Ral_AttributeValueScanFlags *valueFlags)
 {
     int length ;
 
     switch (a->attrType) {
     case Tcl_Type:
 	length = Tcl_ConvertElement(Tcl_GetString(value), dst,
-	    flags->tclValueFlags) ;
+	    valueFlags->simpleFlags) ;
 	break ;
 
     case Tuple_Type:
 	length = Ral_TupleConvertValue(value->internalRep.otherValuePtr,
-	    dst, flags->tupleFlags) ;
+	    dst, typeFlags, valueFlags) ;
 	break ;
 
     case Relation_Type:
 	length = Ral_RelationConvertValue(value->internalRep.otherValuePtr,
-	    dst, flags->relationFlags) ;
+	    dst, typeFlags, valueFlags) ;
 	break ;
 
     default:
@@ -527,24 +516,60 @@ Ral_AttributeConvertValue(
 }
 
 void
-Ral_AttributeScanFlagsFree(
-    Ral_AttributeScanFlags flags)
+Ral_AttributeTypeScanFlagsFree(
+    Ral_AttributeTypeScanFlags *flags)
 {
-    switch (flags->type) {
+    switch (flags->attrType) {
     case Tcl_Type:
 	break ;
 
     case Tuple_Type:
-	Ral_TupleScanFlagsFree(flags->tupleFlags) ;
-	break ;
+    case Relation_Type: {
+	int count = flags->compoundFlags.count ;
+	Ral_AttributeTypeScanFlags *typeFlags = flags->compoundFlags.flags ;
 
-    case Relation_Type:
-	Ral_RelationScanFlagsFree(flags->relationFlags) ;
+	assert(typeFlags != NULL) ;
+
+	while (count-- > 0) {
+	    Ral_AttributeTypeScanFlagsFree(typeFlags++) ;
+	}
+	ckfree((char *)flags->compoundFlags.flags) ;
+	flags->compoundFlags.flags = NULL ;
+    }
 	break ;
 
     default:
-	Tcl_Panic("Ral_AttributeScanFlagsFree: unknown flags type: %d",
-	    flags->type) ;
+	Tcl_Panic("Ral_AttributeTypeScanFlagsFree: unknown flags type: %d",
+	    flags->attrType) ;
+    }
+}
+
+void
+Ral_AttributeValueScanFlagsFree(
+    Ral_AttributeValueScanFlags *flags)
+{
+    switch (flags->attrType) {
+    case Tcl_Type:
+	break ;
+
+    case Tuple_Type:
+    case Relation_Type: {
+	int count = flags->compoundFlags.count ;
+	Ral_AttributeValueScanFlags *valueFlags = flags->compoundFlags.flags ;
+
+	assert(valueFlags != NULL) ;
+
+	while (count-- > 0) {
+	    Ral_AttributeValueScanFlagsFree(valueFlags++) ;
+	}
+	ckfree((char *)flags->compoundFlags.flags) ;
+	flags->compoundFlags.flags = NULL ;
+    }
+	break ;
+
+    default:
+	Tcl_Panic("Ral_AttributeValueScanFlagsFree: unknown flags type: %d",
+	    flags->attrType) ;
     }
 }
 
@@ -555,21 +580,19 @@ char *
 Ral_AttributeToString(
     Ral_Attribute a)
 {
-    Ral_AttributeScanFlags flags ;
+    Ral_AttributeTypeScanFlags flags ;
     int size ;
     char *str ;
     char *s ;
 
-    flags = (Ral_AttributeScanFlags)ckalloc(sizeof(*flags)) ;
-
-    size = Ral_AttributeScanName(a, flags) + Ral_AttributeScanType(a, flags) ;
-    size += 1 ;
+    size = Ral_AttributeScanName(a, &flags) + Ral_AttributeScanType(a, &flags)
+	+ 1; /* +1 for separating space */
     s = str = ckalloc(size) ;
-    s += Ral_AttributeConvertName(a, s, flags) ;
+    s += Ral_AttributeConvertName(a, s, &flags) ;
     *s++ = ' ' ;
-    Ral_AttributeConvertType(a, s, flags) ;
+    Ral_AttributeConvertType(a, s, &flags) ;
 
-    Ral_AttributeScanFlagsFree(flags) ;
+    Ral_AttributeTypeScanFlagsFree(&flags) ;
 
     return str ;
 }

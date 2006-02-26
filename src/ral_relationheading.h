@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationheading.h,v $
-$Revision: 1.3 $
-$Date: 2006/02/20 20:15:07 $
+$Revision: 1.4 $
+$Date: 2006/02/26 04:57:53 $
  *--
  */
 #ifndef _ral_relationheading_h_
@@ -94,15 +94,6 @@ typedef struct Ral_RelationHeading {
 					 * constitute the identifier. */
 } *Ral_RelationHeading ;
 
-typedef struct Ral_RelationScanFlags {
-    int degree ;
-    Ral_AttributeScanFlags attrFlags ;
-    int idCount ;
-    Ral_AttributeScanFlags idFlags ;
-    int cardinality ;
-    Ral_AttributeScanFlags valueFlags ;
-} *Ral_RelationScanFlags ;
-
 /*
 FUNCTION DECLARATIONS
 */
@@ -112,19 +103,19 @@ extern Ral_RelationHeading Ral_RelationHeadingDup(Ral_RelationHeading) ;
 extern void Ral_RelationHeadingDelete(Ral_RelationHeading) ;
 extern void Ral_RelationHeadingReference(Ral_RelationHeading) ;
 extern void Ral_RelationHeadingUnreference(Ral_RelationHeading) ;
+extern int Ral_RelationHeadingDegree(Ral_RelationHeading) ;
 extern int Ral_RelationHeadingEqual(Ral_RelationHeading, Ral_RelationHeading) ;
 extern int Ral_RelationHeadingAddIdentifier(Ral_RelationHeading, int,
     Ral_IntVector) ;
 extern Ral_RelationHeading Ral_RelationHeadingUnion(Ral_RelationHeading,
     Ral_RelationHeading) ;
-extern int Ral_RelationHeadingScan(Ral_RelationHeading, Ral_RelationScanFlags) ;
+extern int Ral_RelationHeadingScan(Ral_RelationHeading,
+    Ral_AttributeTypeScanFlags *) ;
 extern int Ral_RelationHeadingConvert(Ral_RelationHeading, char *,
-    Ral_RelationScanFlags) ;
+    Ral_AttributeTypeScanFlags *) ;
 extern void Ral_RelationHeadingPrint(Ral_RelationHeading, const char *,
     FILE *) ;
-extern Ral_RelationScanFlags Ral_RelationScanFlagsAlloc(Ral_RelationHeading,
-    int) ;
-extern void Ral_RelationScanFlagsFree(Ral_RelationScanFlags) ;
+extern char * Ral_RelationHeadingStringOf(Ral_RelationHeading) ;
 extern const char *Ral_RelationHeadingVersion(void) ;
 
 #endif /* _ral_relationheading_h_ */

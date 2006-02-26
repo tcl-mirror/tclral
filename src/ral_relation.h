@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.h,v $
-$Revision: 1.2 $
-$Date: 2006/02/20 20:15:07 $
+$Revision: 1.3 $
+$Date: 2006/02/26 04:57:53 $
  *--
  */
 #ifndef _ral_relation_h_
@@ -140,12 +140,16 @@ extern void Ral_RelationReserve(Ral_Relation, int) ;
 extern int Ral_RelationDegree(Ral_Relation) ;
 extern int Ral_RelationPushBack(Ral_Relation, Ral_Tuple) ;
 
-extern int Ral_RelationScan(Ral_Relation, Ral_RelationScanFlags *) ;
-extern int Ral_RelationConvert(Ral_Relation, char *, Ral_RelationScanFlags) ;
-extern int Ral_RelationScanValue(Ral_Relation, Ral_RelationScanFlags) ;
+extern int Ral_RelationScan(Ral_Relation, Ral_AttributeTypeScanFlags *,
+    Ral_AttributeValueScanFlags *) ;
+extern int Ral_RelationConvert(Ral_Relation, char *,
+    Ral_AttributeTypeScanFlags *, Ral_AttributeValueScanFlags *) ;
+extern int Ral_RelationScanValue(Ral_Relation,
+    Ral_AttributeTypeScanFlags *, Ral_AttributeValueScanFlags *) ;
 extern int Ral_RelationConvertValue(Ral_Relation, char *,
-    Ral_RelationScanFlags) ;
+    Ral_AttributeTypeScanFlags *, Ral_AttributeValueScanFlags *) ;
 extern void Ral_RelationPrint(Ral_Relation, const char *, FILE *) ;
+extern char *Ral_RelationStringOf(Ral_Relation) ;
 
 extern const char * Ral_RelationVersion(void) ;
 

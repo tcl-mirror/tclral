@@ -43,13 +43,19 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_tuple.c,v $
-$Revision: 1.4 $
-$Date: 2006/02/20 20:15:07 $
+$Revision: 1.5 $
+$Date: 2006/02/26 04:57:53 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_tuple.c,v $
+Revision 1.5  2006/02/26 04:57:53  mangoa01
+Reworked the conversion from internal form to a string yet again.
+This design is better and more recursive in nature.
+Added additional code to the "relation" commands.
+Now in a position to finish off the remaining relation commands.
+
 Revision 1.4  2006/02/20 20:15:07  mangoa01
 Now able to convert strings to relations and vice versa including
 tuple and relation valued attributes.
@@ -107,9 +113,9 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char openList[] = "{" ;
-static const char closeList[] = "}" ;
-static const char rcsid[] = "@(#) $RCSfile: ral_tuple.c,v $ $Revision: 1.4 $" ;
+static const char openList = '{' ;
+static const char closeList = '}' ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tuple.c,v $ $Revision: 1.5 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -314,38 +320,40 @@ Ral_TupleCopy(
     Ral_TupleHeadingIter finish,
     Ral_Tuple dst)
 {
-    Ral_TupleHeading srcHeading = src->heading ;
-    Ral_TupleHeading dstHeading = dst->heading ;
-    int dstOffset ;
-    int srcOffset ;
-    int srcCount ;
-    Tcl_Obj **srcValues ;
-    Tcl_Obj **dstValues ;
-
-    /*
-     * Record where the copy of the values will begin.
-     */
-    dstOffset = Ral_TupleHeadingSize(dstHeading) ;
+    Ral_TupleHeadingIter srcBegin = Ral_TupleHeadingBegin(src->heading) ;
+    Ral_TupleIter srcValuesBegin = src->values + (start - srcBegin) ;
+    Ral_TupleIter srcValuesEnd = src->values + (finish - srcBegin) ;
+    Ral_TupleIter dstPlace = dst->values + Ral_TupleDegree(dst) ;
     /*
      * Copy the attributes into the destination heading.
      */
-    if (!Ral_TupleHeadingAppend(srcHeading, start, finish, dstHeading)) {
+    if (!Ral_TupleHeadingAppend(src->heading, start, finish, dst->heading)) {
 	return 0 ;
     }
     /*
-     * Compute the offsets into the value vectors where the copy will begin.
+     * Copy the values into the destination.
      */
-    srcOffset = start - Ral_TupleHeadingBegin(srcHeading) ;
-    srcValues = src->values + srcOffset ;
-    dstValues = dst->values + dstOffset ;
+    Ral_TupleCopyValues(srcValuesBegin, srcValuesEnd, dstPlace) ;
+
+    return 1 ;
+}
+
+/*
+ * Assumes that the source tuple heading is the same order as the
+ * destination tuple heading.
+ */
+void
+Ral_TupleCopyValues(
+    Ral_TupleIter start,
+    Ral_TupleIter finish,
+    Ral_TupleIter dst)
+{
     /*
      * Copy the values making sure the increment the reference count.
      */
-    for (srcCount = finish - start ; srcCount > 0 ; --srcCount) {
-	Tcl_IncrRefCount(*dstValues++ = *srcValues++) ;
+    while (start != finish) {
+	Tcl_IncrRefCount(*dst++ = *start++) ;
     }
-
-    return 1 ;
 }
 
 Ral_Tuple
@@ -369,36 +377,36 @@ Ral_TupleDup(
 int
 Ral_TupleScan(
     Ral_Tuple tuple,
-    Ral_TupleScanFlags *flags)
+    Ral_AttributeTypeScanFlags *typeFlags,
+    Ral_AttributeValueScanFlags *valueFlags)
 {
     Ral_TupleHeading heading = tuple->heading ;
-    Ral_TupleScanFlags scanFlags ;
-
+    int length ;
     /*
-     * To scan the tuple, we need a set of flags to hold the scan info.
+     * Scan the header.
+     * +1 for space
      */
-    *flags = scanFlags = Ral_TupleScanFlagsAlloc(heading) ;
+    length = Ral_TupleHeadingScan(heading, typeFlags) + 1 ;
     /*
-     * Scan the header and value.
+     * Scan the values.
      */
-    return
-	Ral_TupleHeadingScan(heading, scanFlags) +
-	Ral_TupleScanValue(tuple, scanFlags) +
-	1 ; /* +1 for the separating space between the header and value */
+    length += Ral_TupleScanValue(tuple, typeFlags, valueFlags) ;
+    return length ;
 }
 
 int
 Ral_TupleConvert(
     Ral_Tuple tuple,
     char *dst,
-    Ral_TupleScanFlags scanFlags)
+    Ral_AttributeTypeScanFlags *typeFlags,
+    Ral_AttributeValueScanFlags *valueFlags)
 {
     char *p = dst ;
 
     /*
      * Convert the heading.
      */
-    p += Ral_TupleHeadingConvert(tuple->heading, p, scanFlags) ;
+    p += Ral_TupleHeadingConvert(tuple->heading, p, typeFlags) ;
     /*
      * Separate the heading from the body by space.
      */
@@ -406,11 +414,12 @@ Ral_TupleConvert(
     /*
      * Convert the body.
      */
-    p += Ral_TupleConvertValue(tuple, p, scanFlags) ;
+    p += Ral_TupleConvertValue(tuple, p, typeFlags, valueFlags) ;
     /*
      * Finished with the flags.
      */
-    Ral_TupleScanFlagsFree(scanFlags) ;
+    Ral_AttributeTypeScanFlagsFree(typeFlags) ;
+    Ral_AttributeValueScanFlagsFree(valueFlags) ;
 
     return p - dst ;
 }
@@ -418,31 +427,50 @@ Ral_TupleConvert(
 int
 Ral_TupleScanValue(
     Ral_Tuple tuple,
-    Ral_TupleScanFlags flags)
+    Ral_AttributeTypeScanFlags *typeFlags,
+    Ral_AttributeValueScanFlags *valueFlags)
 {
+    int nBytes ;
     int length ;
     Ral_TupleHeading heading = tuple->heading ;
     Tcl_Obj **values = tuple->values ;
-    Ral_AttributeScanFlags attrFlag = flags->attrFlags ;
+    Ral_AttributeTypeScanFlags *typeFlag ;
+    Ral_AttributeValueScanFlags *valueFlag ;
     Ral_TupleHeadingIter hIter ;
     Ral_TupleHeadingIter hEnd ;
 
+    assert(typeFlags->attrType == Tuple_Type) ;
+    assert(typeFlags->compoundFlags.count == Ral_TupleDegree(tuple)) ;
+    assert(valueFlags->attrType == Tuple_Type) ;
+    assert(valueFlags->compoundFlags.flags == NULL) ;
+
     /*
-     * N.B. here and below all the "-1"'s remove counting the NUL terminator
-     * on the statically allocated character strings.
+     * Allocate space for the value flags.
      */
-    length = sizeof(openList) - 1 ;
+    valueFlags->compoundFlags.count = typeFlags->compoundFlags.count ;
+    nBytes = valueFlags->compoundFlags.count *
+	sizeof(*valueFlags->compoundFlags.flags) ;
+    valueFlags->compoundFlags.flags =
+	(Ral_AttributeValueScanFlags *)ckalloc(nBytes) ;
+    memset(valueFlags->compoundFlags.flags, 0, nBytes) ;
+
+    /*
+     * Iterate through the heading and scan the corresponding values.
+     */
+    typeFlag = typeFlags->compoundFlags.flags ;
+    valueFlag = valueFlags->compoundFlags.flags ;
     hEnd = Ral_TupleHeadingEnd(heading) ;
+
+    length = sizeof(openList) ;
     for (hIter = Ral_TupleHeadingBegin(heading) ; hIter != hEnd ; ++hIter) {
 	Ral_Attribute a = *hIter ;
 	Tcl_Obj *v = *values++ ;
 
 	assert(v != NULL) ;
-	length += Ral_AttributeScanName(a, attrFlag) + 1 ; /* +1 for space */
-	length += Ral_AttributeScanValue(a, v, attrFlag) + 1 ;
-	++attrFlag ;
+	length += typeFlag->nameLength + 1 ; /* +1 for space */
+	length += Ral_AttributeScanValue(a, v, typeFlag++, valueFlag++) + 1 ;
     }
-    length += sizeof(closeList) - 1 ;
+    length += sizeof(closeList) ;
 
     return length ;
 }
@@ -451,33 +479,39 @@ int
 Ral_TupleConvertValue(
     Ral_Tuple tuple,
     char *dst,
-    Ral_TupleScanFlags flags)
+    Ral_AttributeTypeScanFlags *typeFlags,
+    Ral_AttributeValueScanFlags *valueFlags)
 {
     char *p = dst ;
     Ral_TupleHeading heading = tuple->heading ;
     Tcl_Obj **values = tuple->values ;
-    Ral_AttributeScanFlags attrFlag = flags->attrFlags ;
+    Ral_AttributeTypeScanFlags *typeFlag ;
+    Ral_AttributeValueScanFlags *valueFlag ;
     Ral_TupleHeadingIter hIter ;
     Ral_TupleHeadingIter hEnd ;
 
-    /*
-     * N.B. here and below all the "-1"'s remove counting the NUL terminator
-     * on the statically allocated character strings.
-     */
-    strcpy(p, openList) ;
-    p += sizeof(openList) - 1 ;
+    assert(typeFlags->attrType == Tuple_Type) ;
+    assert(typeFlags->compoundFlags.count == Ral_TupleDegree(tuple)) ;
+    assert(valueFlags->attrType == Tuple_Type) ;
+    assert(valueFlags->compoundFlags.count == Ral_TupleDegree(tuple)) ;
+
+    typeFlag = typeFlags->compoundFlags.flags ;
+    valueFlag = valueFlags->compoundFlags.flags ;
     hEnd = Ral_TupleHeadingEnd(heading) ;
+
+    *p++ = openList ;
     for (hIter = Ral_TupleHeadingBegin(heading) ; hIter != hEnd ; ++hIter) {
 	Ral_Attribute a = *hIter ;
 	Tcl_Obj *v = *values++ ;
 
 	assert(v != NULL) ;
-	p += Ral_AttributeConvertName(a, p, attrFlag) ;
+	p += Ral_AttributeConvertName(a, p, typeFlag) ;
 	*p++ = ' ' ;
-	p += Ral_AttributeConvertValue(a, v, p, attrFlag) ;
+	p += Ral_AttributeConvertValue(a, v, p, typeFlag, valueFlag) ;
 	*p++ = ' ' ;
 
-	++attrFlag ;
+	++typeFlag ;
+	++valueFlag ;
     }
     /*
      * Remove the trailing space. Check that the tuple actually had
@@ -486,8 +520,7 @@ Ral_TupleConvertValue(
     if (Ral_TupleDegree(tuple)) {
 	--p ;
     }
-    strcpy(p, closeList) ;
-    p += sizeof(closeList) - 1 ;
+    *p++ = closeList ;
 
     return p - dst ;
 }
@@ -498,13 +531,31 @@ Ral_TuplePrint(
     const char *format,
     FILE *f)
 {
-    Ral_TupleScanFlags flags ;
-    char *str ;
-
-    str = ckalloc(Ral_TupleScan(tuple, &flags)) ;
-    Ral_TupleConvert(tuple, str, flags) ;
+    char *str = Ral_TupleStringOf(tuple) ;
     fprintf(f, format, str) ;
     ckfree(str) ;
+}
+
+char *
+Ral_TupleStringOf(
+    Ral_Tuple tuple)
+{
+    Ral_AttributeTypeScanFlags typeFlags ;
+    Ral_AttributeValueScanFlags valueFlags ;
+    char *str ;
+    int length ;
+
+    memset(&typeFlags, 0, sizeof(typeFlags)) ;
+    typeFlags.attrType = Tuple_Type ;
+    memset(&valueFlags, 0, sizeof(valueFlags)) ;
+    valueFlags.attrType = Tuple_Type ;
+
+    /* +1 for NUL terminator */
+    str = ckalloc(Ral_TupleScan(tuple, &typeFlags, &valueFlags) + 1) ;
+    length = Ral_TupleConvert(tuple, str, &typeFlags, &valueFlags) ;
+    str[length] = '\0' ;
+
+    return str ;
 }
 
 const char *

@@ -43,13 +43,19 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.1 $
-$Date: 2006/02/20 20:15:07 $
+$Revision: 1.2 $
+$Date: 2006/02/26 04:57:53 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_relationcmd.c,v $
+Revision 1.2  2006/02/26 04:57:53  mangoa01
+Reworked the conversion from internal form to a string yet again.
+This design is better and more recursive in nature.
+Added additional code to the "relation" commands.
+Now in a position to finish off the remaining relation commands.
+
 Revision 1.1  2006/02/20 20:15:07  mangoa01
 Now able to convert strings to relations and vice versa including
 tuple and relation valued attributes.
@@ -124,7 +130,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.1 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.2 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -275,7 +281,28 @@ RelationEmptyofCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
-    return TCL_ERROR ;
+    Tcl_Obj *relationObj ;
+    Ral_Relation relation ;
+
+    /* relation emptyof relationValue */
+    if (objc != 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relationValue") ;
+	return TCL_ERROR ;
+    }
+
+    relationObj = *(objv + 2) ;
+    if (Tcl_ConvertToType(interp, relationObj, &Ral_RelationObjType) != TCL_OK)
+	return TCL_ERROR ;
+    relation = relationObj->internalRep.otherValuePtr ;
+
+    /*
+     * An empty version of a relation is obtain by creating a new relation from
+     * the heading of the old one and making the new relation into an object.
+     * Since relation headings are reference counted this works.
+     */
+    Tcl_SetObjResult(interp,
+	Ral_RelationObjNew(Ral_RelationNew(relation->heading))) ;
+    return TCL_OK ;
 }
 
 static int
@@ -311,7 +338,28 @@ RelationHeadingCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
-    return TCL_ERROR ;
+    Tcl_Obj *relObj ;
+    Ral_Relation relation ;
+    char *strRep ;
+    Tcl_Obj *resultObj ;
+
+    if (objc != 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relationValue") ;
+	return TCL_ERROR ;
+    }
+
+    relObj = *(objv + 2) ;
+    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relObj->internalRep.otherValuePtr ;
+
+    strRep = Ral_RelationHeadingStringOf(relation->heading) ;
+    resultObj = Tcl_NewStringObj(strRep, -1) ;
+    ckfree(strRep) ;
+
+    Tcl_SetObjResult(interp, resultObj) ;
+    return TCL_OK ;
 }
 
 static int
@@ -347,7 +395,23 @@ RelationIsemptyCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
-    return TCL_ERROR ;
+    Tcl_Obj *relationObj ;
+    Ral_Relation relation ;
+
+    /* relation isempty relationValue */
+    if (objc != 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relationValue") ;
+	return TCL_ERROR ;
+    }
+
+    relationObj = *(objv + 2) ;
+    if (Tcl_ConvertToType(interp, relationObj, &Ral_RelationObjType) != TCL_OK)
+	return TCL_ERROR ;
+    relation = relationObj->internalRep.otherValuePtr ;
+
+    Tcl_SetObjResult(interp, Tcl_NewBooleanObj(
+	Ral_RelationCardinality(relation) == 0)) ;
+    return TCL_OK ;
 }
 
 static int
@@ -356,7 +420,23 @@ RelationIsnotemptyCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
-    return TCL_ERROR ;
+    Tcl_Obj *relationObj ;
+    Ral_Relation relation ;
+
+    /* relation isnotempty relationValue */
+    if (objc != 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relationValue") ;
+	return TCL_ERROR ;
+    }
+
+    relationObj = *(objv + 2) ;
+    if (Tcl_ConvertToType(interp, relationObj, &Ral_RelationObjType) != TCL_OK)
+	return TCL_ERROR ;
+    relation = relationObj->internalRep.otherValuePtr ;
+
+    Tcl_SetObjResult(interp, Tcl_NewBooleanObj(
+	Ral_RelationCardinality(relation) != 0)) ;
+    return TCL_OK ;
 }
 
 static int

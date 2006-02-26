@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationobj.h,v $
-$Revision: 1.2 $
-$Date: 2006/02/20 20:15:07 $
+$Revision: 1.3 $
+$Date: 2006/02/26 04:57:53 $
  *--
  */
 #ifndef _ral_relationobj_h_
@@ -102,6 +102,7 @@ extern Tcl_ObjType Ral_RelationObjType ;
 FUNCTION DECLARATIONS
 */
 
+extern Tcl_Obj *Ral_RelationObjNew(Ral_Relation) ;
 extern int Ral_RelationObjConvert(Ral_RelationHeading, Tcl_Interp *, Tcl_Obj *,
     Tcl_Obj *) ;
 extern Ral_RelationHeading Ral_RelationHeadingNewFromObjs(Tcl_Interp *,

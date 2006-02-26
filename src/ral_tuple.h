@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuple.h,v $
-$Revision: 1.3 $
-$Date: 2006/02/20 20:15:08 $
+$Revision: 1.4 $
+$Date: 2006/02/26 04:57:53 $
  *--
  */
 #ifndef _ral_tuple_h_
@@ -102,10 +102,11 @@ TYPE DECLARATIONS
  * referenced by many different relations.
  */
 
+typedef Tcl_Obj **Ral_TupleIter ;
 typedef struct Ral_Tuple {
     int refCount ;		/* Reference Count */
     Ral_TupleHeading heading ;	/* Pointer to Tuple heading */
-    Tcl_Obj **values ;		/* Pointer to an array of values.
+    Ral_TupleIter values ;	/* Pointer to an array of values.
 				 * The size of the array is the same as the
 				 * degree of the heading */
 } *Ral_Tuple ;
@@ -131,12 +132,18 @@ extern Ral_TupleUpdateStatus Ral_TupleUpdateAttrValue(Ral_Tuple,
 extern Tcl_Obj *Ral_TupleGetAttrValue(Ral_Tuple, const char *) ;
 extern int Ral_TupleCopy(Ral_Tuple, Ral_TupleHeadingIter,
     Ral_TupleHeadingIter, Ral_Tuple) ;
+extern void Ral_TupleCopyValues(Ral_TupleIter, Ral_TupleIter, Ral_TupleIter) ;
 extern Ral_Tuple Ral_TupleDup(Ral_Tuple) ;
-extern int Ral_TupleScan(Ral_Tuple, Ral_TupleScanFlags *) ;
-extern int Ral_TupleConvert(Ral_Tuple, char *, Ral_TupleScanFlags) ;
-extern int Ral_TupleScanValue(Ral_Tuple, Ral_TupleScanFlags) ;
-extern int Ral_TupleConvertValue(Ral_Tuple, char *, Ral_TupleScanFlags) ;
+extern int Ral_TupleScan(Ral_Tuple, Ral_AttributeTypeScanFlags *,
+    Ral_AttributeValueScanFlags *) ;
+extern int Ral_TupleConvert(Ral_Tuple, char *, Ral_AttributeTypeScanFlags *,
+    Ral_AttributeValueScanFlags *) ;
+extern int Ral_TupleScanValue(Ral_Tuple, Ral_AttributeTypeScanFlags *,
+    Ral_AttributeValueScanFlags *) ;
+extern int Ral_TupleConvertValue(Ral_Tuple, char *,
+    Ral_AttributeTypeScanFlags *, Ral_AttributeValueScanFlags *) ;
 extern void Ral_TuplePrint(Ral_Tuple, const char *, FILE *) ;
+extern char *Ral_TupleStringOf(Ral_Tuple) ;
 extern const char *Ral_TupleVersion(void) ;
 
 #endif /* _ral_tuple_h_ */

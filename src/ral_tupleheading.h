@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleheading.h,v $
-$Revision: 1.4 $
-$Date: 2006/02/20 20:15:10 $
+$Revision: 1.5 $
+$Date: 2006/02/26 04:57:53 $
  *--
  */
 #ifndef _ral_tupleheading_h_
@@ -106,11 +106,6 @@ typedef struct Ral_TupleHeading {
 					 * name*/
 } *Ral_TupleHeading ;
 
-typedef struct Ral_TupleScanFlags {
-    int degree ;
-    struct Ral_AttributeScanFlags *attrFlags ;
-} *Ral_TupleScanFlags ;
-
 /*
 FUNCTION DECLARATIONS
 */
@@ -140,12 +135,16 @@ extern Ral_TupleHeading Ral_TupleHeadingUnion(Ral_TupleHeading,
     Ral_TupleHeading) ;
 extern Ral_TupleHeading Ral_TupleHeadingIntersect(Ral_TupleHeading,
     Ral_TupleHeading) ;
-extern int Ral_TupleHeadingScan(Ral_TupleHeading, Ral_TupleScanFlags) ;
+extern int Ral_TupleHeadingScan(Ral_TupleHeading,
+    Ral_AttributeTypeScanFlags *) ;
+extern int Ral_TupleHeadingScanAttr(Ral_TupleHeading,
+    Ral_AttributeTypeScanFlags *) ;
 extern int Ral_TupleHeadingConvert(Ral_TupleHeading, char *,
-    Ral_TupleScanFlags) ;
+    Ral_AttributeTypeScanFlags *) ;
+extern int Ral_TupleHeadingConvertAttr(Ral_TupleHeading, char *,
+    Ral_AttributeTypeScanFlags *) ;
 extern void Ral_TupleHeadingPrint(Ral_TupleHeading, const char *, FILE *) ;
-extern Ral_TupleScanFlags Ral_TupleScanFlagsAlloc(Ral_TupleHeading) ;
-extern void Ral_TupleScanFlagsFree(Ral_TupleScanFlags) ;
+extern char *Ral_TupleHeadingStringOf(Ral_TupleHeading) ;
 extern const char *Ral_TupleHeadingVersion(void) ;
 
 #endif /* _ral_tupleheading_h_ */

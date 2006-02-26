@@ -43,13 +43,19 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_tupleheading.c,v $
-$Revision: 1.4 $
-$Date: 2006/02/20 20:15:10 $
+$Revision: 1.5 $
+$Date: 2006/02/26 04:57:53 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_tupleheading.c,v $
+Revision 1.5  2006/02/26 04:57:53  mangoa01
+Reworked the conversion from internal form to a string yet again.
+This design is better and more recursive in nature.
+Added additional code to the "relation" commands.
+Now in a position to finish off the remaining relation commands.
+
 Revision 1.4  2006/02/20 20:15:10  mangoa01
 Now able to convert strings to relations and vice versa including
 tuple and relation valued attributes.
@@ -76,6 +82,7 @@ PRAGMAS
 INCLUDE FILES
 */
 #include "ral_tupleheading.h"
+#include "ral_tupleobj.h"
 #include "ral_attribute.h"
 #include "tcl.h"
 #include <string.h>
@@ -108,10 +115,11 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tupleheading.c,v $ $Revision: 1.4 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tupleheading.c,v $ $Revision: 1.5 $" ;
 
-static const char tupleKeyword[] = "Tuple {" ;
-static const char closeList[] = "}" ;
+static const char tupleKeyword[] = "Tuple" ;
+static const char openList = '{' ;
+static const char closeList = '}' ;
 
 /*
 FUNCTION DEFINITIONS
@@ -126,7 +134,7 @@ Ral_TupleHeadingNew(
 
     memSize = sizeof(*h) + size * sizeof(Ral_Attribute) ;
     h = (Ral_TupleHeading)ckalloc(memSize) ;
-    memset(h, memSize, 0) ; /* set reference count to 0 */
+    memset(h, 0, memSize) ; /* set reference count to 0 */
     h->finish = h->start = (Ral_TupleHeadingIter)(h + 1) ;
     h->endStorage = h->start + size ;
     Tcl_InitHashTable(&h->nameMap, TCL_STRING_KEYS) ;
@@ -346,7 +354,7 @@ Ral_TupleHeadingPushBack(
 {
     Tcl_HashEntry *e ;
     int isNewEntry ;
-    Ral_TupleHeadingIter i ;
+    Ral_TupleHeadingIter iter = h->finish ;
 
     if (h->finish >= h->endStorage) {
 	Tcl_Panic("Ral_TupleHeadingPushBack: overflow") ;
@@ -358,15 +366,11 @@ Ral_TupleHeadingPushBack(
      */
     e = Tcl_CreateHashEntry(&h->nameMap, attr->name, &isNewEntry) ;
     if (isNewEntry) {
-	i = h->finish ;
-	*i = attr ;
-	++h->finish ;
-	Tcl_SetHashValue(e, i - Ral_TupleHeadingBegin(h)) ;
-    } else {
-	i = Ral_TupleHeadingEnd(h) ;
+	*h->finish++ = attr  ;
+	Tcl_SetHashValue(e, iter - h->start) ;
     }
 
-    return i ;
+    return iter ;
 }
 
 Ral_TupleHeadingIter
@@ -491,17 +495,37 @@ Ral_TupleHeadingIntersect(
 int
 Ral_TupleHeadingScan(
     Ral_TupleHeading h,
-    Ral_TupleScanFlags flags)
+    Ral_AttributeTypeScanFlags *flags)
 {
-    Ral_TupleHeadingIter i ;
-    Ral_AttributeScanFlags attrFlag = flags->attrFlags ;
-    int length = 1 ; /* for the NUL terminator */
+    int nBytes ;
+    int length = strlen(Ral_TupleObjType.name) + 1 ; /* +1 for space */
+
+    assert(flags->attrType == Tuple_Type) ;
+    assert(flags->compoundFlags.flags == NULL) ;
     /*
-     * The keyword part of the heading.
-     * N.B. here and below all the "-1"'s remove counting the NUL terminator
-     * on the statically allocated character strings.
+     * Allocate space for the type flags for each attribute.
      */
-    length += sizeof(tupleKeyword) - 1 ;
+    flags->compoundFlags.count = Ral_TupleHeadingSize(h) ;
+    nBytes = flags->compoundFlags.count * sizeof(*flags->compoundFlags.flags) ;
+    flags->compoundFlags.flags = (Ral_AttributeTypeScanFlags *)ckalloc(nBytes) ;
+    memset(flags->compoundFlags.flags, 0, nBytes) ;
+
+    length += Ral_TupleHeadingScanAttr(h, flags) ;
+
+    return length ;
+}
+
+int
+Ral_TupleHeadingScanAttr(
+    Ral_TupleHeading h,
+    Ral_AttributeTypeScanFlags *flags)
+{
+    Ral_AttributeTypeScanFlags *typeFlag = flags->compoundFlags.flags ;
+    Ral_TupleHeadingIter i ;
+    int length = sizeof(openList) ;
+
+    assert(flags->compoundFlags.count == Ral_TupleHeadingSize(h)) ;
+    assert(flags->compoundFlags.flags != NULL) ;
 
     for (i = h->start ; i < h->finish ; ++i) {
 	Ral_Attribute a = *i ;
@@ -509,12 +533,14 @@ Ral_TupleHeadingScan(
 	 * +1 to account for the space that needs to separate elements
 	 * in the resulting list.
 	 */
-	length += Ral_AttributeScanName(a, attrFlag) + 1 ;
-	length += Ral_AttributeScanType(a, attrFlag) + 1 ;
-	++attrFlag ;
+	length += Ral_AttributeScanName(a, typeFlag) + 1 ;
+	length += Ral_AttributeScanType(a, typeFlag) + 1 ;
+	++typeFlag ;
     }
-
-    length += sizeof(closeList) - 1 ;
+    if (!Ral_TupleHeadingEmpty(h)) {
+	--length ;
+    }
+    length += sizeof(closeList) ;
 
     return length ;
 }
@@ -523,26 +549,44 @@ int
 Ral_TupleHeadingConvert(
     Ral_TupleHeading h,
     char *dst,
-    Ral_TupleScanFlags flags)
+    Ral_AttributeTypeScanFlags *flags)
 {
     char *p = dst ;
-    Ral_TupleHeadingIter i ;
-    Ral_AttributeScanFlags attrFlag = flags->attrFlags ;
 
-    /*
-     * Copy in the "Tuple" keyword.
-     */
-    strcpy(p, tupleKeyword) ;
-    p += sizeof(tupleKeyword) - 1 ;
+    assert(flags->attrType == Tuple_Type) ;
+    assert(flags->compoundFlags.count == Ral_TupleHeadingSize(h)) ;
+
+    strcpy(p, Ral_TupleObjType.name) ;
+    p += strlen(Ral_TupleObjType.name) ;
+    *p++ = ' ' ;
+
+    p += Ral_TupleHeadingConvertAttr(h, p, flags) ;
+
+    return p - dst ;
+}
+
+int
+Ral_TupleHeadingConvertAttr(
+    Ral_TupleHeading h,
+    char *dst,
+    Ral_AttributeTypeScanFlags *flags)
+{
+    char *p = dst ;
+    Ral_AttributeTypeScanFlags *typeFlag = flags->compoundFlags.flags ;
+    Ral_TupleHeadingIter i ;
+
+    assert(flags->compoundFlags.count == Ral_TupleHeadingSize(h)) ;
+
+    *p++ = openList ;
 
     for (i = h->start ; i < h->finish ; ++i) {
 	Ral_Attribute a = *i ;
 
-	p += Ral_AttributeConvertName(a, p, attrFlag) ;
+	p += Ral_AttributeConvertName(a, p, typeFlag) ;
 	*p++ = ' ' ;
-	p += Ral_AttributeConvertType(a, p, attrFlag) ;
+	p += Ral_AttributeConvertType(a, p, typeFlag) ;
 	*p++ = ' ' ;
-	++attrFlag ;
+	++typeFlag ;
     }
     /*
      * Overwrite any trailing blank. There will be no trailing blank if the
@@ -551,8 +595,7 @@ Ral_TupleHeadingConvert(
     if (!Ral_TupleHeadingEmpty(h)) {
 	--p ;
     }
-    strcpy(p, closeList) ; /* NUL terminates the result */
-    p += sizeof(closeList) - 1 ;
+    *p++ = closeList ;
 
     return p - dst ;
 }
@@ -563,43 +606,30 @@ Ral_TupleHeadingPrint(
     const char *format,
     FILE *f)
 {
-    Ral_TupleScanFlags flags = Ral_TupleScanFlagsAlloc(h) ;
-    char *str = ckalloc(Ral_TupleHeadingScan(h, flags)) ;
-
-    Ral_TupleHeadingConvert(h, str, flags) ;
+    char *str = Ral_TupleHeadingStringOf(h) ;
     fprintf(f, format, str) ;
     ckfree(str) ;
-    Ral_TupleScanFlagsFree(flags) ;
 }
 
-Ral_TupleScanFlags
-Ral_TupleScanFlagsAlloc(
-    Ral_TupleHeading heading)
+char *
+Ral_TupleHeadingStringOf(
+    Ral_TupleHeading h)
 {
-    int degree = Ral_TupleHeadingSize(heading) ;
-    int nBytes ;
-    Ral_TupleScanFlags flags ;
+    Ral_AttributeTypeScanFlags flags ;
+    char *str ;
+    int length ;
 
-    nBytes = sizeof(*flags) + degree * sizeof(*flags->attrFlags) ;
-    flags = (Ral_TupleScanFlags)ckalloc(nBytes) ;
-    memset(flags, 0, nBytes) ;
-    flags->degree = degree ;
-    flags->attrFlags = (Ral_AttributeScanFlags)(flags + 1) ;
-    return flags ;
-}
+    memset(&flags, 0, sizeof(flags)) ;
+    flags.attrType = Tuple_Type ;
+    /*
+     * +1 for the NUL terminator
+     */
+    str = ckalloc(Ral_TupleHeadingScan(h, &flags) + 1) ;
+    length = Ral_TupleHeadingConvert(h, str, &flags) ;
+    str[length] = '\0' ;
+    Ral_AttributeTypeScanFlagsFree(&flags) ;
 
-void
-Ral_TupleScanFlagsFree(
-    Ral_TupleScanFlags flags)
-{
-    int degree = flags->degree ;
-    struct Ral_AttributeScanFlags *attrFlags = flags->attrFlags ;
-
-    assert(attrFlags != NULL) ;
-    while (degree-- > 0) {
-	Ral_AttributeScanFlagsFree(attrFlags++) ;
-    }
-    ckfree((char *)flags) ;
+    return str ;
 }
 
 const char *

@@ -43,13 +43,19 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.2 $
-$Date: 2006/02/20 20:15:07 $
+$Revision: 1.3 $
+$Date: 2006/02/26 04:57:53 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_relation.c,v $
+Revision 1.3  2006/02/26 04:57:53  mangoa01
+Reworked the conversion from internal form to a string yet again.
+This design is better and more recursive in nature.
+Added additional code to the "relation" commands.
+Now in a position to finish off the remaining relation commands.
+
 Revision 1.2  2006/02/20 20:15:07  mangoa01
 Now able to convert strings to relations and vice versa including
 tuple and relation valued attributes.
@@ -110,9 +116,9 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char openList[] = "{" ;
-static const char closeList[] = "}" ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.2 $" ;
+static const char openList = '{' ;
+static const char closeList = '}' ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.3 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -146,13 +152,13 @@ Ral_Relation
 Ral_RelationDup(
     Ral_Relation srcRelation)
 {
+    int degree = Ral_RelationDegree(srcRelation) ;
     Ral_RelationHeading srcHeading = srcRelation->heading ;
     Ral_RelationHeading dupHeading ;
     Ral_Relation dupRelation ;
     Ral_TupleHeading dupTupleHeading ;
     Ral_RelationIter srcIter ;
     Ral_RelationIter srcEnd = srcRelation->finish ;
-    Ral_RelationIter dupIter ;
 
     dupHeading = Ral_RelationHeadingDup(srcHeading) ;
     if (!dupHeading) {
@@ -162,18 +168,14 @@ Ral_RelationDup(
     Ral_RelationReserve(dupRelation, Ral_RelationCardinality(srcRelation)) ;
 
     dupTupleHeading = dupHeading->tupleHeading ;
-    dupIter = dupRelation->start ;
     for (srcIter = srcRelation->start ; srcIter != srcEnd ; ++srcIter) {
 	Ral_Tuple srcTuple = *srcIter ;
 	Ral_Tuple dupTuple ;
-	int copied ;
 	int appended ;
 
 	dupTuple = Ral_TupleNew(dupTupleHeading) ;
-	copied = Ral_TupleCopy(srcTuple,
-	    Ral_TupleHeadingBegin(srcTuple->heading),
-	    Ral_TupleHeadingEnd(srcTuple->heading), dupTuple) ;
-	assert(copied != 0) ;
+	Ral_TupleCopyValues(srcTuple->values, srcTuple->values + degree,
+	    dupTuple->values) ;
 
 	appended = Ral_RelationPushBack(dupRelation, dupTuple) ;
 	assert(appended != 0) ;
@@ -280,33 +282,49 @@ Ral_RelationPushBack(
 int
 Ral_RelationScan(
     Ral_Relation relation,
-    Ral_RelationScanFlags *flags)
+    Ral_AttributeTypeScanFlags *typeFlags,
+    Ral_AttributeValueScanFlags *valueFlags)
 {
     Ral_RelationHeading heading = relation->heading ;
-    Ral_RelationScanFlags scanFlags ;
-
-    *flags = scanFlags = Ral_RelationScanFlagsAlloc(heading,
-	Ral_RelationCardinality(relation)) ;
-
-    return
-	Ral_RelationHeadingScan(heading, scanFlags) +
-	Ral_RelationScanValue(relation, scanFlags) +
-	1 + /* +1 for the separating space */
-	1 ; /* +1 for NUL terminator */
+    int length ;
+    /*
+     * Scan the header.
+     * +1 for space
+     */
+    length = Ral_RelationHeadingScan(heading, typeFlags) + 1 ;
+    /*
+     * Scan the values.
+     */
+    length += Ral_RelationScanValue(relation, typeFlags, valueFlags) ;
+    return length ;
 }
 
 int
 Ral_RelationConvert(
     Ral_Relation relation,
     char *dst,
-    Ral_RelationScanFlags scanFlags)
+    Ral_AttributeTypeScanFlags *typeFlags,
+    Ral_AttributeValueScanFlags *valueFlags)
 {
     char *p = dst ;
 
-    p += Ral_RelationHeadingConvert(relation->heading, p, scanFlags) ;
+    /*
+     * Convert the heading.
+     */
+    p += Ral_RelationHeadingConvert(relation->heading, p, typeFlags) ;
+    /*
+     * Separate the heading from the body by space.
+     */
     *p++ = ' ' ;
-    p += Ral_RelationConvertValue(relation, p, scanFlags) ;
-    Ral_RelationScanFlagsFree(scanFlags) ;
+    /*
+     * Convert the body.
+     */
+    p += Ral_RelationConvertValue(relation, p, typeFlags, valueFlags) ;
+    /*
+     * Finished with the flags.
+     */
+    Ral_AttributeTypeScanFlagsFree(typeFlags) ;
+    Ral_AttributeValueScanFlagsFree(valueFlags) ;
 
     return p - dst ;
 }
@@ -314,42 +332,75 @@ Ral_RelationConvert(
 int
 Ral_RelationScanValue(
     Ral_Relation relation,
-    Ral_RelationScanFlags flags)
+    Ral_AttributeTypeScanFlags *typeFlags,
+    Ral_AttributeValueScanFlags *valueFlags)
 {
+    int nBytes ;
     int length ;
-    Ral_AttributeScanFlags valueFlag = flags->valueFlags ;
+    Ral_AttributeTypeScanFlags *typeFlag ;
+    Ral_AttributeValueScanFlags *valueFlag ;
     Ral_RelationIter rend = Ral_RelationEnd(relation) ;
     Ral_RelationIter riter ;
     Ral_TupleHeading tupleHeading = relation->heading->tupleHeading ;
+    int nonEmptyHeading = !Ral_TupleHeadingEmpty(tupleHeading) ;
     Ral_TupleHeadingIter hEnd = Ral_TupleHeadingEnd(tupleHeading) ;
     Ral_TupleHeadingIter hIter ;
 
+    assert(typeFlags->attrType == Relation_Type) ;
+    assert(typeFlags->compoundFlags.count == Ral_RelationDegree(relation)) ;
+    assert(valueFlags->attrType == Relation_Type) ;
+    assert(valueFlags->compoundFlags.flags == NULL) ;
     /*
-     * N.B. here and below all the "-1"'s remove counting the NUL terminator
-     * on the statically allocated character strings.
+     * Allocate space for the value flags.
+     * For a relation we need a flag structure for each value in each tuple.
      */
-    length = sizeof(openList) - 1 ;
+    valueFlags->compoundFlags.count =
+	typeFlags->compoundFlags.count * Ral_RelationCardinality(relation) ;
+    nBytes = valueFlags->compoundFlags.count *
+	sizeof(*valueFlags->compoundFlags.flags) ;
+    valueFlags->compoundFlags.flags =
+	(Ral_AttributeValueScanFlags *)ckalloc(nBytes) ;
+    memset(valueFlags->compoundFlags.flags, 0, nBytes) ;
 
+    length = sizeof(openList) ;
+
+    valueFlag = valueFlags->compoundFlags.flags ;
     for (riter = Ral_RelationBegin(relation) ; riter != rend ; ++riter) {
 	Ral_Tuple tuple = *riter ;
 	Tcl_Obj **values = tuple->values ;
+	typeFlag = typeFlags->compoundFlags.flags ;
 
-	length = sizeof(openList) - 1 ;
+	length += sizeof(openList) ;
 	for (hIter = Ral_TupleHeadingBegin(tupleHeading) ;
 	    hIter != hEnd ; ++hIter) {
 	    Ral_Attribute a = *hIter ;
 	    Tcl_Obj *v = *values++ ;
 
+	    /*
+	     * Reuse the scan info for the attribute name.
+	     */
+	    length += typeFlag->nameLength + 1 ; /* +1 for space */
 	    assert(v != NULL) ;
-	    /* +1 for space */
-	    length += Ral_AttributeScanName(a, valueFlag) + 1 ;
-	    length += Ral_AttributeScanValue(a, v, valueFlag) + 1 ;
-	    ++valueFlag ;
+	    length += Ral_AttributeScanValue(a, v, typeFlag++, valueFlag++)
+		+ 1 ; /* +1 for the separating space */
 	}
-	length += sizeof(closeList) - 1 ;
+	/*
+	 * Remove trailing space from tuple values if the tuple has a
+	 * non-zero header.
+	 */
+	if (nonEmptyHeading) {
+	    --length ;
+	}
+	length += sizeof(closeList) ;
 	++length ; /* space between list elements */
     }
-    length += sizeof(closeList) - 1 ;
+    /*
+     * Remove the trailing space if the relation contained any tuples.
+     */
+    if (Ral_RelationCardinality(relation)) {
+	--length ;
+    }
+    length += sizeof(closeList) ;
 
     return length ;
 }
@@ -358,10 +409,12 @@ int
 Ral_RelationConvertValue(
     Ral_Relation relation,
     char *dst,
-    Ral_RelationScanFlags flags)
+    Ral_AttributeTypeScanFlags *typeFlags,
+    Ral_AttributeValueScanFlags *valueFlags)
 {
     char *p = dst ;
-    Ral_AttributeScanFlags valueFlag = flags->valueFlags ;
+    Ral_AttributeTypeScanFlags *typeFlag ;
+    Ral_AttributeValueScanFlags *valueFlag ;
     Ral_RelationIter rend = Ral_RelationEnd(relation) ;
     Ral_RelationIter riter ;
     Ral_TupleHeading tupleHeading = relation->heading->tupleHeading ;
@@ -369,37 +422,35 @@ Ral_RelationConvertValue(
     Ral_TupleHeadingIter hEnd = Ral_TupleHeadingEnd(tupleHeading) ;
     Ral_TupleHeadingIter hIter ;
 
-    /*
-     * N.B. here and below all the "-1"'s remove counting the NUL terminator
-     * on the statically allocated character strings.
-     */
-    strcpy(p, openList) ;
-    p += sizeof(openList) - 1 ;
+    assert(typeFlags->attrType == Relation_Type) ;
+    assert(typeFlags->compoundFlags.count == Ral_RelationDegree(relation)) ;
+    assert(valueFlags->attrType == Relation_Type) ;
+    assert(valueFlags->compoundFlags.count ==
+	Ral_RelationDegree(relation) * Ral_RelationCardinality(relation)) ;
+
+    valueFlag = valueFlags->compoundFlags.flags ;
+    *p++ = openList ;
     for (riter = Ral_RelationBegin(relation) ; riter != rend ; ++riter) {
 	Ral_Tuple tuple = *riter ;
 	Tcl_Obj **values = tuple->values ;
+	typeFlag = typeFlags->compoundFlags.flags ;
 
-	strcpy(p, openList) ;
-	p += sizeof(openList) - 1 ;
-
+	*p++ = openList ;
 	for (hIter = Ral_TupleHeadingBegin(tupleHeading) ;
 	    hIter != hEnd ; ++hIter) {
 	    Ral_Attribute a = *hIter ;
 	    Tcl_Obj *v = *values++ ;
 
+	    p += Ral_AttributeConvertName(a, p, typeFlag) ;
+	    *p++ = ' ' ;
 	    assert(v != NULL) ;
-	    p += Ral_AttributeConvertName(a, p, valueFlag) ;
+	    p += Ral_AttributeConvertValue(a, v, p, typeFlag++, valueFlag++) ;
 	    *p++ = ' ' ;
-	    p += Ral_AttributeConvertValue(a, v, p, valueFlag) ;
-	    *p++ = ' ' ;
-
-	    ++valueFlag ;
 	}
 	if (nonEmptyHeading) {
 	    --p ;
 	}
-	strcpy(p, closeList) ;
-	p += sizeof(closeList) - 1 ;
+	*p++ = closeList ;
 	*p++ = ' ' ;
     }
     /*
@@ -409,8 +460,7 @@ Ral_RelationConvertValue(
     if (Ral_RelationCardinality(relation)) {
 	--p ;
     }
-    strcpy(p, closeList) ;
-    p += sizeof(closeList) - 1 ;
+    *p++ = closeList ;
 
     return p - dst ;
 }
@@ -421,13 +471,31 @@ Ral_RelationPrint(
     const char *format,
     FILE *f)
 {
-    Ral_RelationScanFlags flags ;
-    char *str ;
-
-    str = ckalloc(Ral_RelationScan(relation, &flags)) ;
-    Ral_RelationConvert(relation, str, flags) ;
+    char *str = Ral_RelationStringOf(relation) ;
     fprintf(f, format, str) ;
     ckfree(str) ;
+}
+
+char *
+Ral_RelationStringOf(
+    Ral_Relation relation)
+{
+    Ral_AttributeTypeScanFlags typeFlags ;
+    Ral_AttributeValueScanFlags valueFlags ;
+    char *str ;
+    int length ;
+
+    memset(&typeFlags, 0, sizeof(typeFlags)) ;
+    typeFlags.attrType = Relation_Type ;
+    memset(&valueFlags, 0, sizeof(valueFlags)) ;
+    valueFlags.attrType = Relation_Type ;
+
+    /* +1 for NUL terminator */
+    str = ckalloc(Ral_RelationScan(relation, &typeFlags, &valueFlags) + 1) ;
+    length = Ral_RelationConvert(relation, str, &typeFlags, &valueFlags) ;
+    str[length] = '\0' ;
+
+    return str ;
 }
 
 
