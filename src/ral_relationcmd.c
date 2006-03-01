@@ -43,13 +43,16 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.2 $
-$Date: 2006/02/26 04:57:53 $
+$Revision: 1.3 $
+$Date: 2006/03/01 02:28:40 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_relationcmd.c,v $
+Revision 1.3  2006/03/01 02:28:40  mangoa01
+Added new relation commands and test cases. Cleaned up Makefiles.
+
 Revision 1.2  2006/02/26 04:57:53  mangoa01
 Reworked the conversion from internal form to a string yet again.
 This design is better and more recursive in nature.
@@ -130,7 +133,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.2 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.3 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -368,7 +371,56 @@ RelationIdentifiersCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
-    return TCL_ERROR ;
+    Tcl_Obj *relObj ;
+    Ral_Relation relation ;
+    Ral_RelationHeading heading ;
+    Ral_TupleHeading tupleHeading ;
+    Tcl_Obj *idListObj ;
+    int idCount ;
+    Ral_IntVector *ids ;
+
+    /* relation identifiers relationValue */
+    if (objc != 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relationValue") ;
+	return TCL_ERROR ;
+    }
+
+    relObj = *(objv + 2) ;
+    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relObj->internalRep.otherValuePtr ;
+    heading = relation->heading ;
+    tupleHeading = heading->tupleHeading ;
+
+    idListObj = Tcl_NewListObj(0, NULL) ;
+    for (idCount = heading->idCount, ids = heading->identifiers ;
+	idCount > 0 ; --idCount, ++ids) {
+	Tcl_Obj *idObj = Tcl_NewListObj(0, NULL) ;
+	Ral_IntVector idVect = *ids ;
+	Ral_IntVectorIter end = Ral_IntVectorEnd(idVect) ;
+	Ral_IntVectorIter iter ;
+
+	for (iter = Ral_IntVectorBegin(idVect) ; iter != end ; ++iter) {
+	    Ral_Attribute attr = Ral_TupleHeadingFetch(tupleHeading, *iter) ;
+
+	    if (Tcl_ListObjAppendElement(interp, idObj,
+		Tcl_NewStringObj(attr->name, -1)) != TCL_OK) {
+		Tcl_DecrRefCount(idObj) ;
+		Tcl_DecrRefCount(idListObj) ;
+		return TCL_ERROR ;
+	    }
+	}
+
+	if (Tcl_ListObjAppendElement(interp, idListObj, idObj) != TCL_OK) {
+	    Tcl_DecrRefCount(idObj) ;
+	    Tcl_DecrRefCount(idListObj) ;
+	    return TCL_ERROR ;
+	}
+    }
+
+    Tcl_SetObjResult(interp, idListObj) ;
+    return TCL_OK ;
 }
 
 static int
@@ -377,7 +429,65 @@ RelationIntersectCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
-    return TCL_ERROR ;
+    Tcl_Obj *r1Obj ;
+    Tcl_Obj *r2Obj ;
+    Ral_Relation r1 ;
+    Ral_Relation r2 ;
+    Ral_Relation intersectRel ;
+
+    /* relation intersect relation1 relation2 ? ... ? */
+    if (objc < 4) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+	    "relation1 relation2 ?relation3 ...?") ;
+	return TCL_ERROR ;
+    }
+
+    r1Obj = *(objv + 2) ;
+    if (Tcl_ConvertToType(interp, r1Obj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    r1 = r1Obj->internalRep.otherValuePtr ;
+
+    r2Obj = *(objv + 3) ;
+    if (Tcl_ConvertToType(interp, r2Obj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    r2 = r2Obj->internalRep.otherValuePtr ;
+
+    intersectRel = Ral_RelationIntersect(r1, r2) ;
+    if (intersectRel == NULL) {
+	Ral_RelationObjSetError(interp, REL_HEADING_NOT_EQUAL,
+	    Tcl_GetString(r2Obj)) ;
+	return TCL_ERROR ;
+    }
+
+    /*
+     * Increment past the first two relations and perform the intersect
+     * on the remaining values.
+     */
+    objc -= 4 ;
+    objv += 4 ;
+    while (objc-- > 0) {
+	r1 = intersectRel ;
+
+	r2Obj = *objv++ ;
+	if (Tcl_ConvertToType(interp, r2Obj, &Ral_RelationObjType) != TCL_OK) {
+	    Ral_RelationDelete(r1) ;
+	    return TCL_ERROR ;
+	}
+	r2 = r2Obj->internalRep.otherValuePtr ;
+
+	intersectRel = Ral_RelationIntersect(r1, r2) ;
+	Ral_RelationDelete(r1) ;
+	if (intersectRel == NULL) {
+	    Ral_RelationObjSetError(interp, REL_HEADING_NOT_EQUAL,
+		Tcl_GetString(r2Obj)) ;
+	    return TCL_ERROR ;
+	}
+    }
+
+    Tcl_SetObjResult(interp, Ral_RelationObjNew(intersectRel)) ;
+    return TCL_OK ;
 }
 
 static int
@@ -386,7 +496,64 @@ RelationIsCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
-    return TCL_ERROR ;
+    static const struct cmdMap {
+	const char *cmdName ;
+	int (*const cmdFunc)(Ral_Relation, Ral_Relation) ;
+    } cmdTable[] = {
+	{"equal", Ral_RelationEqual},
+	{"==", Ral_RelationEqual},
+	{"notequal", Ral_RelationNotEqual},
+	{"!=", Ral_RelationNotEqual},
+	{"propersubsetof", Ral_RelationProperSubsetOf},
+	{"<", Ral_RelationProperSubsetOf},
+	{"propersupersetof", Ral_RelationProperSupersetOf},
+	{">", Ral_RelationProperSupersetOf},
+	{"subsetof", Ral_RelationSubsetOf},
+	{"<=", Ral_RelationSubsetOf},
+	{"supersetof", Ral_RelationSupersetOf},
+	{">=", Ral_RelationSupersetOf},
+	{NULL, NULL}
+    } ;
+
+    Tcl_Obj *r1Obj ;
+    Tcl_Obj *r2Obj ;
+    Ral_Relation r1 ;
+    Ral_Relation r2 ;
+    int index ;
+    int result ;
+
+    /* relation is relation1 compareop relation2 */
+    if (objc != 5) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relation1 compareop relation2") ;
+	return TCL_ERROR ;
+    }
+
+    r1Obj = objv[2] ;
+    if (Tcl_ConvertToType(interp, r1Obj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    r1 = r1Obj->internalRep.otherValuePtr ;
+
+    if (Tcl_GetIndexFromObjStruct(interp, objv[3], cmdTable,
+	sizeof(struct cmdMap), "compareop", 0, &index) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+
+    r2Obj = objv[4] ;
+    if (Tcl_ConvertToType(interp, r2Obj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    r2 = r2Obj->internalRep.otherValuePtr ;
+
+    result = cmdTable[index].cmdFunc(r1, r2) ;
+    if (result < 0) {
+	Ral_RelationObjSetError(interp, REL_HEADING_NOT_EQUAL,
+	    Tcl_GetString(r2Obj)) ;
+	return TCL_ERROR ;
+    }
+
+    Tcl_SetObjResult(interp, Tcl_NewBooleanObj(result)) ;
+    return TCL_OK ;
 }
 
 static int
@@ -463,7 +630,39 @@ RelationMinusCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
-    return TCL_ERROR ;
+    Tcl_Obj *r1Obj ;
+    Tcl_Obj *r2Obj ;
+    Ral_Relation r1 ;
+    Ral_Relation r2 ;
+    Ral_Relation diffRel ;
+
+    /* relation minus relation1 relation2 */
+    if (objc != 4) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relation1 relation2") ;
+	return TCL_ERROR ;
+    }
+
+    r1Obj = *(objv + 2) ;
+    if (Tcl_ConvertToType(interp, r1Obj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    r1 = r1Obj->internalRep.otherValuePtr ;
+
+    r2Obj = *(objv + 3) ;
+    if (Tcl_ConvertToType(interp, r2Obj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    r2 = r2Obj->internalRep.otherValuePtr ;
+
+    diffRel = Ral_RelationMinus(r1, r2) ;
+    if (diffRel == NULL) {
+	Ral_RelationObjSetError(interp, REL_HEADING_NOT_EQUAL,
+	    Tcl_GetString(r2Obj)) ;
+	return TCL_ERROR ;
+    }
+
+    Tcl_SetObjResult(interp, Ral_RelationObjNew(diffRel)) ;
+    return TCL_OK ;
 }
 
 static int
@@ -562,5 +761,63 @@ RelationUnionCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
-    return TCL_ERROR ;
+    Tcl_Obj *r1Obj ;
+    Tcl_Obj *r2Obj ;
+    Ral_Relation r1 ;
+    Ral_Relation r2 ;
+    Ral_Relation unionRel ;
+
+    /* relation union relation1 relation2 ? ... ? */
+    if (objc < 4) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+	    "relation1 relation2 ?relation3 ...?") ;
+	return TCL_ERROR ;
+    }
+
+    r1Obj = *(objv + 2) ;
+    if (Tcl_ConvertToType(interp, r1Obj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    r1 = r1Obj->internalRep.otherValuePtr ;
+
+    r2Obj = *(objv + 3) ;
+    if (Tcl_ConvertToType(interp, r2Obj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    r2 = r2Obj->internalRep.otherValuePtr ;
+
+    unionRel = Ral_RelationUnion(r1, r2) ;
+    if (unionRel == NULL) {
+	Ral_RelationObjSetError(interp, REL_HEADING_NOT_EQUAL,
+	    Tcl_GetString(r2Obj)) ;
+	return TCL_ERROR ;
+    }
+
+    /*
+     * Increment past the first two relations and perform the union
+     * on the remaining values.
+     */
+    objc -= 4 ;
+    objv += 4 ;
+    while (objc-- > 0) {
+	r1 = unionRel ;
+
+	r2Obj = *objv++ ;
+	if (Tcl_ConvertToType(interp, r2Obj, &Ral_RelationObjType) != TCL_OK) {
+	    Ral_RelationDelete(r1) ;
+	    return TCL_ERROR ;
+	}
+	r2 = r2Obj->internalRep.otherValuePtr ;
+
+	unionRel = Ral_RelationUnion(r1, r2) ;
+	Ral_RelationDelete(r1) ;
+	if (unionRel == NULL) {
+	    Ral_RelationObjSetError(interp, REL_HEADING_NOT_EQUAL,
+		Tcl_GetString(r2Obj)) ;
+	    return TCL_ERROR ;
+	}
+    }
+
+    Tcl_SetObjResult(interp, Ral_RelationObjNew(unionRel)) ;
+    return TCL_OK ;
 }

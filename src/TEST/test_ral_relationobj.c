@@ -57,21 +57,21 @@ main(
     Ral_TupleUpdateAttrValue(t1, "attr1", Tcl_NewStringObj("a1", -1)) ;
     Ral_TupleUpdateAttrValue(t1, "attr2", Tcl_NewStringObj("a2", -1)) ;
     Ral_TupleUpdateAttrValue(t1, "attr3", Tcl_NewStringObj("a3", -1)) ;
-    logTest(Ral_RelationPushBack(r1, t1), 1) ;
+    logTest(Ral_RelationPushBack(r1, t1, NULL), 1) ;
 
     logInfo("adding second tuple") ;
     t1 = Ral_TupleNew(th1) ;
     Ral_TupleUpdateAttrValue(t1, "attr1", Tcl_NewStringObj("b1", -1)) ;
     Ral_TupleUpdateAttrValue(t1, "attr2", Tcl_NewStringObj("b2", -1)) ;
     Ral_TupleUpdateAttrValue(t1, "attr3", Tcl_NewStringObj("b3", -1)) ;
-    logTest(Ral_RelationPushBack(r1, t1), 1) ;
+    logTest(Ral_RelationPushBack(r1, t1, NULL), 1) ;
 
     logInfo("adding third tuple") ;
     t1 = Ral_TupleNew(th1) ;
     Ral_TupleUpdateAttrValue(t1, "attr1", Tcl_NewStringObj("c1", -1)) ;
     Ral_TupleUpdateAttrValue(t1, "attr2", Tcl_NewStringObj("c2", -1)) ;
     Ral_TupleUpdateAttrValue(t1, "attr3", Tcl_NewStringObj("c3", -1)) ;
-    logTest(Ral_RelationPushBack(r1, t1), 1) ;
+    logTest(Ral_RelationPushBack(r1, t1, NULL), 1) ;
 
     logInfo("creating object from tuple") ;
     r1Obj = Ral_RelationObjNew(r1) ;

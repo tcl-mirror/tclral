@@ -43,13 +43,16 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_relationheading.c,v $
-$Revision: 1.4 $
-$Date: 2006/02/26 04:57:53 $
+$Revision: 1.5 $
+$Date: 2006/03/01 02:28:40 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_relationheading.c,v $
+Revision 1.5  2006/03/01 02:28:40  mangoa01
+Added new relation commands and test cases. Cleaned up Makefiles.
+
 Revision 1.4  2006/02/26 04:57:53  mangoa01
 Reworked the conversion from internal form to a string yet again.
 This design is better and more recursive in nature.
@@ -110,7 +113,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.4 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.5 $" ;
 
 static const char relationKeyword[] = "Relation" ;
 static const char openList = '{' ;
@@ -221,7 +224,6 @@ Ral_RelationHeadingEqual(
 {
     int id1Count ;
     Ral_IntVector *id1Array ;
-    Ral_TupleHeadingIter h1Tuples ;
 
     /*
      * The easy case is when we are pointing to the same heading.
@@ -253,14 +255,13 @@ Ral_RelationHeadingEqual(
      *
      * Start with a loop iterating over the identifiers of the first heading.
      */
-    h1Tuples = Ral_TupleHeadingBegin(h1->tupleHeading) ;
     id1Array = h1->identifiers ;
     for (id1Count = h1->idCount ; id1Count > 0 ; --id1Count) {
 	Ral_IntVector id1 ;
 	Ral_IntVector id2 ;
 	Ral_IntVectorIter end1Iter ;
 	Ral_IntVectorIter id1Iter ;
-	Ral_IntVectorIter id2Iter ;
+	int id2Index = 0 ;
 	int id2Count ;
 	Ral_IntVector *id2Array ;
 	int found ;
@@ -273,7 +274,6 @@ Ral_RelationHeadingEqual(
 	 * index in the second heading.
 	 */
 	id2 = Ral_IntVectorNew(Ral_IntVectorSize(id1), -1) ;
-	id2Iter = Ral_IntVectorBegin(id2) ;
 	/*
 	 * Iterate through all the attribute indices of the identifier and
 	 * construct the vector to have a set of attribute indices that
@@ -281,11 +281,11 @@ Ral_RelationHeadingEqual(
 	 */
 	for (id1Iter = Ral_IntVectorBegin(id1) ; id1Iter != end1Iter ;
 	    ++id1Iter) {
-	    int attr1Index = *id1Iter ;
 	    /*
 	     * Get the attribute.
 	     */
-	    Ral_Attribute attr1 = *(h1Tuples + attr1Index) ;
+	    Ral_Attribute attr1 = Ral_TupleHeadingFetch(h1->tupleHeading,
+		*id1Iter) ;
 	    /*
 	     * Find the index of that attribute name in the second heading.
 	     */
@@ -296,7 +296,7 @@ Ral_RelationHeadingEqual(
 	     * have already determined that the two tuple headings are equal.
 	     */
 	    assert (attr2Index >= 0) ;
-	    *id2Iter ++ = attr2Index ;
+	    Ral_IntVectorStore(id2, id2Index++, attr2Index) ;
 	}
 	/*
 	 * Sort the identifier indices into canonical order.
@@ -310,7 +310,6 @@ Ral_RelationHeadingEqual(
 	found = 0 ;
 	for (id2Count = h2->idCount ; id2Count > 0 ; --id2Count) {
 	    Ral_IntVector heading2Id = *id2Array++ ;
-
 	    /*
 	     * All of the identifiers should have been added.
 	     */

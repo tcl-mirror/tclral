@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.h,v $
-$Revision: 1.3 $
-$Date: 2006/02/26 04:57:53 $
+$Revision: 1.4 $
+$Date: 2006/03/01 02:28:40 $
  *--
  */
 #ifndef _ral_relation_h_
@@ -132,13 +132,37 @@ FUNCTION DECLARATIONS
 extern Ral_Relation Ral_RelationNew(Ral_RelationHeading) ;
 extern Ral_Relation Ral_RelationDup(Ral_Relation) ;
 extern void Ral_RelationDelete(Ral_Relation) ;
+
 extern Ral_RelationIter Ral_RelationBegin(Ral_Relation) ;
 extern Ral_RelationIter Ral_RelationEnd(Ral_Relation) ;
+
+extern int Ral_RelationDegree(Ral_Relation) ;
 extern int Ral_RelationCardinality(Ral_Relation) ;
 extern int Ral_RelationCapacity(Ral_Relation) ;
 extern void Ral_RelationReserve(Ral_Relation, int) ;
-extern int Ral_RelationDegree(Ral_Relation) ;
-extern int Ral_RelationPushBack(Ral_Relation, Ral_Tuple) ;
+
+extern int Ral_RelationPushBack(Ral_Relation, Ral_Tuple, Ral_IntVector) ;
+
+extern Ral_RelationIter Ral_RelationFind(Ral_Relation, Ral_Tuple,
+    Ral_IntVector) ;
+extern Ral_Tuple Ral_RelationFetch(Ral_Relation, Ral_RelationIter) ;
+extern void Ral_RelationErase(Ral_Relation, Ral_RelationIter,
+    Ral_RelationIter) ;
+
+extern int Ral_RelationCompare(Ral_Relation, Ral_Relation) ;
+extern int Ral_RelationEqual(Ral_Relation, Ral_Relation) ;
+extern int Ral_RelationNotEqual(Ral_Relation, Ral_Relation) ;
+extern int Ral_RelationSubsetOf(Ral_Relation, Ral_Relation) ;
+extern int Ral_RelationProperSubsetOf(Ral_Relation, Ral_Relation) ;
+extern int Ral_RelationSupersetOf(Ral_Relation, Ral_Relation) ;
+extern int Ral_RelationProperSupersetOf(Ral_Relation, Ral_Relation) ;
+
+extern Ral_Relation Ral_RelationUnion(Ral_Relation, Ral_Relation) ;
+extern Ral_Relation Ral_RelationIntersect(Ral_Relation, Ral_Relation) ;
+extern Ral_Relation Ral_RelationMinus(Ral_Relation, Ral_Relation) ;
+
+extern int Ral_RelationCopy(Ral_Relation, Ral_RelationIter,
+    Ral_RelationIter, Ral_Relation, Ral_IntVector) ;
 
 extern int Ral_RelationScan(Ral_Relation, Ral_AttributeTypeScanFlags *,
     Ral_AttributeValueScanFlags *) ;

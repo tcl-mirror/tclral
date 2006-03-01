@@ -42,7 +42,7 @@ main(
     Ral_TupleUpdateAttrValue(t1, "attr2", Tcl_NewStringObj("foo2", -1)) ;
     Ral_TupleUpdateAttrValue(t1, "attr3", Tcl_NewStringObj("foo3", -1)) ;
 
-    logTest(Ral_RelationPushBack(r1, t1), 1) ;
+    logTest(Ral_RelationPushBack(r1, t1, NULL), 1) ;
     logInfo("printing relation") ;
     Ral_RelationPrint(r1, "\"%s\"\n", stdout) ;
 

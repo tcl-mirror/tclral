@@ -43,13 +43,16 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_tupleheading.c,v $
-$Revision: 1.5 $
-$Date: 2006/02/26 04:57:53 $
+$Revision: 1.6 $
+$Date: 2006/03/01 02:28:40 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_tupleheading.c,v $
+Revision 1.6  2006/03/01 02:28:40  mangoa01
+Added new relation commands and test cases. Cleaned up Makefiles.
+
 Revision 1.5  2006/02/26 04:57:53  mangoa01
 Reworked the conversion from internal form to a string yet again.
 This design is better and more recursive in nature.
@@ -115,7 +118,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tupleheading.c,v $ $Revision: 1.5 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tupleheading.c,v $ $Revision: 1.6 $" ;
 
 static const char tupleKeyword[] = "Tuple" ;
 static const char openList = '{' ;
@@ -490,6 +493,42 @@ Ral_TupleHeadingIntersect(
     }
 
     return intersectHeading ;
+}
+
+/*
+ * Compute ordering to map attributes in "h1" to the corresponding attributes
+ * in "h2".
+ * If the ordering is the same, i.e. the mapping is the identity mapping, then
+ * NULL is returned to indicate that no mapping is necessary.  Otherwise, the
+ * returned vector is in the order of attributes in "h1" with the values giving
+ * the index into "h2" where the same named attribute can be found.
+ * Caller must delete the returned vector.
+ */
+Ral_IntVector
+Ral_TupleHeadingNewOrderMap(
+    Ral_TupleHeading h1,
+    Ral_TupleHeading h2)
+{
+    Ral_IntVector map = Ral_IntVectorNew(Ral_TupleHeadingSize(h1), -1) ;
+    Ral_TupleHeadingIter end1 = Ral_TupleHeadingEnd(h1) ;
+    Ral_TupleHeadingIter iter1 ;
+    int index1 = 0 ;
+    int found = 0 ;
+
+    assert(Ral_TupleHeadingEqual(h1, h2)) ;
+
+    for (iter1 = Ral_TupleHeadingBegin(h1) ; iter1 != end1 ; ++iter1) {
+	int index2 = Ral_TupleHeadingIndexOf(h2, (*iter1)->name) ;
+	/*
+	 * Should always find the attribute in the second heading.
+	 */
+	assert(index2 >= 0) ;
+	found += index1 == index2 ;
+	Ral_IntVectorStore(map, index1++, index2) ;
+    }
+
+    return found == Ral_TupleHeadingSize(h1) ?
+	Ral_IntVectorDelete(map), NULL : map ;
 }
 
 int

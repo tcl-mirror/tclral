@@ -43,13 +43,16 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_tuple.c,v $
-$Revision: 1.5 $
-$Date: 2006/02/26 04:57:53 $
+$Revision: 1.6 $
+$Date: 2006/03/01 02:28:40 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_tuple.c,v $
+Revision 1.6  2006/03/01 02:28:40  mangoa01
+Added new relation commands and test cases. Cleaned up Makefiles.
+
 Revision 1.5  2006/02/26 04:57:53  mangoa01
 Reworked the conversion from internal form to a string yet again.
 This design is better and more recursive in nature.
@@ -115,7 +118,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_tuple.c,v $ $Revision: 1.5 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tuple.c,v $ $Revision: 1.6 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -372,6 +375,35 @@ Ral_TupleDup(
     }
 
     return dst ;
+}
+
+/*
+ * Create a new tuple that contains the same values
+ * of a given tuple but reordered to match the heading.
+ * The "orderMap" is in the same attribute order as "heading" and
+ * gives the indices into tuple for the corresponding attributes.
+ */
+Ral_Tuple
+Ral_TupleDupOrdered(
+    Ral_Tuple tuple,
+    Ral_TupleHeading heading,
+    Ral_IntVector orderMap)
+{
+    Ral_Tuple newTuple = Ral_TupleNew(heading) ;
+    Ral_IntVectorIter end = Ral_IntVectorEnd(orderMap) ;
+    Ral_IntVectorIter iter ;
+    int newAttrIndex = 0 ;
+
+    assert(Ral_IntVectorSize(orderMap) == Ral_TupleHeadingSize(heading)) ;
+
+    for (iter = Ral_IntVectorBegin(orderMap) ; iter !=end ; ++iter) {
+	int oldAttrIndex = *iter ;
+	assert(oldAttrIndex < Ral_TupleDegree(tuple)) ;
+	Tcl_IncrRefCount(newTuple->values[newAttrIndex++] =
+	    tuple->values[oldAttrIndex]) ;
+    }
+
+    return newTuple ;
 }
 
 int

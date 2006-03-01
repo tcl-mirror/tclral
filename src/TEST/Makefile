@@ -43,8 +43,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: Makefile,v $
-# $Revision: 1.4 $
-# $Date: 2006/02/26 04:57:53 $
+# $Revision: 1.5 $
+# $Date: 2006/03/01 02:28:40 $
 #  *--
 
 PROGS = \
@@ -58,6 +58,9 @@ PROGS = \
     test_ral_relationobj \
     $(NULL)
 
+SRCFILES = $(patsubst %,%.c,$(PROGS))
+DEPFILES = $(patsubst %,.%.d,$(PROGS))
+
 # This is set up to use either 8.4 or 8.5. Just uncomment the one
 # appropriate to your Tcl installation.
 #TCLBASE = /usr/local/ActiveTcl-8.4.7
@@ -65,10 +68,11 @@ PROGS = \
 TCLBASE = /usr/local/ActiveTcl
 LDLIBS = -ltclstub8.5
 
-CFLAGS = -g -I.. -I$(TCLBASE)/include/tcl8.5 -Wall
+CPPFLAGS += -I.. -I$(TCLBASE)/include/tcl8.5
+CFLAGS = -g -Wall
+
 # Debugging may be easier if optimization is turned off.
 #CFLAGS += -O2
-
 # Uncomment this for test coverage profiling.
 #CFLAGS += -fprofile-arcs -ftest-coverage
 
@@ -81,41 +85,29 @@ CLEANFILES=\
 
 .PHONY : runtests testprogs
 
-runtests : testprogs
-	@for p in $(PROGS) ; do echo $$p ; $$p ; done
+runtests : testprogs ral.test
+	@for p in $(PROGS) ; do echo $$p ; $$p | grep '^SUMMARY' ; done
+	ral.test
 
 testprogs : $(PROGS)
 
-test_ral_vector : test_ral_vector.c libraltest.a ../libral0.8.so
-	$(CC) $(CFLAGS) $^ $(LOADLIBES) -lral0.8 -ltcl8.5 libraltest.a -o $@
+% : %.c libraltest.a ../libral0.8.so
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(LOADLIBES) $< -lral0.8 -ltcl8.5 libraltest.a -o $@
 
-test_ral_attribute : test_ral_attribute.c libraltest.a ../libral0.8.so
-	$(CC) $(CFLAGS) $^ $(LOADLIBES) -lral0.8 -ltcl8.5 libraltest.a -o $@
+.%.d:%.c
+	set -e; $(CC) -MM $(CPPFLAGS) $< \
+	| sed 's/\($*\).o[ :]*/\1.o $@ : /g' > $@; \
+	[ -s $@ ] || rm -f $@
 
-test_ral_tupleheading : test_ral_tupleheading.c libraltest.a ../libral0.8.so
-	$(CC) $(CFLAGS) $^ $(LOADLIBES) -lral0.8 -ltcl8.5 libraltest.a -o $@
 
-test_ral_tuple : test_ral_tuple.c libraltest.a ../libral0.8.so
-	$(CC) $(CFLAGS) $^ $(LOADLIBES) -lral0.8 -ltcl8.5 libraltest.a -o $@
-
-test_ral_tupleobj : test_ral_tupleobj.c libraltest.a ../libral0.8.so
-	$(CC) $(CFLAGS) $^ $(LOADLIBES) -lral0.8 -ltcl8.5 libraltest.a -o $@
-
-test_ral_relationheading : test_ral_relationheading.c libraltest.a\
-	../libral0.8.so
-	$(CC) $(CFLAGS) $^ $(LOADLIBES) -lral0.8 -ltcl8.5 libraltest.a -o $@
-
-test_ral_relation : test_ral_relation.c libraltest.a ../libral0.8.so
-	$(CC) $(CFLAGS) $^ $(LOADLIBES) -lral0.8 -ltcl8.5 libraltest.a -o $@
-
-test_ral_relationobj : test_ral_relationobj.c libraltest.a ../libral0.8.so
-	$(CC) $(CFLAGS) $^ $(LOADLIBES) -lral0.8 -ltcl8.5 libraltest.a -o $@
+include $(DEPFILES)
 
 libraltest.a : libraltest.a(log.o)
 
 libraltest.a(log.o) : log.o
 
-log.o : log.h
+include .log.d
 
+.PHONY : clean
 clean :
 	$(RM) $(CLEANFILES)

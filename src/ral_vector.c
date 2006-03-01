@@ -43,13 +43,16 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_vector.c,v $
-$Revision: 1.3 $
-$Date: 2006/02/20 20:15:10 $
+$Revision: 1.4 $
+$Date: 2006/03/01 02:28:40 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_vector.c,v $
+Revision 1.4  2006/03/01 02:28:40  mangoa01
+Added new relation commands and test cases. Cleaned up Makefiles.
+
 Revision 1.3  2006/02/20 20:15:10  mangoa01
 Now able to convert strings to relations and vice versa including
 tuple and relation valued attributes.
@@ -104,7 +107,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_vector.c,v $ $Revision: 1.3 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_vector.c,v $ $Revision: 1.4 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -159,8 +162,10 @@ void
 Ral_IntVectorDelete(
     Ral_IntVector v)
 {
-    ckfree((char *)v->start) ;
-    ckfree((char *)v) ;
+    if (v) {
+	ckfree((char *)v->start) ;
+	ckfree((char *)v) ;
+    }
 }
 
 Ral_IntVectorIter

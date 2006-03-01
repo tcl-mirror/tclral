@@ -43,13 +43,16 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_relationobj.c,v $
-$Revision: 1.3 $
-$Date: 2006/02/26 04:57:53 $
+$Revision: 1.4 $
+$Date: 2006/03/01 02:28:40 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_relationobj.c,v $
+Revision 1.4  2006/03/01 02:28:40  mangoa01
+Added new relation commands and test cases. Cleaned up Makefiles.
+
 Revision 1.3  2006/02/26 04:57:53  mangoa01
 Reworked the conversion from internal form to a string yet again.
 This design is better and more recursive in nature.
@@ -123,7 +126,7 @@ Tcl_ObjType Ral_RelationObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.3 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.4 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -330,7 +333,7 @@ Ral_RelationInsertTupleObj(
     /*
      * Insert the tuple into the relation.
      */
-    if (!Ral_RelationPushBack(relation, tuple)) {
+    if (!Ral_RelationPushBack(relation, tuple, NULL)) {
 	Ral_RelationObjSetError(interp, REL_DUPLICATE_TUPLE,
 	    Tcl_GetString(tupleObj)) ;
 	Ral_TupleDelete(tuple) ;
@@ -365,6 +368,7 @@ Ral_RelationObjSetError(
 	"duplicate attribute name in identifier attribute set",
 	"unknown attribute name",
 	"duplicate tuple",
+	"headings not equal",
 
 	"bad relation heading format",
 	"duplicate attribute name",
@@ -381,6 +385,7 @@ Ral_RelationObjSetError(
 	"DUP_ATTR_IN_ID",
 	"UNKNOWN_ATTR",
 	"DUPLICATE_TUPLE",
+	"HEADING_NOT_EQUAL",
 
 	"HEADING_ERR",
 	"DUPLICATE_ATTR",

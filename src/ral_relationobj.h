@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationobj.h,v $
-$Revision: 1.3 $
-$Date: 2006/02/26 04:57:53 $
+$Revision: 1.4 $
+$Date: 2006/03/01 02:28:40 $
  *--
  */
 #ifndef _ral_relationobj_h_
@@ -84,6 +84,7 @@ typedef enum Ral_RelationError {
     REL_DUP_ATTR_IN_ID,
     REL_UNKNOWN_ATTR,
     REL_DUPLICATE_TUPLE,
+    REL_HEADING_NOT_EQUAL,
 
 
     REL_HEADING_ERR,

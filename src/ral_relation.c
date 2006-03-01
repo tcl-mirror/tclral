@@ -43,13 +43,16 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.3 $
-$Date: 2006/02/26 04:57:53 $
+$Revision: 1.4 $
+$Date: 2006/03/01 02:28:40 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_relation.c,v $
+Revision 1.4  2006/03/01 02:28:40  mangoa01
+Added new relation commands and test cases. Cleaned up Makefiles.
+
 Revision 1.3  2006/02/26 04:57:53  mangoa01
 Reworked the conversion from internal form to a string yet again.
 This design is better and more recursive in nature.
@@ -97,8 +100,12 @@ EXTERNAL FUNCTION REFERENCES
 /*
 FORWARD FUNCTION REFERENCES
 */
-static Tcl_DString *Ral_RelationGetIdKey(Ral_Tuple, Ral_IntVector) ;
-static Tcl_HashEntry *Ral_RelationFindIndexEntry(Ral_Relation, int, Ral_Tuple) ;
+static Tcl_DString *Ral_RelationGetIdKey(Ral_Tuple, Ral_IntVector,
+    Ral_IntVector) ;
+static Tcl_HashEntry *Ral_RelationFindIndexEntry(Ral_Relation, int, Ral_Tuple,
+    Ral_IntVector) ;
+static int Ral_RelationFindTupleIndex(Ral_Relation, int, Ral_Tuple,
+    Ral_IntVector) ;
 static void Ral_RelationRemoveIndex(Ral_Relation, int, Ral_Tuple) ;
 static int Ral_RelationIndexIdentifier(Ral_Relation, int, Ral_Tuple,
     Ral_RelationIter) ;
@@ -118,7 +125,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.3 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.4 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -177,7 +184,7 @@ Ral_RelationDup(
 	Ral_TupleCopyValues(srcTuple->values, srcTuple->values + degree,
 	    dupTuple->values) ;
 
-	appended = Ral_RelationPushBack(dupRelation, dupTuple) ;
+	appended = Ral_RelationPushBack(dupRelation, dupTuple, NULL) ;
 	assert(appended != 0) ;
     }
 
@@ -221,6 +228,13 @@ Ral_RelationEnd(
 }
 
 int
+Ral_RelationDegree(
+    Ral_Relation r)
+{
+    return Ral_TupleHeadingSize(r->heading->tupleHeading) ;
+}
+
+int
 Ral_RelationCardinality(
     Ral_Relation relation)
 {
@@ -249,18 +263,14 @@ Ral_RelationReserve(
 }
 
 int
-Ral_RelationDegree(
-    Ral_Relation r)
-{
-    return Ral_TupleHeadingSize(r->heading->tupleHeading) ;
-}
-
-int
 Ral_RelationPushBack(
     Ral_Relation relation,
-    Ral_Tuple tuple)
+    Ral_Tuple tuple,
+    Ral_IntVector orderMap)
 {
-    assert(relation->heading->tupleHeading == tuple->heading) ;
+    Ral_Tuple insertTuple ;
+    assert(Ral_TupleHeadingEqual(relation->heading->tupleHeading,
+	tuple->heading)) ;
 
     if (relation->finish >= relation->endStorage) {
 	int oldCapacity = Ral_RelationCapacity(relation) ;
@@ -271,13 +281,445 @@ Ral_RelationPushBack(
 	 */
 	Ral_RelationReserve(relation, oldCapacity + oldCapacity / 2 + 1) ;
     }
-    if (Ral_RelationIndexTuple(relation, tuple, relation->finish)) {
-	Ral_TupleReference(*relation->finish++ = tuple) ;
+
+    insertTuple = orderMap ?  Ral_TupleDupOrdered(tuple,
+	relation->heading->tupleHeading, orderMap) : tuple ;
+
+    if (Ral_RelationIndexTuple(relation, insertTuple, relation->finish)) {
+	Ral_TupleReference(*relation->finish++ = insertTuple) ;
 	return 1 ;
+    }
+    if (orderMap) {
+	Ral_TupleDelete(insertTuple) ;
     }
 
     return 0 ;
 }
+
+/*
+ * Update the tuple at "pos"
+ */
+int
+Ral_RelationUpdate(
+    Ral_Relation relation,
+    Ral_RelationIter pos,
+    Ral_Tuple tuple,
+    Ral_IntVector orderMap)
+{
+    int result = 1 ;
+    Ral_Tuple newTuple ;
+
+    if (pos >= relation->finish) {
+	Tcl_Panic("Ral_RelationUpdate: attempt to update non-existant tuple") ;
+    }
+
+    assert(*pos != NULL) ;
+
+    /*
+     * Remove the index value for the identifiers for the tuple that
+     * is already in place.
+     */
+    Ral_RelationRemoveTupleIndex(relation, *pos) ;
+    /*
+     * If reordering is required, we create a new tuple with the correct
+     * attribute ordering to match the relation.
+     */
+    newTuple = orderMap ?
+	Ral_TupleDupOrdered(tuple, relation->heading->tupleHeading, orderMap) :
+	tuple ;
+    /*
+     * Compute the indices for each identifier.
+     */
+    if (Ral_RelationIndexTuple(relation, newTuple, pos)) {
+	/*
+	 * If the new tuple is unique, then discard the old one and
+	 * install the new one into place.
+	 */
+	Ral_TupleUnreference(*pos) ;
+	Ral_TupleReference(*pos = newTuple) ;
+    } else {
+	/*
+	 * The indexing failed ==> that the new tuple is not unique in
+	 * its identifying attribute values. Restore the old tuple.
+	 * If we can't compute an index for the old tuple value, then
+	 * there has been a tear in the space / time continuum.
+	 */
+	if (!Ral_RelationIndexTuple(relation, *pos, pos)) {
+	    Tcl_Panic("Ral_RelationUpdate: recovery failure on tuple, \"%s\"",
+		Ral_TupleStringOf(*pos)) ;
+	}
+	result = 0 ;
+    }
+
+    return result ;
+}
+
+int
+Ral_RelationCopy(
+    Ral_Relation src,
+    Ral_RelationIter start,
+    Ral_RelationIter finish,
+    Ral_Relation dst,
+    Ral_IntVector orderMap)
+{
+    int allCopied = 1 ;
+
+    assert(Ral_RelationHeadingEqual(src->heading, dst->heading)) ;
+
+    Ral_RelationReserve(dst, finish - start) ;
+    while (start != finish) {
+	allCopied = Ral_RelationPushBack(dst, *start++, orderMap) && allCopied ;
+    }
+
+    return allCopied ;
+}
+
+Ral_Relation
+Ral_RelationUnion(
+    Ral_Relation r1,
+    Ral_Relation r2)
+{
+    Ral_Relation unionRel ;
+    int copyStatus ;
+    Ral_RelationIter iter2 ;
+    Ral_RelationIter end2 = Ral_RelationEnd(r2) ;
+    Ral_IntVector orderMap ;
+    /*
+     * Headings must be equal to perform a union.
+     */
+    if (!Ral_RelationHeadingEqual(r1->heading, r2->heading)) {
+	return NULL ;
+    }
+    unionRel = Ral_RelationNew(r1->heading) ;
+    /*
+     * Everything in the first relation is in the union, so just copy it in.
+     * No reordering necessary.
+     */
+    copyStatus = Ral_RelationCopy(r1, Ral_RelationBegin(r1),
+	Ral_RelationEnd(r1), unionRel, NULL) ;
+    assert(copyStatus == 1) ;
+    /*
+     * Reordering may be necessary.
+     */
+    orderMap = Ral_TupleHeadingNewOrderMap(r1->heading->tupleHeading,
+	r2->heading->tupleHeading) ;
+    /*
+     * Iterate through the tuples of the second relation and attempt to insert
+     * them into the union.  Just push it in and ignore any return status. If
+     * there is already a matching tuple it will not be inserted.
+     */
+    for (iter2 = Ral_RelationBegin(r2) ; iter2 != end2 ; ++iter2) {
+	Ral_RelationPushBack(unionRel, *iter2, orderMap) ;
+    }
+
+    Ral_IntVectorDelete(orderMap) ;
+
+    return unionRel ;
+}
+
+Ral_Relation
+Ral_RelationIntersect(
+    Ral_Relation r1,
+    Ral_Relation r2)
+{
+    Ral_Relation intersectRel ;
+    Ral_IntVector orderMap ;
+    Ral_RelationIter iter1 ;
+    Ral_RelationIter end1 = Ral_RelationEnd(r1) ;
+    Ral_RelationIter end2 = Ral_RelationEnd(r2) ;
+    /*
+     * Headings must be equal to perform a union.
+     */
+    if (!Ral_RelationHeadingEqual(r1->heading, r2->heading)) {
+	return NULL ;
+    }
+    /*
+     * Reordering may be necessary. Since we will search
+     * "r2" to find matching tuples from "r1", we must compute
+     * the map onto "r2" from "r1".
+     */
+    orderMap = Ral_TupleHeadingNewOrderMap(r2->heading->tupleHeading,
+	r1->heading->tupleHeading) ;
+
+    intersectRel = Ral_RelationNew(r1->heading) ;
+    /*
+     * Iterate through the tuples in the first relation and search
+     * the second one for a match. Only tuples contained in both relations
+     * are added to the intersection.
+     */
+    for (iter1 = Ral_RelationBegin(r1) ; iter1 != end1 ; ++iter1) {
+	if (Ral_RelationFind(r2, *iter1, orderMap) != end2) {
+	    /*
+	     * No reordering is necessary since we know the heading of the
+	     * intersection is the same as r1.
+	     */
+	    Ral_RelationPushBack(intersectRel, *iter1, NULL) ;
+	}
+    }
+
+    Ral_IntVectorDelete(orderMap) ;
+
+    return intersectRel ;
+}
+
+Ral_Relation
+Ral_RelationMinus(
+    Ral_Relation r1,
+    Ral_Relation r2)
+{
+    Ral_Relation diffRel ;
+    Ral_IntVector orderMap ;
+    Ral_RelationIter iter1 ;
+    Ral_RelationIter end1 = Ral_RelationEnd(r1) ;
+    Ral_RelationIter end2 = Ral_RelationEnd(r2) ;
+    /*
+     * Headings must be equal to perform a union.
+     */
+    if (!Ral_RelationHeadingEqual(r1->heading, r2->heading)) {
+	return NULL ;
+    }
+    /*
+     * Reordering may be necessary. Since we will search
+     * "r2" to find matching tuples from "r1", we must compute
+     * the map onto "r2" from "r1".
+     */
+    orderMap = Ral_TupleHeadingNewOrderMap(r2->heading->tupleHeading,
+	r1->heading->tupleHeading) ;
+
+    diffRel = Ral_RelationNew(r1->heading) ;
+    /*
+     * Iterate through the tuples in the first relation and search the second
+     * one for a match. Only tuples not contained in the second relation are
+     * added to the difference.
+     */
+    for (iter1 = Ral_RelationBegin(r1) ; iter1 != end1 ; ++iter1) {
+	if (Ral_RelationFind(r2, *iter1, orderMap) == end2) {
+	    /*
+	     * No reordering is necessary since we know the heading of the
+	     * difference is the same as r1.
+	     */
+	    Ral_RelationPushBack(diffRel, *iter1, NULL) ;
+	}
+    }
+
+    Ral_IntVectorDelete(orderMap) ;
+
+    return diffRel ;
+}
+
+/*
+ * Find a tuple in a relation.
+ * If "map" is NULL, then "tuple" is assumed to be ordered the same as the
+ * tuple heading in "relation".  Othewise, "map" provides the reordering
+ * mapping.
+ */
+Ral_RelationIter
+Ral_RelationFind(
+    Ral_Relation relation,
+    Ral_Tuple tuple,
+    Ral_IntVector map)
+{
+    /*
+     * We can index the tuple based on any identifier. We choose
+     * identifier 0 since it always exists.
+     */
+    int tupleIndex = Ral_RelationFindTupleIndex(relation, 0, tuple, map) ;
+
+    assert(tupleIndex < Ral_RelationCardinality(relation)) ;
+    /*
+     * Check if a tuple with the identifier was found
+     * and that the values of the tuple are equal.
+     */
+    return tupleIndex >= 0 &&
+	Ral_TupleEqual(tuple, relation->start[tupleIndex]) ?
+	    relation->start + tupleIndex : relation->finish ;
+}
+
+Ral_Tuple
+Ral_RelationFetch(
+    Ral_Relation relation,
+    Ral_RelationIter pos)
+{
+    return *relation->start ;
+}
+
+void
+Ral_RelationErase(
+    Ral_Relation relation,
+    Ral_RelationIter start,
+    Ral_RelationIter finish)
+{
+}
+
+/*
+ * Count the number of tuples in r1 that match in r2.
+ * Returns -1 if the relations are not comparable.
+ */
+int
+Ral_RelationCompare(
+    Ral_Relation r1,
+    Ral_Relation r2)
+{
+    Ral_IntVector orderMap ;
+    Ral_RelationIter iter1 ;
+    Ral_RelationIter end1 = Ral_RelationEnd(r1) ;
+    Ral_RelationIter end2 = Ral_RelationEnd(r2) ;
+    int found = 0 ;
+
+    /*
+     * For two relations to be compared, the headings must be equal.
+     */
+    if (!Ral_RelationHeadingEqual(r1->heading, r2->heading)) {
+	return -1 ;
+    }
+    /*
+     * Reordering may be necessary. Since we will search
+     * "r2" to find matching tuples from "r1", we must compute
+     * the map onto "r2" from "r1".
+     */
+    orderMap = Ral_TupleHeadingNewOrderMap(r2->heading->tupleHeading,
+	r1->heading->tupleHeading) ;
+    /*
+     * Iterate through the tuples in the first relation and search
+     * the second one for a match. Count the number of matches.
+     */
+    for (iter1 = Ral_RelationBegin(r1) ; iter1 != end1 ; ++iter1) {
+	if (Ral_RelationFind(r2, *iter1, orderMap) != end2) {
+	    ++found ;
+	}
+    }
+
+    Ral_IntVectorDelete(orderMap) ;
+
+    return found ;
+}
+
+int
+Ral_RelationEqual(
+    Ral_Relation r1,
+    Ral_Relation r2)
+{
+    int matches ;
+    int r1Card ;
+    int r2Card ;
+
+    matches = Ral_RelationCompare(r1, r2) ;
+    if (matches < 0) {
+	return matches ;
+    }
+
+    r1Card = Ral_RelationCardinality(r1) ;
+    r2Card = Ral_RelationCardinality(r2) ;
+
+    return r1Card == r2Card && matches == r1Card ;
+}
+
+int
+Ral_RelationNotEqual(
+    Ral_Relation r1,
+    Ral_Relation r2)
+{
+    int equals = Ral_RelationEqual(r1, r2) ;
+
+    if (equals >= 0) {
+	equals = !equals ;
+    }
+
+    return equals ;
+}
+
+/*
+ * Is r1 a subset of r2?
+ */
+int
+Ral_RelationSubsetOf(
+    Ral_Relation r1,
+    Ral_Relation r2)
+{
+    int matches ;
+    int r1Card ;
+    int r2Card ;
+
+    matches = Ral_RelationCompare(r1, r2) ;
+    if (matches < 0) {
+	return matches ;
+    }
+
+    r1Card = Ral_RelationCardinality(r1) ;
+    r2Card = Ral_RelationCardinality(r2) ;
+
+    return r1Card <= r2Card && matches == r1Card ;
+}
+
+/*
+ * Is r1 a proper subset of r2?
+ */
+int
+Ral_RelationProperSubsetOf(
+    Ral_Relation r1,
+    Ral_Relation r2)
+{
+    int matches ;
+    int r1Card ;
+    int r2Card ;
+
+    matches = Ral_RelationCompare(r1, r2) ;
+    if (matches < 0) {
+	return matches ;
+    }
+
+    r1Card = Ral_RelationCardinality(r1) ;
+    r2Card = Ral_RelationCardinality(r2) ;
+
+    return r1Card < r2Card && matches == r1Card ;
+}
+
+/*
+ * Is r1 a superset of r2?
+ */
+int
+Ral_RelationSupersetOf(
+    Ral_Relation r1,
+    Ral_Relation r2)
+{
+    int matches ;
+    int r1Card ;
+    int r2Card ;
+
+    matches = Ral_RelationCompare(r1, r2) ;
+    if (matches < 0) {
+	return matches ;
+    }
+
+    r1Card = Ral_RelationCardinality(r1) ;
+    r2Card = Ral_RelationCardinality(r2) ;
+
+    return r1Card >= r2Card && matches == r2Card ;
+}
+
+/*
+ * Is r1 a proper superset of r2?
+ */
+int
+Ral_RelationProperSupersetOf(
+    Ral_Relation r1,
+    Ral_Relation r2)
+{
+    int matches ;
+    int r1Card ;
+    int r2Card ;
+
+    matches = Ral_RelationCompare(r1, r2) ;
+    if (matches < 0) {
+	return matches ;
+    }
+
+    r1Card = Ral_RelationCardinality(r1) ;
+    r2Card = Ral_RelationCardinality(r2) ;
+
+    return r1Card > r2Card && matches == r2Card ;
+}
+
 
 int
 Ral_RelationScan(
@@ -509,10 +951,18 @@ Ral_RelationVersion(void)
  * PRIVATE FUNCTIONS
  */
 
+/*
+ * Generate a key string by concatenating the string representation of
+ * the attributes that are part of an identifier. If "orderMap" is not
+ * NULL it is used to reorder to attribute access in "tuple". This allows
+ * "tuple" to be of a different order than the tuple heading to which "idMap"
+ * applies.
+ */
 static Tcl_DString *
 Ral_RelationGetIdKey(
     Ral_Tuple tuple,
-    Ral_IntVector idMap)
+    Ral_IntVector idMap,
+    Ral_IntVector orderMap)
 {
     static Tcl_DString idKey ;
 
@@ -521,7 +971,9 @@ Ral_RelationGetIdKey(
 
     Tcl_DStringInit(&idKey) ;
     for (iter = Ral_IntVectorBegin(idMap) ; iter != end ; ++iter) {
-	Tcl_DStringAppend(&idKey, Tcl_GetString(tuple->values[*iter]), -1) ;
+	int attrIndex = orderMap ? Ral_IntVectorFetch(orderMap, *iter) : *iter ;
+	assert(attrIndex < Ral_TupleDegree(tuple)) ;
+	Tcl_DStringAppend(&idKey, Tcl_GetString(tuple->values[attrIndex]), -1) ;
     }
 
     return &idKey ;
@@ -531,20 +983,33 @@ static Tcl_HashEntry *
 Ral_RelationFindIndexEntry(
     Ral_Relation relation,
     int idIndex,
-    Ral_Tuple tuple)
+    Ral_Tuple tuple,
+    Ral_IntVector orderMap)
 {
     Tcl_DString *idKey ;
     Tcl_HashEntry *entry ;
 
     assert(idIndex < relation->heading->idCount) ;
 
-    idKey = Ral_RelationGetIdKey(tuple,
-	relation->heading->identifiers[idIndex]) ;
+    idKey = Ral_RelationGetIdKey(tuple, relation->heading->identifiers[idIndex],
+	orderMap) ;
     entry = Tcl_FindHashEntry(relation->indexVector + idIndex,
 	Tcl_DStringValue(idKey)) ;
     Tcl_DStringFree(idKey) ;
 
     return entry ;
+}
+
+static int
+Ral_RelationFindTupleIndex(
+    Ral_Relation relation,
+    int idIndex,
+    Ral_Tuple tuple,
+    Ral_IntVector orderMap)
+{
+    Tcl_HashEntry *entry = Ral_RelationFindIndexEntry(relation, idIndex,
+	tuple, orderMap) ;
+    return entry ? (int)Tcl_GetHashValue(entry) : -1 ;
 }
 
 static void
@@ -555,7 +1020,7 @@ Ral_RelationRemoveIndex(
 {
     Tcl_HashEntry *entry ;
 
-    entry = Ral_RelationFindIndexEntry(relation, idIndex, tuple) ;
+    entry = Ral_RelationFindIndexEntry(relation, idIndex, tuple, NULL) ;
     assert (entry != NULL) ;
     Tcl_DeleteHashEntry(entry) ;
 }
@@ -578,7 +1043,7 @@ Ral_RelationIndexIdentifier(
     idMap = relation->heading->identifiers[idIndex] ;
     index = relation->indexVector + idIndex ;
 
-    idKey = Ral_RelationGetIdKey(tuple, idMap) ;
+    idKey = Ral_RelationGetIdKey(tuple, idMap, NULL) ;
     entry = Tcl_CreateHashEntry(index, Tcl_DStringValue(idKey), &newPtr) ;
     Tcl_DStringFree(idKey) ;
     /*

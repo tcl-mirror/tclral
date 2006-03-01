@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleheading.h,v $
-$Revision: 1.5 $
-$Date: 2006/02/26 04:57:53 $
+$Revision: 1.6 $
+$Date: 2006/03/01 02:28:40 $
  *--
  */
 #ifndef _ral_tupleheading_h_
@@ -60,6 +60,7 @@ PRAGMAS
 INCLUDE FILES
 */
 #include "ral_attribute.h"
+#include "ral_vector.h"
 #include <stdio.h>
 
 /*
@@ -135,6 +136,9 @@ extern Ral_TupleHeading Ral_TupleHeadingUnion(Ral_TupleHeading,
     Ral_TupleHeading) ;
 extern Ral_TupleHeading Ral_TupleHeadingIntersect(Ral_TupleHeading,
     Ral_TupleHeading) ;
+extern Ral_IntVector Ral_TupleHeadingNewOrderMap(Ral_TupleHeading,
+    Ral_TupleHeading) ;
+
 extern int Ral_TupleHeadingScan(Ral_TupleHeading,
     Ral_AttributeTypeScanFlags *) ;
 extern int Ral_TupleHeadingScanAttr(Ral_TupleHeading,
