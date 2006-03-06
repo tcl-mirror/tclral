@@ -19,7 +19,7 @@ main(
     Ral_Tuple t1 ;
     Ral_Tuple t2 ;
     Tcl_Obj *v1 ;
-    Ral_TupleUpdateStatus s1 ;
+    int s1 ;
 
     interp = Tcl_CreateInterp() ;
     Tcl_InitMemory(interp) ;
@@ -46,7 +46,7 @@ main(
 
     logInfo("setting value of \"attr1\"") ;
     s1 = Ral_TupleUpdateAttrValue(t1, "attr1", Tcl_NewStringObj("a1", -1)) ;
-    logTest(s1, AttributeUpdated) ;
+    logTest(s1, 1) ;
 
     logInfo("getting value of \"attr1\"") ;
     v1 = Ral_TupleGetAttrValue(t1, "attr1") ;
@@ -54,11 +54,11 @@ main(
 
     logInfo("setting value of \"attr2\"") ;
     s1 = Ral_TupleUpdateAttrValue(t1, "attr2", Tcl_NewStringObj("a2", -1)) ;
-    logTest(s1, AttributeUpdated) ;
+    logTest(s1, 1) ;
 
     logInfo("setting value of \"attr3\"") ;
     s1 = Ral_TupleUpdateAttrValue(t1, "attr3", Tcl_NewStringObj("a3", -1)) ;
-    logTest(s1, AttributeUpdated) ;
+    logTest(s1, 1) ;
 
     logInfo("printing tuple") ;
     Ral_TuplePrint(t1, "%s\n", stdout) ;
@@ -66,7 +66,8 @@ main(
     logInfo("setting value of \"attr4\"") ;
     v1 = Tcl_NewStringObj("a4", -1) ;
     s1 = Ral_TupleUpdateAttrValue(t1, "attr4", v1) ;
-    logTest(s1, NoSuchAttribute) ;
+    logTest(s1, 0) ;
+    logTest(Ral_TupleLastError, TUP_UNKNOWN_ATTR) ;
 
     logInfo("printing tuple") ;
     Ral_TuplePrint(t1, "%s\n", stdout) ;

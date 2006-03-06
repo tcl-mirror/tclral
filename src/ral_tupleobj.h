@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleobj.h,v $
-$Revision: 1.4 $
-$Date: 2006/02/20 20:15:10 $
+$Revision: 1.5 $
+$Date: 2006/03/06 01:07:37 $
  *--
  */
 #ifndef _ral_tupleobj_h_
@@ -62,6 +62,7 @@ INCLUDE FILES
 #include "tcl.h"
 #include "ral_tupleheading.h"
 #include "ral_tuple.h"
+#include "ral_vector.h"
 
 /*
 MACRO DEFINITIONS
@@ -74,16 +75,6 @@ FORWARD CLASS REFERENCES
 /*
 TYPE DECLARATIONS
 */
-typedef enum Ral_TupleError {
-    TUP_UNKNOWN_ATTR,
-    TUP_HEADING_ERR,
-    TUP_FORMAT_ERR,
-    TUP_DUPLICATE_ATTR,
-    TUP_BAD_VALUE,
-    TUP_BAD_KEYWORD,
-    TUP_WRONG_NUM_ATTRS,
-    TUP_BAD_PAIRS_LIST,
-} Ral_TupleError ;
 
 /*
 EXTERNAL DATA REFERENCES
@@ -97,11 +88,15 @@ FUNCTION DECLARATIONS
 extern Tcl_Obj *Ral_TupleObjNew(Ral_Tuple) ;
 extern int Ral_TupleObjConvert(Ral_TupleHeading, Tcl_Interp *, Tcl_Obj *,
     Tcl_Obj *) ;
+
 extern Ral_TupleHeading Ral_TupleHeadingNewFromObj(Tcl_Interp *, Tcl_Obj *) ;
+extern Ral_IntVector Ral_TupleHeadingAttrsFromObj(Ral_TupleHeading,
+    Tcl_Interp *, Tcl_Obj *) ;
+extern Ral_IntVector Ral_TupleHeadingAttrsFromVect(Ral_TupleHeading,
+    Tcl_Interp *, int, Tcl_Obj *const*) ;
+
 extern int Ral_TupleSetFromObj(Ral_Tuple, Tcl_Interp *, Tcl_Obj *) ;
 extern int Ral_TupleUpdateFromObj(Ral_Tuple, Tcl_Interp *, Tcl_Obj *) ;
-extern int Ral_TupleUpdateAttrFromObj(Ral_Tuple, Tcl_Interp *, Tcl_Obj *,
-    Tcl_Obj *) ;
 extern const char *Ral_TupleObjVersion(void) ;
 extern void Ral_TupleObjSetError(Tcl_Interp *, Ral_TupleError, const char *) ;
 

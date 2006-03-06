@@ -43,13 +43,16 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.4 $
-$Date: 2006/03/01 02:28:40 $
+$Revision: 1.5 $
+$Date: 2006/03/06 01:07:37 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_relation.c,v $
+Revision 1.5  2006/03/06 01:07:37  mangoa01
+More relation commands done. Cleaned up error reporting.
+
 Revision 1.4  2006/03/01 02:28:40  mangoa01
 Added new relation commands and test cases. Cleaned up Makefiles.
 
@@ -82,6 +85,7 @@ INCLUDE FILES
 #include "ral_relation.h"
 #include "ral_relationheading.h"
 #include "ral_tupleheading.h"
+#include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 
@@ -111,6 +115,9 @@ static int Ral_RelationIndexIdentifier(Ral_Relation, int, Ral_Tuple,
     Ral_RelationIter) ;
 static int Ral_RelationIndexTuple(Ral_Relation, Ral_Tuple, Ral_RelationIter) ;
 static void Ral_RelationRemoveTupleIndex(Ral_Relation, Ral_Tuple) ;
+static void Ral_RelationTupleSortKey(const Ral_Tuple, Tcl_DString *) ;
+static int Ral_RelationTupleCompareAscending(const void *, const void *) ;
+static int Ral_RelationTupleCompareDescending(const void *, const void *) ;
 
 /*
 EXTERNAL DATA REFERENCES
@@ -119,13 +126,15 @@ EXTERNAL DATA REFERENCES
 /*
 EXTERNAL DATA DEFINITIONS
 */
+Ral_RelationError Ral_RelationLastError = REL_OK ;
 
 /*
 STATIC DATA ALLOCATION
 */
+static Ral_IntVector sortAttrs ;
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.4 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.5 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -507,6 +516,112 @@ Ral_RelationMinus(
     return diffRel ;
 }
 
+Ral_Relation
+Ral_RelationTimes(
+    Ral_Relation multiplicand,
+    Ral_Relation multiplier)
+{
+    Ral_RelationHeading prodHeading ;
+    Ral_Relation product ;
+    Ral_RelationIter mcandIter ;
+    Ral_RelationIter mcandEnd = Ral_RelationEnd(multiplicand) ;
+    Ral_RelationIter mlierIter ;
+    Ral_RelationIter mlierEnd = Ral_RelationEnd(multiplier) ;
+    Ral_TupleHeading prodTupleHeading ;
+    int mlierOffset = Ral_RelationDegree(multiplicand) ;
+
+    prodHeading = Ral_RelationHeadingUnion(multiplicand->heading,
+	multiplier->heading) ;
+    if (!prodHeading) {
+	return NULL ;
+    }
+    prodTupleHeading = prodHeading->tupleHeading ;
+
+    product = Ral_RelationNew(prodHeading) ;
+    Ral_RelationReserve(product, Ral_RelationCardinality(multiplicand) *
+	Ral_RelationCardinality(multiplier)) ;
+
+    for (mcandIter = Ral_RelationBegin(multiplicand) ; mcandIter != mcandEnd ;
+	++mcandIter) {
+	for (mlierIter = Ral_RelationBegin(multiplier) ; mlierIter != mlierEnd ;
+	    ++mlierIter) {
+	    Ral_Tuple mcandTuple = *mcandIter ;
+	    Ral_Tuple mlierTuple = *mlierIter ;
+	    Ral_Tuple prodTuple = Ral_TupleNew(prodTupleHeading) ;
+	    Ral_TupleIter prodTupleBegin = Ral_TupleBegin(prodTuple) ;
+
+	    Ral_TupleCopyValues(Ral_TupleBegin(mcandTuple),
+		Ral_TupleEnd(mcandTuple), prodTupleBegin) ;
+	    Ral_TupleCopyValues(Ral_TupleBegin(mlierTuple),
+		Ral_TupleEnd(mlierTuple), prodTupleBegin + mlierOffset) ;
+
+	    if (!Ral_RelationPushBack(product, prodTuple, NULL)) {
+		Ral_RelationDelete(product) ;
+		return NULL ;
+	    }
+	}
+    }
+
+    return product ;
+}
+
+Ral_Relation
+Ral_RelationProject(
+    Ral_Relation relation,
+    Ral_IntVector attrSet)
+{
+    Ral_RelationHeading projHeading =
+	Ral_RelationHeadingSubset(relation->heading, attrSet) ;
+    Ral_TupleHeading projTupleHeading = projHeading->tupleHeading ;
+    Ral_Relation projRel = Ral_RelationNew(projHeading) ;
+    Ral_RelationIter end = Ral_RelationEnd(relation) ;
+    Ral_RelationIter iter ;
+
+    Ral_RelationReserve(projRel, Ral_RelationCardinality(relation)) ;
+    for (iter = Ral_RelationBegin(relation) ; iter != end ; ++iter) {
+	Ral_Tuple projTuple = Ral_TupleSubset(*iter, projTupleHeading,
+	    attrSet) ;
+	/*
+	 * Ignore the return. Projecting, in general, results in
+	 * duplicated tuples.
+	 */
+	Ral_RelationPushBack(projRel, projTuple, NULL) ;
+    }
+
+    return projRel ;
+}
+
+Ral_Relation
+Ral_RelationSortAscending(
+    Ral_Relation relation,
+    Ral_IntVector attrs)
+{
+    Ral_Relation sortedRel = Ral_RelationDup(relation) ;
+    sortAttrs = attrs ;
+
+    qsort(Ral_RelationBegin(sortedRel), Ral_RelationCardinality(sortedRel),
+	sizeof(Ral_RelationIter), Ral_RelationTupleCompareAscending) ;
+    sortAttrs = NULL ;
+
+    return sortedRel ;
+}
+
+Ral_Relation
+Ral_RelationSortDescending(
+    Ral_Relation relation,
+    Ral_IntVector attrs)
+{
+    Ral_Relation sortedRel = Ral_RelationDup(relation) ;
+    sortAttrs = attrs ;
+
+    qsort(Ral_RelationBegin(sortedRel), Ral_RelationCardinality(sortedRel),
+	sizeof(Ral_RelationIter), Ral_RelationTupleCompareDescending) ;
+    sortAttrs = NULL ;
+
+    return sortedRel ;
+}
+
+
 /*
  * Find a tuple in a relation.
  * If "map" is NULL, then "tuple" is assumed to be ordered the same as the
@@ -531,7 +646,7 @@ Ral_RelationFind(
      * and that the values of the tuple are equal.
      */
     return tupleIndex >= 0 &&
-	Ral_TupleEqual(tuple, relation->start[tupleIndex]) ?
+	Ral_TupleEqualValues(tuple, relation->start[tupleIndex]) ?
 	    relation->start + tupleIndex : relation->finish ;
 }
 
@@ -718,6 +833,41 @@ Ral_RelationProperSupersetOf(
     r2Card = Ral_RelationCardinality(r2) ;
 
     return r1Card > r2Card && matches == r2Card ;
+}
+
+int
+Ral_RelationRenameAttribute(
+    Ral_Relation relation,
+    const char *oldName,
+    const char *newName)
+{
+    Ral_TupleHeading tupleHeading = relation->heading->tupleHeading ;
+    Ral_TupleHeadingIter end = Ral_TupleHeadingEnd(tupleHeading) ;
+    Ral_TupleHeadingIter found ;
+    Ral_Attribute newAttr ;
+
+    /*
+     * Find the old name.
+     */
+    found = Ral_TupleHeadingFind(tupleHeading, oldName) ;
+    if (found == end) {
+	Ral_RelationLastError = REL_UNKNOWN_ATTR ;
+	return 0 ;
+    }
+    /*
+     * Create a new attribute with the new name.
+     */
+    newAttr = Ral_AttributeRename(*found, newName) ;
+    /*
+     * Store the new attribute into the heading.
+     */
+    found = Ral_TupleHeadingStore(tupleHeading, found, newAttr) ;
+    if (found == end) {
+	Ral_RelationLastError = REL_DUPLICATE_ATTR ;
+	return 0 ;
+    }
+
+    return 1 ;
 }
 
 
@@ -1050,6 +1200,7 @@ Ral_RelationIndexIdentifier(
      * Check that there are no duplicate tuples.
      */
     if (newPtr == 0) {
+	Ral_RelationLastError = REL_DUPLICATE_TUPLE ;
 	return 0 ;
     }
 
@@ -1094,4 +1245,63 @@ Ral_RelationRemoveTupleIndex(
     for (i = 0 ; i < relation->heading->idCount ; ++i) {
 	Ral_RelationRemoveIndex(relation, i, tuple) ;
     }
+}
+
+static void
+Ral_RelationTupleSortKey(
+    const Ral_Tuple tuple,
+    Tcl_DString *idKey)
+{
+    Ral_IntVectorIter end = Ral_IntVectorEnd(sortAttrs) ;
+    Ral_IntVectorIter iter ;
+    Ral_TupleIter values = tuple->values ;
+
+    Tcl_DStringInit(idKey) ;
+    for (iter = Ral_IntVectorBegin(sortAttrs) ; iter != end ; ++iter) {
+	Tcl_DStringAppend(idKey, Tcl_GetString(values[*iter]), -1) ;
+    }
+}
+
+static int
+Ral_RelationTupleCompareAscending(
+    const void *v1,
+    const void *v2)
+{
+    Tcl_DString sortKey1 ;
+    Tcl_DString sortKey2 ;
+    int result ;
+
+    Ral_RelationTupleSortKey(*(Ral_RelationIter)v1, &sortKey1) ;
+    Ral_RelationTupleSortKey(*(Ral_RelationIter)v2, &sortKey2) ;
+
+    result = strcmp(Tcl_DStringValue(&sortKey1), Tcl_DStringValue(&sortKey2)) ;
+
+    Tcl_DStringFree(&sortKey1) ;
+    Tcl_DStringFree(&sortKey2) ;
+
+    return result ;
+}
+
+static int
+Ral_RelationTupleCompareDescending(
+    const void *v1,
+    const void *v2)
+{
+    Tcl_DString sortKey1 ;
+    Tcl_DString sortKey2 ;
+    int result ;
+
+    Ral_RelationTupleSortKey(*(Ral_RelationIter)v1, &sortKey1) ;
+    Ral_RelationTupleSortKey(*(Ral_RelationIter)v2, &sortKey2) ;
+
+    /*
+     * N.B. inverted order of first and second tuple to obtain
+     * the proper result for descending order.
+     */
+    result = strcmp(Tcl_DStringValue(&sortKey2), Tcl_DStringValue(&sortKey1)) ;
+
+    Tcl_DStringFree(&sortKey1) ;
+    Tcl_DStringFree(&sortKey2) ;
+
+    return result ;
 }

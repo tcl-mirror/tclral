@@ -43,13 +43,16 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_tupleobj.c,v $
-$Revision: 1.5 $
-$Date: 2006/02/26 04:57:53 $
+$Revision: 1.6 $
+$Date: 2006/03/06 01:07:37 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_tupleobj.c,v $
+Revision 1.6  2006/03/06 01:07:37  mangoa01
+More relation commands done. Cleaned up error reporting.
+
 Revision 1.5  2006/02/26 04:57:53  mangoa01
 Reworked the conversion from internal form to a string yet again.
 This design is better and more recursive in nature.
@@ -132,7 +135,7 @@ Tcl_ObjType Ral_TupleObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tupleobj.c,v $ $Revision: 1.5 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tupleobj.c,v $ $Revision: 1.6 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -230,6 +233,61 @@ Ral_TupleHeadingNewFromObj(
 }
 
 /*
+ * Scan the object and return the list of attributes.
+ * The returned vector contains a set of attribute indices
+ * that map into the heading for those attribute names mentioned
+ * in the Tcl object.
+ * Caller must delete the returned vector.
+ */
+Ral_IntVector
+Ral_TupleHeadingAttrsFromObj(
+    Ral_TupleHeading heading,
+    Tcl_Interp *interp,
+    Tcl_Obj *objPtr)
+{
+    int objc ;
+    Tcl_Obj **objv ;
+
+    /*
+     * Convert the object into a list
+     */
+    if (Tcl_ListObjGetElements(interp, objPtr, &objc, &objv) != TCL_OK) {
+	return NULL ;
+    }
+    return Ral_TupleHeadingAttrsFromVect(heading, interp, objc, objv) ;
+}
+
+Ral_IntVector
+Ral_TupleHeadingAttrsFromVect(
+    Ral_TupleHeading heading,
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Ral_IntVector attrVector = Ral_IntVectorNewEmpty(objc) ;
+    /*
+     * Iterate over the array looking up the attributes in the
+     * tuple heading.
+     */
+    while (objc-- > 0) {
+	const char *attrName = Tcl_GetString(*objv++) ;
+	int attrIndex = Ral_TupleHeadingIndexOf(heading, attrName) ;
+	if (attrIndex >= 0) {
+	    /*
+	     * N.B. Attributes must always form a set.
+	     */
+	    Ral_IntVectorSetAdd(attrVector, attrIndex) ;
+	} else {
+	    Ral_TupleObjSetError(interp, TUP_UNKNOWN_ATTR, attrName) ;
+	    Ral_IntVectorDelete(attrVector) ;
+	    return NULL ;
+	}
+    }
+
+    return attrVector ;
+}
+
+/*
  * The Tcl object must be a list of attribute value pairs and a value
  * must be given for every attribute.
  */
@@ -310,33 +368,19 @@ Ral_TupleUpdateFromObj(
      * Go through the attribute / value pairs updating the attribute values.
      */
     for ( ; elemc > 0 ; elemc -= 2, elemv += 2) {
-	if (Ral_TupleUpdateAttrFromObj(tuple, interp, *elemv, *(elemv + 1))
-	    != TCL_OK) {
+	const char *attrName = Tcl_GetString(*elemv) ;
+	if (!Ral_TupleUpdateAttrValue(tuple, attrName, elemv[1])) {
+	    if (Ral_TupleLastError == TUP_BAD_VALUE) {
+		Ral_TupleObjSetError(interp, Ral_TupleLastError,
+		    Tcl_GetString(elemv[1])) ;
+	    } else {
+		Ral_TupleObjSetError(interp, Ral_TupleLastError, attrName) ;
+	    }
 	    return TCL_ERROR ;
 	}
     }
 
     return TCL_OK ;
-}
-
-int
-Ral_TupleUpdateAttrFromObj(
-    Ral_Tuple tuple,
-    Tcl_Interp *interp,
-    Tcl_Obj *attrObj,
-    Tcl_Obj *valueObj)
-{
-    const char *attrName = Tcl_GetString(attrObj) ;
-    Ral_TupleUpdateStatus status ;
-
-    status = Ral_TupleUpdateAttrValue(tuple, attrName, valueObj) ;
-    if (status == NoSuchAttribute) {
-	Ral_TupleObjSetError(interp, TUP_UNKNOWN_ATTR, attrName) ;
-    } else if (status == BadValueType) {
-	Ral_TupleObjSetError(interp, TUP_BAD_VALUE, Tcl_GetString(valueObj)) ;
-    }
-
-    return status == AttributeUpdated ? TCL_OK : TCL_ERROR ;
 }
 
 const char *
@@ -356,6 +400,7 @@ Ral_TupleObjSetError(
      * enumeration.
      */
     static const char *resultStrings[] = {
+	"no error",
 	"unknown attribute name",
 	"bad tuple heading format",
 	"bad tuple value format",
@@ -366,6 +411,7 @@ Ral_TupleObjSetError(
 	"bad list of pairs"
     } ;
     static const char *errorStrings[] = {
+	"OK",
 	"UNKNOWN_ATTR",
 	"HEADING_ERR",
 	"FORMAT_ERR",

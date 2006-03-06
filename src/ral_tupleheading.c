@@ -43,13 +43,16 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_tupleheading.c,v $
-$Revision: 1.6 $
-$Date: 2006/03/01 02:28:40 $
+$Revision: 1.7 $
+$Date: 2006/03/06 01:07:37 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_tupleheading.c,v $
+Revision 1.7  2006/03/06 01:07:37  mangoa01
+More relation commands done. Cleaned up error reporting.
+
 Revision 1.6  2006/03/01 02:28:40  mangoa01
 Added new relation commands and test cases. Cleaned up Makefiles.
 
@@ -118,7 +121,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tupleheading.c,v $ $Revision: 1.6 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tupleheading.c,v $ $Revision: 1.7 $" ;
 
 static const char tupleKeyword[] = "Tuple" ;
 static const char openList = '{' ;
@@ -142,6 +145,31 @@ Ral_TupleHeadingNew(
     h->endStorage = h->start + size ;
     Tcl_InitHashTable(&h->nameMap, TCL_STRING_KEYS) ;
     return h ;
+}
+
+/*
+ * Build a new tuple heading based on the old relation
+ * using only the attributes in the attribute set.
+ */
+Ral_TupleHeading
+Ral_TupleHeadingSubset(
+    Ral_TupleHeading heading,
+    Ral_IntVector attrSet)
+{
+    Ral_TupleHeading newHeading =
+	Ral_TupleHeadingNew(Ral_IntVectorSize(attrSet)) ;
+    Ral_IntVectorIter end = Ral_IntVectorEnd(attrSet) ;
+    Ral_IntVectorIter iter ;
+
+    for (iter = Ral_IntVectorBegin(attrSet) ; iter != end ; ++iter) {
+	Ral_Attribute attr = Ral_TupleHeadingFetch(heading, *iter) ;
+	Ral_Attribute newAttr = Ral_AttributeDup(attr) ;
+	Ral_TupleHeadingIter hIter = Ral_TupleHeadingPushBack(newHeading,
+	    newAttr) ;
+	assert(hIter != Ral_TupleHeadingEnd(newHeading)) ;
+    }
+
+    return newHeading ;
 }
 
 Ral_TupleHeading

@@ -43,13 +43,16 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_tuple.c,v $
-$Revision: 1.6 $
-$Date: 2006/03/01 02:28:40 $
+$Revision: 1.7 $
+$Date: 2006/03/06 01:07:37 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_tuple.c,v $
+Revision 1.7  2006/03/06 01:07:37  mangoa01
+More relation commands done. Cleaned up error reporting.
+
 Revision 1.6  2006/03/01 02:28:40  mangoa01
 Added new relation commands and test cases. Cleaned up Makefiles.
 
@@ -112,13 +115,14 @@ EXTERNAL DATA REFERENCES
 /*
 EXTERNAL DATA DEFINITIONS
 */
+Ral_TupleError Ral_TupleLastError = TUP_OK ;
 
 /*
 STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_tuple.c,v $ $Revision: 1.6 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tuple.c,v $ $Revision: 1.7 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -141,6 +145,26 @@ Ral_TupleNew(
     tuple->values = (Tcl_Obj **)(tuple + 1) ;
 
     return tuple ;
+}
+
+Ral_Tuple
+Ral_TupleSubset(
+    Ral_Tuple tuple,
+    Ral_TupleHeading heading,
+    Ral_IntVector attrSet)
+{
+    Ral_Tuple subTuple = Ral_TupleNew(heading) ;
+    Ral_TupleIter subIter = Ral_TupleBegin(subTuple) ;
+    Ral_IntVectorIter end = Ral_IntVectorEnd(attrSet) ;
+    Ral_IntVectorIter iter ;
+
+    for (iter = Ral_IntVectorBegin(attrSet) ; iter != end ; ++iter) {
+	Ral_IntVectorValueType attrIndex = *iter ;
+	assert(attrIndex < Ral_TupleDegree(tuple)) ;
+	Tcl_IncrRefCount(*subIter++ = tuple->values[attrIndex]) ;
+    }
+
+    return subTuple ;
 }
 
 void
@@ -190,18 +214,25 @@ Ral_TupleDegree(
     return Ral_TupleHeadingSize(tuple->heading) ;
 }
 
+Ral_TupleIter
+Ral_TupleBegin(
+    Ral_Tuple tuple)
+{
+    return tuple->values ;
+}
+
+Ral_TupleIter
+Ral_TupleEnd(
+    Ral_Tuple tuple)
+{
+    return tuple->values + Ral_TupleDegree(tuple) ;
+}
+
 int
 Ral_TupleEqual(
     Ral_Tuple tuple1,
     Ral_Tuple tuple2)
 {
-    Ral_TupleHeading h1 ;
-    Ral_TupleHeading h2 ;
-    Tcl_Obj **v1 ;
-    Tcl_Obj **v2 ;
-    Ral_TupleHeadingIter b1 ;
-    Ral_TupleHeadingIter e1 ;
-
     /*
      * Tuples at the same address are equal.
      */
@@ -211,21 +242,39 @@ Ral_TupleEqual(
     /*
      * For tuples to be equal they must have equal headings.
      */
-    h1 = tuple1->heading ;
-    h2 = tuple2->heading ;
-    if (!Ral_TupleHeadingEqual(h1, h2)) {
+    if (!Ral_TupleHeadingEqual(tuple1->heading, tuple2->heading)) {
 	return 0 ;
     }
+    /*
+     * Match the values.
+     */
+    return Ral_TupleEqualValues(tuple1, tuple2) ;
+}
+
+/*
+ * Only compare the values in two tuples.
+ * Assumes that the headers have already been verified to be equal.
+ * If not, use Ral_TupleEqual().
+ */
+int
+Ral_TupleEqualValues(
+    Ral_Tuple tuple1,
+    Ral_Tuple tuple2)
+{
+    Ral_TupleHeading h1 = tuple1->heading ;
+    Ral_TupleHeading h2 = tuple2->heading ;
+    Ral_TupleIter iter1 = tuple1->values ;
+    Ral_TupleIter iter2 = tuple2->values ;
+    Ral_TupleHeadingIter e1 = Ral_TupleHeadingEnd(h1) ;
+    Ral_TupleHeadingIter b1 ;
     /*
      * Match the values. We iterate on the first tuple, using the
      * attribute name to find the proper index into the second tuple.
      * Thus the comparison is independent of storage order as desired.
      */
-    v1 = tuple1->values ;
-    v2 = tuple2->values ;
-    e1 = Ral_TupleHeadingEnd(h1) ;
     for (b1 = Ral_TupleHeadingBegin(h1) ; b1 != e1 ; ++b1) {
-	int i2 = Ral_TupleHeadingIndexOf(h2, (*b1)->name) ;
+	Ral_Attribute attr = *b1 ;
+	int i2 = Ral_TupleHeadingIndexOf(h2, attr->name) ;
 	/*
 	 * Since the two headings are equal, we must be able to find
 	 * each attribute.
@@ -234,14 +283,14 @@ Ral_TupleEqual(
 	/*
 	 * And all the object values must be equal.
 	 */
-	if (!Ral_ObjEqual(*v1++, v2[i2])) {
+	if (!Ral_AttributeValueEqual(attr, *iter1++, *(iter2 + i2))) {
 	    return 0 ;
 	}
     }
     return 1 ;
 }
 
-Ral_TupleUpdateStatus
+int
 Ral_TupleUpdateAttrValue(
     Ral_Tuple tuple,
     const char *attrName,
@@ -265,14 +314,16 @@ Ral_TupleUpdateAttrValue(
     heading = tuple->heading ;
     i_attr = Ral_TupleHeadingFind(heading, attrName) ;
     if (i_attr == Ral_TupleHeadingEnd(heading)) {
-	return NoSuchAttribute ;
+	Ral_TupleLastError = TUP_UNKNOWN_ATTR ;
+	return 0 ;
     }
     attribute = *i_attr ;
     /*
      * Convert the value to the type of the attribute.
      */
     if (Ral_AttributeConvertValueToType(NULL, attribute, value) != TCL_OK) {
-	return BadValueType ;
+	Ral_TupleLastError = TUP_BAD_VALUE ;
+	return 0 ;
     }
     /*
      * Compute where to update in the object array.
@@ -289,7 +340,7 @@ Ral_TupleUpdateAttrValue(
      * Update the tuple to the new value.
      */
     Tcl_IncrRefCount(tuple->values[valueIndex] = value) ;
-    return AttributeUpdated ;
+    return 1 ;
 }
 
 Tcl_Obj *

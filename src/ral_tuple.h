@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuple.h,v $
-$Revision: 1.5 $
-$Date: 2006/03/01 02:28:40 $
+$Revision: 1.6 $
+$Date: 2006/03/06 01:07:37 $
  *--
  */
 #ifndef _ral_tuple_h_
@@ -75,7 +75,6 @@ FORWARD CLASS REFERENCES
 /*
 TYPE DECLARATIONS
 */
-
 
 /*
  * A Tuple type is a tuple heading combined with a list of values, one for each
@@ -111,23 +110,40 @@ typedef struct Ral_Tuple {
 				 * degree of the heading */
 } *Ral_Tuple ;
 
-typedef enum {
-    AttributeUpdated = 0,
-    NoSuchAttribute,
-    BadValueType
-} Ral_TupleUpdateStatus ;
+typedef enum Ral_TupleError {
+    TUP_OK = 0,
+    TUP_UNKNOWN_ATTR,
+    TUP_HEADING_ERR,
+    TUP_FORMAT_ERR,
+    TUP_DUPLICATE_ATTR,
+    TUP_BAD_VALUE,
+    TUP_BAD_KEYWORD,
+    TUP_WRONG_NUM_ATTRS,
+    TUP_BAD_PAIRS_LIST,
+} Ral_TupleError ;
+
+/*
+DATA DECLARATIONS
+*/ 
+extern Ral_TupleError Ral_TupleLastError ;
 
 /*
 FUNCTION DECLARATIONS
 */
 
 extern Ral_Tuple Ral_TupleNew(Ral_TupleHeading) ;
+extern Ral_Tuple Ral_TupleSubset(Ral_Tuple, Ral_TupleHeading, Ral_IntVector) ;
 extern void Ral_TupleDelete(Ral_Tuple) ;
 extern void Ral_TupleReference(Ral_Tuple) ;
 extern void Ral_TupleUnreference(Ral_Tuple) ;
 extern int Ral_TupleDegree(Ral_Tuple) ;
+
+extern Ral_TupleIter Ral_TupleBegin(Ral_Tuple) ;
+extern Ral_TupleIter Ral_TupleEnd(Ral_Tuple) ;
+
 extern int Ral_TupleEqual(Ral_Tuple, Ral_Tuple) ;
-extern Ral_TupleUpdateStatus Ral_TupleUpdateAttrValue(Ral_Tuple,
+extern int Ral_TupleEqualValues(Ral_Tuple, Ral_Tuple) ;
+extern int Ral_TupleUpdateAttrValue(Ral_Tuple,
     const char *, Tcl_Obj *) ;
 extern Tcl_Obj *Ral_TupleGetAttrValue(Ral_Tuple, const char *) ;
 extern int Ral_TupleCopy(Ral_Tuple, Ral_TupleHeadingIter,

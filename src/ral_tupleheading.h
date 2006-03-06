@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleheading.h,v $
-$Revision: 1.6 $
-$Date: 2006/03/01 02:28:40 $
+$Revision: 1.7 $
+$Date: 2006/03/06 01:07:37 $
  *--
  */
 #ifndef _ral_tupleheading_h_
@@ -112,6 +112,8 @@ FUNCTION DECLARATIONS
 */
 
 extern Ral_TupleHeading Ral_TupleHeadingNew(int) ;
+extern Ral_TupleHeading Ral_TupleHeadingSubset(Ral_TupleHeading,
+    Ral_IntVector) ;
 extern Ral_TupleHeading Ral_TupleHeadingDup(Ral_TupleHeading) ;
 extern void Ral_TupleHeadingDelete(Ral_TupleHeading) ;
 extern void Ral_TupleHeadingReference(Ral_TupleHeading) ;

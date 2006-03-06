@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.h,v $
-$Revision: 1.4 $
-$Date: 2006/03/01 02:28:40 $
+$Revision: 1.5 $
+$Date: 2006/03/06 01:07:37 $
  *--
  */
 #ifndef _ral_relation_h_
@@ -62,6 +62,7 @@ INCLUDE FILES
 #include "ral_relationheading.h"
 #include "ral_tuple.h"
 #include "ral_attribute.h"
+#include "ral_vector.h"
 
 #include <stdio.h>
 
@@ -125,6 +126,33 @@ typedef struct Ral_Relation {
 				     * tables. */
 } *Ral_Relation ;
 
+typedef enum Ral_RelationError {
+    REL_OK,
+    REL_FORMAT_ERR,
+    REL_BAD_KEYWORD,
+    REL_NO_IDENTIFIER,
+    REL_IDENTIFIER_FORMAT,
+    REL_IDENTIFIER_SUBSET,
+    REL_DUP_ATTR_IN_ID,
+    REL_UNKNOWN_ATTR,
+    REL_DUPLICATE_TUPLE,
+    REL_HEADING_NOT_EQUAL,
+    REL_DUPLICATE_ATTR,
+    REL_DEGREE_ONE,
+    REL_CARDINALITY_ONE,
+    REL_BAD_PAIRS_LIST,
+
+
+    REL_HEADING_ERR,
+    REL_BAD_VALUE,
+    REL_WRONG_NUM_ATTRS,
+} Ral_RelationError ;
+
+/*
+DATA DECLARATIONS
+*/
+extern Ral_RelationError Ral_RelationLastError ;
+
 /*
 FUNCTION DECLARATIONS
 */
@@ -157,9 +185,17 @@ extern int Ral_RelationProperSubsetOf(Ral_Relation, Ral_Relation) ;
 extern int Ral_RelationSupersetOf(Ral_Relation, Ral_Relation) ;
 extern int Ral_RelationProperSupersetOf(Ral_Relation, Ral_Relation) ;
 
+extern int Ral_RelationRenameAttribute(Ral_Relation, const char *,
+    const char *) ;
+
 extern Ral_Relation Ral_RelationUnion(Ral_Relation, Ral_Relation) ;
 extern Ral_Relation Ral_RelationIntersect(Ral_Relation, Ral_Relation) ;
 extern Ral_Relation Ral_RelationMinus(Ral_Relation, Ral_Relation) ;
+extern Ral_Relation Ral_RelationTimes(Ral_Relation, Ral_Relation) ;
+extern Ral_Relation Ral_RelationProject(Ral_Relation, Ral_IntVector) ;
+
+extern Ral_Relation Ral_RelationSortAscending(Ral_Relation, Ral_IntVector) ;
+extern Ral_Relation Ral_RelationSortDescending(Ral_Relation, Ral_IntVector) ;
 
 extern int Ral_RelationCopy(Ral_Relation, Ral_RelationIter,
     Ral_RelationIter, Ral_Relation, Ral_IntVector) ;

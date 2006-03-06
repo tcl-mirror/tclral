@@ -43,13 +43,16 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_relationheading.c,v $
-$Revision: 1.5 $
-$Date: 2006/03/01 02:28:40 $
+$Revision: 1.6 $
+$Date: 2006/03/06 01:07:37 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_relationheading.c,v $
+Revision 1.6  2006/03/06 01:07:37  mangoa01
+More relation commands done. Cleaned up error reporting.
+
 Revision 1.5  2006/03/01 02:28:40  mangoa01
 Added new relation commands and test cases. Cleaned up Makefiles.
 
@@ -113,7 +116,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.5 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.6 $" ;
 
 static const char relationKeyword[] = "Relation" ;
 static const char openList = '{' ;
@@ -148,6 +151,84 @@ Ral_RelationHeadingNew(
      */
 
     return heading ;
+}
+
+Ral_RelationHeading
+Ral_RelationHeadingSubset(
+    Ral_RelationHeading heading,
+    Ral_IntVector attrList)
+{
+    Ral_TupleHeading tupleHeading =
+	Ral_TupleHeadingSubset(heading->tupleHeading, attrList) ;
+    int idCount ;
+    Ral_IntVector *idArray = heading->identifiers ;
+    Ral_IntVector foundIds = Ral_IntVectorNewEmpty(heading->idCount) ;
+    int foundCount ;
+    Ral_RelationHeading subHeading ;
+
+    /*
+     * Scan the identifiers to determine if they are retained in the
+     * subset.
+     */
+    for (idCount = 0 ; idCount < heading->idCount ; ++idCount) {
+	Ral_IntVector id = *idArray++ ;
+	if (Ral_IntVectorSubsetOf(id, attrList)) {
+	    Ral_IntVectorPushBack(foundIds, idCount) ;
+	}
+    }
+
+    foundCount = Ral_IntVectorSize(foundIds) ;
+    if (foundCount) {
+	Ral_IntVectorIter end = Ral_IntVectorEnd(foundIds) ;
+	Ral_IntVectorIter attrStart = Ral_IntVectorBegin(attrList) ;
+	Ral_IntVectorIter iter ;
+	/*
+	 * Create a new relation heading to hold the identifiers
+	 * and copy them in.
+	 */
+	subHeading = Ral_RelationHeadingNew(tupleHeading, foundCount) ;
+	idCount = 0 ;
+	for (iter = Ral_IntVectorBegin(foundIds) ; iter != end ; ++iter) {
+	    int idIndex = *iter ;
+	    Ral_IntVector id = heading->identifiers[idIndex] ;
+	    Ral_IntVector newId = Ral_IntVectorDup(id) ;
+	    Ral_IntVectorIter idEnd = Ral_IntVectorEnd(newId) ;
+	    Ral_IntVectorIter idIter ;
+	    int status ;
+	    /*
+	     * Remap new id
+	     */
+	    for (idIter = Ral_IntVectorBegin(newId) ; idIter != idEnd ;
+		++idIter) {
+		Ral_IntVectorIter found = Ral_IntVectorFind(attrList, *idIter) ;
+		assert(found != Ral_IntVectorEnd(attrList)) ;
+		*idIter = found - attrStart ;
+	    }
+	    status = Ral_RelationHeadingAddIdentifier(subHeading, idCount++,
+		newId) ;
+	    assert(status != 0) ;
+	}
+    } else {
+	/*
+	 * None of the identifiers survived the subset, so make all
+	 * the attributes the single identifier.
+	 */
+	int degree = Ral_TupleHeadingSize(tupleHeading) ;
+	Ral_IntVector allId = Ral_IntVectorNewEmpty(degree) ;
+	int i ;
+	int status ;
+
+	for (i = 0 ; i < degree ; ++i) {
+	    Ral_IntVectorPushBack(allId, i) ;
+	}
+	subHeading = Ral_RelationHeadingNew(tupleHeading, 1) ;
+	status = Ral_RelationHeadingAddIdentifier(subHeading, 0, allId) ;
+	assert(status != 0) ;
+    }
+
+    Ral_IntVectorDelete(foundIds) ;
+
+    return subHeading ;
 }
 
 Ral_RelationHeading
@@ -377,7 +458,8 @@ Ral_RelationHeadingUnion(
     int h1Size = Ral_TupleHeadingSize(h1->tupleHeading) ;
     Ral_TupleHeading unionTupleHeading ;
     Ral_RelationHeading unionRelationHeading ;
-    int c1 ;
+    Ral_IntVector *h1Identifiers = h1->identifiers ;
+    int id1Count ;
     int idNum = 0 ;
 
     /*
@@ -394,31 +476,30 @@ Ral_RelationHeadingUnion(
      * of the two component headings.
      */
     unionRelationHeading = Ral_RelationHeadingNew(unionTupleHeading,
-	h1Size * Ral_TupleHeadingSize(h2->tupleHeading)) ;
+	h1->idCount * h2->idCount) ;
 
     /*
      * Loop through the identifiers for the two heading components
      * and compose new identifiers for the union.
      */
-    for (c1 = 0 ; c1 < h1->idCount ; ++c1) {
-	Ral_IntVector h1Id = h1->identifiers[c1] ;
-	int c2 ;
+    for (id1Count = h1->idCount ; id1Count > 0 ; --id1Count) {
+	Ral_IntVector h1Id = *h1Identifiers++ ;
+	Ral_IntVector *h2Identifiers = h2->identifiers ;
+	int id2Count ;
 
-	for (c2 = 0 ; c2 < h2->idCount ; ++c2) {
-	    Ral_IntVector h2Id = h2->identifiers[c2] ;
+	for (id2Count = h2->idCount ; id2Count > 0 ; --id2Count) {
+	    Ral_IntVector h2Id = *h2Identifiers++ ;
 	    Ral_IntVectorIter h2IdIter ;
 	    Ral_IntVectorIter h2IdEnd = Ral_IntVectorEnd(h2Id) ;
 	    Ral_IntVector unionId = Ral_IntVectorNewEmpty(
 		Ral_IntVectorSize(h1Id) + Ral_IntVectorSize(h2Id)) ;
 	    int added ;
-
 	    /*
 	     * Copy the identifier indices from the first header.
 	     * These indices are correct for the union header also.
 	     */
 	    Ral_IntVectorCopy(h1Id, Ral_IntVectorBegin(h1Id),
 		Ral_IntVectorEnd(h1Id), unionId, Ral_IntVectorBegin(unionId)) ;
-
 	    /*
 	     * The identifier indices from the second header must
 	     * be offset by the number of attributes in the first header.
@@ -428,7 +509,6 @@ Ral_RelationHeadingUnion(
 		++h2IdIter) {
 		Ral_IntVectorPushBack(unionId, *h2IdIter + h1Size) ;
 	    }
-
 	    /*
 	     * Add the newly formed identifier.
 	     * It should always add.

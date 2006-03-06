@@ -43,13 +43,16 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_utils.c,v $
-$Revision: 1.2 $
-$Date: 2006/02/20 20:15:10 $
+$Revision: 1.3 $
+$Date: 2006/03/06 01:07:37 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_utils.c,v $
+Revision 1.3  2006/03/06 01:07:37  mangoa01
+More relation commands done. Cleaned up error reporting.
+
 Revision 1.2  2006/02/20 20:15:10  mangoa01
 Now able to convert strings to relations and vice versa including
 tuple and relation valued attributes.
@@ -97,7 +100,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_utils.c,v $ $Revision: 1.2 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_utils.c,v $ $Revision: 1.3 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -106,15 +109,10 @@ FUNCTION DEFINITIONS
 /*
  * Ral_ObjEqual
 
- * Compare two objects. The comparison is based on comparing the string
+ * Compare two Tcl objects. The comparison is based on comparing the string
  * representation of the objects.
 
  * Returns 1 if the objects are equal, 0 otherwise.
- */
-
-/*
- * There's a problem here. Tuples and relations cannot compared based
- * on their string representations.
  */
 
 int

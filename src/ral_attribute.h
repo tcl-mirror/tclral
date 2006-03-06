@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.h,v $
-$Revision: 1.5 $
-$Date: 2006/02/26 04:57:53 $
+$Revision: 1.6 $
+$Date: 2006/03/06 01:07:37 $
  *--
  */
 #ifndef _ral_attribute_h_
@@ -147,6 +147,7 @@ extern void Ral_AttributeDelete(Ral_Attribute) ;
 extern Ral_Attribute Ral_AttributeDup(Ral_Attribute) ;
 extern Ral_Attribute Ral_AttributeRename(Ral_Attribute, const char *) ;
 extern int Ral_AttributeEqual(Ral_Attribute, Ral_Attribute) ;
+extern int Ral_AttributeValueEqual(Ral_Attribute, Tcl_Obj *, Tcl_Obj *) ;
 extern int Ral_AttributeScanName(Ral_Attribute, Ral_AttributeTypeScanFlags *) ;
 extern int Ral_AttributeConvertName(Ral_Attribute, char *,
     Ral_AttributeTypeScanFlags *) ;

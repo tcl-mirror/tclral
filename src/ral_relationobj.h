@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationobj.h,v $
-$Revision: 1.4 $
-$Date: 2006/03/01 02:28:40 $
+$Revision: 1.5 $
+$Date: 2006/03/06 01:07:37 $
  *--
  */
 #ifndef _ral_relationobj_h_
@@ -75,24 +75,6 @@ FORWARD CLASS REFERENCES
 /*
 TYPE DECLARATIONS
 */
-typedef enum Ral_RelationError {
-    REL_FORMAT_ERR,
-    REL_BAD_KEYWORD,
-    REL_NO_IDENTIFIER,
-    REL_IDENTIFIER_FORMAT,
-    REL_IDENTIFIER_SUBSET,
-    REL_DUP_ATTR_IN_ID,
-    REL_UNKNOWN_ATTR,
-    REL_DUPLICATE_TUPLE,
-    REL_HEADING_NOT_EQUAL,
-
-
-    REL_HEADING_ERR,
-    REL_DUPLICATE_ATTR,
-    REL_BAD_VALUE,
-    REL_WRONG_NUM_ATTRS,
-    REL_BAD_PAIRS_LIST,
-} Ral_RelationError ;
 
 /*
 EXTERNAL DATA REFERENCES

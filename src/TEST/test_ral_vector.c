@@ -17,7 +17,7 @@ main(
     Ral_IntVector v3 ;
     Ral_IntVectorIter i ;
 
-    logInfo("testing ral_vector version %s", Ral_IntVectorVersion()) ;
+    logInfo("testing ral_vector version %s", Ral_VectorVersion()) ;
 
     logInfo("creating vector, \"v1\", of %d %d's", v1Size, v1Fill) ;
     v1 = Ral_IntVectorNew(v1Size, v1Fill) ;

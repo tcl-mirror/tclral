@@ -43,13 +43,16 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_relationobj.c,v $
-$Revision: 1.4 $
-$Date: 2006/03/01 02:28:40 $
+$Revision: 1.5 $
+$Date: 2006/03/06 01:07:37 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_relationobj.c,v $
+Revision 1.5  2006/03/06 01:07:37  mangoa01
+More relation commands done. Cleaned up error reporting.
+
 Revision 1.4  2006/03/01 02:28:40  mangoa01
 Added new relation commands and test cases. Cleaned up Makefiles.
 
@@ -126,7 +129,7 @@ Tcl_ObjType Ral_RelationObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.4 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.5 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -360,6 +363,7 @@ Ral_RelationObjSetError(
      * enumeration.
      */
     static const char *resultStrings[] = {
+	"no error",
 	"bad relation value format",
 	"bad relation type keyword",
 	"relations of non-zero degree must have at least one identifier",
@@ -369,14 +373,17 @@ Ral_RelationObjSetError(
 	"unknown attribute name",
 	"duplicate tuple",
 	"headings not equal",
+	"duplicate attribute name",
+	"relation must have degree of one",
+	"relation must have cardinality of one",
+	"bad list of pairs"
 
 	"bad relation heading format",
-	"duplicate attribute name",
 	"bad value type for value",
 	"wrong number of attributes specified",
-	"bad list of pairs"
     } ;
     static const char *errorStrings[] = {
+	"OK",
 	"FORMAT_ERR",
 	"BAD_KEYWORD",
 	"NO_IDENTIFIER",
@@ -386,12 +393,14 @@ Ral_RelationObjSetError(
 	"UNKNOWN_ATTR",
 	"DUPLICATE_TUPLE",
 	"HEADING_NOT_EQUAL",
+	"DUPLICATE_ATTR",
+	"DEGREE_ONE",
+	"CARDINALITY_ONE",
+	"BAD_PAIRS_LIST",
 
 	"HEADING_ERR",
-	"DUPLICATE_ATTR",
 	"BAD_VALUE",
 	"WRONG_NUM_ATTRS",
-	"BAD_PAIRS_LIST",
     } ;
 
     Ral_ObjSetError(interp, "RELATION", resultStrings[error],

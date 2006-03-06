@@ -43,13 +43,16 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.3 $
-$Date: 2006/03/01 02:28:40 $
+$Revision: 1.4 $
+$Date: 2006/03/06 01:07:37 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_relationcmd.c,v $
+Revision 1.4  2006/03/06 01:07:37  mangoa01
+More relation commands done. Cleaned up error reporting.
+
 Revision 1.3  2006/03/01 02:28:40  mangoa01
 Added new relation commands and test cases. Cleaned up Makefiles.
 
@@ -77,6 +80,7 @@ INCLUDE FILES
 #include "tcl.h"
 #include "ral_relation.h"
 #include "ral_relationobj.h"
+#include "ral_tupleobj.h"
 
 /*
 MACRO DEFINITIONS
@@ -133,7 +137,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.3 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.4 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -275,7 +279,40 @@ RelationEliminateCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
-    return TCL_ERROR ;
+    Tcl_Obj *relObj ;
+    Ral_Relation relation ;
+    Ral_IntVector elimAttrs ;
+    Ral_IntVector projAttrs ;
+    Ral_Relation projRel ;
+
+    /* relation eliminate relationValue ?attr ... ? */
+    if (objc < 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relationValue ?attr ... ?") ;
+	return TCL_ERROR ;
+    }
+    relObj = *(objv + 2) ;
+    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relObj->internalRep.otherValuePtr ;
+
+    objc -= 3 ;
+    objv += 3 ;
+
+    elimAttrs = Ral_TupleHeadingAttrsFromVect(relation->heading->tupleHeading,
+	interp, objc, objv) ;
+    if (elimAttrs == NULL) {
+	return TCL_ERROR ;
+    }
+    projAttrs = Ral_IntVectorSetComplement(elimAttrs,
+	Ral_RelationDegree(relation)) ;
+    Ral_IntVectorDelete(elimAttrs) ;
+
+    projRel = Ral_RelationProject(relation, projAttrs) ;
+    Ral_IntVectorDelete(projAttrs) ;
+    Tcl_SetObjResult(interp, Ral_RelationObjNew(projRel)) ;
+
+    return TCL_OK ;
 }
 
 static int
@@ -299,9 +336,9 @@ RelationEmptyofCmd(
     relation = relationObj->internalRep.otherValuePtr ;
 
     /*
-     * An empty version of a relation is obtain by creating a new relation from
-     * the heading of the old one and making the new relation into an object.
-     * Since relation headings are reference counted this works.
+     * An empty version of a relation is obtained by creating a new relation
+     * from the heading of the old one and making the new relation into an
+     * object.  Since relation headings are reference counted this works.
      */
     Tcl_SetObjResult(interp,
 	Ral_RelationObjNew(Ral_RelationNew(relation->heading))) ;
@@ -323,7 +360,133 @@ RelationForeachCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
-    return TCL_ERROR ;
+    enum Ordering {
+	SORT_ASCENDING,
+	SORT_DESCENDING
+    } ;
+    static const char *orderKeyWords[] = {
+	"ascending",
+	"descending",
+	NULL
+    } ;
+
+    Tcl_Obj *varNameObj ;
+    Tcl_Obj *relObj ;
+    Tcl_Obj *scriptObj ;
+    Ral_Relation relation ;
+    Ral_Relation sortedRel ;
+    Ral_RelationIter relIter ;
+    Ral_RelationIter relEnd ;
+    int result = TCL_OK ;
+
+    /*
+     * relation foreach tupleVarName relationValue ?ascending | descending?
+     * ?attr-list? script
+     */
+    if (objc < 5 || objc > 7) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+	    "tupleVarName relationValue ?ascending | descending? ?attr-list?"
+	    "script") ;
+	return TCL_ERROR ;
+    }
+
+    varNameObj = objv[2] ;
+    relObj = objv[3] ;
+
+    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relObj->internalRep.otherValuePtr ;
+
+    if (objc == 5) {
+	/*
+	 * No order specified.
+	 */
+	sortedRel = relation ;
+	scriptObj = objv[4] ;
+    } else if (objc == 6) {
+	Ral_IntVector sortAttrs = Ral_TupleHeadingAttrsFromObj(
+	    relation->heading->tupleHeading, interp, objv[4]) ;
+	if (sortAttrs == NULL) {
+	    return TCL_ERROR ;
+	}
+	sortedRel = Ral_RelationSortAscending(relation, sortAttrs) ;
+	Ral_IntVectorDelete(sortAttrs) ;
+	scriptObj = objv[5] ;
+    } else /* objc == 7 */ {
+	int index ;
+	Ral_IntVector sortAttrs ;
+
+	if (Tcl_GetIndexFromObj(interp, objv[4], orderKeyWords, "ordering", 0,
+	    &index) != TCL_OK) {
+	    return TCL_ERROR ;
+	}
+	sortAttrs = Ral_TupleHeadingAttrsFromObj(
+	    relation->heading->tupleHeading, interp, objv[5]) ;
+	if (sortAttrs == NULL) {
+	    return TCL_ERROR ;
+	}
+	sortedRel = index == SORT_ASCENDING ?
+	    Ral_RelationSortAscending(relation, sortAttrs) :
+	    Ral_RelationSortDescending(relation, sortAttrs) ;
+	Ral_IntVectorDelete(sortAttrs) ;
+	scriptObj = objv[6] ;
+    }
+
+    /*
+     * Hang onto these objects in case something strange happens in
+     * the script execution.
+     */
+    Tcl_IncrRefCount(varNameObj) ;
+    Tcl_IncrRefCount(relObj) ;
+    Tcl_IncrRefCount(scriptObj) ;
+
+    Tcl_ResetResult(interp) ;
+
+    relEnd = Ral_RelationEnd(sortedRel) ;
+    for (relIter = Ral_RelationBegin(sortedRel) ;
+	relIter != relEnd ; ++relIter) {
+	Tcl_Obj *tupleObj ;
+
+	tupleObj = Ral_TupleObjNew(*relIter) ;
+	if (Tcl_ObjSetVar2(interp, varNameObj, NULL, tupleObj,
+	    TCL_LEAVE_ERR_MSG) == NULL) {
+	    Tcl_DecrRefCount(tupleObj) ;
+	    result = TCL_ERROR ;
+	    break; 
+	}
+
+	result = Tcl_EvalObjEx(interp, scriptObj, 0) ;
+	if (result != TCL_OK) {
+	    if (result == TCL_CONTINUE) {
+		result = TCL_OK ;
+	    } else if (result == TCL_BREAK) {
+		result = TCL_OK ;
+		break ;
+	    } else if (result == TCL_ERROR) {
+		static const char msgfmt[] =
+		    "\n    (\"relation foreach\" body line %d)" ;
+		char msg[sizeof(msgfmt) + TCL_INTEGER_SPACE] ;
+		sprintf(msg, msgfmt, interp->errorLine) ;
+		Tcl_AddObjErrorInfo(interp, msg, -1) ;
+		break ;
+	    } else {
+		break ;
+	    }
+	}
+    }
+
+    if (Ral_RelationCardinality(sortedRel)) {
+	Tcl_UnsetVar(interp, Tcl_GetString(varNameObj), 0) ;
+    }
+    if (sortedRel != relation) {
+	Ral_RelationDelete(sortedRel) ;
+    }
+    Tcl_DecrRefCount(varNameObj) ;
+    Tcl_DecrRefCount(relObj) ;
+    Tcl_DecrRefCount(scriptObj) ;
+
+    return result ;
 }
 
 static int
@@ -621,7 +784,42 @@ RelationListCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
-    return TCL_ERROR ;
+    /* relation list relationValue */
+    Tcl_Obj *relObj ;
+    Ral_Relation relation ;
+    Tcl_Obj *listObj ;
+    Ral_RelationIter iter ;
+    Ral_RelationIter end ;
+
+    if (objc != 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relationValue") ;
+	return TCL_ERROR ;
+    }
+
+    relObj = objv[2] ;
+    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relObj->internalRep.otherValuePtr ;
+    if (Ral_RelationDegree(relation) != 1) {
+	Ral_RelationObjSetError(interp, REL_DEGREE_ONE, Tcl_GetString(relObj)) ;
+	return TCL_ERROR ;
+    }
+
+    listObj = Tcl_NewListObj(0, NULL) ;
+    end = Ral_RelationEnd(relation) ;
+    for (iter = Ral_RelationBegin(relation) ; iter != end ; ++iter) {
+	Ral_Tuple tuple = *iter ;
+
+	if (Tcl_ListObjAppendElement(interp, listObj, *tuple->values)
+	    != TCL_OK) {
+	    Tcl_DecrRefCount(listObj) ;
+	    return TCL_ERROR ;
+	}
+    }
+
+    Tcl_SetObjResult(interp, listObj) ;
+    return TCL_OK ;
 }
 
 static int
@@ -642,13 +840,13 @@ RelationMinusCmd(
 	return TCL_ERROR ;
     }
 
-    r1Obj = *(objv + 2) ;
+    r1Obj = objv[2] ;
     if (Tcl_ConvertToType(interp, r1Obj, &Ral_RelationObjType) != TCL_OK) {
 	return TCL_ERROR ;
     }
     r1 = r1Obj->internalRep.otherValuePtr ;
 
-    r2Obj = *(objv + 3) ;
+    r2Obj = objv[3] ;
     if (Tcl_ConvertToType(interp, r2Obj, &Ral_RelationObjType) != TCL_OK) {
 	return TCL_ERROR ;
     }
@@ -671,7 +869,36 @@ RelationProjectCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
-    return TCL_ERROR ;
+    Tcl_Obj *relObj ;
+    Ral_Relation relation ;
+    Ral_IntVector projAttrs ;
+    Ral_Relation projRel ;
+
+    /* relation project relationValue ?attr ... ? */
+    if (objc < 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relationValue ?attr ... ?") ;
+	return TCL_ERROR ;
+    }
+    relObj = *(objv + 2) ;
+    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relObj->internalRep.otherValuePtr ;
+
+    objc -= 3 ;
+    objv += 3 ;
+
+    projAttrs = Ral_TupleHeadingAttrsFromVect(relation->heading->tupleHeading,
+	interp, objc, objv) ;
+    if (projAttrs == NULL) {
+	return TCL_ERROR ;
+    }
+
+    projRel = Ral_RelationProject(relation, projAttrs) ;
+    Ral_IntVectorDelete(projAttrs) ;
+    Tcl_SetObjResult(interp, Ral_RelationObjNew(projRel)) ;
+
+    return TCL_OK ;
 }
 
 static int
@@ -680,7 +907,44 @@ RelationRenameCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
-    return TCL_ERROR ;
+    Tcl_Obj *relObj ;
+    Ral_Relation relation ;
+    Ral_Relation newRelation ;
+
+    /* relation rename relationValue ?oldname newname ... ? */
+    if (objc < 3) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+	    "relationValue ?oldname newname ... ?") ;
+	return TCL_ERROR ;
+    }
+
+    relObj = objv[2] ;
+    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relObj->internalRep.otherValuePtr ;
+
+    objc -= 3 ;
+    objv += 3 ;
+    if (objc % 2 != 0) {
+	Ral_RelationObjSetError(interp, REL_BAD_PAIRS_LIST,
+	    "oldname / newname arguments must be given in pairs") ;
+	return TCL_ERROR ;
+    }
+
+    newRelation = Ral_RelationDup(relation) ;
+    for ( ; objc > 0 ; objc -= 2, objv += 2) {
+	if (!Ral_RelationRenameAttribute(newRelation, Tcl_GetString(objv[0]),
+	    Tcl_GetString(objv[1]))) {
+	    Ral_RelationObjSetError(interp, REL_DUPLICATE_ATTR,
+		Tcl_GetString(objv[1])) ;
+	    Ral_RelationDelete(newRelation) ;
+	    return TCL_ERROR ;
+	}
+    }
+
+    Tcl_SetObjResult(interp, Ral_RelationObjNew(newRelation)) ;
+    return TCL_OK ;
 }
 
 static int
@@ -689,6 +953,65 @@ RelationRestrictCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
+    Tcl_Obj *relObj ;
+    Ral_Relation relation ;
+    Tcl_Obj *exprObj ;
+    Tcl_Obj *varNameObj ;
+    Ral_Relation newRelation ;
+    Ral_RelationIter iter ;
+    Ral_RelationIter end ;
+
+    /* relation restrict relValue tupleVarName expr */
+    if (objc != 5) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relValue tupleVarName expr") ;
+	return TCL_ERROR ;
+    }
+
+    relObj = objv[2] ;
+    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relObj->internalRep.otherValuePtr ;
+    varNameObj = objv[3] ;
+    exprObj = objv[4] ;
+
+    newRelation = Ral_RelationNew(relation->heading) ;
+
+    Tcl_IncrRefCount(exprObj) ;
+    Tcl_IncrRefCount(varNameObj) ;
+
+    end = Ral_RelationEnd(relation) ;
+    for (iter = Ral_RelationBegin(relation) ; iter != end ; ++iter) {
+	Ral_Tuple tuple = *iter ;
+	Tcl_Obj *tupleObj = Ral_TupleObjNew(tuple) ;
+	int boolValue ;
+
+	if (Tcl_ObjSetVar2(interp, varNameObj, NULL, tupleObj,
+	    TCL_LEAVE_ERR_MSG) == NULL) {
+	    goto errorOut ;
+	}
+
+	if (Tcl_ExprBooleanObj(interp, exprObj, &boolValue) != TCL_OK) {
+	    goto errorOut ;
+	}
+	if (boolValue) {
+	    int inserted ;
+	    inserted = Ral_RelationPushBack(newRelation, tuple, NULL) ;
+	    assert(inserted != 0) ;
+	}
+    }
+
+    Tcl_UnsetVar(interp, Tcl_GetString(varNameObj), 0) ;
+    Tcl_DecrRefCount(exprObj) ;
+    Tcl_DecrRefCount(varNameObj) ;
+    Tcl_SetObjResult(interp, Ral_RelationObjNew(newRelation)) ;
+    return TCL_OK ;
+
+errorOut:
+    Tcl_UnsetVar(interp, Tcl_GetString(varNameObj), 0) ;
+    Tcl_DecrRefCount(exprObj) ;
+    Tcl_DecrRefCount(varNameObj) ;
+    Ral_RelationDelete(newRelation) ;
     return TCL_ERROR ;
 }
 
@@ -734,7 +1057,65 @@ RelationTimesCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
-    return TCL_ERROR ;
+    Tcl_Obj *r1Obj ;
+    Tcl_Obj *r2Obj ;
+    Ral_Relation r1 ;
+    Ral_Relation r2 ;
+    Ral_Relation prodRel ;
+
+    /* relation times relation1 relation2 ? ... ? */
+    if (objc < 4) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+	    "relation1 relation2 ?relation3 ...?") ;
+	return TCL_ERROR ;
+    }
+
+    r1Obj = *(objv + 2) ;
+    if (Tcl_ConvertToType(interp, r1Obj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    r1 = r1Obj->internalRep.otherValuePtr ;
+
+    r2Obj = *(objv + 3) ;
+    if (Tcl_ConvertToType(interp, r2Obj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    r2 = r2Obj->internalRep.otherValuePtr ;
+
+    prodRel = Ral_RelationTimes(r1, r2) ;
+    if (prodRel == NULL) {
+	Ral_RelationObjSetError(interp, REL_DUPLICATE_ATTR,
+	    Tcl_GetString(r2Obj)) ;
+	return TCL_ERROR ;
+    }
+
+    /*
+     * Increment past the first two relations and perform the multiplication
+     * on the remaining values.
+     */
+    objc -= 4 ;
+    objv += 4 ;
+    while (objc-- > 0) {
+	r1 = prodRel ;
+
+	r2Obj = *objv++ ;
+	if (Tcl_ConvertToType(interp, r2Obj, &Ral_RelationObjType) != TCL_OK) {
+	    Ral_RelationDelete(r1) ;
+	    return TCL_ERROR ;
+	}
+	r2 = r2Obj->internalRep.otherValuePtr ;
+
+	prodRel = Ral_RelationTimes(r1, r2) ;
+	Ral_RelationDelete(r1) ;
+	if (prodRel == NULL) {
+	    Ral_RelationObjSetError(interp, REL_DUPLICATE_ATTR,
+		Tcl_GetString(r2Obj)) ;
+	    return TCL_ERROR ;
+	}
+    }
+
+    Tcl_SetObjResult(interp, Ral_RelationObjNew(prodRel)) ;
+    return TCL_OK ;
 }
 
 static int
@@ -743,7 +1124,28 @@ RelationTupleCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
-    return TCL_ERROR ;
+    /* relation tuple relationValue */
+    Tcl_Obj *relObj ;
+    Ral_Relation relation ;
+
+    if (objc != 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relationValue") ;
+	return TCL_ERROR ;
+    }
+
+    relObj = *(objv + 2) ;
+    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relObj->internalRep.otherValuePtr ;
+    if (Ral_RelationCardinality(relation) != 1) {
+	Ral_RelationObjSetError(interp, REL_CARDINALITY_ONE,
+	    Tcl_GetString(relObj)) ;
+	return TCL_ERROR ;
+    }
+
+    Tcl_SetObjResult(interp, Ral_TupleObjNew(*Ral_RelationBegin(relation))) ;
+    return TCL_OK ;
 }
 
 static int

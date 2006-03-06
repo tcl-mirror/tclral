@@ -43,13 +43,16 @@ terms specified in this license.
 MODULE:
 
 $RCSfile: ral_attribute.c,v $
-$Revision: 1.5 $
-$Date: 2006/02/26 04:57:53 $
+$Revision: 1.6 $
+$Date: 2006/03/06 01:07:37 $
 
 ABSTRACT:
 
 MODIFICATION HISTORY:
 $Log: ral_attribute.c,v $
+Revision 1.6  2006/03/06 01:07:37  mangoa01
+More relation commands done. Cleaned up error reporting.
+
 Revision 1.5  2006/02/26 04:57:53  mangoa01
 Reworked the conversion from internal form to a string yet again.
 This design is better and more recursive in nature.
@@ -85,6 +88,7 @@ INCLUDE FILES
 #include <string.h>
 #include <assert.h>
 #include "ral_attribute.h"
+#include "ral_utils.h"
 #include "ral_tupleheading.h"
 #include "ral_relationheading.h"
 #include "ral_tupleobj.h"
@@ -119,7 +123,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList[] = "{" ;
 static const char closeList[] = "}" ;
-static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.5 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.6 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -269,6 +273,22 @@ void
 Ral_AttributeDelete(
     Ral_Attribute a)
 {
+    switch (a->attrType) {
+    case Tcl_Type:
+	break ;
+
+    case Tuple_Type:
+	Ral_TupleHeadingUnreference(a->tupleHeading) ;
+	break ;
+
+    case Relation_Type:
+	Ral_RelationHeadingUnreference(a->relationHeading) ;
+	break ;
+
+    default:
+	Tcl_Panic("Ral_AttributeDelete: unknown attribute type: %d",
+	    a->attrType) ;
+    }
     ckfree((char *)a) ;
 }
 
@@ -276,22 +296,26 @@ Ral_Attribute
 Ral_AttributeDup(
     Ral_Attribute a)
 {
+    Ral_Attribute newAttr ;
+
     switch (a->attrType) {
     case Tcl_Type:
-	return Ral_AttributeNewTclType(a->name, a->tclType) ;
+	newAttr = Ral_AttributeNewTclType(a->name, a->tclType) ;
+	break ;
 
     case Tuple_Type:
-	return Ral_AttributeNewTupleType(a->name, a->tupleHeading) ;
+	newAttr = Ral_AttributeNewTupleType(a->name, a->tupleHeading) ;
+	break ;
 
     case Relation_Type:
-	return Ral_AttributeNewRelationType(a->name, a->relationHeading) ;
+	newAttr = Ral_AttributeNewRelationType(a->name, a->relationHeading) ;
+	break ;
 
     default:
 	Tcl_Panic("Ral_AttributeDup: unknown attribute type: %d",
 	    a->attrType) ;
     }
-    /* Not reached */
-    return NULL ;
+    return newAttr ;
 }
 
 Ral_Attribute
@@ -348,6 +372,40 @@ Ral_AttributeEqual(
     default:
 	Tcl_Panic("Ral_AttributeEqual: unknown attribute type: %d",
 	    a1->attrType) ;
+    }
+    /* Not reached */
+    return 1 ;
+}
+
+int
+Ral_AttributeValueEqual(
+    Ral_Attribute a,
+    Tcl_Obj *v1,
+    Tcl_Obj *v2)
+{
+    switch (a->attrType) {
+    case Tcl_Type:
+	return Ral_ObjEqual(v1, v2) ;
+
+    case Tuple_Type:
+	if (Tcl_ConvertToType(NULL, v1, &Ral_TupleObjType) != TCL_OK ||
+	    Tcl_ConvertToType(NULL, v2, &Ral_TupleObjType) != TCL_OK) {
+	    Tcl_Panic("Ral_AttributeValueEqual: cannot convert to tuple") ;
+	}
+	return Ral_TupleEqual(v1->internalRep.otherValuePtr,
+	    v2->internalRep.otherValuePtr) ;
+
+    case Relation_Type:
+	if (Tcl_ConvertToType(NULL, v1, &Ral_RelationObjType) != TCL_OK ||
+	    Tcl_ConvertToType(NULL, v2, &Ral_RelationObjType) != TCL_OK) {
+	    Tcl_Panic("Ral_AttributeValueEqual: cannot convert to relation") ;
+	}
+	return Ral_RelationEqual(v1->internalRep.otherValuePtr,
+	    v2->internalRep.otherValuePtr) ;
+
+    default:
+	Tcl_Panic("Ral_AttributeValueEqual: unknown attribute type: %d",
+	    a->attrType) ;
     }
     /* Not reached */
     return 1 ;

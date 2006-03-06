@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_vector.h,v $
-$Revision: 1.3 $
-$Date: 2006/02/20 20:15:11 $
+$Revision: 1.4 $
+$Date: 2006/03/06 01:07:37 $
  *--
  */
 #ifndef _ral_vector_h_
@@ -81,6 +81,14 @@ typedef struct Ral_IntVector {
     Ral_IntVectorIter endStorage ;
 } *Ral_IntVector ;
 
+typedef void *Ral_PtrVectorValueType ;
+typedef Ral_PtrVectorValueType *Ral_PtrVectorIter ;
+typedef struct Ral_PtrVector {
+    Ral_PtrVectorIter start ;
+    Ral_PtrVectorIter finish ;
+    Ral_PtrVectorIter endStorage ;
+} *Ral_PtrVector ;
+
 /*
 FUNCTION DECLARATIONS
 */
@@ -113,6 +121,7 @@ extern Ral_IntVectorIter Ral_IntVectorErase(Ral_IntVector, Ral_IntVectorIter,
     Ral_IntVectorIter) ;
 
 extern int Ral_IntVectorSetAdd(Ral_IntVector, Ral_IntVectorValueType) ;
+extern Ral_IntVector Ral_IntVectorSetComplement(Ral_IntVector, int) ;
 
 extern void Ral_IntVectorSort(Ral_IntVector) ;
 extern Ral_IntVectorIter Ral_IntVectorFind(Ral_IntVector,
@@ -123,7 +132,47 @@ extern Ral_IntVectorIter Ral_IntVectorCopy(Ral_IntVector, Ral_IntVectorIter,
     Ral_IntVectorIter, Ral_IntVector, Ral_IntVectorIter) ;
 
 extern const char *Ral_IntVectorPrint(Ral_IntVector, Ral_IntVectorIter) ;
-extern const char *Ral_IntVectorVersion(void) ;
+
+extern Ral_PtrVector Ral_PtrVectorNew(int) ;
+extern Ral_PtrVector Ral_PtrVectorDup(Ral_PtrVector) ;
+extern void Ral_PtrVectorDelete(Ral_PtrVector) ;
+
+extern Ral_PtrVectorIter Ral_PtrVectorBegin(Ral_PtrVector) ;
+extern Ral_PtrVectorIter Ral_PtrVectorEnd(Ral_PtrVector) ;
+
+extern int Ral_PtrVectorSize(Ral_PtrVector) ;
+extern int Ral_PtrVectorCapacity(Ral_PtrVector) ;
+extern void Ral_PtrVectorReserve(Ral_PtrVector, int) ;
+
+extern int Ral_PtrVectorEmpty(Ral_PtrVector) ;
+extern void Ral_PtrVectorFill(Ral_PtrVector, Ral_PtrVectorValueType) ;
+
+extern Ral_PtrVectorValueType Ral_PtrVectorFetch(Ral_PtrVector, int) ;
+extern void Ral_PtrVectorStore(Ral_PtrVector, int,
+    Ral_PtrVectorValueType) ;
+extern Ral_PtrVectorValueType Ral_PtrVectorFront(Ral_PtrVector) ;
+extern Ral_PtrVectorValueType Ral_PtrVectorBack(Ral_PtrVector) ;
+extern void Ral_PtrVectorPushBack(Ral_PtrVector, Ral_PtrVectorValueType) ;
+extern void Ral_PtrVectorPopBack(Ral_PtrVector) ;
+extern Ral_PtrVectorIter Ral_PtrVectorInsert(Ral_PtrVector, Ral_PtrVectorIter,
+    int, Ral_PtrVectorValueType) ;
+extern Ral_PtrVectorIter Ral_PtrVectorErase(Ral_PtrVector, Ral_PtrVectorIter,
+    Ral_PtrVectorIter) ;
+
+extern int Ral_PtrVectorSetAdd(Ral_PtrVector, Ral_PtrVectorValueType) ;
+
+extern void Ral_PtrVectorSort(Ral_PtrVector) ;
+extern Ral_PtrVectorIter Ral_PtrVectorFind(Ral_PtrVector,
+    Ral_PtrVectorValueType) ;
+extern int Ral_PtrVectorEqual(Ral_PtrVector, Ral_PtrVector) ;
+extern int Ral_PtrVectorSubsetOf(Ral_PtrVector, Ral_PtrVector) ;
+extern Ral_PtrVectorIter Ral_PtrVectorCopy(Ral_PtrVector, Ral_PtrVectorIter,
+    Ral_PtrVectorIter, Ral_PtrVector, Ral_PtrVectorIter) ;
+
+extern const char *Ral_PtrVectorPrint(Ral_PtrVector, Ral_PtrVectorIter) ;
+
+
+extern const char *Ral_VectorVersion(void) ;
 
 
 #endif /* _ral_vector_h_ */

@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.5 $
-# $Date: 2006/03/01 02:28:40 $
+# $Revision: 1.6 $
+# $Date: 2006/03/06 01:07:37 $
 #  *--
 
 package require tcltest 2.2
@@ -62,9 +62,20 @@ set env(LD_LIBRARY_PATH) [file normalize ..]:/usr/local/ActiveTcl/lib
 set ::auto_path [linsert $::auto_path 0 [file normalize ..]]
 package require ral 0.8
 
+proc tupleMatch {expected actual} {
+    return [::ral::tuple equal $expected $actual]
+}
+
+proc relationMatch {expected actual} {
+    return [::ral::relation is $expected == $actual]
+}
+
 namespace eval ::ral::test {
     namespace import ::tcltest::*
     namespace import ::ral::*
+
+    customMatch tuple tupleMatch
+    customMatch relation relationMatch
 
     set S {
 	Relation
@@ -205,12 +216,12 @@ namespace eval ::ral::test {
     # tuple create subcommand
     test tuple-create-1.0 {single attribute} -body {
 	tuple create {Name string} {Name Andrew}
-    } -result {Tuple {Name string} {Name Andrew}}
+    } -result {Tuple {Name string} {Name Andrew}} -match tuple
 
     test tuple-create-2.0 {multiple attributes} -body {
 	set h {Name string Age int}
 	tuple create $h {Name Andrew Age 20}
-    } -result {Tuple {Name string Age int} {Name Andrew Age 20}}
+    } -result {Tuple {Name string Age int} {Name Andrew Age 20}} -match tuple
 
     test tuple-create-3.0 {bad format} -body {
 	set h {Name string Age int}
@@ -239,7 +250,7 @@ namespace eval ::ral::test {
 
     test tuple-create-8.0 {empty tuple} -body {
 	tuple create {} {}
-    } -result {Tuple {} {}}
+    } -result {Tuple {} {}} -match tuple
 
     # tuple degree subcommand
     test tuple-degree-1.0 {single attribute} -body {
@@ -326,13 +337,13 @@ namespace eval ::ral::test {
     test tuple-extend-1.0 {single attribute} -body {
 	set t {Tuple {Name string} {Name Andrew}}
 	tuple extend $t {Age int 20}
-    } -result {Tuple {Name string Age int} {Name Andrew Age 20}}
+    } -result {Tuple {Name string Age int} {Name Andrew Age 20}} -match tuple
 
     test tuple-extend-2.0 {multiple attributes} -body {
 	set t {Tuple {Name string} {Name Andrew}}
 	tuple extend $t {Age int 20} {Size double 1.3}
     } -result {Tuple {Name string Age int Size double}\
-	{Name Andrew Age 20 Size 1.3}}
+	{Name Andrew Age 20 Size 1.3}} -match tuple
 
     test tuple-extend-3.0 {duplicate name} -body {
 	set t {Tuple {Name string} {Name Andrew}}
@@ -395,23 +406,23 @@ namespace eval ::ral::test {
     test tuple-project-1.0 {single attribute} -body {
 	set t {Tuple {Name string} {Name Andrew}}
 	tuple project $t Name
-    } -result {Tuple {Name string} {Name Andrew}}
+    } -result {Tuple {Name string} {Name Andrew}} -match tuple
 
     test tuple-project-2.0 {multiple attributes} -body {
 	set t {Tuple {Name string Age int Size double}\
 	    {Name Andrew Age 20 Size 1.3}}
 	tuple project $t Name Age
-    } -result {Tuple {Name string Age int} {Name Andrew Age 20}}
+    } -result {Tuple {Name string Age int} {Name Andrew Age 20}} -match tuple
 
     test tuple-project-3.0 {project nothing} -body {
 	set t {Tuple {Name string Age int} {Name Andrew Age 20}}
 	tuple project $t
-    } -result {Tuple {} {}}
+    } -result {Tuple {} {}} -match tuple
 
     test tuple-project-4.0 {project everything} -body {
 	set t {Tuple {Name string Age int} {Name Andrew Age 20}}
 	tuple project $t Name Age
-    } -result {Tuple {Name string Age int} {Name Andrew Age 20}}
+    } -result {Tuple {Name string Age int} {Name Andrew Age 20}} -match tuple
 
     test tuple-project-5.0 {unknown attribute} -body {
 	set t {Tuple {Name string Age int} {Name Andrew Age 20}}
@@ -423,13 +434,13 @@ namespace eval ::ral::test {
 	set t [tuple create {Name string} {Name Andrew}]
     } -body {
 	tuple rename $t Name Age
-    } -result {Tuple {Age string} {Age Andrew}}
+    } -result {Tuple {Age string} {Age Andrew}} -match tuple
 
     test tuple-rename-2.0 {multiple attributes} -setup {
 	set t [tuple create {Name string Age int} {Name Andrew Age 20}]
     } -body {
 	tuple rename $t Name foo
-    } -result {Tuple {foo string Age int} {foo Andrew Age 20}}
+    } -result {Tuple {foo string Age int} {foo Andrew Age 20}} -match tuple
 
     test tuple-rename-3.0 {unknown attribute} -setup {
 	set t [tuple create {Name string Age int} {Name Andrew Age 20}]
@@ -448,13 +459,13 @@ namespace eval ::ral::test {
 	set t [tuple create {Name string Age int} {Name Andrew Age 20}]
     } -body {
 	tuple rename $t Age bar Name foo
-    } -result {Tuple {foo string bar int} {foo Andrew bar 20}}
+    } -result {Tuple {foo string bar int} {foo Andrew bar 20}} -match tuple
 
     test tuple-rename-6.0 {same attribute, multiple renamings} -setup {
 	set t [tuple create {Name string Age int} {Name Andrew Age 20}]
     } -body {
 	tuple rename $t Name foo foo bar bar baz
-    } -result {Tuple {baz string Age int} {baz Andrew Age 20}}
+    } -result {Tuple {baz string Age int} {baz Andrew Age 20}} -match tuple
 
     test tuple-rename-7.0 {existing attribute} -setup {
 	set t [tuple create {Name string Age int} {Name Andrew Age 20}]
@@ -471,7 +482,8 @@ namespace eval ::ral::test {
     } -body {
 	tuple unwrap $t Address
     } -result {Tuple {Name string Number int Street string City string}\
-	{Name Andrew Number 599 Street Blackwood City Sunnyvale}}
+	{Name Andrew Number 599 Street Blackwood City Sunnyvale}}\
+    -match tuple
 
     test tuple-unwrap-2.0 {unwrap single attribute} -setup {
 	set t [tuple create\
@@ -479,7 +491,8 @@ namespace eval ::ral::test {
 	    {Name Andrew Address {Number 599}}]
     } -body {
 	tuple unwrap $t Address
-    } -result {Tuple {Name string Number int} {Name Andrew Number 599}}
+    } -result {Tuple {Name string Number int} {Name Andrew Number 599}}\
+    -match tuple
 
     test tuple-unwrap-3.0 {unknown unwrap attribute} -setup {
 	set t [tuple create\
@@ -507,7 +520,7 @@ namespace eval ::ral::test {
     } -body {
 	tuple update t {Age 40}
     } -result {Tuple {Name string Age int Size double}\
-	    {Name Andrew Age 40 Size 3.0}}
+	    {Name Andrew Age 40 Size 3.0}} -match tuple
 
     test tuple-update-2.0 {multiple attributes} -setup {
 	set t [tuple create {Name string Age int Size double}\
@@ -515,7 +528,7 @@ namespace eval ::ral::test {
     } -body {
 	tuple update t {Age 40 Size 33.0}
     } -result {Tuple {Name string Age int Size double}\
-	    {Name Andrew Age 40 Size 33.0}}
+	    {Name Andrew Age 40 Size 33.0}} -match tuple
 
     test tuple-update-3.0 {unknown attribute} -setup {
 	set t [tuple create {Name string Age int Size double}\
@@ -538,7 +551,7 @@ namespace eval ::ral::test {
     } -body {
 	tuple wrap $t Props {Age}
     } -result {Tuple {Name string Size double Props {Tuple {Age int}}}\
-	{Name Andrew Size 3.0 Props {Age 20}}}
+	{Name Andrew Size 3.0 Props {Age 20}}} -match tuple
 
     test tuple-wrap-2.0 {wrap multiple attributes} -setup {
 	set t [tuple create {Name string Age int Size double}\
@@ -546,7 +559,7 @@ namespace eval ::ral::test {
     } -body {
 	tuple wrap $t Props {Age Size}
     } -result {Tuple {Name string Props {Tuple {Age int Size double}}}\
-	{Name Andrew Props {Age 20 Size 3.0}}}
+	{Name Andrew Props {Age 20 Size 3.0}}} -match tuple
 
     test tuple-wrap-3.0 {wrap all attributes} -setup {
 	set t [tuple create {Name string Age int Size double}\
@@ -554,7 +567,7 @@ namespace eval ::ral::test {
     } -body {
 	tuple wrap $t Props {Name Age Size}
     } -result {Tuple {Props {Tuple {Name string Age int Size double}}}\
-	{Props {Name Andrew Age 20 Size 3.0}}}
+	{Props {Name Andrew Age 20 Size 3.0}}} -match tuple
 
     test tuple-wrap-4.0 {non-existent attribute to wrap} -setup {
 	set t [tuple create {Name string Age int Size double}\
@@ -583,77 +596,83 @@ namespace eval ::ral::test {
 	relation cardinality $r
 	string length $r
 	set r
-    } -result {Relation {} {{}} {}}
+    } -result {Relation {} {{}} {}} -match relation
 
     test relation-shimmer-2.0 {dee relation} -body {
 	set r {Relation {} {{}} {{}}}
 	relation cardinality $r
 	string length $r
 	set r
-    } -result {Relation {} {{}} {{}}}
+    } -result {Relation {} {{}} {{}}} -match relation
 
     test relation-shimmer-3.0 {degree 1, cardinality 0} -body {
 	set r {Relation {a1 string} a1 {}}
 	relation cardinality $r
 	string length $r
 	set r
-    } -result {Relation {a1 string} a1 {}}
+    } -result {Relation {a1 string} a1 {}} -match relation
 
     test relation-shimmer-3.1 {degree 1, cardinality 1} -body {
 	set r {Relation {a1 string} a1 {{a1 foo}}}
 	relation cardinality $r
 	string length $r
 	set r
-    } -result {Relation {a1 string} a1 {{a1 foo}}}
+    } -result {Relation {a1 string} a1 {{a1 foo}}} -match relation
 
     test relation-shimmer-3.2 {degree 1, cardinality 2} -body {
 	set r {Relation {a1 string} a1 {{a1 foo} {a1 bar}}}
 	relation cardinality $r
 	string length $r
 	set r
-    } -result {Relation {a1 string} a1 {{a1 foo} {a1 bar}}}
+    } -result {Relation {a1 string} a1 {{a1 foo} {a1 bar}}} -match relation
 
     test relation-shimmer-4.0 {tuple attr, degree 1, cardinality 0} -body {
 	set r {Relation {a1 {Tuple {t1 string t2 string}}} {a1} {}}
 	relation cardinality $r
 	string length $r
 	set r
-    } -result {Relation {a1 {Tuple {t1 string t2 string}}} a1 {}}
+    } -result {Relation {a1 {Tuple {t1 string t2 string}}} a1 {}}\
+    -match relation
 
     test relation-shimmer-4.1 {tuple attr, degree 1, cardinality 1} -body {
 	set r {Relation {a1 {Tuple {t1 string t2 string}}} {a1} {{a1 {t1 foo t2 bar}}}}
 	relation cardinality $r
 	string length $r
 	set r
-    } -result {Relation {a1 {Tuple {t1 string t2 string}}} a1 {{a1 {t1 foo t2 bar}}}}
+    } -result {Relation {a1 {Tuple {t1 string t2 string}}} a1 {{a1 {t1 foo t2 bar}}}}\
+    -match relation
 
     test relation-shimmer-4.2 {tuple attr, degree 1, cardinality 2} -body {
 	set r {Relation {a1 {Tuple {t1 string t2 string}}} {a1} {{a1 {t1 foo t2 bar}} {a1 {t1 foo2 t2 bar2}}}}
 	relation cardinality $r
 	string length $r
 	set r
-    } -result {Relation {a1 {Tuple {t1 string t2 string}}} a1 {{a1 {t1 foo t2 bar}} {a1 {t1 foo2 t2 bar2}}}}
+    } -result {Relation {a1 {Tuple {t1 string t2 string}}} a1 {{a1 {t1 foo t2 bar}} {a1 {t1 foo2 t2 bar2}}}}\
+    -match relation
 
     test relation-shimmer-5.0 {relation attr, degree 1, cardinality 0} -body {
 	set r {Relation {a1 {Relation {t1 string t2 string} {t1}}} {a1} {}}
 	relation cardinality $r
 	string length $r
 	set r
-    } -result {Relation {a1 {Relation {t1 string t2 string} t1}} a1 {}}
+    } -result {Relation {a1 {Relation {t1 string t2 string} t1}} a1 {}}\
+    -match relation
 
     test relation-shimmer-5.1 {relation attr, degree 1, cardinality 1} -body {
 	set r {Relation {a1 {Relation {t1 string t2 string} {t1}}} {a1} {{a1 {{t1 foo t2 bar}}}}}
 	relation cardinality $r
 	string length $r
 	set r
-    } -result {Relation {a1 {Relation {t1 string t2 string} t1}} a1 {{a1 {{t1 foo t2 bar}}}}}
+    } -result {Relation {a1 {Relation {t1 string t2 string} t1}} a1 {{a1 {{t1 foo t2 bar}}}}}\
+    -match relation
 
     test relation-shimmer-5.2 {relation attr, degree 1, cardinality 1} -body {
 	set r {Relation {a1 {Relation {t1 string t2 string} {t1}}} {a1} {{a1 {{t1 foo t2 bar} {t1 foo2 t2 bar2}}}}}
 	relation cardinality $r
 	string length $r
 	set r
-    } -result {Relation {a1 {Relation {t1 string t2 string} t1}} a1 {{a1 {{t1 foo t2 bar} {t1 foo2 t2 bar2}}}}}
+    } -result {Relation {a1 {Relation {t1 string t2 string} t1}} a1 {{a1 {{t1 foo t2 bar} {t1 foo2 t2 bar2}}}}}\
+    -match relation
 
     # relation cardinality subcommand
     test relation-cardinality-1.0 {dum relation} -body {
@@ -685,10 +704,98 @@ namespace eval ::ral::test {
 	relation degree $S
     } -result 4
 
+    # relation eliminate subcommand
+    test relation-eliminate-1.0 {single attribute} -body {
+	set r1 {Relation\
+	    {Name string Number int Street string IsMale string}\
+	    Name\
+	    {{Name Andrew Number 599 Street Blackwood IsMale true}\
+	    {Name Jane Street Main Number 300 IsMale false}\
+	    {Name Fred Street Maple Number 599 IsMale true}}}
+	relation eliminate $r1 Name
+    } -result {Relation {Number int Street string IsMale string} {{Number Street IsMale}} {{Number 599 Street Blackwood IsMale true} {Number 300 Street Main IsMale false} {Number 599 Street Maple IsMale true}}}\
+    -match relation
+
+    test relation-eliminate-2.0 {multiple attributes} -body {
+	set r1 {Relation\
+	    {Name string Number int Street string IsMale string}\
+	    Name\
+	    {{Name Andrew Number 599 Street Blackwood IsMale true}\
+	    {Name Jane Street Main Number 300 IsMale false}\
+	    {Name Fred Street Maple Number 599 IsMale true}}}
+	relation eliminate $r1 Number IsMale
+    } -result {Relation {Name string Street string} Name {{Name Andrew Street Blackwood} {Name Jane Street Main} {Name Fred Street Maple}}}\
+    -match relation
+
+    test relation-eliminate-2.1 {multiple attributes} -body {
+	set r1 {Relation\
+	    {Name string Number int Street string IsMale string}\
+	    Name\
+	    {{Name Andrew Number 599 Street Blackwood IsMale true}\
+	    {Name Jane Street Main Number 300 IsMale false}\
+	    {Name Fred Street Maple Number 599 IsMale true}}}
+	relation eliminate $r1 Name Street
+    } -result {Relation {Number int IsMale string} {{Number IsMale}} {{Number 599 IsMale true} {Number 300 IsMale false}}}\
+    -match relation
+
+    test relation-eliminate-3.0 {nullary eliminate, non-empty relation} -body {
+	set r1 {Relation\
+	    {Name string Number int Street string IsMale string}\
+	    Name\
+	    {{Name Andrew Number 599 Street Blackwood IsMale true}\
+	    {Name Jane Street Main Number 300 IsMale false}\
+	    {Name Fred Street Maple Number 599 IsMale true}}}
+	relation eliminate $r1
+    } -result {Relation {Name string Number int Street string IsMale string} Name {{Name Andrew Number 599 Street Blackwood IsMale true} {Name Jane Number 300 Street Main IsMale false} {Name Fred Number 599 Street Maple IsMale true}}}\
+    -match relation
+
+    test relation-eliminate-4.0 {nullary eliminate, empty relation} -body {
+	set r1 {Relation\
+	    {Name string Number int Street string IsMale string}\
+	    Name\
+	    {}}
+	relation eliminate $r1
+    } -result {Relation {Name string Number int Street string IsMale string} Name {}}\
+    -match relation
+
     # relation emptyof subcommand
     test relation-emptyof-1.0 {multiple attributes} -body {
 	relation emptyof $S
-    } -result {Relation {S# string SNAME string STATUS int CITY string} S# {}}
+    } -result {Relation {S# string SNAME string STATUS int CITY string} S# {}}\
+    -match relation
+
+    # relation foreach subcommand
+    test relation-foreach-1.0 {simple visit of suppliers} -body {
+	set nameList [list]
+	relation foreach sup $S {
+	    lappend nameList [tuple extract $sup SNAME]
+	}
+	lsort $nameList
+    } -result {Adams Blake Clark Jones Smith}
+
+    test relation-foreach-2.0 {visit of suppliers ascending order} -body {
+	set nameList [list]
+	relation foreach sup $S ascending SNAME {
+	    lappend nameList [tuple extract $sup SNAME]
+	}
+	set nameList
+    } -result {Adams Blake Clark Jones Smith}
+
+    test relation-foreach-3.0 {visit of suppliers descending order} -body {
+	set nameList [list]
+	relation foreach sup $S descending SNAME {
+	    lappend nameList [tuple extract $sup SNAME]
+	}
+	set nameList
+    } -result {Smith Jones Clark Blake Adams}
+
+    test relation-foreach-4.0 {visit of suppliers ordered by multiple} -body {
+	set nameList [list]
+	relation foreach sup $S ascending {STATUS CITY} {
+	    lappend nameList [tuple extract $sup SNAME]
+	}
+	set nameList
+    } -result {Jones Smith Clark Adams Blake}
 
     # relation heading subcommand
     test relation-heading-1.0 {dum relation} -body {
@@ -728,12 +835,12 @@ namespace eval ::ral::test {
     test relation-intersect-1.0 {dum relation} -body {
 	set r {Relation {} {{}} {}}
 	relation intersect $r $r
-    } -result {Relation {} {{}} {}}
+    } -result {Relation {} {{}} {}} -match relation
 
     test relation-intersect-2.0 {dee relation} -body {
 	set r {Relation {} {{}} {{}}}
 	relation intersect $r $r
-    } -result {Relation {} {{}} {{}}}
+    } -result {Relation {} {{}} {{}}} -match relation
 
     test relation-intersect-3.0 {disjoint sets} -body {
 	set r1 {Relation {Name string Age int City string} Name\
@@ -741,14 +848,16 @@ namespace eval ::ral::test {
 	set r2 {Relation {Name string Age int City string} Name\
 	    {{Name George Age 20 City {San Jose}}}}
 	relation intersect $r1 $r2
-    } -result {Relation {Name string Age int City string} Name {}}
+    } -result {Relation {Name string Age int City string} Name {}}\
+    -match relation
 
     test relation-intersect-4.0 {same relation} -body {
 	set r1 {Relation {Name string Age int City string} Name\
 	    {{Name Andrew Age 30 City Sunnyvale}}}
 	relation intersect $r1 $r1
     } -result {Relation {Name string Age int City string} Name\
-	    {{Name Andrew Age 30 City Sunnyvale}}}
+	{{Name Andrew Age 30 City Sunnyvale}}}\
+    -match relation
 
     test relation-intersect-5.0 {common tuples} -body {
 	set r1 {Relation {Name string Age int City string} Name\
@@ -758,7 +867,8 @@ namespace eval ::ral::test {
 	    {{Name George Age 20 City {San Jose}}}}
 	relation intersect $r1 $r2
     } -result {Relation {Name string Age int City string} Name\
-	    {{Name George Age 20 City {San Jose}}}}
+	{{Name George Age 20 City {San Jose}}}}\
+    -match relation
 
     test relation-intersect-6.0 {multiple common tuples} -body {
 	set r1 {Relation {Name string Age int City string} Name\
@@ -770,8 +880,9 @@ namespace eval ::ral::test {
 	    {Name Andrew Age 30 City Sunnyvale}}}
 	relation intersect $r1 $r2
     } -result {Relation {Name string Age int City string} Name\
-	    {{Name Andrew Age 30 City Sunnyvale}\
-	    {Name George Age 20 City {San Jose}}}}
+	{{Name Andrew Age 30 City Sunnyvale}\
+	{Name George Age 20 City {San Jose}}}}\
+    -match relation
 
     test relation-intersect-7.0 {multiple relations} -body {
 	set r1 {Relation {Name string Age int City string} Name\
@@ -784,7 +895,8 @@ namespace eval ::ral::test {
 	    {Name Fred Age 10 City Saratoga}}}
 	relation intersect $r1 $r2 $r3
     } -result {Relation {Name string Age int City string} Name\
-	    {{Name George Age 20 City {San Jose}}}}
+	{{Name George Age 20 City {San Jose}}}}\
+    -match relation
 
     test relation-intersect-8.0 {multiple relations, different order} -body {
 	set r1 {Relation {Name string Age int City string} Name\
@@ -797,7 +909,8 @@ namespace eval ::ral::test {
 	    {Name Fred Age 10 City Saratoga}}}
 	relation intersect $r1 $r2 $r3
     } -result {Relation {Name string Age int City string} Name\
-	    {{Name George Age 20 City {San Jose}}}}
+	{{Name George Age 20 City {San Jose}}}}\
+    -match relation
 
     # relation is subcommand
 
@@ -861,6 +974,200 @@ namespace eval ::ral::test {
     } -result {headings not equal, "Relation {Name string Status int City string} Name {{Name George Status 20 City {San Jose}} {Name Andrew Status 30 City Sunnyvale} {Name Fred Status 10 City Saratoga}}"}\
     -returnCodes error
 
+    test relation-is-equal-7.0 {tuple valued attributes} -body {
+	set r1 {
+	    Relation
+	    {	Name string
+		Age int
+		Address {Tuple {Number int Street string City string}}
+	    }
+	    Name
+	    {
+		{Name Andrew Age 30
+		    Address {Number 200 Street Main City Sunnyvale}}
+		{Age 20 Name George
+		    Address {Number 300 Street Clay City {San Jose}}}
+		{Address {Street 51st Number 100 City Saratoga}
+		    Age 10 Name Fred}
+	    }
+	}
+	set r2 {
+	    Relation
+	    {	Name string
+		Address {Tuple {Number int Street string City string}}
+		Age int
+	    }
+	    Name
+	    {
+		{   Address {City Sunnyvale Number 200 Street Main}
+		    Age 30
+		    Name Andrew
+		}
+		{   Age 20 
+		    Name George
+		    Address {Number 300 Street Clay City {San Jose}}
+		}
+		{   Name Fred
+		    Address {Street 51st Number 100 City Saratoga}
+		    Age 10
+		}
+	    }
+	}
+	relation is $r1 == $r2
+    } -result 1
+
+    test relation-is-equal-8.0 {relation valued attributes} -body {
+	set r1 {
+	    Relation
+	    {	Name string
+		Age int
+		Addresses {
+		    Relation
+		    {Number int Street string City string}
+		    {{Number Street City}}
+		}
+	    }
+	    Name
+	    {
+		{   Name Andrew
+		    Age 30
+		    Addresses {
+			{Number 200 Street Main City Sunnyvale}
+		    }
+		}
+		{
+		    Age 20
+		    Name George
+		    Addresses {
+			{Number 300 Street Clay City {San Jose}}
+		    }
+		}
+		{   Addresses {
+			{Street 51st Number 100 City Saratoga}
+		    }
+		    Age 10
+		    Name Fred
+		}
+	    }
+	}
+	set r2 {
+	    Relation
+	    {	Name string
+		Age int
+		Addresses {
+		    Relation
+		    {Number int Street string City string}
+		    {{Number Street City}}
+		}
+	    }
+	    Name
+	    {
+		{
+		    Age 20
+		    Addresses {
+			{Number 300 Street Clay City {San Jose}}
+		    }
+		    Name George
+		}
+		{   Addresses {
+			{Street 51st Number 100 City Saratoga}
+		    }
+		    Age 10
+		    Name Fred
+		}
+		{   Name Andrew
+		    Addresses {
+			{Number 200 Street Main City Sunnyvale}
+		    }
+		    Age 30
+		}
+	    }
+	}
+	relation is $r1 == $r2
+    } -result 1
+
+    test relation-is-equal-8.1 {relation valued attributes, multi value} -body {
+	set r1 {
+	    Relation
+	    {	Name string
+		Age int
+		Addresses {
+		    Relation
+		    {Number int Street string City string}
+		    {{Number Street City}}
+		}
+	    }
+	    Name
+	    {
+		{   Name Andrew
+		    Age 30
+		    Addresses {
+			{Number 200 Street Main City Sunnyvale}
+			{Number 201 Street Main City Sunnyvale}
+			{Number 202 Street Main City Sunnyvale}
+		    }
+		}
+		{
+		    Age 20
+		    Name George
+		    Addresses {
+			{Number 300 Street Clay City {San Jose}}
+			{Number 301 Street Clay City {San Jose}}
+			{Number 302 Street Clay City {San Jose}}
+		    }
+		}
+		{   Addresses {
+			{Street 51st Number 100 City Saratoga}
+			{Street 51st Number 101 City Saratoga}
+			{Street 51st Number 102 City Saratoga}
+		    }
+		    Age 10
+		    Name Fred
+		}
+	    }
+	}
+	set r2 {
+	    Relation
+	    {	Name string
+		Age int
+		Addresses {
+		    Relation
+		    {Number int Street string City string}
+		    {{Number Street City}}
+		}
+	    }
+	    Name
+	    {
+		{
+		    Age 20
+		    Addresses {
+			{Number 301 Street Clay City {San Jose}}
+			{Number 300 Street Clay City {San Jose}}
+			{Number 302 Street Clay City {San Jose}}
+		    }
+		    Name George
+		}
+		{   Addresses {
+			{Street 51st Number 102 City Saratoga}
+			{Street 51st Number 100 City Saratoga}
+			{Street 51st Number 101 City Saratoga}
+		    }
+		    Age 10
+		    Name Fred
+		}
+		{   Name Andrew
+		    Addresses {
+			{Number 201 Street Main City Sunnyvale}
+			{Number 202 Street Main City Sunnyvale}
+			{Number 200 Street Main City Sunnyvale}
+		    }
+		    Age 30
+		}
+	    }
+	}
+	relation is $r1 == $r2
+    } -result 1
+
     # relation notequal operator
     test relation-is-notequal-1.0 {dum relation} -body {
 	set r {Relation {} {{}} {}}
@@ -905,7 +1212,7 @@ namespace eval ::ral::test {
 	    {{Age 20 Name George City {San Jose}}\
 	    {Name Andrew Age 40 City Sunnyvale}\
 	    {City Saratoga Age 10 Name Fred}}}
-	relation is $r1 notequal $r2
+	relation is $r1 != $r2
     } -result 1
 
     # relation propersubset operator
@@ -950,7 +1257,7 @@ namespace eval ::ral::test {
 	set r2 {Relation {Name string Age int City string} Name\
 	    {{Age 20 Name George City {San Jose}}\
 	    {City Saratoga Age 10 Name Fred}}}
-	relation is $r1 propersubsetof $r2
+	relation is $r1 < $r2
     } -result 0
 
     # relation propersuperset operator
@@ -995,7 +1302,7 @@ namespace eval ::ral::test {
 	    {{Age 20 Name George City {San Jose}}\
 	    {Name Andrew Age 30 City Sunnyvale}\
 	    {City Saratoga Age 10 Name Fred}}}
-	relation is $r1 propersupersetof $r2
+	relation is $r1 > $r2
     } -result 0
 
     # relation subset operator
@@ -1040,7 +1347,7 @@ namespace eval ::ral::test {
 	set r2 {Relation {Name string Age int City string} Name\
 	    {{Age 20 Name George City {San Jose}}\
 	    {City Saratoga Age 10 Name Fred}}}
-	relation is $r1 subsetof $r2
+	relation is $r1 <= $r2
     } -result 0
 
     # relation superset operator
@@ -1085,7 +1392,7 @@ namespace eval ::ral::test {
 	    {{Age 20 Name George City {San Jose}}\
 	    {Name Andrew Age 30 City Sunnyvale}\
 	    {City Saratoga Age 10 Name Fred}}}
-	relation is $r1 supersetof $r2
+	relation is $r1 >= $r2
     } -result 0
 
     # relation isempty subcommand
@@ -1114,16 +1421,37 @@ namespace eval ::ral::test {
 	relation isnotempty $S
     } -result 1
 
+    # relation list subcommand
+    test relation-list-1.0 {multiple tuples} -body {
+	set r {
+	    Relation
+	    {SNAME string}
+	    SNAME
+	    {
+		{SNAME Smith}
+		{SNAME Jones}
+		{SNAME Blake}
+		{SNAME Clark}
+		{SNAME Adams}
+	    }
+	}
+	lsort [relation list $r]
+    } -result {Adams Blake Clark Jones Smith}
+
+    test relation-list-2.0 {one tuple} -body {
+	relation list {Relation {Name string} Name {{Name Fred}}}
+    } -result {Fred}
+
     # relation minus subcommand
     test relation-minus-1.0 {dum relation} -body {
 	set r {Relation {} {{}} {}}
 	relation minus $r $r
-    } -result {Relation {} {{}} {}}
+    } -result {Relation {} {{}} {}} -match relation
 
     test relation-minus-2.0 {dee relation} -body {
 	set r {Relation {} {{}} {{}}}
 	relation minus $r $r
-    } -result {Relation {} {{}} {}}
+    } -result {Relation {} {{}} {}} -match relation
 
     test relation-minus-3.0 {disjoint sets} -body {
 	set r1 {Relation {Name string Age int City string} Name\
@@ -1132,24 +1460,226 @@ namespace eval ::ral::test {
 	    {{Name George Age 20 City {San Jose}}}}
 	relation minus $r1 $r2
     } -result {Relation {Name string Age int City string} Name\
-	{{Name Andrew Age 30 City Sunnyvale}}}
+	{{Name Andrew Age 30 City Sunnyvale}}} -match relation
 
     test relation-minus-4.0 {same sets} -body {
 	set r1 {Relation {Name string Age int City string} Name\
 	    {{Name Andrew Age 30 City Sunnyvale}}}
 	relation minus $r1 $r1
-    } -result {Relation {Name string Age int City string} Name {}}
+    } -result {Relation {Name string Age int City string} Name {}}\
+    -match relation
+
+    # relation project subcommand
+    test relation-project-1.0 {single attribute} -body {
+	set r1 {Relation \
+	    {Name string Number int Street string IsMale string}\
+	    Name\
+	    {{Name Andrew Number 599 Street Blackwood IsMale true}\
+	    {Name Jane Street Main Number 300 IsMale false}\
+	    {Name Fred Street Maple Number 599 IsMale true}}}
+	relation project $r1 Name
+    } -result {Relation {Name string} Name {{Name Andrew} {Name Jane} {Name Fred}}}\
+    -match relation
+
+    test relation-project-2.0 {multiple attributes} -body {
+	set r1 {Relation \
+	    {Name string Number int Street string IsMale string}\
+	    Name\
+	    {{Name Andrew Number 599 Street Blackwood IsMale true}\
+	    {Name Jane Street Main Number 300 IsMale false}\
+	    {Name Fred Street Maple Number 599 IsMale true}}}
+	relation project $r1 Number IsMale
+    } -result {Relation {Number int IsMale string} {{Number IsMale}} {{Number 599 IsMale true} {Number 300 IsMale false}}}\
+    -match relation
+
+    test relation-project-3.0 {nullary projection, non-empty relation} -body {
+	set r1 {Relation \
+	    {Name string Number int Street string IsMale string}\
+	    Name\
+	    {{Name Andrew Number 599 Street Blackwood IsMale true}\
+	    {Name Jane Street Main Number 300 IsMale false}\
+	    {Name Fred Street Maple Number 599 IsMale true}}}
+	relation project $r1
+    } -result {Relation {} {{}} {{}}} -match relation
+
+    test relation-project-4.0 {nullary projection, empty relation} -body {
+	set r1 {Relation \
+	    {Name string Number int Street string IsMale string}\
+	    Name\
+	    {}}
+	relation project $r1
+    } -result {Relation {} {{}} {}} -match relation
+
+    test relation-project-5.0 {non-existant attribute} -body {
+	set r1 {Relation \
+	    {Name string Number int Street string IsMale string}\
+	    Name\
+	    {{Name Andrew Number 599 Street Blackwood IsMale true}\
+	    {Name Jane Street Main Number 300 IsMale false}\
+	    {Name Fred Street Maple Number 599 IsMale true}}}
+	relation project $r1 foo
+    } -result {unknown attribute name, "foo"} -returnCodes error
+
+    test relation-project-6.0 {duplicate projection attribute} -body {
+	set r1 {Relation \
+	    {Name string Number int Street string IsMale string}\
+	    Name\
+	    {{Name Andrew Number 599 Street Blackwood IsMale true}\
+	    {Name Jane Street Main Number 300 IsMale false}\
+	    {Name Fred Street Maple Number 599 IsMale true}}}
+	relation project $r1 Name Name
+    } -result {Relation {Name string} Name {{Name Andrew} {Name Jane} {Name Fred}}}\
+    -match relation
+
+    test relation-project-7.0 {reorder attributes} -body {
+	set r1 {Relation \
+	    {Name string Number int Street string IsMale string}\
+	    {{Number Street}}\
+	    {{Name Andrew Number 599 Street Blackwood IsMale true}\
+	    {Name Jane Street Main Number 300 IsMale false}\
+	    {Name Fred Street Maple Number 599 IsMale true}}}
+	relation project $r1 Number Street IsMale
+    } -result {Relation {Number int Street string IsMale string} {{Number Street}} {{Number 599 Street Blackwood IsMale true} {Number 300 Street Main IsMale false} {Number 599 Street Maple IsMale true}}}\
+    -match relation
+
+    # relation rename subcommand
+    test relation-rename-1.0 {single attribute} -body {
+	set r {Relation {Name string} Name {{Name Andrew}}}
+	relation rename $r Name foo
+    } -result {Relation {foo string} foo {{foo Andrew}}}\
+    -match relation
+
+    test relation-rename-2.0 {multiple attributes} -body {
+	set r {Relation {Name string Age int City string} Name\
+	{{Name Andrew Age 30 City Sunnyvale}\
+	 {Name George Age 20 City {San Jose}}}}
+	relation rename $r Age Status
+    } -result {Relation {Name string Status int City string} Name\
+	{{Name Andrew Status 30 City Sunnyvale}\
+	 {Name George Status 20 City {San Jose}}}}\
+     -match relation
+
+    test relation-rename-2.1 {multiple attributes, multiple renames} -body {
+	set r {Relation {Name string Age int City string} Name\
+	{{Name Andrew Age 30 City Sunnyvale}\
+	 {Name George Age 20 City {San Jose}}}}
+	relation rename $r Age Status City Town
+    } -result {Relation {Name string Status int Town string} Name\
+	{{Name Andrew Status 30 Town Sunnyvale}\
+	 {Name George Status 20 Town {San Jose}}}}\
+    -match relation
+
+    # relation restrict subcommand
+    test relation-restrict-1.0 {match on one attribute} -body {
+	set r {Relation {Name string Age int City string} Name\
+	    {{Name Andrew Age 30 City Sunnyvale}\
+	    {Age 20 Name George City {San Jose}}\
+	    {City Saratoga Age 10 Name Fred}}}
+	relation restrict $r t {[tuple extract $t Age] < 20}
+    } -result {Relation {Name string Age int City string} Name\
+	{{Name Fred Age 10 City Saratoga}}}\
+    -match relation
+
+    test relation-restrict-2.0 {match on several attributes} -body {
+	set r {Relation {Name string Age int City string} Name\
+	    {{Name Andrew Age 30 City Sunnyvale}\
+	    {Age 20 Name George City {San Jose}}\
+	    {City Saratoga Age 10 Name Fred}}}
+	relation restrict $r t\
+	    {[tuple extract $t Age] < 20 &&\
+	    [string index [tuple extract $t City] 0] ne "S"}
+    } -result {Relation {Name string Age int City string} Name {}}\
+    -match relation
+
+    test relation-restrict-3.0 {bad expression} -body {
+	set r {Relation {Name string Age int City string} Name\
+	    {{Name Andrew Age 30 City Sunnyvale}\
+	    {Age 20 Name George City {San Jose}}\
+	    {City Saratoga Age 10 Name Fred}}}
+	relation restrict $r selected {< 20}
+    } -result {syntax error in expression "< 20": unexpected operator <}\
+    -returnCodes error
+
+    # relation times subcommand
+    test relation-times-1.0 {single attribute, square relation} -body {
+	set r1 {Relation {Name string} Name {{Name Andrew}}}
+	set r2 {Relation {XName string} XName {{XName Andrew}}}
+	relation times $r1 $r2
+    } -result {Relation {Name string XName string} {{Name XName}}\
+	{{Name Andrew XName Andrew}}}\
+    -match relation
+
+    test relation-times-2.0 {single attribute times dee} -body {
+	set r1 {Relation {Name string} Name {{Name Andrew}}}
+	set r2 {Relation {} {{}} {{}}}
+	relation times $r1 $r2
+    } -result {Relation {Name string} Name {{Name Andrew}}}\
+    -match relation
+
+    test relation-times-3.0 {single attribute times dum} -body {
+	set r1 {Relation {Name string} Name {{Name Andrew}}}
+	set r2 {Relation {} {{}} {}}
+	relation times $r1 $r2
+    } -result {Relation {Name string} Name {}}\
+    -match relation
+
+    test relation-times-4.0 {single attribute, cube relation} -body {
+	set r1 {Relation {Name string} Name {{Name Andrew}}}
+	set r2 {Relation {XName string} XName {{XName Andrew}}}
+	set r3 {Relation {YName string} YName {{YName Andrew}}}
+	relation times $r1 $r2 $r3
+    } -result {Relation {Name string XName string YName string}\
+	{{Name XName YName}} {{Name Andrew XName Andrew YName Andrew}}}\
+    -match relation
+
+    test relation-times-5.0 {multiple attributes, square relation} -body {
+	set r1 {Relation {Name string} Name {{Name Andrew} {Name George}}}
+	set r2 {Relation {Status int} Status {{Status 20} {Status 30}}}
+	relation times $r1 $r2
+    } -result {Relation {Name string Status int} {{Name Status}} {{Name Andrew Status 20} {Name Andrew Status 30} {Name George Status 20} {Name George Status 30}}}\
+    -match relation
+
+    test relation-times-6.0 {attribute name conflict} -body {
+	set r1 {Relation {Name string} Name {{Name Andrew}}}
+	relation times $r1 $r1
+    } -result {duplicate attribute name, "Relation {Name string} Name {{Name Andrew}}"}\
+    -returnCodes error
+
+    test relation-times-6.1 {attribute name conflict, third relation} -body {
+	set r1 {Relation {Name string} Name {{Name Andrew}}}
+	set r2 {Relation {Status int} Status {{Status 20} {Status 30}}}
+	relation times $r1 $r2 $r1
+    } -result {duplicate attribute name, "Relation {Name string} Name {{Name Andrew}}"}\
+    -returnCodes error
+
+    # relation tuple subcommand
+    test relation-tuple-1.0 {single attribute} -body {
+	set t [relation tuple {Relation {Name string} Name {{Name Andrew}}}]
+	tuple equal $t {Tuple {Name string} {Name Andrew}}
+    } -result 1
+
+    test relation-tuple-2.0 {multiple attributes} -body {
+	set r {Relation {Name string Age int} Name {{Name Andrew Age 20}}}
+	set t [relation tuple $r]
+	tuple equal $t {Tuple {Name string Age int} {Name Andrew Age 20}}
+    } -result 1
+
+    test relation-tuple-3.0 {body too long} -body {
+	set r {Relation {Name string Age int} Name\
+	    {{Name Andrew Age 20} {Name George Age 20}}}
+	relation tuple $r
+    } -result {relation must have cardinality of one, "Relation {Name string Age int} Name {{Name Andrew Age 20} {Name George Age 20}}"} -returnCodes error
 
     # relation union subcommand
     test relation-union-1.0 {dum relation} -body {
 	set r {Relation {} {{}} {}}
 	relation union $r $r
-    } -result {Relation {} {{}} {}}
+    } -result {Relation {} {{}} {}} -match relation
 
     test relation-union-2.0 {dee relation} -body {
 	set r {Relation {} {{}} {{}}}
 	relation union $r $r
-    } -result {Relation {} {{}} {{}}}
+    } -result {Relation {} {{}} {{}}} -match relation
 
     test relation-union-3.0 {disjoint sets} -body {
 	set r1 {Relation {Name string Age int City string} Name\
@@ -1159,7 +1689,8 @@ namespace eval ::ral::test {
 	relation union $r1 $r2
     } -result {Relation {Name string Age int City string} Name\
 	{{Name Andrew Age 30 City Sunnyvale}\
-	 {Name George Age 20 City {San Jose}}}}
+	 {Name George Age 20 City {San Jose}}}}\
+     -match relation
 
     test relation-union-4.0 {relations with common tuples} -body {
 	set r1 {Relation {Name string Age int City string} Name\
@@ -1170,7 +1701,8 @@ namespace eval ::ral::test {
 	relation union $r1 $r2
     } -result {Relation {Name string Age int City string} Name\
 	{{Name Andrew Age 30 City Sunnyvale}\
-	 {Name George Age 20 City {San Jose}}}}
+	 {Name George Age 20 City {San Jose}}}}\
+     -match relation
 
     test relation-union-5.0 {union of more than two relations} -body {
 	set r1 {Relation {Name string Age int City string} Name\
@@ -1183,7 +1715,8 @@ namespace eval ::ral::test {
     } -result {Relation {Name string Age int City string} Name\
 	{{Name Andrew Age 30 City Sunnyvale}\
 	 {Name George Age 20 City {San Jose}}\
-	 {Name Fred Age 10 City Saratoga}}}
+	 {Name Fred Age 10 City Saratoga}}}\
+     -match relation
 
     test relation-union-6.0 {union of more than two, common tuples } -body {
 	set r1 {Relation {Name string Age int City string} Name\
@@ -1198,7 +1731,8 @@ namespace eval ::ral::test {
     } -result {Relation {Name string Age int City string} Name\
 	{{Name Andrew Age 30 City Sunnyvale}\
 	 {Name George Age 20 City {San Jose}}\
-	 {Name Fred Age 10 City Saratoga}}}
+	 {Name Fred Age 10 City Saratoga}}}\
+     -match relation
 
     test relation-union-7.0 {type mismatch} -body {
 	set r1 {Relation {Name string Age int City string} Name\
@@ -1217,7 +1751,8 @@ namespace eval ::ral::test {
 	relation union $r1 $r2
     } -result {Relation {Name string Age int City string} Name\
 	{{Name Andrew Age 30 City Sunnyvale}\
-	 {Name George Age 20 City {San Jose}}}}
+	 {Name George Age 20 City {San Jose}}}}\
+     -match relation
 
     cleanupTests
 }
