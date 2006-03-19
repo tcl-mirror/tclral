@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.h,v $
-$Revision: 1.5 $
-$Date: 2006/03/06 01:07:37 $
+$Revision: 1.6 $
+$Date: 2006/03/19 19:48:31 $
  *--
  */
 #ifndef _ral_relation_h_
@@ -126,8 +126,12 @@ typedef struct Ral_Relation {
 				     * tables. */
 } *Ral_Relation ;
 
+/*
+ * Order here is important!
+ * These enumerators are used as an array index in Ral_RelationObjSetError()
+ */
 typedef enum Ral_RelationError {
-    REL_OK,
+    REL_OK = 0,
     REL_FORMAT_ERR,
     REL_BAD_KEYWORD,
     REL_NO_IDENTIFIER,
@@ -141,6 +145,9 @@ typedef enum Ral_RelationError {
     REL_DEGREE_ONE,
     REL_CARDINALITY_ONE,
     REL_BAD_PAIRS_LIST,
+    REL_BAD_TRIPLE_LIST,
+    REL_NOT_AN_IDENTIFIER,
+    REL_NOT_A_RELATION,
 
 
     REL_HEADING_ERR,
@@ -171,9 +178,10 @@ extern void Ral_RelationReserve(Ral_Relation, int) ;
 
 extern int Ral_RelationPushBack(Ral_Relation, Ral_Tuple, Ral_IntVector) ;
 
-extern Ral_RelationIter Ral_RelationFind(Ral_Relation, Ral_Tuple,
+extern Ral_RelationIter Ral_RelationFind(Ral_Relation, int, Ral_Tuple,
     Ral_IntVector) ;
-extern Ral_Tuple Ral_RelationFetch(Ral_Relation, Ral_RelationIter) ;
+extern Ral_RelationIter Ral_RelationFindKey(Ral_Relation, int, Ral_Tuple,
+    Ral_IntVector) ;
 extern void Ral_RelationErase(Ral_Relation, Ral_RelationIter,
     Ral_RelationIter) ;
 
@@ -193,6 +201,8 @@ extern Ral_Relation Ral_RelationIntersect(Ral_Relation, Ral_Relation) ;
 extern Ral_Relation Ral_RelationMinus(Ral_Relation, Ral_Relation) ;
 extern Ral_Relation Ral_RelationTimes(Ral_Relation, Ral_Relation) ;
 extern Ral_Relation Ral_RelationProject(Ral_Relation, Ral_IntVector) ;
+extern Ral_Relation Ral_RelationExtend(Ral_Relation, int) ;
+extern Ral_Relation Ral_RelationUngroup(Ral_Relation, const char *) ;
 
 extern Ral_Relation Ral_RelationSortAscending(Ral_Relation, Ral_IntVector) ;
 extern Ral_Relation Ral_RelationSortDescending(Ral_Relation, Ral_IntVector) ;

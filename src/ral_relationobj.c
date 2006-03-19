@@ -42,36 +42,11 @@ terms specified in this license.
  *++
 MODULE:
 
-$RCSfile: ral_relationobj.c,v $
-$Revision: 1.5 $
-$Date: 2006/03/06 01:07:37 $
-
 ABSTRACT:
 
-MODIFICATION HISTORY:
-$Log: ral_relationobj.c,v $
-Revision 1.5  2006/03/06 01:07:37  mangoa01
-More relation commands done. Cleaned up error reporting.
-
-Revision 1.4  2006/03/01 02:28:40  mangoa01
-Added new relation commands and test cases. Cleaned up Makefiles.
-
-Revision 1.3  2006/02/26 04:57:53  mangoa01
-Reworked the conversion from internal form to a string yet again.
-This design is better and more recursive in nature.
-Added additional code to the "relation" commands.
-Now in a position to finish off the remaining relation commands.
-
-Revision 1.2  2006/02/20 20:15:07  mangoa01
-Now able to convert strings to relations and vice versa including
-tuple and relation valued attributes.
-
-Revision 1.1  2006/02/06 05:02:45  mangoa01
-Started on relation heading and other code refactoring.
-This is a checkpoint after a number of added files and changes
-to tuple heading code.
-
-
+$RCSfile: ral_relationobj.c,v $
+$Revision: 1.6 $
+$Date: 2006/03/19 19:48:31 $
  *--
  */
 
@@ -129,7 +104,7 @@ Tcl_ObjType Ral_RelationObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.5 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.6 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -376,7 +351,10 @@ Ral_RelationObjSetError(
 	"duplicate attribute name",
 	"relation must have degree of one",
 	"relation must have cardinality of one",
-	"bad list of pairs"
+	"bad list of pairs",
+	"bad list of triples",
+	"attributes do not constitute an identifier",
+	"attribute must be of a Relation type",
 
 	"bad relation heading format",
 	"bad value type for value",
@@ -397,6 +375,9 @@ Ral_RelationObjSetError(
 	"DEGREE_ONE",
 	"CARDINALITY_ONE",
 	"BAD_PAIRS_LIST",
+	"BAD_TRIPLE_LIST",
+	"NOT_AN_IDENTIFIER",
+	"NOT_A_RELATION",
 
 	"HEADING_ERR",
 	"BAD_VALUE",
@@ -476,7 +457,5 @@ SetRelationFromAny(
 	return TCL_ERROR ;
     }
 
-    Ral_RelationObjConvert(heading, interp, objv[3], objPtr) ;
-
-    return TCL_OK ;
+    return Ral_RelationObjConvert(heading, interp, objv[3], objPtr) ;
 }

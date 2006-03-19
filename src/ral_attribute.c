@@ -42,38 +42,11 @@ terms specified in this license.
  *++
 MODULE:
 
-$RCSfile: ral_attribute.c,v $
-$Revision: 1.6 $
-$Date: 2006/03/06 01:07:37 $
-
 ABSTRACT:
 
-MODIFICATION HISTORY:
-$Log: ral_attribute.c,v $
-Revision 1.6  2006/03/06 01:07:37  mangoa01
-More relation commands done. Cleaned up error reporting.
-
-Revision 1.5  2006/02/26 04:57:53  mangoa01
-Reworked the conversion from internal form to a string yet again.
-This design is better and more recursive in nature.
-Added additional code to the "relation" commands.
-Now in a position to finish off the remaining relation commands.
-
-Revision 1.4  2006/02/20 20:15:07  mangoa01
-Now able to convert strings to relations and vice versa including
-tuple and relation valued attributes.
-
-Revision 1.3  2006/02/06 05:02:45  mangoa01
-Started on relation heading and other code refactoring.
-This is a checkpoint after a number of added files and changes
-to tuple heading code.
-
-Revision 1.2  2006/01/02 01:39:29  mangoa01
-Tuple commands now operate properly. Fixed problems of constructing the string representation when there were tuple valued attributes.
-
-Revision 1.1  2005/12/27 23:17:19  mangoa01
-Update to the new spilt out file structure.
-
+$RCSfile: ral_attribute.c,v $
+$Revision: 1.7 $
+$Date: 2006/03/19 19:48:31 $
  *--
  */
 
@@ -121,9 +94,9 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char openList[] = "{" ;
-static const char closeList[] = "}" ;
-static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.6 $" ;
+static const char openList = '{' ;
+static const char closeList = '}' ;
+static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.7 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -136,6 +109,7 @@ Ral_AttributeNewTclType(
 {
     Ral_Attribute a ;
 
+    /* +1 for the NUL terminator */
     a = (Ral_Attribute)ckalloc(sizeof(*a) + strlen(name) + 1) ;
     a->name = strcpy((char *)(a + 1), name) ;
     a->attrType = Tcl_Type ;
@@ -172,101 +146,6 @@ Ral_AttributeNewRelationType(
     Ral_RelationHeadingReference(a->relationHeading = heading) ;
 
     return a ;
-}
-
-Ral_Attribute
-Ral_AttributeNewFromObjs(
-    Tcl_Interp *interp,
-    Tcl_Obj *nameObj,
-    Tcl_Obj *typeObj)
-{
-    Ral_Attribute attribute = NULL ;
-    int typec ;
-    Tcl_Obj **typev ;
-    const char *attrName ;
-    const char *typeName ;
-
-    /*
-     * The complication arises when the type is either Tuple or Relation.
-     * So first see if the "type" object is a list that might contain
-     * a Tuple or Relation type specification.
-     */
-    if (Tcl_ListObjGetElements(interp, typeObj, &typec, &typev) != TCL_OK) {
-	return NULL ;
-    }
-    attrName = Tcl_GetString(nameObj) ;
-    typeName = Tcl_GetString(*typev) ;
-    if (strcmp("Tuple", typeName) == 0 && typec == 2) {
-	Ral_TupleHeading heading =
-	    Ral_TupleHeadingNewFromObj(interp, *(typev + 1)) ;
-
-	if (heading) {
-	    attribute = Ral_AttributeNewTupleType(attrName, heading) ;
-	}
-    } else if (strcmp("Relation", typeName) == 0 && typec == 3) {
-	Ral_RelationHeading heading =
-	    Ral_RelationHeadingNewFromObjs(interp, typev[1], typev[2]) ;
-
-	if (heading) {
-	    attribute = Ral_AttributeNewRelationType(attrName, heading) ;
-	}
-    } else if (typec == 1) {
-	Tcl_ObjType *tclType = Tcl_GetObjType(typeName) ;
-
-	if (tclType != NULL) {
-	    attribute = Ral_AttributeNewTclType(attrName, tclType) ;
-	} else {
-	    Tcl_ResetResult(interp) ;
-	    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-		"unknown data type, \"", typeName, "\"",
-		NULL) ;
-	}
-    } else {
-	Tcl_ResetResult(interp) ;
-	Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-	    "bad type specification, \"", Tcl_GetString(typeObj),
-	    "\"", NULL) ;
-    }
-
-    return attribute ;
-}
-
-int
-Ral_AttributeConvertValueToType(
-    Tcl_Interp *interp,
-    Ral_Attribute attr,
-    Tcl_Obj *objPtr)
-{
-    int result = TCL_OK ;
-
-    switch (attr->attrType) {
-    case Tcl_Type:
-	result = Tcl_ConvertToType(interp, objPtr, attr->tclType) ;
-	if (result == TCL_OK && strcmp(attr->tclType->name, "string") != 0) {
-	    Tcl_InvalidateStringRep(objPtr) ;
-	}
-	break ;
-
-    case Tuple_Type:
-	if (objPtr->typePtr != &Ral_TupleObjType) {
-	    result = Ral_TupleObjConvert(attr->tupleHeading, interp, objPtr,
-		objPtr) ;
-	}
-	break ;
-
-    case Relation_Type:
-	if (objPtr->typePtr != &Ral_RelationObjType) {
-	    result = Ral_RelationObjConvert(attr->relationHeading, interp,
-		objPtr, objPtr) ;
-	}
-	break ;
-
-    default:
-	Tcl_Panic("unknown attribute data type") ;
-	break ;
-    }
-
-    return result ;
 }
 
 void
@@ -411,6 +290,109 @@ Ral_AttributeValueEqual(
     return 1 ;
 }
 
+/*
+ * Construct an attribute from a Tcl objects.
+ */
+Ral_Attribute
+Ral_AttributeNewFromObjs(
+    Tcl_Interp *interp,
+    Tcl_Obj *nameObj,
+    Tcl_Obj *typeObj)
+{
+    Ral_Attribute attribute = NULL ;
+    int typec ;
+    Tcl_Obj **typev ;
+    const char *attrName ;
+    const char *typeName ;
+
+    /*
+     * The complication arises when the type is either Tuple or Relation.
+     * So first see if the "type" object is a list that might contain
+     * a Tuple or Relation type specification.
+     */
+    if (Tcl_ListObjGetElements(interp, typeObj, &typec, &typev) != TCL_OK) {
+	return NULL ;
+    }
+    attrName = Tcl_GetString(nameObj) ;
+    typeName = Tcl_GetString(*typev) ;
+    if (strcmp("Tuple", typeName) == 0 && typec == 2) {
+	Ral_TupleHeading heading =
+	    Ral_TupleHeadingNewFromObj(interp, *(typev + 1)) ;
+
+	if (heading) {
+	    attribute = Ral_AttributeNewTupleType(attrName, heading) ;
+	}
+    } else if (strcmp("Relation", typeName) == 0 && typec == 3) {
+	Ral_RelationHeading heading =
+	    Ral_RelationHeadingNewFromObjs(interp, typev[1], typev[2]) ;
+
+	if (heading) {
+	    attribute = Ral_AttributeNewRelationType(attrName, heading) ;
+	}
+    } else if (typec == 1) {
+	Tcl_ObjType *tclType = Tcl_GetObjType(typeName) ;
+
+	if (tclType != NULL) {
+	    attribute = Ral_AttributeNewTclType(attrName, tclType) ;
+	} else {
+	    Tcl_ResetResult(interp) ;
+	    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
+		"unknown data type, \"", typeName, "\"",
+		NULL) ;
+	}
+    } else {
+	Tcl_ResetResult(interp) ;
+	Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
+	    "bad type specification, \"", Tcl_GetString(typeObj),
+	    "\"", NULL) ;
+    }
+
+    return attribute ;
+}
+
+/*
+ * When an attribute is given a value in a Tuple or Relation, it must
+ * be able to be coerced into the appropriate type.
+ */
+int
+Ral_AttributeConvertValueToType(
+    Tcl_Interp *interp,
+    Ral_Attribute attr,
+    Tcl_Obj *objPtr)
+{
+    int result = TCL_OK ;
+
+    switch (attr->attrType) {
+    case Tcl_Type:
+	result = Tcl_ConvertToType(interp, objPtr, attr->tclType) ;
+	if (result == TCL_OK && strcmp(attr->tclType->name, "string") != 0) {
+	    Tcl_InvalidateStringRep(objPtr) ;
+	}
+	break ;
+
+    case Tuple_Type:
+	if (objPtr->typePtr != &Ral_TupleObjType) {
+	    result = Ral_TupleObjConvert(attr->tupleHeading, interp, objPtr,
+		objPtr) ;
+	}
+	break ;
+
+    case Relation_Type:
+	if (objPtr->typePtr != &Ral_RelationObjType) {
+	    result = Ral_RelationObjConvert(attr->relationHeading, interp,
+		objPtr, objPtr) ;
+	}
+	break ;
+
+    default:
+	Tcl_Panic("Ral_AttributeConvertValueToType: unknown attribute type: %d",
+	    attr->attrType) ;
+	break ;
+    }
+
+    return result ;
+}
+
 int
 Ral_AttributeScanName(
     Ral_Attribute a,
@@ -444,12 +426,12 @@ Ral_AttributeScanType(
 
     case Tuple_Type:
 	length = Ral_TupleHeadingScan(a->tupleHeading, flags) ;
-	length += sizeof(openList) - 1 + sizeof(closeList) - 1;
+	length += sizeof(openList) + sizeof(closeList) ;
 	break ;
 
     case Relation_Type:
 	length = Ral_RelationHeadingScan(a->relationHeading, flags) ;
-	length += sizeof(openList) - 1 + sizeof(closeList) - 1;
+	length += sizeof(openList) + sizeof(closeList) ;
 	break ;
 
     default:
@@ -476,11 +458,9 @@ Ral_AttributeConvertType(
     case Tuple_Type: {
 	char *p = dst ;
 
-	strcpy(p, openList) ;
-	p += sizeof(openList) - 1 ;
+	*p++ = openList ;
 	p += Ral_TupleHeadingConvert(a->tupleHeading, p, flags) ;
-	strcpy(p, closeList) ;
-	p += sizeof(closeList) - 1;
+	*p++ = closeList ;
 	length = p - dst ;
     }
 	break ;
@@ -488,11 +468,9 @@ Ral_AttributeConvertType(
     case Relation_Type: {
 	char *p = dst ;
 
-	strcpy(p, openList) ;
-	p += sizeof(openList) - 1 ;
+	*p++ = openList ;
 	p += Ral_RelationHeadingConvert(a->relationHeading, p, flags) ;
-	strcpy(p, closeList) ;
-	p += sizeof(closeList) - 1;
+	*p++ = closeList ;
 	length = p - dst ;
     }
 	break ;

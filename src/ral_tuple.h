@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuple.h,v $
-$Revision: 1.6 $
-$Date: 2006/03/06 01:07:37 $
+$Revision: 1.7 $
+$Date: 2006/03/19 19:48:31 $
  *--
  */
 #ifndef _ral_tuple_h_
@@ -133,6 +133,7 @@ FUNCTION DECLARATIONS
 
 extern Ral_Tuple Ral_TupleNew(Ral_TupleHeading) ;
 extern Ral_Tuple Ral_TupleSubset(Ral_Tuple, Ral_TupleHeading, Ral_IntVector) ;
+extern Ral_Tuple Ral_TupleExtend(Ral_Tuple, Ral_TupleHeading) ;
 extern void Ral_TupleDelete(Ral_Tuple) ;
 extern void Ral_TupleReference(Ral_Tuple) ;
 extern void Ral_TupleUnreference(Ral_Tuple) ;
@@ -148,7 +149,7 @@ extern int Ral_TupleUpdateAttrValue(Ral_Tuple,
 extern Tcl_Obj *Ral_TupleGetAttrValue(Ral_Tuple, const char *) ;
 extern int Ral_TupleCopy(Ral_Tuple, Ral_TupleHeadingIter,
     Ral_TupleHeadingIter, Ral_Tuple) ;
-extern void Ral_TupleCopyValues(Ral_TupleIter, Ral_TupleIter, Ral_TupleIter) ;
+extern int Ral_TupleCopyValues(Ral_TupleIter, Ral_TupleIter, Ral_TupleIter) ;
 extern Ral_Tuple Ral_TupleDup(Ral_Tuple) ;
 extern Ral_Tuple Ral_TupleDupOrdered(Ral_Tuple, Ral_TupleHeading,
     Ral_IntVector) ;

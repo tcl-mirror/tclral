@@ -49,8 +49,8 @@ ABSTRACT:
     Algebra.
 
 $RCSfile: ral.c,v $
-$Revision: 1.25 $
-$Date: 2006/02/20 20:15:03 $
+$Revision: 1.26 $
+$Date: 2006/03/19 19:48:31 $
  *--
  */
 
@@ -99,9 +99,9 @@ STATIC DATA ALLOCATION
 static const char ral_pkgname[] = "ral" ;
 static const char ral_version[] = "0.8" ;
 static const char ral_rcsid[] =
-    "$Id: ral.c,v 1.25 2006/02/20 20:15:03 mangoa01 Exp $" ;
+    "$Id: ral.c,v 1.26 2006/03/19 19:48:31 mangoa01 Exp $" ;
 static const char ral_copyright[] =
-    "This software is copyrighted 2004, 2005 by G. Andrew Mangogna."
+    "This software is copyrighted 2004, 2005, 2006 by G. Andrew Mangogna."
     "Terms and conditions for use are distributed with the source code." ;
 
 /*

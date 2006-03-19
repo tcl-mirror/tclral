@@ -42,38 +42,11 @@ terms specified in this license.
  *++
 MODULE:
 
-$RCSfile: ral_tuplecmd.c,v $
-$Revision: 1.6 $
-$Date: 2006/03/06 01:07:37 $
-
 ABSTRACT:
 
-MODIFICATION HISTORY:
-$Log: ral_tuplecmd.c,v $
-Revision 1.6  2006/03/06 01:07:37  mangoa01
-More relation commands done. Cleaned up error reporting.
-
-Revision 1.5  2006/02/26 04:57:53  mangoa01
-Reworked the conversion from internal form to a string yet again.
-This design is better and more recursive in nature.
-Added additional code to the "relation" commands.
-Now in a position to finish off the remaining relation commands.
-
-Revision 1.4  2006/02/20 20:15:08  mangoa01
-Now able to convert strings to relations and vice versa including
-tuple and relation valued attributes.
-
-Revision 1.3  2006/02/06 05:02:45  mangoa01
-Started on relation heading and other code refactoring.
-This is a checkpoint after a number of added files and changes
-to tuple heading code.
-
-Revision 1.2  2006/01/02 01:39:29  mangoa01
-Tuple commands now operate properly. Fixed problems of constructing the string representation when there were tuple valued attributes.
-
-Revision 1.1  2005/12/27 23:17:19  mangoa01
-Update to the new spilt out file structure.
-
+$RCSfile: ral_tuplecmd.c,v $
+$Revision: 1.7 $
+$Date: 2006/03/19 19:48:31 $
  *--
  */
 
@@ -131,7 +104,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tuplecmd.c,v $ $Revision: 1.6 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tuplecmd.c,v $ $Revision: 1.7 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -465,11 +438,9 @@ TupleExtendCmd(
 {
     Tcl_Obj *tupleObj ;
     Ral_Tuple tuple ;
-    Ral_TupleHeading heading ;
     Ral_Tuple newTuple ;
     Ral_TupleHeading newHeading ;
     Ral_TupleIter newValues ;
-    int i ;
 
     if (objc < 3) {
 	Tcl_WrongNumArgs(interp, 2, objv, "tupleValue ?name-type-value ... ?") ;
@@ -492,22 +463,12 @@ TupleExtendCmd(
     }
     objv += 3 ;
     tuple = tupleObj->internalRep.otherValuePtr ;
-    heading = tuple->heading ;
     /*
      * The heading for the new tuple is larger by the number of new
      * attributes given in the command.
      */
-    newHeading = Ral_TupleHeadingNew(Ral_TupleDegree(tuple) + objc) ;
-    newTuple = Ral_TupleNew(newHeading) ;
-    /*
-     * Copy the attribute values from the tuple to the new tuple.
-     */
-    i = Ral_TupleCopy(tuple, Ral_TupleHeadingBegin(heading),
-	Ral_TupleHeadingEnd(heading), newTuple) ;
-    /*
-     * Should always be able to copy the old tuple into an empty new one.
-     */
-    assert(i != 0) ;
+    newHeading = Ral_TupleHeadingExtend(tuple->heading, objc) ;
+    newTuple = Ral_TupleExtend(tuple, newHeading) ;
     /*
      * Add the new attributes to the new tuple.  The new attributes are tacked
      * on at the end of the attributes that came from the original tuple.

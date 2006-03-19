@@ -42,38 +42,11 @@ terms specified in this license.
  *++
 MODULE:
 
-$RCSfile: ral_tupleobj.c,v $
-$Revision: 1.6 $
-$Date: 2006/03/06 01:07:37 $
-
 ABSTRACT:
 
-MODIFICATION HISTORY:
-$Log: ral_tupleobj.c,v $
-Revision 1.6  2006/03/06 01:07:37  mangoa01
-More relation commands done. Cleaned up error reporting.
-
-Revision 1.5  2006/02/26 04:57:53  mangoa01
-Reworked the conversion from internal form to a string yet again.
-This design is better and more recursive in nature.
-Added additional code to the "relation" commands.
-Now in a position to finish off the remaining relation commands.
-
-Revision 1.4  2006/02/20 20:15:10  mangoa01
-Now able to convert strings to relations and vice versa including
-tuple and relation valued attributes.
-
-Revision 1.3  2006/02/06 05:02:45  mangoa01
-Started on relation heading and other code refactoring.
-This is a checkpoint after a number of added files and changes
-to tuple heading code.
-
-Revision 1.2  2006/01/02 01:39:29  mangoa01
-Tuple commands now operate properly. Fixed problems of constructing the string representation when there were tuple valued attributes.
-
-Revision 1.1  2005/12/27 23:17:19  mangoa01
-Update to the new spilt out file structure.
-
+$RCSfile: ral_tupleobj.c,v $
+$Revision: 1.7 $
+$Date: 2006/03/19 19:48:31 $
  *--
  */
 
@@ -135,7 +108,7 @@ Tcl_ObjType Ral_TupleObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tupleobj.c,v $ $Revision: 1.6 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tupleobj.c,v $ $Revision: 1.7 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -408,7 +381,7 @@ Ral_TupleObjSetError(
 	"bad value type for value",
 	"bad tuple type keyword",
 	"wrong number of attributes specified",
-	"bad list of pairs"
+	"bad list of pairs",
     } ;
     static const char *errorStrings[] = {
 	"OK",

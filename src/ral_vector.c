@@ -42,32 +42,11 @@ terms specified in this license.
  *++
 MODULE:
 
-$RCSfile: ral_vector.c,v $
-$Revision: 1.5 $
-$Date: 2006/03/06 01:07:37 $
-
 ABSTRACT:
 
-MODIFICATION HISTORY:
-$Log: ral_vector.c,v $
-Revision 1.5  2006/03/06 01:07:37  mangoa01
-More relation commands done. Cleaned up error reporting.
-
-Revision 1.4  2006/03/01 02:28:40  mangoa01
-Added new relation commands and test cases. Cleaned up Makefiles.
-
-Revision 1.3  2006/02/20 20:15:10  mangoa01
-Now able to convert strings to relations and vice versa including
-tuple and relation valued attributes.
-
-Revision 1.2  2006/02/06 05:02:45  mangoa01
-Started on relation heading and other code refactoring.
-This is a checkpoint after a number of added files and changes
-to tuple heading code.
-
-Revision 1.1  2005/12/27 23:17:19  mangoa01
-Update to the new spilt out file structure.
-
+$RCSfile: ral_vector.c,v $
+$Revision: 1.6 $
+$Date: 2006/03/19 19:48:31 $
  *--
  */
 
@@ -110,7 +89,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_vector.c,v $ $Revision: 1.5 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_vector.c,v $ $Revision: 1.6 $" ;
 
 /*
 FUNCTION DEFINITIONS

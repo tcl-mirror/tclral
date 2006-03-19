@@ -42,30 +42,11 @@ terms specified in this license.
  *++
 MODULE:
 
-$RCSfile: ral_relationcmd.c,v $
-$Revision: 1.4 $
-$Date: 2006/03/06 01:07:37 $
-
 ABSTRACT:
 
-MODIFICATION HISTORY:
-$Log: ral_relationcmd.c,v $
-Revision 1.4  2006/03/06 01:07:37  mangoa01
-More relation commands done. Cleaned up error reporting.
-
-Revision 1.3  2006/03/01 02:28:40  mangoa01
-Added new relation commands and test cases. Cleaned up Makefiles.
-
-Revision 1.2  2006/02/26 04:57:53  mangoa01
-Reworked the conversion from internal form to a string yet again.
-This design is better and more recursive in nature.
-Added additional code to the "relation" commands.
-Now in a position to finish off the remaining relation commands.
-
-Revision 1.1  2006/02/20 20:15:07  mangoa01
-Now able to convert strings to relations and vice versa including
-tuple and relation valued attributes.
-
+$RCSfile: ral_relationcmd.c,v $
+$Revision: 1.5 $
+$Date: 2006/03/19 19:48:31 $
  *--
  */
 
@@ -89,6 +70,10 @@ MACRO DEFINITIONS
 /*
 TYPE DEFINITIONS
 */
+enum Ordering {
+    SORT_ASCENDING,
+    SORT_DESCENDING
+} ;
 
 /*
 EXTERNAL FUNCTION REFERENCES
@@ -137,7 +122,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.4 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.5 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -351,6 +336,158 @@ RelationExtendCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
+    static const char *orderOptions[] = {
+	"-ascending",
+	"-descending",
+	NULL
+    } ;
+    static const char usage[] = "relationValue "
+	"?-ascending | -descending attrList? "
+	"tupleVarName ?attr1 expr1 ... attrN exprN?" ;
+
+    Tcl_Obj *relObj ;
+    Ral_Relation relation ;
+    const char *orderOption ;
+    Tcl_Obj *varNameObj ;
+    Ral_Relation sortedRel ;
+    Ral_Relation extRelation ;
+    Ral_TupleHeading extTupleHeading ;
+    int c ;
+    Tcl_Obj *const*v ;
+    Ral_RelationIter iter ;
+    Ral_RelationIter end ;
+    Ral_RelationIter extIter ;
+    int extOffset ;
+
+    /*
+     * relation extend relationValue ?-ascending | -descending attr-list?
+     *	    tupleVarName ?attr1 type1 expr1...attrN typeN exprN?
+     */
+    if (objc < 4) {
+	Tcl_WrongNumArgs(interp, 2, objv, usage) ;
+	return TCL_ERROR ;
+    }
+
+    relObj = objv[2] ;
+    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relObj->internalRep.otherValuePtr ;
+
+    orderOption = Tcl_GetString(objv[3]) ;
+    if (*orderOption == '-') {
+	/*
+	 * Ordering option specified.
+	 */
+	int index ;
+	Ral_IntVector sortAttrs ;
+
+	if (objc < 6) {
+	    Tcl_WrongNumArgs(interp, 2, objv, usage) ;
+	    return TCL_ERROR ;
+	}
+
+	if (Tcl_GetIndexFromObj(interp, objv[3], orderOptions, "ordering", 0,
+	    &index) != TCL_OK) {
+	    return TCL_ERROR ;
+	}
+	sortAttrs = Ral_TupleHeadingAttrsFromObj(
+	    relation->heading->tupleHeading, interp, objv[4]) ;
+	if (sortAttrs == NULL) {
+	    return TCL_ERROR ;
+	}
+	sortedRel = index == SORT_ASCENDING ?
+	    Ral_RelationSortAscending(relation, sortAttrs) :
+	    Ral_RelationSortDescending(relation, sortAttrs) ;
+	Ral_IntVectorDelete(sortAttrs) ;
+	varNameObj = objv[5] ;
+	objc -= 6 ;
+	objv += 6 ;
+    } else {
+	sortedRel = relation ;
+	varNameObj = objv[3] ;
+	objc -= 4 ;
+	objv += 4 ;
+    }
+
+    if (objc % 3 != 0) {
+	Ral_RelationObjSetError(interp, REL_BAD_TRIPLE_LIST,
+	"attribute / type / expression arguments must be given in triples") ;
+	return TCL_ERROR ;
+    }
+
+    Tcl_IncrRefCount(varNameObj) ;
+    /*
+     * Make the new relation adding the extended attributes
+     */
+    extRelation = Ral_RelationExtend(sortedRel, objc / 3) ;
+    extTupleHeading = extRelation->heading->tupleHeading ;
+
+    for (c = objc, v = objv ; c > 0 ; c -= 3, v += 3) {
+	Ral_Attribute attr = Ral_AttributeNewFromObjs(interp, *v, *(v + 1)) ;
+	Ral_TupleHeadingIter inserted ;
+
+	if (attr == NULL) {
+	    goto errorOut ;
+	}
+	inserted = Ral_TupleHeadingPushBack(extTupleHeading, attr) ;
+	if (inserted == Ral_TupleHeadingEnd(extTupleHeading)) {
+	    Ral_RelationObjSetError(interp, REL_DUPLICATE_ATTR,
+		Tcl_GetString(*v)) ;
+	    goto errorOut ;
+	}
+    }
+
+    extIter = Ral_RelationBegin(extRelation) ;
+    extOffset = Ral_RelationDegree(sortedRel) ;
+
+    end = Ral_RelationEnd(sortedRel) ;
+    for (iter = Ral_RelationBegin(sortedRel) ; iter != end ; ++iter) {
+	Tcl_Obj *tupleObj ;
+	Ral_Tuple tuple = *iter ;
+	Ral_Tuple extTuple = *extIter++ ;
+	Ral_TupleIter valueIter = Ral_TupleBegin(extTuple) + extOffset ;
+	Ral_TupleHeadingIter attrIter = Ral_TupleHeadingBegin(extTupleHeading) +
+	    extOffset ;
+
+	tupleObj = Ral_TupleObjNew(tuple) ;
+	if (Tcl_ObjSetVar2(interp, varNameObj, NULL, tupleObj,
+	    TCL_LEAVE_ERR_MSG) == NULL) {
+	    Tcl_DecrRefCount(tupleObj) ;
+	    goto errorOut ;
+	}
+
+	for (c = objc, v = objv + 2 ; c > 0 ; c -= 3, v += 3) {
+	    Tcl_Obj *exprResult ;
+
+	    if (Tcl_ExprObj(interp, *v, &exprResult) != TCL_OK) {
+		goto errorOut ;
+	    }
+	    if (Ral_AttributeConvertValueToType(interp, *attrIter++,
+		exprResult) != TCL_OK) {
+		Tcl_DecrRefCount(exprResult) ;
+		goto errorOut ;
+	    }
+	    Tcl_IncrRefCount(*valueIter++ = exprResult) ;
+	    Tcl_DecrRefCount(exprResult) ;
+	}
+    }
+
+    Tcl_UnsetVar(interp, Tcl_GetString(varNameObj), 0) ;
+    Tcl_DecrRefCount(varNameObj) ;
+    if (sortedRel != relation) {
+	Ral_RelationDelete(sortedRel) ;
+    }
+    Tcl_SetObjResult(interp, Ral_RelationObjNew(extRelation)) ;
+    return TCL_OK ;
+
+errorOut:
+    Tcl_UnsetVar(interp, Tcl_GetString(varNameObj), 0) ;
+    Tcl_DecrRefCount(varNameObj) ;
+    if (sortedRel != relation) {
+	Ral_RelationDelete(sortedRel) ;
+    }
+    Ral_RelationDelete(extRelation) ;
     return TCL_ERROR ;
 }
 
@@ -360,10 +497,6 @@ RelationForeachCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
-    enum Ordering {
-	SORT_ASCENDING,
-	SORT_DESCENDING
-    } ;
     static const char *orderKeyWords[] = {
 	"ascending",
 	"descending",
@@ -1021,6 +1154,104 @@ RelationRestrictOneCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
+    Tcl_Obj *relObj ;
+    Ral_Relation relation ;
+    Ral_RelationHeading heading ;
+    Ral_TupleHeading tupleHeading ;
+    int elemc ;
+    Tcl_Obj **elemv ;
+    Ral_IntVector id ;
+    Ral_Tuple key ;
+    int idNum ;
+    Ral_Relation newRelation ;
+    Ral_RelationIter found ;
+
+    /* relation restrictone relValue name-value-list */
+    if (objc != 4) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relValue name-value-list") ;
+	return TCL_ERROR ;
+    }
+
+    relObj = objv[2] ;
+    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relObj->internalRep.otherValuePtr ;
+    heading = relation->heading ;
+    tupleHeading = heading->tupleHeading ;
+
+    /*
+     * Iterate through the name/value list and construct an identifier
+     * vector from the attribute names and a key tuple from the corresponding
+     * values.
+     */
+    if (Tcl_ListObjGetElements(interp, objv[3], &elemc, &elemv) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    if (elemc % 2 != 0) {
+	Ral_RelationObjSetError(interp, REL_BAD_PAIRS_LIST,
+	    "attribute / value arguments must be given in pairs") ;
+	return TCL_ERROR ;
+    }
+
+    id = Ral_IntVectorNewEmpty(elemc / 2) ;
+    key = Ral_TupleNew(tupleHeading) ;
+    for ( ; elemc > 0 ; elemc -= 2, elemv += 2) {
+	const char *attrName = Tcl_GetString(*elemv) ;
+	int attrIndex = Ral_TupleHeadingIndexOf(tupleHeading, attrName) ;
+	int updated ;
+
+	if (attrIndex < 0) {
+	    Ral_RelationObjSetError(interp, REL_UNKNOWN_ATTR, attrName) ;
+	    goto error_out ;
+	}
+	Ral_IntVectorPushBack(id, attrIndex) ;
+
+	updated = Ral_TupleUpdateAttrValue(key, attrName, *(elemv + 1)) ;
+	if (!updated) {
+	    Ral_TupleObjSetError(interp, Ral_TupleLastError,
+		Tcl_GetString(*(elemv + 1))) ;
+	    goto error_out ;
+	}
+    }
+
+    /*
+     * Check if the attributes given do constitute an identifier.
+     */
+    idNum = Ral_RelationHeadingFindIdentifier(heading, id) ;
+    if (idNum < 0) {
+	Ral_RelationObjSetError(interp, REL_NOT_AN_IDENTIFIER,
+	    Tcl_GetString(objv[3])) ;
+	goto error_out ;
+    }
+    Ral_IntVectorDelete(id) ;
+    /*
+     * Create the result relation.
+     */
+    newRelation = Ral_RelationNew(relation->heading) ;
+    /*
+     * Find the key tuple in the relation.
+     */
+    found = Ral_RelationFindKey(relation, idNum, key, NULL) ;
+    Ral_TupleDelete(key) ;
+    /*
+     * If the key tuple can be found, then insert the tuple into
+     * the result. Otherwise the result will have cardinality 0.
+     */
+    if (found != Ral_RelationEnd(relation)) {
+	int inserted = Ral_RelationPushBack(newRelation, *found, NULL) ;
+	/*
+	 * Should always be able to insert into an empty relation.
+	 */
+	assert(inserted != 0) ;
+    }
+
+    Tcl_SetObjResult(interp, Ral_RelationObjNew(newRelation)) ;
+    return TCL_OK ;
+
+error_out:
+    Ral_IntVectorDelete(id) ;
+    Ral_TupleDelete(key) ;
     return TCL_ERROR ;
 }
 
@@ -1154,7 +1385,34 @@ RelationUngroupCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
-    return TCL_ERROR ;
+    Tcl_Obj *relObj ;
+    Ral_Relation relation ;
+    Tcl_Obj *attrObj ;
+    const char *attrName ;
+    Ral_Relation ungrpRel ;
+
+    /* relation ungroup relation attribute */
+    if (objc != 4) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relation attribute") ;
+	return TCL_ERROR ;
+    }
+    relObj = objv[2] ;
+    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relObj->internalRep.otherValuePtr ;
+    attrObj = objv[3] ;
+    attrName = Tcl_GetString(attrObj) ;
+
+    ungrpRel = Ral_RelationUngroup(relation, attrName) ;
+    if (ungrpRel == NULL) {
+	Ral_RelationObjSetError(interp, Ral_RelationLastError,
+	    "during ungroup operation") ;
+	return TCL_ERROR ;
+    }
+
+    Tcl_SetObjResult(interp, Ral_RelationObjNew(ungrpRel)) ;
+    return TCL_OK ;
 }
 
 static int

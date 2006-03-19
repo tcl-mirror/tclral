@@ -42,41 +42,11 @@ terms specified in this license.
  *++
 MODULE:
 
-$RCSfile: ral_tuple.c,v $
-$Revision: 1.7 $
-$Date: 2006/03/06 01:07:37 $
-
 ABSTRACT:
 
-MODIFICATION HISTORY:
-$Log: ral_tuple.c,v $
-Revision 1.7  2006/03/06 01:07:37  mangoa01
-More relation commands done. Cleaned up error reporting.
-
-Revision 1.6  2006/03/01 02:28:40  mangoa01
-Added new relation commands and test cases. Cleaned up Makefiles.
-
-Revision 1.5  2006/02/26 04:57:53  mangoa01
-Reworked the conversion from internal form to a string yet again.
-This design is better and more recursive in nature.
-Added additional code to the "relation" commands.
-Now in a position to finish off the remaining relation commands.
-
-Revision 1.4  2006/02/20 20:15:07  mangoa01
-Now able to convert strings to relations and vice versa including
-tuple and relation valued attributes.
-
-Revision 1.3  2006/02/06 05:02:45  mangoa01
-Started on relation heading and other code refactoring.
-This is a checkpoint after a number of added files and changes
-to tuple heading code.
-
-Revision 1.2  2006/01/02 01:39:29  mangoa01
-Tuple commands now operate properly. Fixed problems of constructing the string representation when there were tuple valued attributes.
-
-Revision 1.1  2005/12/27 23:17:19  mangoa01
-Update to the new spilt out file structure.
-
+$RCSfile: ral_tuple.c,v $
+$Revision: 1.8 $
+$Date: 2006/03/19 19:48:31 $
  *--
  */
 
@@ -122,7 +92,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_tuple.c,v $ $Revision: 1.7 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tuple.c,v $ $Revision: 1.8 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -167,20 +137,31 @@ Ral_TupleSubset(
     return subTuple ;
 }
 
+Ral_Tuple
+Ral_TupleExtend(
+    Ral_Tuple tuple,
+    Ral_TupleHeading heading)
+{
+    Ral_Tuple extendTuple = Ral_TupleNew(heading) ;
+
+    Ral_TupleCopyValues(Ral_TupleBegin(tuple), Ral_TupleEnd(tuple),
+	Ral_TupleBegin(extendTuple)) ;
+
+    return extendTuple ;
+}
+
 void
 Ral_TupleDelete(
     Ral_Tuple tuple)
 {
     if (tuple) {
-	Tcl_Obj **objPtr ;
-	Tcl_Obj **last ;
+	Ral_TupleIter iter ;
+	Ral_TupleIter end = Ral_TupleEnd(tuple) ;
 
 	assert(tuple->refCount <= 0) ;
-	for (objPtr = tuple->values,
-	    last = objPtr + Ral_TupleHeadingSize(tuple->heading) ;
-	    objPtr != last ; ++objPtr) {
-	    if (*objPtr) {
-		Tcl_DecrRefCount(*objPtr) ;
+	for (iter = Ral_TupleBegin(tuple) ; iter != end ; ++iter) {
+	    if (*iter) {
+		Tcl_DecrRefCount(*iter) ;
 	    }
 	}
 	Ral_TupleHeadingUnreference(tuple->heading) ;
@@ -396,18 +377,22 @@ Ral_TupleCopy(
  * Assumes that the source tuple heading is the same order as the
  * destination tuple heading.
  */
-void
+int
 Ral_TupleCopyValues(
     Ral_TupleIter start,
     Ral_TupleIter finish,
     Ral_TupleIter dst)
 {
+    int count = 0 ;
     /*
      * Copy the values making sure the increment the reference count.
      */
     while (start != finish) {
 	Tcl_IncrRefCount(*dst++ = *start++) ;
+	++count ;
     }
+
+    return count ;
 }
 
 Ral_Tuple

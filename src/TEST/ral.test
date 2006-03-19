@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.6 $
-# $Date: 2006/03/06 01:07:37 $
+# $Revision: 1.7 $
+# $Date: 2006/03/19 19:48:31 $
 #  *--
 
 package require tcltest 2.2
@@ -674,6 +674,29 @@ namespace eval ::ral::test {
     } -result {Relation {a1 {Relation {t1 string t2 string} t1}} a1 {{a1 {{t1 foo t2 bar} {t1 foo2 t2 bar2}}}}}\
     -match relation
 
+    test relation-shimmer-6.0 {multiple identifiers} -body {
+	set r {
+	    Relation
+	    {a1 string a2 string a3 string}
+	    {a1 a2}
+	    {
+		{a1 a a2 b a3 c}
+		{a1 d a2 e a3 f}
+	    }
+	}
+	relation cardinality $r
+	string length $r
+	set r
+    } -result {
+	Relation
+	{a1 string a2 string a3 string}
+	{a1 a2}
+	{
+	    {a1 a a2 b a3 c}
+	    {a1 d a2 e a3 f}
+	}
+    } -match relation
+
     # relation cardinality subcommand
     test relation-cardinality-1.0 {dum relation} -body {
 	relation cardinality {Relation {} {{}} {}}
@@ -761,8 +784,93 @@ namespace eval ::ral::test {
     # relation emptyof subcommand
     test relation-emptyof-1.0 {multiple attributes} -body {
 	relation emptyof $S
-    } -result {Relation {S# string SNAME string STATUS int CITY string} S# {}}\
-    -match relation
+    } -result {
+	Relation
+	{S# string SNAME string STATUS int CITY string}
+	S#
+	{}
+    } -match relation
+
+    # relation extend subcommand
+    test relation-extend-1.0 {multiple body tuples} -body {
+	set r1 {Relation {Name string Age int} Name\
+	    {{Name Andrew Age 20}\
+	    {Name George Age 20}\
+	    {Name Fred Age 20}}}
+	relation extend $r1 t AgeInMonths int {[tuple extract $t Age] * 12}
+    } -result {
+	Relation
+	{Name string Age int AgeInMonths int}
+	Name
+	{
+	    {Name Andrew Age 20 AgeInMonths 240}
+	    {Name George Age 20 AgeInMonths 240}
+	    {Name Fred Age 20 AgeInMonths 240}
+	}
+    } -match relation
+
+    test relation-extend-2.0 {bad expression} -body {
+	set r1 {Relation {Name string Age int} Name\
+	    {{Name Andrew Age 20}\
+	    {Name George Age 20}\
+	    {Name Fred Age 20}}}
+	relation extend $r1 t AgeInMonths int {[tuple extract $t foo] * 12}
+    } -result {unknown attribute name, "foo"} -returnCodes error
+
+    test relation-extend-3.0 {specify ordering} -body {
+	set r1 {
+	    Relation
+	    {Name string Age int}
+	    Name
+	    {
+		{Name Andrew Age 20}
+		{Name George Age 20}
+		{Name Fred Age 20}
+	    }
+	}
+	set cnt -1
+	relation extend $r1 -ascending Name t Order int {[incr cnt]}
+    } -match relation -result {
+	Relation
+	{Name string Age int Order int}
+	Name
+	{
+	    {Name Andrew Age 20 Order 0}
+	    {Name George Age 20 Order 2}
+	    {Name Fred Age 20 Order 1}
+	}
+    }
+
+    test relation-extend-3.1 {specify ordering; bad command} -body {
+	set r1 {
+	    Relation
+	    {Name string Age int}
+	    Name
+	    {
+		{Name Andrew Age 20}
+		{Name George Age 20}
+		{Name Fred Age 20}
+	    }
+	}
+	set cnt -1
+	relation extend $r1 -ascending t Order int {[incr cnt]}
+    } -returnCodes error -result {unknown attribute name, "t"}
+
+    test relation-extend-3.2 {specify ordering; bad command} -body {
+	set r1 {
+	    Relation
+	    {Name string Age int}
+	    Name
+	    {
+		{Name Andrew Age 20}
+		{Name George Age 20}
+		{Name Fred Age 20}
+	    }
+	}
+	set cnt -1
+	relation extend $r1 -ascending Name
+    } -returnCodes error -result {wrong # args: should be "relation extend relationValue ?-ascending | -descending attrList? tupleVarName ?attr1 expr1 ... attrN exprN?"}
+    # HERE -- add tests
 
     # relation foreach subcommand
     test relation-foreach-1.0 {simple visit of suppliers} -body {
@@ -1600,6 +1708,41 @@ namespace eval ::ral::test {
     } -result {syntax error in expression "< 20": unexpected operator <}\
     -returnCodes error
 
+    # relation restrictone subcommand
+    test relation-restrictone-1.0 {match the only id} -body {
+	set r {Relation {Name string Age int City string} Name\
+	    {{Name Andrew Age 30 City Sunnyvale}\
+	    {Age 20 Name George City {San Jose}}\
+	    {City Saratoga Age 10 Name Fred}}}
+	relation restrictone $r {Name Fred}
+    } -result {Relation {Name string Age int City string} Name\
+	{{Name Fred Age 10 City Saratoga}}} -match relation
+
+    test relation-restrictone-2.0 {no match} -body {
+	set r {Relation {Name string Age int City string} Name\
+	    {{Name Andrew Age 30 City Sunnyvale}\
+	    {Age 20 Name George City {San Jose}}\
+	    {City Saratoga Age 10 Name Fred}}}
+	relation restrictone $r {Name Alice}
+    } -result {Relation {Name string Age int City string} Name {}}\
+    -match relation
+
+    test relation-restrictone-3.0 {bad identifier} -body {
+	set r {Relation {Name string Age int City string} Name\
+	    {{Name Andrew Age 30 City Sunnyvale}\
+	    {Age 20 Name George City {San Jose}}\
+	    {City Saratoga Age 10 Name Fred}}}
+	relation restrictone $r {City Sunnyvale}
+    } -result {attributes do not constitute an identifier, "City Sunnyvale"}\
+    -returnCodes 1
+
+    test relation-restrictone-4.0 {multiple identifiers} -body {
+	set r {Relation {Name string Age int} {Name Age}\
+	    {{Name Andrew Age 10} {Name George Age 20} {Name Fred Age 30}}}
+	relation restrictone $r {Age 30}
+    } -result {Relation {Name string Age int} {Name Age} {{Name Fred Age 30}}}\
+    -match relation
+
     # relation times subcommand
     test relation-times-1.0 {single attribute, square relation} -body {
 	set r1 {Relation {Name string} Name {{Name Andrew}}}
@@ -1669,6 +1812,120 @@ namespace eval ::ral::test {
 	    {{Name Andrew Age 20} {Name George Age 20}}}
 	relation tuple $r
     } -result {relation must have cardinality of one, "Relation {Name string Age int} Name {{Name Andrew Age 20} {Name George Age 20}}"} -returnCodes error
+
+    # relation ungroup subcommand
+    test relation-ungroup-1.0 {two attribute relation} -body {
+	set r {Relation {Name string\
+	    Dog {Relation {DogName string Breed string} DogName}} Name\
+	    {{Name Fred Dog\
+		{{DogName Rover Breed Terrier}\
+		{DogName Missy Breed Poodle}}}\
+	    {Name Alice Dog {{DogName Tiger Breed Setter}}}}}
+	relation ungroup $r Dog
+    } -result {Relation {Name string DogName string Breed string} {{Name DogName}} {{Name Fred DogName Rover Breed Terrier} {Name Fred DogName Missy Breed Poodle} {Name Alice DogName Tiger Breed Setter}}}\
+    -match relation
+
+    test relation-ungroup-2.0 {duplicate attribute name} -body {
+	set r {Relation {Name string\
+	    Dog {Relation {Name string Breed string} Name}} Name\
+	    {{Name Fred Dog\
+		{{Name Rover Breed Terrier}\
+		{Name Missy Breed Poodle}}}\
+	    {Name Alice Dog {{Name Tiger Breed Setter}}}}}
+	relation ungroup $r Dog
+    } -result {duplicate attribute name, "during ungroup operation"}\
+    -returnCodes error
+
+    test relation-ungroup-2.1 {unknown attribute name} -body {
+	set r {
+	    Relation
+	    {Name string Dog {Relation {Name string Breed string} Name}}
+	    Name
+	    {
+		{Name Fred Dog
+		    {
+			{Name Rover Breed Terrier}
+			{Name Missy Breed Poodle}
+		    }
+		}
+		{Name Alice Dog {{Name Tiger Breed Setter}}
+		}
+	    }
+	}
+	relation ungroup $r Weight
+    } -result {unknown attribute name, "during ungroup operation"}\
+    -returnCodes error
+
+    test relation-ungroup-2.2 {attribute not a relation} -body {
+	set r {
+	    Relation
+	    {Name string Dog {Relation {Name string Breed string} Name}}
+	    Name
+	    {
+		{Name Fred Dog
+		    {
+			{Name Rover Breed Terrier}
+			{Name Missy Breed Poodle}
+		    }
+		}
+		{Name Alice Dog {{Name Tiger Breed Setter}}
+		}
+	    }
+	}
+	relation ungroup $r Name
+    } -result\
+	{attribute must be of a Relation type, "during ungroup operation"}\
+    -returnCodes error
+
+    test relation-ungroup-3.0 {common tuples in the relation attribute} -body {
+	set r {Relation {Name string\
+	    Dog {Relation {DogName string Breed string} DogName}}\
+		{{Name Dog}}\
+	    {{Name Fred Dog\
+		{{DogName Rover Breed Terrier}\
+		{DogName Missy Breed Poodle}}}\
+	    {Name Fred Dog {{DogName Rover Breed Terrier}}}}}
+	relation ungroup $r Dog
+    } -result {Relation {Name string DogName string Breed string} {{Name DogName}} {{Name Fred DogName Rover Breed Terrier} {Name Fred DogName Missy Breed Poodle}}}\
+    -match relation
+
+    test relation-ungroup-4.0 {attributes beyond ungrouped attribute} -body {
+	set r {
+	    Relation
+	    {Name string Dog {
+		Relation
+		{DogName string Breed string}
+		DogName} Weight int}
+	    Name
+	    {
+		{
+		    Name Fred
+		    Dog {
+			{DogName Rover Breed Terrier}
+			{DogName Missy Breed Poodle}
+		    }
+		    Weight 20
+		}
+		{
+		    Name Alice
+		    Dog {
+			{DogName Tiger Breed Setter}
+		    }
+		    Weight 40
+		}
+	    }
+	}
+	relation ungroup $r Dog
+    } -result {
+	Relation
+	{Name string Weight int DogName string Breed string}
+	{{Name DogName}}
+	{
+	    {Name Fred Weight 20 DogName Rover Breed Terrier}
+	    {Name Fred Weight 20 DogName Missy Breed Poodle}
+	    {Name Alice Weight 40 DogName Tiger Breed Setter}
+	}
+    } -match relation
 
     # relation union subcommand
     test relation-union-1.0 {dum relation} -body {

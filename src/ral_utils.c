@@ -42,24 +42,11 @@ terms specified in this license.
  *++
 MODULE:
 
-$RCSfile: ral_utils.c,v $
-$Revision: 1.3 $
-$Date: 2006/03/06 01:07:37 $
-
 ABSTRACT:
 
-MODIFICATION HISTORY:
-$Log: ral_utils.c,v $
-Revision 1.3  2006/03/06 01:07:37  mangoa01
-More relation commands done. Cleaned up error reporting.
-
-Revision 1.2  2006/02/20 20:15:10  mangoa01
-Now able to convert strings to relations and vice versa including
-tuple and relation valued attributes.
-
-Revision 1.1  2005/12/27 23:17:19  mangoa01
-Update to the new spilt out file structure.
-
+$RCSfile: ral_utils.c,v $
+$Revision: 1.4 $
+$Date: 2006/03/19 19:48:31 $
  *--
  */
 
@@ -100,7 +87,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_utils.c,v $ $Revision: 1.3 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_utils.c,v $ $Revision: 1.4 $" ;
 
 /*
 FUNCTION DEFINITIONS

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.h,v $
-$Revision: 1.6 $
-$Date: 2006/03/06 01:07:37 $
+$Revision: 1.7 $
+$Date: 2006/03/19 19:48:31 $
  *--
  */
 #ifndef _ral_attribute_h_
@@ -86,15 +86,16 @@ typedef enum Ral_AttrDataType {
 /*
  * An Attribute is an association of name to data type.  Name is just a simple
  * string. Data type is either one of the "known" Tcl data types or it can be a
- * "Tuple" or "Relation" type.  For the cases of "Tuple" or "Relation" these
+ * "Tuple" or "Relation" type.  For the cases of "Tuple" or "Relation", these
  * types are not of constant structure. So for them we need a reference to the
- * headings that describe the details of the particular Tuple or Relation to
- * which this attribute refers.
+ * headings to describe the details of the particular Tuple or Relation to
+ * which an attribute refers. Remember Tuple and Relation are really type
+ * generators rather than specific fixed types.
  */
 
 typedef struct Ral_Attribute {
-    const char *name ;
-    Ral_AttrDataType attrType ;
+    const char *name ;		    /* name of the attribute */
+    Ral_AttrDataType attrType ;	    /* encoding to distinguish the union */
     union {
 	Tcl_ObjType *tclType ;
 	struct Ral_TupleHeading *tupleHeading ;
@@ -103,7 +104,13 @@ typedef struct Ral_Attribute {
 } *Ral_Attribute ;
 
 /*
- * Data structures to hold scan flags.
+ * Data structures to hold scan flags. Scan flags are used to accumulate
+ * information used when comverting list elements into strings. Here the
+ * scan flags concept is broadened to deal with the issues that arise for
+ * Tuple and Relation types. We also split the flags between those needed
+ * for type information and those used for values. The complexity arises
+ * here because of the possiblity of Tuple or Relation valued attributes and
+ * those attributes will have a recursive structure.
  */
 typedef struct Ral_AttributeTypeScanFlags {
     Ral_AttrDataType attrType ;

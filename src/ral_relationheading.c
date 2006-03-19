@@ -42,38 +42,11 @@ terms specified in this license.
  *++
 MODULE:
 
-$RCSfile: ral_relationheading.c,v $
-$Revision: 1.6 $
-$Date: 2006/03/06 01:07:37 $
-
 ABSTRACT:
 
-MODIFICATION HISTORY:
-$Log: ral_relationheading.c,v $
-Revision 1.6  2006/03/06 01:07:37  mangoa01
-More relation commands done. Cleaned up error reporting.
-
-Revision 1.5  2006/03/01 02:28:40  mangoa01
-Added new relation commands and test cases. Cleaned up Makefiles.
-
-Revision 1.4  2006/02/26 04:57:53  mangoa01
-Reworked the conversion from internal form to a string yet again.
-This design is better and more recursive in nature.
-Added additional code to the "relation" commands.
-Now in a position to finish off the remaining relation commands.
-
-Revision 1.3  2006/02/20 20:15:07  mangoa01
-Now able to convert strings to relations and vice versa including
-tuple and relation valued attributes.
-
-Revision 1.2  2006/02/06 05:02:45  mangoa01
-Started on relation heading and other code refactoring.
-This is a checkpoint after a number of added files and changes
-to tuple heading code.
-
-Revision 1.1  2005/12/27 23:17:19  mangoa01
-Update to the new spilt out file structure.
-
+$RCSfile: ral_relationheading.c,v $
+$Revision: 1.7 $
+$Date: 2006/03/19 19:48:31 $
  *--
  */
 
@@ -116,7 +89,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.6 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.7 $" ;
 
 static const char relationKeyword[] = "Relation" ;
 static const char openList = '{' ;
@@ -255,6 +228,31 @@ Ral_RelationHeadingDup(
     return dupHeading ;
 }
 
+Ral_RelationHeading
+Ral_RelationHeadingExtend(
+    Ral_RelationHeading heading,
+    int addAttrs)
+{
+    Ral_TupleHeading tupleHeading ;
+    Ral_RelationHeading extendHeading ;
+    int idCount = heading->idCount ;
+    Ral_IntVector *srcIds = heading->identifiers ;
+    Ral_IntVector *dstIds ;
+
+    tupleHeading = Ral_TupleHeadingExtend(heading->tupleHeading, addAttrs) ;
+    if (!tupleHeading) {
+	return NULL ;
+    }
+
+    extendHeading = Ral_RelationHeadingNew(tupleHeading, idCount) ;
+    dstIds = extendHeading->identifiers ;
+    while (idCount-- > 0) {
+	*dstIds++ = Ral_IntVectorDup(*srcIds++) ;
+    }
+
+    return extendHeading ;
+}
+
 void
 Ral_RelationHeadingDelete(
     Ral_RelationHeading heading)
@@ -289,6 +287,20 @@ Ral_RelationHeadingUnreference(
     if (heading && --heading->refCount <= 0) {
 	Ral_RelationHeadingDelete(heading) ;
     }
+}
+
+Ral_RelationIdIter
+Ral_RelationHeadingIdBegin(
+    Ral_RelationHeading heading)
+{
+    return heading->identifiers ;
+}
+
+Ral_RelationIdIter
+Ral_RelationHeadingIdEnd(
+    Ral_RelationHeading heading)
+{
+    return heading->identifiers + heading->idCount ;
 }
 
 int
@@ -448,6 +460,36 @@ Ral_RelationHeadingAddIdentifier(
 }
 
 /*
+ * Return the index into the identifer array where the identifier
+ * matches. Returns -1 if there is no match.
+ */
+int
+Ral_RelationHeadingFindIdentifier(
+    Ral_RelationHeading heading,
+    Ral_IntVector id)
+{
+    int idCount = heading->idCount ;
+    Ral_IntVector *idArray = heading->identifiers ;
+
+    /*
+     * Make sure the candidate identifier is in canonical order.
+     */
+    Ral_IntVectorSort(id) ;
+    /*
+     * Iterate through the identifies in the heading looking for a match.
+     */
+    assert(idCount >= 1) ;
+    for (idArray = heading->identifiers ; idCount > 0 ; --idCount, ++idArray) {
+	Ral_IntVector headingId = *idArray ;
+
+	if (headingId && Ral_IntVectorEqual(id, headingId)) {
+	    return idArray - heading->identifiers ;
+	}
+    }
+    return -1 ;
+}
+
+/*
  * Create a new relation heading that is the union of two other headings.
  */
 Ral_RelationHeading
@@ -530,7 +572,7 @@ Ral_RelationHeadingScan(
     int nBytes ;
     int idCount = h->idCount ;
     Ral_IntVector *ids = h->identifiers ;
-    int needIdList = Ral_IntVectorSize(*ids) != 1 ;
+    int needIdList = idCount > 1 || Ral_IntVectorSize(*ids) != 1 ;
     int length = strlen(Ral_RelationObjType.name) + 1 ; /* +1 for space */
 
     assert(flags->attrType == Relation_Type) ;
@@ -600,7 +642,7 @@ Ral_RelationHeadingConvert(
     char *p = dst ;
     int idCount = h->idCount ;
     Ral_IntVector *ids = h->identifiers ;
-    int needIdList = Ral_IntVectorSize(*ids) != 1 ;
+    int needIdList = idCount > 1 || Ral_IntVectorSize(*ids) != 1 ;
     Ral_TupleHeading tupleHeading = h->tupleHeading ;
 
     assert(flags->attrType == Relation_Type) ;

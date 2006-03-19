@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationheading.h,v $
-$Revision: 1.5 $
-$Date: 2006/03/06 01:07:37 $
+$Revision: 1.6 $
+$Date: 2006/03/19 19:48:31 $
  *--
  */
 #ifndef _ral_relationheading_h_
@@ -80,6 +80,7 @@ TYPE DECLARATIONS
  * Identifiers are sub sets of attributes for which the tuples may not have
  * duplicated values.
  */
+typedef Ral_IntVector *Ral_RelationIdIter ;
 typedef struct Ral_RelationHeading {
     int refCount ;			/* Relation headings are reference
 					 * counted. */
@@ -87,7 +88,7 @@ typedef struct Ral_RelationHeading {
 					 * all of the tuples contained in the
 					 * relation */
     int idCount ;			/* The number of identfiers */
-    Ral_IntVector *identifiers ;	/* An array of vectors holding the
+    Ral_RelationIdIter identifiers ;	/* An array of vectors holding the
 					 * identifiers. Identifiers are a vector
 					 * of offsets into the Tuple Heading
 					 * giving the attributes that
@@ -102,12 +103,17 @@ extern Ral_RelationHeading Ral_RelationHeadingNew(Ral_TupleHeading, int) ;
 extern Ral_RelationHeading Ral_RelationHeadingSubset(Ral_RelationHeading,
     Ral_IntVector) ;
 extern Ral_RelationHeading Ral_RelationHeadingDup(Ral_RelationHeading) ;
+extern Ral_RelationHeading Ral_RelationHeadingExtend(Ral_RelationHeading, int) ;
 extern void Ral_RelationHeadingDelete(Ral_RelationHeading) ;
 extern void Ral_RelationHeadingReference(Ral_RelationHeading) ;
 extern void Ral_RelationHeadingUnreference(Ral_RelationHeading) ;
+extern Ral_RelationIdIter Ral_RelationHeadingIdBegin(Ral_RelationHeading) ;
+extern Ral_RelationIdIter Ral_RelationHeadingIdEnd(Ral_RelationHeading) ;
 extern int Ral_RelationHeadingDegree(Ral_RelationHeading) ;
 extern int Ral_RelationHeadingEqual(Ral_RelationHeading, Ral_RelationHeading) ;
 extern int Ral_RelationHeadingAddIdentifier(Ral_RelationHeading, int,
+    Ral_IntVector) ;
+extern int Ral_RelationHeadingFindIdentifier(Ral_RelationHeading,
     Ral_IntVector) ;
 extern Ral_RelationHeading Ral_RelationHeadingUnion(Ral_RelationHeading,
     Ral_RelationHeading) ;
