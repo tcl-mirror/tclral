@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationheading.c,v $
-$Revision: 1.7 $
-$Date: 2006/03/19 19:48:31 $
+$Revision: 1.8 $
+$Date: 2006/03/27 02:20:35 $
  *--
  */
 
@@ -89,7 +89,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.7 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.8 $" ;
 
 static const char relationKeyword[] = "Relation" ;
 static const char openList = '{' ;
@@ -235,19 +235,20 @@ Ral_RelationHeadingExtend(
 {
     Ral_TupleHeading tupleHeading ;
     Ral_RelationHeading extendHeading ;
-    int idCount = heading->idCount ;
-    Ral_IntVector *srcIds = heading->identifiers ;
-    Ral_IntVector *dstIds ;
+    Ral_RelationIdIter srcIdIter ;
+    Ral_RelationIdIter srcIdEnd = Ral_RelationHeadingIdEnd(heading) ;
+    Ral_RelationIdIter dstIdIter ;
 
     tupleHeading = Ral_TupleHeadingExtend(heading->tupleHeading, addAttrs) ;
     if (!tupleHeading) {
 	return NULL ;
     }
 
-    extendHeading = Ral_RelationHeadingNew(tupleHeading, idCount) ;
-    dstIds = extendHeading->identifiers ;
-    while (idCount-- > 0) {
-	*dstIds++ = Ral_IntVectorDup(*srcIds++) ;
+    extendHeading = Ral_RelationHeadingNew(tupleHeading, heading->idCount) ;
+    dstIdIter = Ral_RelationHeadingIdBegin(extendHeading) ;
+    for (srcIdIter = Ral_RelationHeadingIdBegin(heading) ;
+	srcIdIter != srcIdEnd ; ++srcIdIter) {
+	*dstIdIter++ = Ral_IntVectorDup(*srcIdIter) ;
     }
 
     return extendHeading ;
@@ -500,8 +501,8 @@ Ral_RelationHeadingUnion(
     int h1Size = Ral_TupleHeadingSize(h1->tupleHeading) ;
     Ral_TupleHeading unionTupleHeading ;
     Ral_RelationHeading unionRelationHeading ;
-    Ral_IntVector *h1Identifiers = h1->identifiers ;
-    int id1Count ;
+    Ral_RelationIdIter id1Iter ;
+    Ral_RelationIdIter id1End = Ral_RelationHeadingIdEnd(h1) ;
     int idNum = 0 ;
 
     /*
@@ -524,13 +525,15 @@ Ral_RelationHeadingUnion(
      * Loop through the identifiers for the two heading components
      * and compose new identifiers for the union.
      */
-    for (id1Count = h1->idCount ; id1Count > 0 ; --id1Count) {
-	Ral_IntVector h1Id = *h1Identifiers++ ;
-	Ral_IntVector *h2Identifiers = h2->identifiers ;
-	int id2Count ;
+    for (id1Iter = Ral_RelationHeadingIdBegin(h1) ;
+	id1Iter != id1End ; ++id1Iter) {
+	Ral_IntVector h1Id = *id1Iter ;
+	Ral_RelationIdIter id2Iter ;
+	Ral_RelationIdIter id2End = Ral_RelationHeadingIdEnd(h2) ;
 
-	for (id2Count = h2->idCount ; id2Count > 0 ; --id2Count) {
-	    Ral_IntVector h2Id = *h2Identifiers++ ;
+	for (id2Iter = Ral_RelationHeadingIdBegin(h2) ;
+	    id2Iter != id2End ; ++id2Iter) {
+	    Ral_IntVector h2Id = *id2Iter ;
 	    Ral_IntVectorIter h2IdIter ;
 	    Ral_IntVectorIter h2IdEnd = Ral_IntVectorEnd(h2Id) ;
 	    Ral_IntVector unionId = Ral_IntVectorNewEmpty(
@@ -564,15 +567,164 @@ Ral_RelationHeadingUnion(
     return unionRelationHeading ;
 }
 
+/*
+ * Create a new relation heading that is the join of two other headings.  "map"
+ * contains the attribute mapping of what is to be joined.  Returns the new
+ * relation heading and "attrMap" which is a vector that is the same size as
+ * the degree of h2.  Each element contains either -1 if that attribute of h2
+ * is not included in the join, or the index into the join heading where that
+ * attribute of h2 is to be placed in the joined relation.
+ * Caller must delete the returned "attrMap" vector.
+ */
+Ral_RelationHeading
+Ral_RelationHeadingJoin(
+    Ral_RelationHeading h1,
+    Ral_RelationHeading h2,
+    Ral_JoinMap map,
+    Ral_IntVector *attrMap)
+{
+    int status ;
+    Ral_TupleHeading joinTupleHeading ;
+    Ral_RelationHeading joinHeading ;
+    Ral_TupleHeading h1TupleHeading = h1->tupleHeading ;
+    Ral_TupleHeading h2TupleHeading = h2->tupleHeading ;
+    Ral_IntVector h2JoinAttrs ;
+    Ral_IntVectorIter h2AttrMapIter ;
+    Ral_TupleHeadingIter h2TupleHeadingIter ;
+    Ral_TupleHeadingIter h2TupleHeadingEnd =
+	Ral_TupleHeadingEnd(h2TupleHeading) ;
+    int joinIndex = Ral_TupleHeadingSize(h1TupleHeading) ;
+    Ral_RelationIdIter id1Iter ;
+    Ral_RelationIdIter id1End = Ral_RelationHeadingIdEnd(h1) ;
+    Ral_RelationIdIter id2End = Ral_RelationHeadingIdEnd(h2) ;
+    int idNum = 0 ;
+    /*
+     * Construct the tuple heading. The size of the heading is the
+     * sum of the degrees of the two relations being joined minus
+     * the number of attributes participating in the join.
+     */
+    joinTupleHeading = Ral_TupleHeadingNew(Ral_RelationHeadingDegree(h1) +
+	Ral_RelationHeadingDegree(h2) - Ral_JoinMapAttrSize(map)) ;
+    /*
+     * The tuple heading contains all the attributes of the first
+     * relation.
+     */
+    status = Ral_TupleHeadingAppend(h1TupleHeading,
+	Ral_TupleHeadingBegin(h1TupleHeading),
+	Ral_TupleHeadingEnd(h1TupleHeading), joinTupleHeading) ;
+    assert(status != 0) ;
+    /*
+     * The tuple heading contains all the attributes of the second relations
+     * except those that are used in the join. So create a vector that
+     * contains a boolean that indicates whether or not a given attribute
+     * index is contained in the join map and use that determine which
+     * attributes in r2 are placed in the join. As we iterate through the
+     * vector, we modify it in place to be the offset in the join tuple
+     * heading where this attribute will be placed.
+     */
+    *attrMap = h2JoinAttrs = Ral_JoinMapAttrMap(map, 1,
+	Ral_TupleHeadingSize(h2TupleHeading)) ;
+    h2AttrMapIter = Ral_IntVectorBegin(h2JoinAttrs) ;
+    for (h2TupleHeadingIter = Ral_TupleHeadingBegin(h2TupleHeading) ;
+	h2TupleHeadingIter != h2TupleHeadingEnd ; ++h2TupleHeadingIter) {
+	if (*h2AttrMapIter) {
+	    status = Ral_TupleHeadingAppend(h2TupleHeading,
+		h2TupleHeadingIter, h2TupleHeadingIter + 1, joinTupleHeading) ;
+	    if (status == 0) {
+		Ral_RelationLastError = REL_DUPLICATE_ATTR ;
+		Ral_TupleHeadingDelete(joinTupleHeading) ;
+		Ral_IntVectorDelete(h2JoinAttrs) ;
+		*attrMap = NULL ;
+		return NULL ;
+	    }
+	    *h2AttrMapIter++ = joinIndex++ ;
+	} else {
+	    /*
+	     * Attributes that don't appear in the results are given
+	     * a final index of -1
+	     */
+	    *h2AttrMapIter++ = -1 ;
+	}
+    }
+    /*
+     * Construct the relation heading -- infer the identifiers.
+     * The identifiers for the join are the cross product of the identifiers
+     * of the two relations, minus any join attributes of r2.
+     */
+    joinHeading = Ral_RelationHeadingNew(joinTupleHeading,
+	h1->idCount * h2->idCount) ;
+    /*
+     * Loop through the identifiers for the two heading components
+     * and compose new identifiers for the join.
+     */
+    for (id1Iter = Ral_RelationHeadingIdBegin(h1) ;
+	id1Iter != id1End ; ++id1Iter) {
+	Ral_IntVector h1Id = *id1Iter ;
+	Ral_RelationIdIter id2Iter ;
+
+	for (id2Iter = Ral_RelationHeadingIdBegin(h2) ;
+	    id2Iter != id2End ; ++id2Iter) {
+	    Ral_IntVector h2Id = *id2Iter ;
+	    Ral_IntVectorIter h2IdIter ;
+	    Ral_IntVectorIter h2IdEnd = Ral_IntVectorEnd(h2Id) ;
+	    Ral_IntVector joinId = Ral_IntVectorNewEmpty(
+		Ral_IntVectorSize(h1Id) + Ral_IntVectorSize(h2Id)) ;
+	    int added ;
+	    /*
+	     * Copy the identifier indices from the first header.
+	     * These indices are correct for the join header also.
+	     */
+	    Ral_IntVectorCopy(h1Id, Ral_IntVectorBegin(h1Id),
+		Ral_IntVectorEnd(h1Id), joinId, Ral_IntVectorBegin(joinId)) ;
+	    /*
+	     * The identifier indices from the second header must
+	     * be corrected for the place where the attributes will end up.
+	     * If the identifier is to be eliminated, the we have to find
+	     * the corresponding attribute in the first relation.
+	     */
+	    for (h2IdIter = Ral_IntVectorBegin(h2Id) ; h2IdIter != h2IdEnd ;
+		++h2IdIter) {
+		Ral_IntVectorValueType index = Ral_IntVectorFetch(h2JoinAttrs,
+		    *h2IdIter) ;
+		if (index >= 0) {
+		    Ral_IntVectorPushBack(joinId, index) ;
+		} else {
+		    /*
+		     * Identifier in the second relation is to be eliminated.
+		     * Find its corresponding attribute in the first and
+		     * it will become an identifier (if it is not already).
+		     */
+		    int attrInr1 = Ral_JoinMapFindAttr(map, 1, *h2IdIter) ;
+		    assert(attrInr1 != -1) ;
+		    /*
+		     * Add the corresponding attribute in r1 in a set fashion
+		     * in case it is already part of this identifier.
+		     */
+		    Ral_IntVectorSetAdd(joinId, attrInr1) ;
+		}
+	    }
+	    /*
+	     * Add the newly formed identifier.
+	     * It should always add.
+	     */
+	    added = Ral_RelationHeadingAddIdentifier(joinHeading, idNum++,
+		joinId) ;
+	    assert(added == 1) ;
+	}
+    }
+
+    return joinHeading ;
+}
+
 int
 Ral_RelationHeadingScan(
     Ral_RelationHeading h,
     Ral_AttributeTypeScanFlags *flags)
 {
     int nBytes ;
-    int idCount = h->idCount ;
-    Ral_IntVector *ids = h->identifiers ;
-    int needIdList = idCount > 1 || Ral_IntVectorSize(*ids) != 1 ;
+    Ral_RelationIdIter idIter = Ral_RelationHeadingIdBegin(h) ;
+    Ral_RelationIdIter idEnd = Ral_RelationHeadingIdEnd(h) ;
+    int needIdList = h->idCount > 1 || Ral_IntVectorSize(*idIter) != 1 ;
     int length = strlen(Ral_RelationObjType.name) + 1 ; /* +1 for space */
 
     assert(flags->attrType == Relation_Type) ;
@@ -595,8 +747,8 @@ Ral_RelationHeadingScan(
     if (needIdList) {
 	length += sizeof(openList) ;
     }
-    while (idCount-- > 0) {
-	Ral_IntVector id = *ids++ ;
+    for (; idIter != idEnd ; ++idIter) {
+	Ral_IntVector id = *idIter ;
 	Ral_IntVectorIter end = Ral_IntVectorEnd(id) ;
 	int nIdAttrs = Ral_IntVectorSize(id) ;
 	Ral_IntVectorIter iter ;
@@ -640,9 +792,9 @@ Ral_RelationHeadingConvert(
     Ral_AttributeTypeScanFlags *flags)
 {
     char *p = dst ;
-    int idCount = h->idCount ;
-    Ral_IntVector *ids = h->identifiers ;
-    int needIdList = idCount > 1 || Ral_IntVectorSize(*ids) != 1 ;
+    Ral_RelationIdIter idIter = Ral_RelationHeadingIdBegin(h) ;
+    Ral_RelationIdIter idEnd = Ral_RelationHeadingIdEnd(h) ;
+    int needIdList = h->idCount > 1 || Ral_IntVectorSize(*idIter) != 1 ;
     Ral_TupleHeading tupleHeading = h->tupleHeading ;
 
     assert(flags->attrType == Relation_Type) ;
@@ -665,8 +817,8 @@ Ral_RelationHeadingConvert(
     if (needIdList) {
 	*p++ = openList ;
     }
-    while (idCount-- > 0) {
-	Ral_IntVector id = *ids++ ;
+    for (; idIter != idEnd ; ++idIter) {
+	Ral_IntVector id = *idIter ;
 	Ral_IntVectorIter end = Ral_IntVectorEnd(id) ;
 	int nIdAttrs = Ral_IntVectorSize(id) ;
 	Ral_IntVectorIter iter ;

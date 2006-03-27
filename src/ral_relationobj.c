@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationobj.c,v $
-$Revision: 1.6 $
-$Date: 2006/03/19 19:48:31 $
+$Revision: 1.7 $
+$Date: 2006/03/27 02:20:35 $
  *--
  */
 
@@ -61,6 +61,7 @@ INCLUDE FILES
 #include "ral_relationobj.h"
 #include "ral_relation.h"
 #include "ral_tupleobj.h"
+#include "ral_joinmap.h"
 
 #include <assert.h>
 #include <string.h>
@@ -104,7 +105,7 @@ Tcl_ObjType Ral_RelationObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.6 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.7 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -316,6 +317,88 @@ Ral_RelationInsertTupleObj(
 	    Tcl_GetString(tupleObj)) ;
 	Ral_TupleDelete(tuple) ;
 	return TCL_ERROR ;
+    }
+
+    return TCL_OK ;
+}
+
+int Ral_RelationObjParseJoinArgs(
+    Tcl_Interp *interp,
+    int *objcPtr,
+    Tcl_Obj *const**objvPtr,
+    Ral_Relation r1,
+    Ral_Relation r2,
+    Ral_JoinMap joinMap)
+{
+    int findCommon = 1 ;
+    int objc = *objcPtr ;
+    Tcl_Obj *const*objv = *objvPtr ;
+
+    if (objc) {
+	const char *nextArg = Tcl_GetString(*objv) ;
+	if (strcmp(nextArg, "-using") == 0) {
+	    findCommon = 0 ;
+	    /*
+	     * Join arguments specified.
+	     */
+	    if (Ral_RelationFindJoinAttrs(interp, r1, r2, *(objv + 1), joinMap)
+		!= TCL_OK) {
+		Ral_JoinMapDelete(joinMap) ;
+		return TCL_ERROR ;
+	    }
+	    *objcPtr -= 2 ;
+	    *objvPtr += 2 ;
+	}
+    }
+    if (findCommon) {
+	/*
+	 * Join on common attributes.
+	 */
+	Ral_TupleHeadingCommonAttributes(
+	    r1->heading->tupleHeading, r2->heading->tupleHeading, joinMap) ;
+    }
+
+    return TCL_OK ;
+}
+
+int
+Ral_RelationFindJoinAttrs(
+    Tcl_Interp *interp,
+    Ral_Relation r1,
+    Ral_Relation r2,
+    Tcl_Obj *attrList,
+    Ral_JoinMap joinMap)
+{
+    Ral_TupleHeading r1TupleHeading = r1->heading->tupleHeading ;
+    Ral_TupleHeading r2TupleHeading = r2->heading->tupleHeading ;
+    int objc ;
+    Tcl_Obj **objv ;
+
+    if (Tcl_ListObjGetElements(interp, attrList, &objc, &objv) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    if (objc % 2 != 0) {
+	Ral_RelationObjSetError(interp, REL_BAD_PAIRS_LIST,
+	    Tcl_GetString(attrList)) ;
+	return TCL_ERROR ;
+    }
+    Ral_JoinMapAttrReserve(joinMap, objc / 2) ;
+    for ( ; objc > 0 ; objc -= 2, objv += 2) {
+	int r1Index = Ral_TupleHeadingIndexOf(r1TupleHeading,
+	    Tcl_GetString(*objv)) ;
+	int r2Index = Ral_TupleHeadingIndexOf(r2TupleHeading,
+	    Tcl_GetString(*(objv + 1))) ;
+	if (r1Index < 0) {
+	    Ral_RelationObjSetError(interp, REL_DUPLICATE_ATTR,
+		Tcl_GetString(*objv)) ;
+	    return TCL_ERROR ;
+	}
+	if (r2Index < 0) {
+	    Ral_RelationObjSetError(interp, REL_DUPLICATE_ATTR,
+		Tcl_GetString(*(objv + 1))) ;
+	    return TCL_ERROR ;
+	}
+	Ral_JoinMapAddAttrMapping(joinMap, r1Index, r2Index) ;
     }
 
     return TCL_OK ;

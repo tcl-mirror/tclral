@@ -43,8 +43,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.4 $
-# $Date: 2004/08/30 00:29:11 $
+# $Revision: 1.5 $
+# $Date: 2006/03/27 02:20:35 $
 #  *--
 
 namespace eval ::ral {
@@ -66,7 +66,7 @@ proc ::ral::relformat {relValue {title {}}} {
 	append result $title\n
 	append result [string repeat - [string length $title]]\n
     }
-    set heading [relation heading $relValue]
+    set heading [lindex [relation heading $relValue] 1]
     foreach {attr type} $heading {
 	set colWidth($attr) [string length $attr]
 	set typeWidth [string length [lindex $type 0]]

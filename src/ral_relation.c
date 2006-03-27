@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.6 $
-$Date: 2006/03/19 19:48:31 $
+$Revision: 1.7 $
+$Date: 2006/03/27 02:20:35 $
  *--
  */
 
@@ -86,6 +86,8 @@ static Tcl_HashEntry *Ral_RelationFindIndexEntry(Ral_Relation, int, Ral_Tuple,
     Ral_IntVector) ;
 static int Ral_RelationFindTupleIndex(Ral_Relation, int, Ral_Tuple,
     Ral_IntVector) ;
+static int Ral_RelationFindTupleReference(Ral_Relation, int, Ral_Tuple,
+    Ral_IntVector) ;
 static void Ral_RelationRemoveIndex(Ral_Relation, int, Ral_Tuple) ;
 static int Ral_RelationIndexIdentifier(Ral_Relation, int, Ral_Tuple,
     Ral_RelationIter) ;
@@ -94,6 +96,11 @@ static void Ral_RelationRemoveTupleIndex(Ral_Relation, Ral_Tuple) ;
 static void Ral_RelationTupleSortKey(const Ral_Tuple, Tcl_DString *) ;
 static int Ral_RelationTupleCompareAscending(const void *, const void *) ;
 static int Ral_RelationTupleCompareDescending(const void *, const void *) ;
+static void Ral_RelationFindJoinTuples(Ral_Relation, Ral_Relation,
+    Ral_JoinMap) ;
+static void Ral_RelationGetJoinMapKey(Ral_Tuple, Ral_JoinMap, int,
+    Tcl_DString *) ;
+static int Ral_RelationFindJoinId(Ral_Relation, Ral_JoinMap, int) ;
 
 /*
 EXTERNAL DATA REFERENCES
@@ -110,7 +117,7 @@ STATIC DATA ALLOCATION
 static Ral_IntVector sortAttrs ;
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.6 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.7 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -122,7 +129,7 @@ Ral_RelationNew(
 {
     int nBytes ;
     Ral_Relation relation ;
-    int c ;
+    int idCount ;
     Tcl_HashTable *indexVector ;
 
     nBytes = sizeof(*relation) +
@@ -132,8 +139,8 @@ Ral_RelationNew(
 
     Ral_RelationHeadingReference(relation->heading = heading) ;
     relation->indexVector = (Tcl_HashTable *)(relation + 1) ;
-    for (c = heading->idCount, indexVector = relation->indexVector ;
-	c > 0 ; --c, ++indexVector) {
+    for (idCount = heading->idCount, indexVector = relation->indexVector ;
+	idCount > 0 ; --idCount, ++indexVector) {
 	Tcl_InitHashTable(indexVector, TCL_STRING_KEYS) ;
     }
 
@@ -394,6 +401,7 @@ Ral_RelationUnion(
      * Headings must be equal to perform a union.
      */
     if (!Ral_RelationHeadingEqual(r1->heading, r2->heading)) {
+	Ral_RelationLastError = REL_HEADING_NOT_EQUAL ;
 	return NULL ;
     }
     unionRel = Ral_RelationNew(r1->heading) ;
@@ -437,6 +445,7 @@ Ral_RelationIntersect(
      * Headings must be equal to perform a union.
      */
     if (!Ral_RelationHeadingEqual(r1->heading, r2->heading)) {
+	Ral_RelationLastError = REL_HEADING_NOT_EQUAL ;
 	return NULL ;
     }
     /*
@@ -482,6 +491,7 @@ Ral_RelationMinus(
      * Headings must be equal to perform a union.
      */
     if (!Ral_RelationHeadingEqual(r1->heading, r2->heading)) {
+	Ral_RelationLastError = REL_HEADING_NOT_EQUAL ;
 	return NULL ;
     }
     /*
@@ -829,6 +839,188 @@ Ral_RelationUngroup(
 	}
     }
     return resultRel ;
+}
+
+/*
+ * Natural join of two relations using the attributes in the join map.
+ */
+Ral_Relation
+Ral_RelationJoin(
+    Ral_Relation r1,
+    Ral_Relation r2,
+    Ral_JoinMap map)
+{
+    Ral_RelationHeading r1Heading = r1->heading ;
+    Ral_RelationHeading r2Heading = r2->heading ;
+    Ral_RelationHeading joinHeading ;
+    Ral_TupleHeading joinTupleHeading ;
+    Ral_IntVector r2JoinAttrs ;
+    Ral_Relation joinRel ;
+    Ral_JoinMapIter tupleMapEnd ;
+    Ral_JoinMapIter tupleMapIter ;
+    Ral_RelationIter r1Begin = Ral_RelationBegin(r1) ;
+    Ral_RelationIter r2Begin = Ral_RelationBegin(r2) ;
+
+    /*
+     * Finish building the join map by finding which tuples are
+     * to be joined.
+     */
+    Ral_RelationFindJoinTuples(r1, r2, map) ;
+    /*
+     * Construct the heading for the joined relation.
+     */
+    joinHeading = Ral_RelationHeadingJoin(r1Heading, r2Heading, map,
+	&r2JoinAttrs) ;
+    if (joinHeading == NULL) {
+	return NULL ;
+    }
+    joinTupleHeading = joinHeading->tupleHeading ;
+    /*
+     * Construct the joined relation.
+     */
+    joinRel = Ral_RelationNew(joinHeading) ;
+    /*
+     * Add in the tuples.
+     */
+    Ral_RelationReserve(joinRel, Ral_JoinMapTupleSize(map)) ;
+    /*
+     * Step through the matches found in the join map and compose the
+     * indicated tuples.
+     */
+    tupleMapEnd = Ral_JoinMapTupleEnd(map) ;
+    for (tupleMapIter = Ral_JoinMapTupleBegin(map) ;
+	tupleMapIter != tupleMapEnd ; ++tupleMapIter) {
+	Ral_Tuple r1Tuple = *(r1Begin + tupleMapIter->m[0]) ;
+	Ral_Tuple r2Tuple = *(r2Begin + tupleMapIter->m[1]) ;
+	Ral_TupleIter r2TupleEnd = Ral_TupleEnd(r2Tuple) ;
+	Ral_TupleIter r2TupleIter ;
+	Ral_Tuple joinTuple ;
+	Ral_TupleIter jtIter ;
+	Ral_IntVectorIter attrMapIter = Ral_IntVectorBegin(r2JoinAttrs) ;
+	int status ;
+
+	joinTuple = Ral_TupleNew(joinTupleHeading) ;
+	jtIter = Ral_TupleBegin(joinTuple) ;
+	/*
+	 * Take all the values from the first relation's tuple.
+	 */
+	jtIter += Ral_TupleCopyValues(Ral_TupleBegin(r1Tuple),
+	    Ral_TupleEnd(r1Tuple), jtIter) ;
+	/*
+	 * Take the values from the second relation's tuple, eliminating
+	 * those that are part of the natural join.
+	 */
+	for (r2TupleIter = Ral_TupleBegin(r2Tuple) ;
+	    r2TupleIter != r2TupleEnd ; ++r2TupleIter) {
+	    int attrIndex = *attrMapIter++ ;
+	    if (attrIndex != -1) {
+		jtIter += Ral_TupleCopyValues(r2TupleIter,
+		    r2TupleIter + 1, jtIter) ;
+	    }
+	}
+
+	status = Ral_RelationPushBack(joinRel, joinTuple, NULL) ;
+	if (status == 0) {
+	    Ral_RelationDelete(joinRel) ;
+	    Ral_IntVectorDelete(r2JoinAttrs) ;
+	    return NULL ;
+	}
+    }
+
+    Ral_IntVectorDelete(r2JoinAttrs) ;
+
+    return joinRel ;
+}
+
+/*
+ * Semi-join of two relations using the attributes in the join map.
+ */
+Ral_Relation
+Ral_RelationSemiJoin(
+    Ral_Relation r1,
+    Ral_Relation r2,
+    Ral_JoinMap map)
+{
+    Ral_Relation semiJoinRel ;
+    Ral_JoinMapIter tupleMapEnd ;
+    Ral_JoinMapIter tupleMapIter ;
+    Ral_RelationIter r1Begin = Ral_RelationBegin(r1) ;
+
+    /*
+     * Finish building the join map by finding which tuples are
+     * to be joined.
+     */
+    Ral_RelationFindJoinTuples(r1, r2, map) ;
+    /*
+     * The relation heading for a semijoin is the same as the first
+     * relation in the operation
+     */
+    semiJoinRel = Ral_RelationNew(r1->heading) ;
+    /*
+     * Add in the tuples.  Step through the matches found in the join map and
+     * compose the indicated tuples. The tuples of the semijoin will simply be
+     * those from the first relation that matched.
+     */
+    Ral_RelationReserve(semiJoinRel, Ral_JoinMapTupleSize(map)) ;
+    tupleMapEnd = Ral_JoinMapTupleEnd(map) ;
+    for (tupleMapIter = Ral_JoinMapTupleBegin(map) ;
+	tupleMapIter != tupleMapEnd ; ++tupleMapIter) {
+	Ral_Tuple r1Tuple = *(r1Begin + tupleMapIter->m[0]) ;
+
+	/*
+	 * Ignore any duplicates.
+	 */
+	Ral_RelationPushBack(semiJoinRel, r1Tuple, NULL) ;
+    }
+
+    return semiJoinRel ;
+}
+
+/*
+ * Semi-minus of two relations using the attributes in the join map.
+ */
+Ral_Relation
+Ral_RelationSemiMinus(
+    Ral_Relation r1,
+    Ral_Relation r2,
+    Ral_JoinMap map)
+{
+    Ral_Relation semiMinusRel ;
+    Ral_RelationIter r1End = Ral_RelationEnd(r1) ;
+    Ral_RelationIter r1Iter ;
+    Ral_IntVector tupleMatches ;
+    Ral_IntVectorIter nomatch ;
+
+    /*
+     * Finish building the join map by finding which tuples are
+     * to be joined.
+     */
+    Ral_RelationFindJoinTuples(r1, r2, map) ;
+    /*
+     * The relation heading for a semiminus is the same as the first
+     * relation in the operation
+     */
+    semiMinusRel = Ral_RelationNew(r1->heading) ;
+    /*
+     * Add in the tuples.  The tuples we want are the ones that did
+     * NOT match. We get these from the join map.
+     */
+    tupleMatches = Ral_JoinMapTupleMap(map, 0, Ral_RelationCardinality(r1)) ;
+    nomatch = Ral_IntVectorBegin(tupleMatches) ;
+    for (r1Iter = Ral_RelationBegin(r1) ; r1Iter != r1End ; ++r1Iter) {
+	if (*nomatch++) {
+	    int status ;
+	    /*
+	     * There should not be any duplicates.
+	     */
+	    status = Ral_RelationPushBack(semiMinusRel, *r1Iter, NULL) ;
+	    assert(status != 0) ;
+	}
+    }
+
+    Ral_IntVectorDelete(tupleMatches) ;
+
+    return semiMinusRel ;
 }
 
 Ral_Relation
@@ -1407,6 +1599,33 @@ Ral_RelationFindTupleIndex(
     return entry ? (int)Tcl_GetHashValue(entry) : -1 ;
 }
 
+/*
+ * Find a tuple in "relation" based on the values in "tuple". The attributes
+ * to be used are given in the "attrSet". These attributes refer to the
+ * same attributes as the identifier given by "idIndex".
+ */
+static int
+Ral_RelationFindTupleReference(
+    Ral_Relation relation,
+    int idIndex,
+    Ral_Tuple tuple,
+    Ral_IntVector attrSet)
+{
+    Tcl_DString *idKey ;
+    Tcl_HashEntry *entry ;
+
+    assert(idIndex < relation->heading->idCount) ;
+    assert(Ral_IntVectorSize(relation->heading->identifiers[idIndex]) ==
+	Ral_IntVectorSize(attrSet)) ;
+
+    idKey = Ral_RelationGetIdKey(tuple, attrSet, NULL) ;
+    entry = Tcl_FindHashEntry(relation->indexVector + idIndex,
+	Tcl_DStringValue(idKey)) ;
+    Tcl_DStringFree(idKey) ;
+
+    return entry ? (int)Tcl_GetHashValue(entry) : -1 ;
+}
+
 static void
 Ral_RelationRemoveIndex(
     Ral_Relation relation,
@@ -1549,4 +1768,177 @@ Ral_RelationTupleCompareDescending(
     Tcl_DStringFree(&sortKey2) ;
 
     return result ;
+}
+
+/*
+ * Find the tuples that match according to the attributes in the
+ * join map. The result is recorded back into the join map.
+ */
+static void
+Ral_RelationFindJoinTuples(
+    Ral_Relation r1,
+    Ral_Relation r2,
+    Ral_JoinMap map)
+{
+    int idNum ;
+    /*
+     * First we want to determine if the join is across identifiers and
+     * referring attributes. If so, then we can use the hash tables to
+     * speed the process along. Otherwise we will have to iterate through
+     * both relations finding the matching tuples.
+     *
+     * So first compare the identifiers in "r1" to the join map and see
+     * if we can find a match. Then compare the identifiers in "r2" to the
+     * join map, again looking for a match. Finally, we resort to doing it
+     * the hard way.
+     */
+    idNum = Ral_RelationFindJoinId(r1, map, 0) ;
+    if (idNum >= 0) {
+	/*
+	 * "r2" refers to "idNum" of "r1".
+	 * For this case, the identifier given by "idNum" matches the 1st
+	 * attribute vector in the join map and is an identifier of "r1".  Find
+	 * the tuples in "r2" that match the attributes in the second attribute
+	 * vector of the join map. The resulting map is place back into "map".
+	 */
+	Ral_RelationIter r2Iter ;
+	Ral_RelationIter r2Begin = Ral_RelationBegin(r2) ;
+	Ral_RelationIter r2End = Ral_RelationEnd(r2) ;
+	Ral_IntVector refAttrs = Ral_JoinMapGetAttr(map, 1) ;
+	/*
+	 * Iterate through the tuples in r2, and find and find any corresponding
+	 * match in r1, based on the ID given by idNum.
+	 */
+	for (r2Iter = r2Begin ; r2Iter != r2End ; ++r2Iter) {
+	    int r1Index = Ral_RelationFindTupleReference(r1, idNum, *r2Iter,
+		refAttrs) ;
+
+	    if (r1Index >= 0) {
+		Ral_JoinMapAddTupleMapping(map, r1Index, r2Iter - r2Begin) ;
+	    }
+	}
+	Ral_IntVectorDelete(refAttrs) ;
+    } else {
+	idNum = Ral_RelationFindJoinId(r2, map, 1) ;
+	if (idNum >= 0) {
+	    /*
+	     * "r1" refers to "idNum" of "r2"
+	     * Here tuples in "r1" refer to an identifier in "r2". The
+	     * identifier is given by "idNum". Find the tuples in "r1" whose
+	     * attributes match the corresponding attributes in "r2".
+	     */
+	    Ral_RelationIter r1Iter ;
+	    Ral_RelationIter r1Begin = Ral_RelationBegin(r1) ;
+	    Ral_RelationIter r1End = Ral_RelationEnd(r1) ;
+	    Ral_IntVector refAttrs = Ral_JoinMapGetAttr(map, 0) ;
+	    /*
+	     * Iterate through the tuples in r1, and find any corresponding
+	     * match in r2, based on the ID given by idNum.
+	     */
+	    for (r1Iter = r1Begin ; r1Iter != r1End ; ++r1Iter) {
+		int r2Index = Ral_RelationFindTupleReference(r2, idNum, *r1Iter,
+		    refAttrs) ;
+
+		if (r2Index >= 0) {
+		    Ral_JoinMapAddTupleMapping(map, r1Iter - r1Begin, r2Index) ;
+		}
+	    }
+	    Ral_IntVectorDelete(refAttrs) ;
+	} else {
+	    /*
+	     * Join attributes do not constitute an identifier in either
+	     * relation. Must join by searching both relations.
+	     */
+	    Ral_RelationIter r1Iter ;
+	    Ral_RelationIter r1Begin = Ral_RelationBegin(r1) ;
+	    Ral_RelationIter r1End = Ral_RelationEnd(r1) ;
+	    Ral_RelationIter r2Iter ;
+	    Ral_RelationIter r2Begin = Ral_RelationBegin(r2) ;
+	    Ral_RelationIter r2End = Ral_RelationEnd(r2) ;
+	    Tcl_DString *r1Keys ;
+	    Tcl_DString *key1 ;
+	    Tcl_DString *r2Keys ;
+	    Tcl_DString *key2 ;
+
+	    /*
+	     * First compute the keys for all the tuples in both relations.
+	     */
+	    r1Keys = (Tcl_DString*)ckalloc(
+		sizeof(*r1Keys) * Ral_RelationCardinality(r1)) ;
+	    r2Keys = (Tcl_DString *)ckalloc(
+		sizeof(*r2Keys) * Ral_RelationCardinality(r2)) ;
+
+	    key1 = r1Keys ;
+	    for (r1Iter = r1Begin ; r1Iter != r1End ; ++r1Iter) {
+		Ral_RelationGetJoinMapKey(*r1Iter, map, 0, key1++) ;
+	    }
+
+	    key2 = r2Keys ;
+	    for (r2Iter = r2Begin ; r2Iter != r2End ; ++r2Iter) {
+		Ral_RelationGetJoinMapKey(*r2Iter, map, 1, key2++) ;
+	    }
+	    /*
+	     * Search through the tuples and find the corresponding matches.
+	     */
+	    key1 = r1Keys ;
+	    for (r1Iter = r1Begin ; r1Iter != r1End ; ++r1Iter) {
+		int r1Index = r1Iter - r1Begin ;
+		key2 = r2Keys ;
+		for (r2Iter = r2Begin ; r2Iter != r2End ; ++r2Iter) {
+		    if (strcmp(Tcl_DStringValue(key1), Tcl_DStringValue(key2))
+			== 0) {
+			Ral_JoinMapAddTupleMapping(map, r1Index,
+			    r2Iter - r2Begin) ;
+		    }
+		    ++key2 ;
+		}
+		++key1 ;
+	    }
+	    /*
+	     * Clean up the key information.
+	     */
+	    key1 = r1Keys ;
+	    for (r1Iter = r1Begin ; r1Iter != r1End ; ++r1Iter) {
+		Tcl_DStringFree(key1++) ;
+	    }
+	    key2 = r2Keys ;
+	    for (r2Iter = r2Begin ; r2Iter != r2End ; ++r2Iter) {
+		Tcl_DStringFree(key2++) ;
+	    }
+	    ckfree((char *)r1Keys) ;
+	    ckfree((char *)r2Keys) ;
+	}
+    }
+}
+
+static void
+Ral_RelationGetJoinMapKey(
+    Ral_Tuple tuple,
+    Ral_JoinMap map,
+    int offset,
+    Tcl_DString *idKey)
+{
+    Ral_JoinMapIter iter ;
+    Ral_JoinMapIter end = Ral_JoinMapAttrEnd(map) ;
+
+    Tcl_DStringInit(idKey) ;
+    for (iter = Ral_JoinMapAttrBegin(map) ; iter != end ; ++iter) {
+	int attrIndex = iter->m[offset] ;
+	assert(attrIndex < Ral_TupleDegree(tuple)) ;
+	Tcl_DStringAppend(idKey, Tcl_GetString(tuple->values[attrIndex]), -1) ;
+    }
+
+    return ;
+}
+
+static int
+Ral_RelationFindJoinId(
+    Ral_Relation rel,
+    Ral_JoinMap map,
+    int offset)
+{
+    Ral_IntVector mapAttrs = Ral_JoinMapGetAttr(map, offset) ;
+    int idNum = Ral_RelationHeadingFindIdentifier(rel->heading, mapAttrs) ;
+    Ral_IntVectorDelete(mapAttrs) ;
+    return idNum ;
 }

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_vector.h,v $
-$Revision: 1.4 $
-$Date: 2006/03/06 01:07:37 $
+$Revision: 1.5 $
+$Date: 2006/03/27 02:20:35 $
  *--
  */
 #ifndef _ral_vector_h_
@@ -122,6 +122,7 @@ extern Ral_IntVectorIter Ral_IntVectorErase(Ral_IntVector, Ral_IntVectorIter,
 
 extern int Ral_IntVectorSetAdd(Ral_IntVector, Ral_IntVectorValueType) ;
 extern Ral_IntVector Ral_IntVectorSetComplement(Ral_IntVector, int) ;
+extern Ral_IntVector Ral_IntVectorBooleanMap(Ral_IntVector, int) ;
 
 extern void Ral_IntVectorSort(Ral_IntVector) ;
 extern Ral_IntVectorIter Ral_IntVectorFind(Ral_IntVector,

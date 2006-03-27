@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.h,v $
-$Revision: 1.6 $
-$Date: 2006/03/19 19:48:31 $
+$Revision: 1.7 $
+$Date: 2006/03/27 02:20:35 $
  *--
  */
 #ifndef _ral_relation_h_
@@ -63,6 +63,7 @@ INCLUDE FILES
 #include "ral_tuple.h"
 #include "ral_attribute.h"
 #include "ral_vector.h"
+#include "ral_joinmap.h"
 
 #include <stdio.h>
 
@@ -203,6 +204,11 @@ extern Ral_Relation Ral_RelationTimes(Ral_Relation, Ral_Relation) ;
 extern Ral_Relation Ral_RelationProject(Ral_Relation, Ral_IntVector) ;
 extern Ral_Relation Ral_RelationExtend(Ral_Relation, int) ;
 extern Ral_Relation Ral_RelationUngroup(Ral_Relation, const char *) ;
+extern Ral_Relation Ral_RelationJoin(Ral_Relation, Ral_Relation, Ral_JoinMap) ;
+extern Ral_Relation Ral_RelationSemiJoin(Ral_Relation, Ral_Relation,
+    Ral_JoinMap) ;
+extern Ral_Relation Ral_RelationSemiMinus(Ral_Relation, Ral_Relation,
+    Ral_JoinMap) ;
 
 extern Ral_Relation Ral_RelationSortAscending(Ral_Relation, Ral_IntVector) ;
 extern Ral_Relation Ral_RelationSortDescending(Ral_Relation, Ral_IntVector) ;

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleheading.c,v $
-$Revision: 1.8 $
-$Date: 2006/03/19 19:48:31 $
+$Revision: 1.9 $
+$Date: 2006/03/27 02:20:35 $
  *--
  */
 
@@ -91,7 +91,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tupleheading.c,v $ $Revision: 1.8 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tupleheading.c,v $ $Revision: 1.9 $" ;
 
 static const char tupleKeyword[] = "Tuple" ;
 static const char openList = '{' ;
@@ -544,6 +544,39 @@ Ral_TupleHeadingNewOrderMap(
 
     return found == Ral_TupleHeadingSize(h1) ?
 	Ral_IntVectorDelete(map), NULL : map ;
+}
+
+/*
+ * Find the common attributes between two headings and record the result
+ * in the join map. Return the number of common attributes found.
+ */
+int
+Ral_TupleHeadingCommonAttributes(
+    Ral_TupleHeading h1,
+    Ral_TupleHeading h2,
+    Ral_JoinMap map)
+{
+    int count = 0 ;
+    Ral_TupleHeadingIter begin1 = Ral_TupleHeadingBegin(h1) ;
+    Ral_TupleHeadingIter end1 = Ral_TupleHeadingEnd(h1) ;
+    Ral_TupleHeadingIter begin2 = Ral_TupleHeadingBegin(h2) ;
+    Ral_TupleHeadingIter end2 = Ral_TupleHeadingEnd(h2) ;
+    Ral_TupleHeadingIter iter1 ;
+
+    for (iter1 = begin1 ; iter1 != end1 ; ++iter1) {
+	Ral_Attribute attr1 = *iter1 ;
+	Ral_TupleHeadingIter iter2 = Ral_TupleHeadingFind(h2, attr1->name) ;
+	/*
+	 * Ral_AttributeEqual() will make sure that the types match.
+	 * It is not sufficient that only the names match.
+	 */
+	if (iter2 != end2 && Ral_AttributeEqual(attr1, *iter2)) {
+	    Ral_JoinMapAddAttrMapping(map, iter1 - begin1, iter2 - begin2) ;
+	    ++count ;
+	}
+    }
+
+    return count ;
 }
 
 int

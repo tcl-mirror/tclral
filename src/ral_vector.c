@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_vector.c,v $
-$Revision: 1.6 $
-$Date: 2006/03/19 19:48:31 $
+$Revision: 1.7 $
+$Date: 2006/03/27 02:20:35 $
  *--
  */
 
@@ -89,7 +89,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_vector.c,v $ $Revision: 1.6 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_vector.c,v $ $Revision: 1.7 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -409,6 +409,27 @@ Ral_IntVectorSetComplement(
     }
 
     return cmpl ;
+}
+
+/*
+ * Return a vector "size" large. Each slot contains either 0 if the
+ * corresponding index does not appear in "v" and 1 if it does.
+ * It follows that the maximum value contained in "v" must be less than "size".
+ */
+Ral_IntVector
+Ral_IntVectorBooleanMap(
+    Ral_IntVector v,
+    int size)
+{
+    Ral_IntVectorIter end = Ral_IntVectorEnd(v) ;
+    Ral_IntVectorIter iter ;
+    Ral_IntVector mapV = Ral_IntVectorNew(size, 0) ;
+
+    for (iter = Ral_IntVectorBegin(v) ; iter != end ; ++iter) {
+	Ral_IntVectorStore(mapV, *iter, 1) ;
+    }
+
+    return mapV ;
 }
 
 void

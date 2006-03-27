@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.5 $
-$Date: 2006/03/19 19:48:31 $
+$Revision: 1.6 $
+$Date: 2006/03/27 02:20:35 $
  *--
  */
 
@@ -58,10 +58,12 @@ PRAGMAS
 INCLUDE FILES
 */
 #include <assert.h>
+#include <string.h>
 #include "tcl.h"
 #include "ral_relation.h"
 #include "ral_relationobj.h"
 #include "ral_tupleobj.h"
+#include "ral_joinmap.h"
 
 /*
 MACRO DEFINITIONS
@@ -122,7 +124,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.5 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.6 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -752,7 +754,7 @@ RelationIntersectCmd(
 
     intersectRel = Ral_RelationIntersect(r1, r2) ;
     if (intersectRel == NULL) {
-	Ral_RelationObjSetError(interp, REL_HEADING_NOT_EQUAL,
+	Ral_RelationObjSetError(interp, Ral_RelationLastError,
 	    Tcl_GetString(r2Obj)) ;
 	return TCL_ERROR ;
     }
@@ -776,7 +778,7 @@ RelationIntersectCmd(
 	intersectRel = Ral_RelationIntersect(r1, r2) ;
 	Ral_RelationDelete(r1) ;
 	if (intersectRel == NULL) {
-	    Ral_RelationObjSetError(interp, REL_HEADING_NOT_EQUAL,
+	    Ral_RelationObjSetError(interp, Ral_RelationLastError,
 		Tcl_GetString(r2Obj)) ;
 	    return TCL_ERROR ;
 	}
@@ -908,7 +910,76 @@ RelationJoinCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
-    return TCL_ERROR ;
+    Tcl_Obj *r1Obj ;
+    Ral_Relation r1 ;
+    Tcl_Obj *r2Obj ;
+    Ral_Relation r2 ;
+    Ral_Relation joinRel ;
+    Ral_JoinMap joinMap ;
+
+    /* relation join relation1 relation2 ?-using joinAttrs relation3 ... ? */
+    if (objc < 4) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+	    "relation1 relation2 ?-using joinAttrs relation3 ... ?") ;
+	return TCL_ERROR ;
+    }
+    r1Obj = objv[2] ;
+    if (Tcl_ConvertToType(interp, r1Obj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    r1 = r1Obj->internalRep.otherValuePtr ;
+
+    r2Obj = objv[3] ;
+    if (Tcl_ConvertToType(interp, r2Obj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    r2 = r2Obj->internalRep.otherValuePtr ;
+    joinMap = Ral_JoinMapNew(0, 0) ;
+
+    objc -= 4 ;
+    objv += 4 ;
+
+    if (Ral_RelationObjParseJoinArgs(interp, &objc, &objv, r1, r2, joinMap)
+	!= TCL_OK) {
+	Ral_JoinMapDelete(joinMap) ;
+	return TCL_ERROR ;
+    }
+
+    joinRel = Ral_RelationJoin(r1, r2, joinMap) ;
+    Ral_JoinMapDelete(joinMap) ;
+    if (joinRel == NULL) {
+	Ral_RelationObjSetError(interp, Ral_RelationLastError,
+	    Tcl_GetString(r2Obj)) ;
+	return TCL_ERROR ;
+    }
+
+    while (objc-- > 0) {
+	r1 = joinRel ;
+	r2Obj = *objv++ ;
+	if (Tcl_ConvertToType(interp, r2Obj, &Ral_RelationObjType) != TCL_OK) {
+	    Ral_RelationDelete(r1) ;
+	    return TCL_ERROR ;
+	}
+	r2 = r2Obj->internalRep.otherValuePtr ;
+	joinMap = Ral_JoinMapNew(0, 0) ;
+
+	if (Ral_RelationObjParseJoinArgs(interp, &objc, &objv, r1, r2, joinMap)
+	    != TCL_OK) {
+	    Ral_JoinMapDelete(joinMap) ;
+	    return TCL_ERROR ;
+	}
+	joinRel = Ral_RelationJoin(r1, r2, joinMap) ;
+	Ral_RelationDelete(r1) ;
+	Ral_JoinMapDelete(joinMap) ;
+	if (joinRel == NULL) {
+	    Ral_RelationObjSetError(interp, Ral_RelationLastError,
+		Tcl_GetString(r2Obj)) ;
+	    return TCL_ERROR ;
+	}
+    }
+
+    Tcl_SetObjResult(interp, Ral_RelationObjNew(joinRel)) ;
+    return TCL_OK ;
 }
 
 static int
@@ -987,7 +1058,7 @@ RelationMinusCmd(
 
     diffRel = Ral_RelationMinus(r1, r2) ;
     if (diffRel == NULL) {
-	Ral_RelationObjSetError(interp, REL_HEADING_NOT_EQUAL,
+	Ral_RelationObjSetError(interp, Ral_RelationLastError,
 	    Tcl_GetString(r2Obj)) ;
 	return TCL_ERROR ;
     }
@@ -1261,7 +1332,51 @@ RelationSemijoinCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
-    return TCL_ERROR ;
+    Tcl_Obj *r1Obj ;
+    Ral_Relation r1 ;
+    Tcl_Obj *r2Obj ;
+    Ral_Relation r2 ;
+    Ral_Relation semiJoinRel ;
+    Ral_JoinMap joinMap ;
+
+    /* relation semijoin relation1 relation2 ?-using joinAttrs? */
+    if (objc < 4) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+	    "relation1 relation2 ?-using joinAttrs?") ;
+	return TCL_ERROR ;
+    }
+    r1Obj = objv[2] ;
+    if (Tcl_ConvertToType(interp, r1Obj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    r1 = r1Obj->internalRep.otherValuePtr ;
+
+    r2Obj = objv[3] ;
+    if (Tcl_ConvertToType(interp, r2Obj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    r2 = r2Obj->internalRep.otherValuePtr ;
+    joinMap = Ral_JoinMapNew(0, 0) ;
+
+    objc -= 4 ;
+    objv += 4 ;
+
+    if (Ral_RelationObjParseJoinArgs(interp, &objc, &objv, r1, r2, joinMap)
+	!= TCL_OK) {
+	Ral_JoinMapDelete(joinMap) ;
+	return TCL_ERROR ;
+    }
+
+    semiJoinRel = Ral_RelationSemiJoin(r1, r2, joinMap) ;
+    Ral_JoinMapDelete(joinMap) ;
+    if (semiJoinRel == NULL) {
+	Ral_RelationObjSetError(interp, Ral_RelationLastError,
+	    Tcl_GetString(r2Obj)) ;
+	return TCL_ERROR ;
+    }
+
+    Tcl_SetObjResult(interp, Ral_RelationObjNew(semiJoinRel)) ;
+    return TCL_OK ;
 }
 
 static int
@@ -1270,7 +1385,51 @@ RelationSemiminusCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
-    return TCL_ERROR ;
+    Tcl_Obj *r1Obj ;
+    Ral_Relation r1 ;
+    Tcl_Obj *r2Obj ;
+    Ral_Relation r2 ;
+    Ral_Relation semiMinusRel ;
+    Ral_JoinMap joinMap ;
+
+    /* relation semiminus relation1 relation2 ?-using joinAttrs? */
+    if (objc < 4) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+	    "relation1 relation2 ?-using joinAttrs?") ;
+	return TCL_ERROR ;
+    }
+    r1Obj = objv[2] ;
+    if (Tcl_ConvertToType(interp, r1Obj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    r1 = r1Obj->internalRep.otherValuePtr ;
+
+    r2Obj = objv[3] ;
+    if (Tcl_ConvertToType(interp, r2Obj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    r2 = r2Obj->internalRep.otherValuePtr ;
+    joinMap = Ral_JoinMapNew(0, 0) ;
+
+    objc -= 4 ;
+    objv += 4 ;
+
+    if (Ral_RelationObjParseJoinArgs(interp, &objc, &objv, r1, r2, joinMap)
+	!= TCL_OK) {
+	Ral_JoinMapDelete(joinMap) ;
+	return TCL_ERROR ;
+    }
+
+    semiMinusRel = Ral_RelationSemiMinus(r1, r2, joinMap) ;
+    Ral_JoinMapDelete(joinMap) ;
+    if (semiMinusRel == NULL) {
+	Ral_RelationObjSetError(interp, Ral_RelationLastError,
+	    Tcl_GetString(r2Obj)) ;
+	return TCL_ERROR ;
+    }
+
+    Tcl_SetObjResult(interp, Ral_RelationObjNew(semiMinusRel)) ;
+    return TCL_OK ;
 }
 
 static int
@@ -1434,13 +1593,13 @@ RelationUnionCmd(
 	return TCL_ERROR ;
     }
 
-    r1Obj = *(objv + 2) ;
+    r1Obj = objv[2] ;
     if (Tcl_ConvertToType(interp, r1Obj, &Ral_RelationObjType) != TCL_OK) {
 	return TCL_ERROR ;
     }
     r1 = r1Obj->internalRep.otherValuePtr ;
 
-    r2Obj = *(objv + 3) ;
+    r2Obj = objv[3] ;
     if (Tcl_ConvertToType(interp, r2Obj, &Ral_RelationObjType) != TCL_OK) {
 	return TCL_ERROR ;
     }
@@ -1448,7 +1607,7 @@ RelationUnionCmd(
 
     unionRel = Ral_RelationUnion(r1, r2) ;
     if (unionRel == NULL) {
-	Ral_RelationObjSetError(interp, REL_HEADING_NOT_EQUAL,
+	Ral_RelationObjSetError(interp, Ral_RelationLastError,
 	    Tcl_GetString(r2Obj)) ;
 	return TCL_ERROR ;
     }
@@ -1472,7 +1631,7 @@ RelationUnionCmd(
 	unionRel = Ral_RelationUnion(r1, r2) ;
 	Ral_RelationDelete(r1) ;
 	if (unionRel == NULL) {
-	    Ral_RelationObjSetError(interp, REL_HEADING_NOT_EQUAL,
+	    Ral_RelationObjSetError(interp, Ral_RelationLastError,
 		Tcl_GetString(r2Obj)) ;
 	    return TCL_ERROR ;
 	}

@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.7 $
-# $Date: 2006/03/19 19:48:31 $
+# $Revision: 1.8 $
+# $Date: 2006/03/27 02:20:35 $
 #  *--
 
 package require tcltest 2.2
@@ -1529,6 +1529,103 @@ namespace eval ::ral::test {
 	relation isnotempty $S
     } -result 1
 
+    # relation join subcommand
+    test relation-join-1.0 {one common attribute} -body {
+	set r1 {Relation {Name string Age int} Name\
+	    {{Age 20 Name George}\
+	    {Age 10 Name Fred}}}
+	set r2 {Relation {Age int City string} Age\
+	    {{Age 30 City Sunnyvale}\
+	    {Age 20 City {San Jose}}\
+	    {City Saratoga Age 10}}}
+	relation join $r1 $r2
+    } -result {
+	Relation
+	{Name string Age int City string}
+	{{Name Age}}
+	{
+	    {Name George Age 20 City {San Jose}}
+	    {Name Fred Age 10 City Saratoga}
+	}
+    } -match relation
+
+    test relation-join-2.0 {multiple common attribute} -body {
+	set r1 {Relation {Name string Age int City string} Name\
+	    {{Age 20 Name George City {San Jose}}\
+	    {City Saratoga Age 10 Name Fred}}}
+	set r2 {Relation {Age int City string} Age\
+	    {{Age 30 City Sunnyvale}\
+	    {Age 20 City {San Jose}}\
+	    {City Saratoga Age 10}}}
+	relation join $r1 $r2
+    } -result {
+	Relation
+	{Name string Age int City string}
+	{{Name Age}}
+	{
+	    {Name George Age 20 City {San Jose}}
+	    {Name Fred Age 10 City Saratoga}
+	}
+    } -match relation
+
+    test relation-join-3.0 {no common attribute} -body {
+	set r1 {Relation {Name string Age int} Name\
+	    {{Age 20 Name George}\
+	    {Age 10 Name Fred}}}
+	set r2 {Relation {Status int City string} Status\
+	    {{Status 30 City Sunnyvale}\
+	    {Status 20 City {San Jose}}\
+	    {City Saratoga Status 10}}}
+	relation join $r1 $r2
+    } -result {
+	Relation
+	{Name string Age int Status int City string}
+	{{Name Status}}
+	{
+	    {Name George Age 20 Status 30 City Sunnyvale}
+	    {Name George Age 20 Status 20 City {San Jose}}
+	    {Name George Age 20 Status 10 City Saratoga}
+	    {Name Fred Age 10 Status 30 City Sunnyvale}
+	    {Name Fred Age 10 Status 20 City {San Jose}}
+	    {Name Fred Age 10 Status 10 City Saratoga}
+	}
+    } -match relation
+
+    test relation-join-4.0 {join with DEE; identity} -body {
+	set r1 {Relation {Name string Age int} Name\
+	    {{Age 20 Name George}\
+	    {Age 10 Name Fred}}}
+	set r2 {Relation {} {{}} {{}}}
+	relation is [relation join $r1 $r2] == $r1
+    } -result 1
+
+    test relation-join-5.0 {join with DUM ; empty} -body {
+	set r1 {Relation {Name string Age int} Name\
+	    {{Age 20 Name George}\
+	    {Age 10 Name Fred}}}
+	set r2 {Relation {} {{}} {}}
+	relation is [relation join $r1 $r2] == [relation empty $r1]
+    } -result 1
+
+    test relation-join-6.0 {specified attribute} -body {
+	set r1 {Relation {Name string Age int City string} Name\
+	    {{Age 20 Name George City {San Jose}}\
+	    {City Saratoga Age 10 Name Fred}}}
+	set r2 {Relation {Status int City string} Status\
+	    {{Status 30 City Sunnyvale}\
+	    {Status 20 City {San Jose}}\
+	    {City Saratoga Status 10}}}
+	relation join $r1 $r2 -using {City City}
+    } -result {
+	Relation
+	{Name string Age int City string Status int}
+	{{Name Status}}
+	{
+	    {Name George Age 20 City {San Jose} Status 20}
+	    {Name Fred Age 10 City Saratoga Status 10}
+	}
+    } -match relation
+
     # relation list subcommand
     test relation-list-1.0 {multiple tuples} -body {
 	set r {
@@ -1743,6 +1840,67 @@ namespace eval ::ral::test {
     } -result {Relation {Name string Age int} {Name Age} {{Name Fred Age 30}}}\
     -match relation
 
+    # relation semijoin subcommand
+    test relation-semijoin-1.0 {one common attribute} -body {
+	set r1 {Relation {Name string Age int} Name\
+	    {{Age 20 Name George}\
+	    {Age 10 Name Fred}}}
+	set r2 {Relation {Age int City string} Age\
+	    {{Age 30 City Sunnyvale}\
+	    {Age 20 City {San Jose}}\
+	    {City Saratoga Age 10}}}
+	relation semijoin $r1 $r2
+    } -result {
+	Relation
+	{Name string Age int}
+	Name
+	{
+	    {Name George Age 20}
+	    {Name Fred Age 10}
+	}
+    } -match relation
+
+    test relation-semijoin-2.0 {one common attribute} -body {
+	set r1 {Relation {Name string Age int} Name\
+	    {{Age 20 Name George}\
+	    {Age 10 Name Fred}}}
+	set r2 {Relation {Age int City string} Age\
+	    {{Age 35 City Sunnyvale}\
+	    {Age 20 City {San Jose}}\
+	    {City Saratoga Age 15}}}
+	relation semijoin $r1 $r2
+    } -result {
+	Relation
+	{Name string Age int}
+	Name
+	{
+	    {Name George Age 20}
+	}
+    } -match relation
+    # HERE -- add tests
+
+    # relation semiminus subcommand
+    test relation-semiminus-1.0 {one common attribute} -body {
+	relation semiminus $S $SP
+    } -result {
+	Relation
+	{S# string SNAME string STATUS int CITY string}
+	S#
+	{
+	    {S# S5 SNAME Adams STATUS 30 CITY Athens}
+	}
+    } -match relation
+
+    test relation-semiminus-2.0 {one common attribute} -body {
+	relation semiminus $SP $S
+    } -result {
+	Relation
+	{S# string P# string QTY int}
+	{{S# P#}}
+	{}
+    } -match relation
+    # HERE -- add tests
+
     # relation times subcommand
     test relation-times-1.0 {single attribute, square relation} -body {
 	set r1 {Relation {Name string} Name {{Name Andrew}}}
@@ -1779,8 +1937,17 @@ namespace eval ::ral::test {
 	set r1 {Relation {Name string} Name {{Name Andrew} {Name George}}}
 	set r2 {Relation {Status int} Status {{Status 20} {Status 30}}}
 	relation times $r1 $r2
-    } -result {Relation {Name string Status int} {{Name Status}} {{Name Andrew Status 20} {Name Andrew Status 30} {Name George Status 20} {Name George Status 30}}}\
-    -match relation
+    } -result {
+	Relation
+	{Name string Status int}
+	{{Name Status}}
+	{
+	    {Name Andrew Status 20}
+	    {Name Andrew Status 30}
+	    {Name George Status 20}
+	    {Name George Status 30}
+	}
+    } -match relation
 
     test relation-times-6.0 {attribute name conflict} -body {
 	set r1 {Relation {Name string} Name {{Name Andrew}}}
@@ -1822,8 +1989,16 @@ namespace eval ::ral::test {
 		{DogName Missy Breed Poodle}}}\
 	    {Name Alice Dog {{DogName Tiger Breed Setter}}}}}
 	relation ungroup $r Dog
-    } -result {Relation {Name string DogName string Breed string} {{Name DogName}} {{Name Fred DogName Rover Breed Terrier} {Name Fred DogName Missy Breed Poodle} {Name Alice DogName Tiger Breed Setter}}}\
-    -match relation
+    } -result {
+	Relation
+	{Name string DogName string Breed string}
+	{{Name DogName}}
+	{
+	    {Name Fred DogName Rover Breed Terrier}
+	    {Name Fred DogName Missy Breed Poodle}
+	    {Name Alice DogName Tiger Breed Setter}
+	}
+    } -match relation
 
     test relation-ungroup-2.0 {duplicate attribute name} -body {
 	set r {Relation {Name string\
@@ -1886,8 +2061,15 @@ namespace eval ::ral::test {
 		{DogName Missy Breed Poodle}}}\
 	    {Name Fred Dog {{DogName Rover Breed Terrier}}}}}
 	relation ungroup $r Dog
-    } -result {Relation {Name string DogName string Breed string} {{Name DogName}} {{Name Fred DogName Rover Breed Terrier} {Name Fred DogName Missy Breed Poodle}}}\
-    -match relation
+    } -result {
+	Relation
+	{Name string DogName string Breed string}
+	{{Name DogName}}
+	{
+	    {Name Fred DogName Rover Breed Terrier}
+	    {Name Fred DogName Missy Breed Poodle}
+	}
+    } -match relation
 
     test relation-ungroup-4.0 {attributes beyond ungrouped attribute} -body {
 	set r {
@@ -1956,10 +2138,15 @@ namespace eval ::ral::test {
 	    {{Name Andrew Age 30 City Sunnyvale}\
 	    {Name George Age 20 City {San Jose}}}}
 	relation union $r1 $r2
-    } -result {Relation {Name string Age int City string} Name\
-	{{Name Andrew Age 30 City Sunnyvale}\
-	 {Name George Age 20 City {San Jose}}}}\
-     -match relation
+    } -result {
+	Relation
+	{Name string Age int City string}
+	Name
+	{
+	    {Name Andrew Age 30 City Sunnyvale}
+	    {Name George Age 20 City {San Jose}}
+	}
+    } -match relation
 
     test relation-union-5.0 {union of more than two relations} -body {
 	set r1 {Relation {Name string Age int City string} Name\
@@ -1969,11 +2156,16 @@ namespace eval ::ral::test {
 	set r3 {Relation {Name string Age int City string} Name\
 	    {{Name Fred Age 10 City Saratoga}}}
 	relation union $r1 $r2 $r3
-    } -result {Relation {Name string Age int City string} Name\
-	{{Name Andrew Age 30 City Sunnyvale}\
-	 {Name George Age 20 City {San Jose}}\
-	 {Name Fred Age 10 City Saratoga}}}\
-     -match relation
+    } -result {
+	Relation
+	{Name string Age int City string}
+	Name
+	{
+	    {Name Andrew Age 30 City Sunnyvale}
+	    {Name George Age 20 City {San Jose}}
+	    {Name Fred Age 10 City Saratoga}
+	}
+    } -match relation
 
     test relation-union-6.0 {union of more than two, common tuples } -body {
 	set r1 {Relation {Name string Age int City string} Name\
@@ -1985,11 +2177,16 @@ namespace eval ::ral::test {
 	    {{Name George Age 20 City {San Jose}}\
 	    {Name Fred Age 10 City Saratoga}}}
 	relation union $r1 $r2 $r3
-    } -result {Relation {Name string Age int City string} Name\
-	{{Name Andrew Age 30 City Sunnyvale}\
-	 {Name George Age 20 City {San Jose}}\
-	 {Name Fred Age 10 City Saratoga}}}\
-     -match relation
+    } -result {
+	Relation
+	{Name string Age int City string}
+	Name
+	{
+	    {Name Andrew Age 30 City Sunnyvale}
+	    {Name George Age 20 City {San Jose}}
+	    {Name Fred Age 10 City Saratoga}
+	}
+    } -match relation
 
     test relation-union-7.0 {type mismatch} -body {
 	set r1 {Relation {Name string Age int City string} Name\
@@ -2006,10 +2203,120 @@ namespace eval ::ral::test {
 	set r2 {Relation {Age int Name string City string} Name\
 	    {{Name George Age 20 City {San Jose}}}}
 	relation union $r1 $r2
-    } -result {Relation {Name string Age int City string} Name\
-	{{Name Andrew Age 30 City Sunnyvale}\
-	 {Name George Age 20 City {San Jose}}}}\
-     -match relation
+    } -result {
+	Relation
+	{Name string Age int City string}
+	Name
+	{
+	    {Name Andrew Age 30 City Sunnyvale}
+	    {Name George Age 20 City {San Jose}}
+	}
+    } -match relation
+
+    # examples from the Date book
+    test date-example-1.0 {Get suppliers who supply all parts} -body {
+	set pnums [relation project $P P#]
+	relation restrict $S sx\
+	    {[relation is\
+		[relation project\
+		    [relation restrict $SP spx\
+		    {[tuple extract $spx S#] eq [tuple extract $sx S#]}] P#]\
+	    equal $pnums]}
+    } -result {
+	Relation
+	{S# string SNAME string STATUS int CITY string}
+	S#
+	{
+	    {S# S1 SNAME Smith STATUS 20 CITY London}
+	}
+    } -match relation
+
+    test date-example-3.0\
+	{Get supplier names for suppliers who supply part P2} -body {
+	relation project\
+	    [relation restrict [relation join $SP $S]\
+		r1 {[tuple extract $r1 P#] eq "P2"}] SNAME
+    } -result {
+	Relation
+	{SNAME string}
+	SNAME
+	{
+	     {SNAME Smith}
+	     {SNAME Jones}
+	     {SNAME Blake}
+	     {SNAME Clark}
+	}
+    } -match relation
+
+    test date-example-4.0 {Get supplier name for suppliers who supply at\
+    least one red part} -body {
+	relation project\
+	    [relation join\
+	    [relation project\
+	    [relation join\
+		[relation restrict $P t1\
+		    {[tuple extract $t1 COLOR] eq "Red"}] $SP] S#] $S] SNAME
+    } -result {
+	Relation
+	{SNAME string}
+	SNAME
+	{
+	     {SNAME Smith}
+	     {SNAME Jones}
+	     {SNAME Clark}
+	}
+    } -match relation
+
+    test date-example-6.0 {Get all pairs of supplier numbers such that\
+	the suppliers concerned are colocated} -body {
+	relation project\
+	    [relation restrict\
+		[relation join\
+		    [relation project [relation rename $S S# SA] SA CITY]\
+		    [relation project [relation rename $S S# SB] SB CITY]\
+		]\
+		t1 {[string compare\
+		    [tuple extract $t1 SA] [tuple extract $t1 SB]] < 0}\
+	    ]\
+	SA SB
+    } -result {
+	Relation
+	{SA string SB string}
+	{{SA SB}}
+	{
+	    {SA S1	SB S4}
+	    {SA S2	SB S3}
+	}
+    } -match relation
+
+    test date-example-7.0 {Get supplier info for suppliers who supply part P2}\
+    -body {
+	relation semijoin $S\
+	    [relation restrict $SP r1 {[tuple extract $r1 P#] eq "P2"}]
+    } -result {
+	Relation
+	{S# string SNAME string STATUS int CITY string}
+	S#
+	{
+	    {S# S1 SNAME Smith STATUS 20 CITY London}
+	    {S# S2 SNAME Jones STATUS 10 CITY Paris}
+	    {S# S3 SNAME Blake STATUS 30 CITY Paris}
+	    {S# S4 SNAME Clark STATUS 20 CITY London}
+	}
+    } -match relation
+
+    test date-example-8.0 {Get supplier info for suppliers who do not\
+	supply part P2} -body {
+	relation semiminus $S\
+	    [relation restrict $SP r1 {[tuple extract $r1 P#] eq "P2"}]
+    } -result {
+	Relation
+	{S# string SNAME string STATUS int CITY string}
+	S#
+	{
+	    {S# S5 SNAME Adams STATUS 30 CITY Athens}
+	}
+    } -match relation
 
     cleanupTests
 }

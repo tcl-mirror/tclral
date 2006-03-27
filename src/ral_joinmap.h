@@ -1,5 +1,5 @@
 /*
-This software is copyrighted 2005 by G. Andrew Mangogna.  The following
+This software is copyrighted 2006 by G. Andrew Mangogna.  The following
 terms apply to all files associated with the software unless explicitly
 disclaimed in individual files.
 
@@ -44,13 +44,13 @@ MODULE:
 
 ABSTRACT:
 
-$RCSfile: ral_relationobj.h,v $
-$Revision: 1.6 $
+$RCSfile: ral_joinmap.h,v $
+$Revision: 1.1 $
 $Date: 2006/03/27 02:20:35 $
  *--
  */
-#ifndef _ral_relationobj_h_
-#define _ral_relationobj_h_
+#ifndef _ral_joinmap_h_
+#define _ral_joinmap_h_
 
 /*
 PRAGMAS
@@ -59,10 +59,7 @@ PRAGMAS
 /*
 INCLUDE FILES
 */
-#include "tcl.h"
-#include "ral_relationheading.h"
-#include "ral_relation.h"
-#include <stdio.h>
+#include "ral_vector.h"
 
 /*
 MACRO DEFINITIONS
@@ -76,28 +73,53 @@ FORWARD CLASS REFERENCES
 TYPE DECLARATIONS
 */
 
+typedef int Ral_JoinMapComponentType ;
+
 /*
-EXTERNAL DATA REFERENCES
-*/
-extern Tcl_ObjType Ral_RelationObjType ;
+ * Each mapping element is just a pair of integers.
+ */
+#define MAP_ELEMENT_COUNT 2
+typedef struct {
+    Ral_JoinMapComponentType m[MAP_ELEMENT_COUNT] ;
+} Ral_JoinMapValueType ;
+
+typedef Ral_JoinMapValueType *Ral_JoinMapIter ;
+
+typedef struct Ral_JoinMap {
+    Ral_JoinMapIter attrStart ;
+    Ral_JoinMapIter attrFinish ;
+    Ral_JoinMapIter attrEndStorage ;
+    Ral_JoinMapIter tupleStart ;
+    Ral_JoinMapIter tupleFinish ;
+    Ral_JoinMapIter tupleEndStorage ;
+} *Ral_JoinMap ;
 
 /*
 FUNCTION DECLARATIONS
 */
 
-extern Tcl_Obj *Ral_RelationObjNew(Ral_Relation) ;
-extern int Ral_RelationObjConvert(Ral_RelationHeading, Tcl_Interp *, Tcl_Obj *,
-    Tcl_Obj *) ;
-extern Ral_RelationHeading Ral_RelationHeadingNewFromObjs(Tcl_Interp *,
-    Tcl_Obj *, Tcl_Obj *) ;
-extern int Ral_RelationSetFromObj(Ral_Relation, Tcl_Interp *, Tcl_Obj *) ;
-extern int Ral_RelationInsertTupleObj(Ral_Relation, Tcl_Interp *, Tcl_Obj *) ;
-extern int Ral_RelationObjParseJoinArgs(Tcl_Interp *, int *, Tcl_Obj *const**,
-    Ral_Relation, Ral_Relation, Ral_JoinMap) ;
-extern int Ral_RelationFindJoinAttrs(Tcl_Interp *, Ral_Relation, Ral_Relation,
-    Tcl_Obj *, Ral_JoinMap) ;
-extern const char *Ral_RelationObjVersion(void) ;
-extern void Ral_RelationObjSetError(Tcl_Interp *, Ral_RelationError,
-    const char *) ;
+extern Ral_JoinMap Ral_JoinMapNew(int, int) ;
+extern void Ral_JoinMapDelete(Ral_JoinMap) ;
+extern Ral_JoinMapIter Ral_JoinMapAttrBegin(Ral_JoinMap) ;
+extern Ral_JoinMapIter Ral_JoinMapAttrEnd(Ral_JoinMap) ;
+extern Ral_JoinMapIter Ral_JoinMapTupleBegin(Ral_JoinMap) ;
+extern Ral_JoinMapIter Ral_JoinMapTupleEnd(Ral_JoinMap) ;
+extern int Ral_JoinMapAttrSize(Ral_JoinMap) ;
+extern int Ral_JoinMapAttrCapacity(Ral_JoinMap) ;
+extern void Ral_JoinMapAttrReserve(Ral_JoinMap, int) ;
+extern int Ral_JoinMapTupleSize(Ral_JoinMap) ;
+extern int Ral_JoinMapTupleCapacity(Ral_JoinMap) ;
+extern void Ral_JoinMapTupleReserve(Ral_JoinMap, int) ;
+extern void Ral_JoinMapAddAttrMapping(Ral_JoinMap,
+    Ral_JoinMapComponentType, Ral_JoinMapComponentType) ;
+extern void Ral_JoinMapAddTupleMapping(Ral_JoinMap,
+    Ral_JoinMapComponentType, Ral_JoinMapComponentType) ;
 
-#endif /* _ral_relationobj_h_ */
+extern Ral_IntVector Ral_JoinMapGetAttr(Ral_JoinMap, int) ;
+extern Ral_IntVector Ral_JoinMapAttrMap(Ral_JoinMap, int, int) ;
+extern int Ral_JoinMapFindAttr(Ral_JoinMap, int, int) ;
+extern Ral_IntVector Ral_JoinMapTupleMap(Ral_JoinMap, int, int) ;
+
+extern const char *Ral_JoinMapVersion(void) ;
+
+#endif /* _ral_joinmap_h_ */

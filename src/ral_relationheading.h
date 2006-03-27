@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationheading.h,v $
-$Revision: 1.6 $
-$Date: 2006/03/19 19:48:31 $
+$Revision: 1.7 $
+$Date: 2006/03/27 02:20:35 $
  *--
  */
 #ifndef _ral_relationheading_h_
@@ -61,6 +61,7 @@ INCLUDE FILES
 */
 #include "ral_tupleheading.h"
 #include "ral_vector.h"
+#include "ral_joinmap.h"
 #include <stdio.h>
 
 /*
@@ -117,6 +118,8 @@ extern int Ral_RelationHeadingFindIdentifier(Ral_RelationHeading,
     Ral_IntVector) ;
 extern Ral_RelationHeading Ral_RelationHeadingUnion(Ral_RelationHeading,
     Ral_RelationHeading) ;
+extern Ral_RelationHeading Ral_RelationHeadingJoin(Ral_RelationHeading,
+    Ral_RelationHeading, Ral_JoinMap, Ral_IntVector *) ;
 extern int Ral_RelationHeadingScan(Ral_RelationHeading,
     Ral_AttributeTypeScanFlags *) ;
 extern int Ral_RelationHeadingConvert(Ral_RelationHeading, char *,
