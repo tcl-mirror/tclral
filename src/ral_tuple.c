@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuple.c,v $
-$Revision: 1.8 $
-$Date: 2006/03/19 19:48:31 $
+$Revision: 1.9 $
+$Date: 2006/04/06 02:07:30 $
  *--
  */
 
@@ -92,7 +92,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_tuple.c,v $ $Revision: 1.8 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tuple.c,v $ $Revision: 1.9 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -386,8 +386,13 @@ Ral_TupleCopyValues(
     int count = 0 ;
     /*
      * Copy the values making sure the increment the reference count.
+     * Also be careful to decrement the reference count of any
+     * value already stored in the tuple.
      */
     while (start != finish) {
+	if (*dst) {
+	    Tcl_DecrRefCount(*dst) ;
+	}
 	Tcl_IncrRefCount(*dst++ = *start++) ;
 	++count ;
     }

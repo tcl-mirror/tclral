@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.h,v $
-$Revision: 1.7 $
-$Date: 2006/03/27 02:20:35 $
+$Revision: 1.8 $
+$Date: 2006/04/06 02:07:30 $
  *--
  */
 #ifndef _ral_relation_h_
@@ -149,6 +149,9 @@ typedef enum Ral_RelationError {
     REL_BAD_TRIPLE_LIST,
     REL_NOT_AN_IDENTIFIER,
     REL_NOT_A_RELATION,
+    REL_NOT_A_PROJECTION,
+    REL_NOT_DISJOINT,
+    REL_NOT_UNION,
 
 
     REL_HEADING_ERR,
@@ -183,6 +186,7 @@ extern Ral_RelationIter Ral_RelationFind(Ral_Relation, int, Ral_Tuple,
     Ral_IntVector) ;
 extern Ral_RelationIter Ral_RelationFindKey(Ral_Relation, int, Ral_Tuple,
     Ral_IntVector) ;
+extern Ral_Relation Ral_RelationExtract(Ral_Relation, Ral_IntVector) ;
 extern void Ral_RelationErase(Ral_Relation, Ral_RelationIter,
     Ral_RelationIter) ;
 
@@ -202,19 +206,22 @@ extern Ral_Relation Ral_RelationIntersect(Ral_Relation, Ral_Relation) ;
 extern Ral_Relation Ral_RelationMinus(Ral_Relation, Ral_Relation) ;
 extern Ral_Relation Ral_RelationTimes(Ral_Relation, Ral_Relation) ;
 extern Ral_Relation Ral_RelationProject(Ral_Relation, Ral_IntVector) ;
-extern Ral_Relation Ral_RelationExtend(Ral_Relation, int) ;
 extern Ral_Relation Ral_RelationUngroup(Ral_Relation, const char *) ;
 extern Ral_Relation Ral_RelationJoin(Ral_Relation, Ral_Relation, Ral_JoinMap) ;
 extern Ral_Relation Ral_RelationSemiJoin(Ral_Relation, Ral_Relation,
     Ral_JoinMap) ;
 extern Ral_Relation Ral_RelationSemiMinus(Ral_Relation, Ral_Relation,
     Ral_JoinMap) ;
+extern Ral_Relation Ral_RelationDivide(Ral_Relation, Ral_Relation,
+    Ral_Relation) ;
 
-extern Ral_Relation Ral_RelationSortAscending(Ral_Relation, Ral_IntVector) ;
-extern Ral_Relation Ral_RelationSortDescending(Ral_Relation, Ral_IntVector) ;
+extern Ral_IntVector Ral_RelationSortAscending(Ral_Relation, Ral_IntVector) ;
+extern Ral_IntVector Ral_RelationSortDescending(Ral_Relation, Ral_IntVector) ;
 
 extern int Ral_RelationCopy(Ral_Relation, Ral_RelationIter,
     Ral_RelationIter, Ral_Relation, Ral_IntVector) ;
+extern void Ral_RelationFindJoinTuples(Ral_Relation, Ral_Relation,
+    Ral_JoinMap) ;
 
 extern int Ral_RelationScan(Ral_Relation, Ral_AttributeTypeScanFlags *,
     Ral_AttributeValueScanFlags *) ;

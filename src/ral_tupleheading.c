@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleheading.c,v $
-$Revision: 1.9 $
-$Date: 2006/03/27 02:20:35 $
+$Revision: 1.10 $
+$Date: 2006/04/06 02:07:30 $
  *--
  */
 
@@ -91,7 +91,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tupleheading.c,v $ $Revision: 1.9 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tupleheading.c,v $ $Revision: 1.10 $" ;
 
 static const char tupleKeyword[] = "Tuple" ;
 static const char openList = '{' ;
@@ -547,8 +547,9 @@ Ral_TupleHeadingNewOrderMap(
 }
 
 /*
- * Find the common attributes between two headings and record the result
- * in the join map. Return the number of common attributes found.
+ * Find the common attributes between two headings.
+ * Return the number of common attributes found.
+ * If "map" is non-NULL then the mapping is also recorded there.
  */
 int
 Ral_TupleHeadingCommonAttributes(
@@ -571,7 +572,9 @@ Ral_TupleHeadingCommonAttributes(
 	 * It is not sufficient that only the names match.
 	 */
 	if (iter2 != end2 && Ral_AttributeEqual(attr1, *iter2)) {
-	    Ral_JoinMapAddAttrMapping(map, iter1 - begin1, iter2 - begin2) ;
+	    if (map) {
+		Ral_JoinMapAddAttrMapping(map, iter1 - begin1, iter2 - begin2) ;
+	    }
 	    ++count ;
 	}
     }

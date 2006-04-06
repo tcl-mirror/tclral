@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_joinmap.c,v $
-$Revision: 1.1 $
-$Date: 2006/03/27 02:20:35 $
+$Revision: 1.2 $
+$Date: 2006/04/06 02:07:30 $
  *--
  */
 
@@ -89,7 +89,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_joinmap.c,v $ $Revision: 1.1 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_joinmap.c,v $ $Revision: 1.2 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -343,6 +343,30 @@ Ral_JoinMapTupleMap(
     }
 
     return v ;
+}
+
+/*
+ * Return a set of tuple indices that match the given tuple "index".
+ * Caller must delete the returned vector.
+ */
+Ral_IntVector
+Ral_JoinMapMatchingTupleSet(
+    Ral_JoinMap map,
+    int offset,
+    int index)
+{
+    Ral_IntVector matchSet = Ral_IntVectorNewEmpty(5) ; /* just a guess */
+    Ral_JoinMapIter end = Ral_JoinMapTupleEnd(map) ;
+    Ral_JoinMapIter iter ;
+    int otherOffset = (offset + 1) % MAP_ELEMENT_COUNT ;
+
+    for (iter = Ral_JoinMapTupleBegin(map) ; iter != end ; ++iter) {
+	if (iter->m[offset] == index) {
+	    Ral_IntVectorSetAdd(matchSet, iter->m[otherOffset]) ;
+	}
+    }
+
+    return matchSet ;
 }
 
 const char *

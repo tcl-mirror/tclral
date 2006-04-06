@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationobj.c,v $
-$Revision: 1.7 $
-$Date: 2006/03/27 02:20:35 $
+$Revision: 1.8 $
+$Date: 2006/04/06 02:07:30 $
  *--
  */
 
@@ -105,7 +105,7 @@ Tcl_ObjType Ral_RelationObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.7 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.8 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -343,7 +343,6 @@ int Ral_RelationObjParseJoinArgs(
 	     */
 	    if (Ral_RelationFindJoinAttrs(interp, r1, r2, *(objv + 1), joinMap)
 		!= TCL_OK) {
-		Ral_JoinMapDelete(joinMap) ;
 		return TCL_ERROR ;
 	    }
 	    *objcPtr -= 2 ;
@@ -438,6 +437,9 @@ Ral_RelationObjSetError(
 	"bad list of triples",
 	"attributes do not constitute an identifier",
 	"attribute must be of a Relation type",
+	"relation is not a projection of the summarized relation",
+	"divisor heading must be disjoint from the dividend heading",
+	"mediator heading must be a union of the dividend and divisor headings",
 
 	"bad relation heading format",
 	"bad value type for value",
@@ -461,6 +463,9 @@ Ral_RelationObjSetError(
 	"BAD_TRIPLE_LIST",
 	"NOT_AN_IDENTIFIER",
 	"NOT_A_RELATION",
+	"NOT_A_PROJECTION",
+	"NOT_DISJOINT",
+	"NOT_UNION",
 
 	"HEADING_ERR",
 	"BAD_VALUE",

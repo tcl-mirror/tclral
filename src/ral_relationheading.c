@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationheading.c,v $
-$Revision: 1.8 $
-$Date: 2006/03/27 02:20:35 $
+$Revision: 1.9 $
+$Date: 2006/04/06 02:07:30 $
  *--
  */
 
@@ -89,7 +89,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.8 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.9 $" ;
 
 static const char relationKeyword[] = "Relation" ;
 static const char openList = '{' ;
@@ -228,30 +228,48 @@ Ral_RelationHeadingDup(
     return dupHeading ;
 }
 
+/*
+ * Create a new relation heading that is an extension of "heading".
+ * The extended heading will have "extTupleHeading" as the tupleheading.
+ */
 Ral_RelationHeading
 Ral_RelationHeadingExtend(
     Ral_RelationHeading heading,
-    int addAttrs)
+    Ral_TupleHeading extTupleHeading)
 {
-    Ral_TupleHeading tupleHeading ;
-    Ral_RelationHeading extendHeading ;
+    Ral_RelationHeading extHeading ;
     Ral_RelationIdIter srcIdIter ;
     Ral_RelationIdIter srcIdEnd = Ral_RelationHeadingIdEnd(heading) ;
     Ral_RelationIdIter dstIdIter ;
 
-    tupleHeading = Ral_TupleHeadingExtend(heading->tupleHeading, addAttrs) ;
-    if (!tupleHeading) {
-	return NULL ;
+    /*
+     * Normally all the identifiers are obtained from the original heading.
+     * That is extending a heading does not introduce new identifiers.
+     * The exception is the "dum" and "dee" relations. Extending them
+     * results in identifiers begin created from the extended attributes.
+     */
+    extHeading = Ral_RelationHeadingNew(extTupleHeading, heading->idCount) ;
+    dstIdIter = Ral_RelationHeadingIdBegin(extHeading) ;
+    if (Ral_RelationHeadingDegree(heading) == 0) {
+	/*
+	 * If we are extending a relation that has no attributes, then we take
+	 * all the attributes of the extention as components of the single
+	 * identifier for the extended relation.
+	 */
+	Ral_IntVector idVect = Ral_IntVectorNew(
+	    Ral_TupleHeadingSize(extTupleHeading), 0) ;
+
+	assert(extHeading->idCount == 1) ;
+	Ral_IntVectorFillConsecutive(idVect, 0) ;
+	*extHeading->identifiers = idVect ;
+    } else {
+	for (srcIdIter = Ral_RelationHeadingIdBegin(heading) ;
+	    srcIdIter != srcIdEnd ; ++srcIdIter) {
+	    *dstIdIter++ = Ral_IntVectorDup(*srcIdIter) ;
+	}
     }
 
-    extendHeading = Ral_RelationHeadingNew(tupleHeading, heading->idCount) ;
-    dstIdIter = Ral_RelationHeadingIdBegin(extendHeading) ;
-    for (srcIdIter = Ral_RelationHeadingIdBegin(heading) ;
-	srcIdIter != srcIdEnd ; ++srcIdIter) {
-	*dstIdIter++ = Ral_IntVectorDup(*srcIdIter) ;
-    }
-
-    return extendHeading ;
+    return extHeading ;
 }
 
 void

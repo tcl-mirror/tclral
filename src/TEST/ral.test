@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.8 $
-# $Date: 2006/03/27 02:20:35 $
+# $Revision: 1.9 $
+# $Date: 2006/04/06 02:07:30 $
 #  *--
 
 package require tcltest 2.2
@@ -68,6 +68,23 @@ proc tupleMatch {expected actual} {
 
 proc relationMatch {expected actual} {
     return [::ral::relation is $expected == $actual]
+}
+
+proc ::tcl::mathfunc::rcount {relation} {
+    return [::ral::relation cardinality $relation]
+}
+
+proc ::tcl::mathfunc::rsum {relation attr} {
+    set result 0
+    ::ral::relation foreach t $relation {
+	set result [expr {$result + [::ral::tuple extract $t $attr]}]
+    }
+    return $result
+}
+
+proc ::tcl::mathfunc::ravg {relation attr} {
+    return [expr {rsum($relation, $attr) /\
+	[::ral::relation cardinality $relation]}]
 }
 
 namespace eval ::ral::test {
@@ -781,6 +798,74 @@ namespace eval ::ral::test {
     } -result {Relation {Name string Number int Street string IsMale string} Name {}}\
     -match relation
 
+    # relation divide subcommand
+    test relation-divide-1.0 {suppliers who supply P1} -setup {
+	set dend [relation project $S S#]
+	set med [relation project $SP S# P#]
+	set dsor [relation project\
+	    [relation restrictwith $P {${P#} eq "P1"}] P#]
+    } -body {
+	relation divide $dend $dsor $med
+    } -result {
+	Relation
+	{S# string}
+	S#
+	{
+	    {S# S1}
+	    {S# S2}
+	}
+    } -match relation
+
+    test relation-divide-2.0 {suppliers who supply P2 and P4} -setup {
+	set dend [relation project $S S#]
+	set med [relation project $SP P# S#]
+	set dsor [relation project\
+	    [relation restrictwith $P {${P#} eq "P2" || ${P#} eq "P4"}] P#]
+    } -body {
+	relation divide $dend $dsor $med
+    } -result {
+	Relation
+	{S# string}
+	S#
+	{
+	    {S# S1}
+	    {S# S4}
+	}
+    } -match relation
+
+    test relation-divide-3.0 {suppliers who supply all parts} -setup {
+	set dend [relation project $S S#]
+	set med [relation project $SP P# S#]
+	set dsor [relation project $P P#]
+    } -body {
+	relation divide $dend $dsor $med
+    } -result {
+	Relation
+	{S# string}
+	S#
+	{
+	    {S# S1}
+	}
+    } -match relation
+
+    test relation-divide-4.0 {not disjoint dividend and divsor} -setup {
+	set dend [relation project $S S#]
+	set dsor $S
+	set med [relation project $SP P# S#]
+    } -body {
+	relation divide $dend $dsor $med
+    } -result {divisor heading must be disjoint from the dividend heading, "during divide operation"}\
+    -returnCodes error
+
+    test relation-divide-5.0 {mediator not union dividend and divsor} -setup {
+	set dend [relation project $S S#]
+	set dsor [relation project $P P#]
+	set med [relation project $SP S#]
+    } -body {
+	relation divide $dend $dsor $med
+    } -result {mediator heading must be a union of the dividend and divisor headings, "during divide operation"}\
+    -returnCodes error
+
     # relation emptyof subcommand
     test relation-emptyof-1.0 {multiple attributes} -body {
 	relation emptyof $S
@@ -869,7 +954,7 @@ namespace eval ::ral::test {
 	}
 	set cnt -1
 	relation extend $r1 -ascending Name
-    } -returnCodes error -result {wrong # args: should be "relation extend relationValue ?-ascending | -descending attrList? tupleVarName ?attr1 expr1 ... attrN exprN?"}
+    } -returnCodes error -result {wrong # args: should be "relation extend relationValue ?-ascending | -descending attrList? tupleVarName ?attr1 type1 expr1 ... attrN typeN exprN?"}
     # HERE -- add tests
 
     # relation foreach subcommand
@@ -883,7 +968,7 @@ namespace eval ::ral::test {
 
     test relation-foreach-2.0 {visit of suppliers ascending order} -body {
 	set nameList [list]
-	relation foreach sup $S ascending SNAME {
+	relation foreach sup $S -ascending SNAME {
 	    lappend nameList [tuple extract $sup SNAME]
 	}
 	set nameList
@@ -891,7 +976,7 @@ namespace eval ::ral::test {
 
     test relation-foreach-3.0 {visit of suppliers descending order} -body {
 	set nameList [list]
-	relation foreach sup $S descending SNAME {
+	relation foreach sup $S -descending SNAME {
 	    lappend nameList [tuple extract $sup SNAME]
 	}
 	set nameList
@@ -899,7 +984,7 @@ namespace eval ::ral::test {
 
     test relation-foreach-4.0 {visit of suppliers ordered by multiple} -body {
 	set nameList [list]
-	relation foreach sup $S ascending {STATUS CITY} {
+	relation foreach sup $S -ascending {STATUS CITY} {
 	    lappend nameList [tuple extract $sup SNAME]
 	}
 	set nameList
@@ -1840,15 +1925,45 @@ namespace eval ::ral::test {
     } -result {Relation {Name string Age int} {Name Age} {{Name Fred Age 30}}}\
     -match relation
 
+    # relation restrictwith subcommand
+    test relation-restrictwith-1.0 {match on one attribute} -body {
+	set r {Relation {Name string Age int City string} Name\
+	    {{Name Andrew Age 30 City Sunnyvale}\
+	    {Age 20 Name George City {San Jose}}\
+	    {City Saratoga Age 10 Name Fred}}}
+	relation restrictwith $r {$Age < 20}
+    } -result {Relation {Name string Age int City string} Name\
+	{{Name Fred Age 10 City Saratoga}}}\
+    -match relation
+
+    test relation-restrictwith-2.0 {match on several attributes} -body {
+	set r {Relation {Name string Age int City string} Name\
+	    {{Name Andrew Age 30 City Sunnyvale}\
+	    {Age 20 Name George City {San Jose}}\
+	    {City Saratoga Age 10 Name Fred}}}
+	relation restrictwith $r\
+	    {$Age < 20 && [string index $City 0] ne "S"}
+    } -result {Relation {Name string Age int City string} Name {}}\
+    -match relation
+
+    test relation-restrictwith-3.0 {bad expression} -body {
+	set r {Relation {Name string Age int City string} Name\
+	    {{Name Andrew Age 30 City Sunnyvale}\
+	    {Age 20 Name George City {San Jose}}\
+	    {City Saratoga Age 10 Name Fred}}}
+	relation restrictwith $r {< 20}
+    } -result {syntax error in expression "< 20": unexpected operator <}\
+    -returnCodes error
+
     # relation semijoin subcommand
     test relation-semijoin-1.0 {one common attribute} -body {
-	set r1 {Relation {Name string Age int} Name\
-	    {{Age 20 Name George}\
-	    {Age 10 Name Fred}}}
-	set r2 {Relation {Age int City string} Age\
+	set r1 {Relation {Age int City string} Age\
 	    {{Age 30 City Sunnyvale}\
 	    {Age 20 City {San Jose}}\
 	    {City Saratoga Age 10}}}
+	set r2 {Relation {Name string Age int} Name\
+	    {{Age 20 Name George}\
+	    {Age 10 Name Fred}}}
 	relation semijoin $r1 $r2
     } -result {
 	Relation
@@ -1861,13 +1976,13 @@ namespace eval ::ral::test {
     } -match relation
 
     test relation-semijoin-2.0 {one common attribute} -body {
-	set r1 {Relation {Name string Age int} Name\
-	    {{Age 20 Name George}\
-	    {Age 10 Name Fred}}}
-	set r2 {Relation {Age int City string} Age\
+	set r1 {Relation {Age int City string} Age\
 	    {{Age 35 City Sunnyvale}\
 	    {Age 20 City {San Jose}}\
 	    {City Saratoga Age 15}}}
+	set r2 {Relation {Name string Age int} Name\
+	    {{Age 20 Name George}\
+	    {Age 10 Name Fred}}}
 	relation semijoin $r1 $r2
     } -result {
 	Relation
@@ -1877,11 +1992,25 @@ namespace eval ::ral::test {
 	    {Name George Age 20}
 	}
     } -match relation
+
+    test relation-semijoin-3.0 {more than two relations} -body {
+	relation semijoin $P $SP $S
+    } -result {
+	Relation
+	{S# string SNAME string STATUS int CITY string}
+	S#
+	{
+	    {S# S1 SNAME Smith STATUS 20 CITY London}
+	    {S# S2 SNAME Jones STATUS 10 CITY Paris}
+	    {S# S3 SNAME Blake STATUS 30 CITY Paris}
+	    {S# S4 SNAME Clark STATUS 20 CITY London}
+	}
+    } -match relation
     # HERE -- add tests
 
     # relation semiminus subcommand
     test relation-semiminus-1.0 {one common attribute} -body {
-	relation semiminus $S $SP
+	relation semiminus $SP $S
     } -result {
 	Relation
 	{S# string SNAME string STATUS int CITY string}
@@ -1892,14 +2021,101 @@ namespace eval ::ral::test {
     } -match relation
 
     test relation-semiminus-2.0 {one common attribute} -body {
-	relation semiminus $SP $S
+	relation semiminus $S $SP
     } -result {
 	Relation
 	{S# string P# string QTY int}
 	{{S# P#}}
 	{}
     } -match relation
+
+    test relation-semiminus-3.0 {one common attribute} -body {
+	set r1 {
+	    Relation
+	    {Age int City string}
+	    Age
+	    {
+		{Age 30 City Sunnyvale}
+		{Age 20 City {San Jose}}
+		{City Saratoga Age 10}
+	    }
+	}
+	set r2 {
+	    Relation
+	    {Name string Age int Town string}
+	    Name
+	    {
+		{Age 20 Name George Town Sunnyvale}
+		{Age 10 Name Fred Town {New York}}
+	    }
+	}
+	relation semiminus $r1 $r2 -using {City Town}
+    } -result {
+	    Relation
+	    {Name string Age int Town string}
+	    Name
+	    {
+		{Age 10 Name Fred Town {New York}}
+	    }
+    } -match relation
     # HERE -- add tests
+
+    # relation summarize subcommand
+    test relation-summarize-1.0 {count} -body {
+	set p [relation project $P P#]
+	relation summarize $SP $p r Total int {rsum($r, "QTY")}
+    } -result {
+	Relation
+	{P# string Total int}
+	P#
+	{
+	    {P# P1 Total 600}
+	    {P# P2 Total 1000}
+	    {P# P3 Total 400}
+	    {P# P4 Total 500}
+	    {P# P5 Total 500}
+	    {P# P6 Total 100}
+	}
+    } -match relation
+
+    test relation-summarize-2.0 {summarize per dee} -body {
+	set dee {Relation {} {{}} {{}}}
+	relation summarize $SP $dee r GrandTotal int {rsum($r, "QTY")}
+    } -result {
+	Relation
+	{GrandTotal int}
+	GrandTotal
+	{
+	    {GrandTotal 3100}
+	}
+    } -match relation
+
+    test relation-summarize-2.1 {summarize per dee, average} -body {
+	set dee {Relation {} {{}} {{}}}
+	relation summarize $SP $dee r GrandAvg int {ravg($r, "QTY")}
+    } -result {
+	Relation
+	{GrandAvg int}
+	GrandAvg
+	{
+	    {GrandAvg 258}
+	}
+    } -match relation
+
+    test relation-summarize-3.0 {projection} -body {
+	relation summarize $S [relation project $S STATUS CITY] r\
+	    TOTAL int {rcount($r)}
+    } -result {
+	Relation
+	{STATUS int CITY string TOTAL int}
+	{{STATUS CITY}}
+	{
+	    {STATUS 20 CITY London TOTAL 2}
+	    {STATUS 10 CITY Paris TOTAL 1}
+	    {STATUS 30 CITY Paris TOTAL 1}
+	    {STATUS 30 CITY Athens TOTAL 1}
+	}
+    } -match relation
 
     # relation times subcommand
     test relation-times-1.0 {single attribute, square relation} -body {
@@ -2231,11 +2447,44 @@ namespace eval ::ral::test {
 	}
     } -match relation
 
+    test date-example-2.0 {Get suppliers who supply all parts (divide)}\
+    -body {
+	relation join\
+	    [relation divide\
+		[relation project $S S#]\
+		[relation project $P P#]\
+		[relation project $SP S# P#]] $S
+    } -result {
+	Relation
+	{S# string SNAME string STATUS int CITY string}
+	S#
+	{
+	    {S# S1 SNAME Smith STATUS 20 CITY London}
+	}
+    } -match relation
+
     test date-example-3.0\
 	{Get supplier names for suppliers who supply part P2} -body {
 	relation project\
-	    [relation restrict [relation join $SP $S]\
-		r1 {[tuple extract $r1 P#] eq "P2"}] SNAME
+	    [relation restrictwith [relation join $SP $S]\
+		{${P#} eq "P2"}] SNAME
+    } -result {
+	Relation
+	{SNAME string}
+	SNAME
+	{
+	     {SNAME Smith}
+	     {SNAME Jones}
+	     {SNAME Blake}
+	     {SNAME Clark}
+	}
+    } -match relation
+
+    test date-example-3.1\
+	{Get supplier names for suppliers who supply part P2} -body {
+	# use semijoin
+	set p2 [relation restrictwith $P {${P#} eq "P2"}]
+	relation project [relation semijoin $p2 $SP $S] SNAME
     } -result {
 	Relation
 	{SNAME string}
@@ -2254,8 +2503,23 @@ namespace eval ::ral::test {
 	    [relation join\
 	    [relation project\
 	    [relation join\
-		[relation restrict $P t1\
-		    {[tuple extract $t1 COLOR] eq "Red"}] $SP] S#] $S] SNAME
+		[relation restrictwith $P {$COLOR eq "Red"}] $SP] S#] $S] SNAME
+    } -result {
+	Relation
+	{SNAME string}
+	SNAME
+	{
+	     {SNAME Smith}
+	     {SNAME Jones}
+	     {SNAME Clark}
+	}
+    } -match relation
+
+    test date-example-4.1 {Get supplier name for suppliers who supply at\
+    least one red part} -body {
+	# use semijoin
+	set redPart [relation restrictwith $P {$COLOR eq "Red"}]
+	relation project [relation semijoin $redPart $SP $S] SNAME
     } -result {
 	Relation
 	{SNAME string}
@@ -2270,13 +2534,12 @@ namespace eval ::ral::test {
     test date-example-6.0 {Get all pairs of supplier numbers such that\
 	the suppliers concerned are colocated} -body {
 	relation project\
-	    [relation restrict\
+	    [relation restrictwith\
 		[relation join\
 		    [relation project [relation rename $S S# SA] SA CITY]\
 		    [relation project [relation rename $S S# SB] SB CITY]\
 		]\
-		t1 {[string compare\
-		    [tuple extract $t1 SA] [tuple extract $t1 SB]] < 0}\
+		{[string compare $SA $SB] < 0}\
 	    ]\
 	SA SB
     } -result {
@@ -2291,8 +2554,8 @@ namespace eval ::ral::test {
 
     test date-example-7.0 {Get supplier info for suppliers who supply part P2}\
     -body {
-	relation semijoin $S\
-	    [relation restrict $SP r1 {[tuple extract $r1 P#] eq "P2"}]
+	relation semijoin\
+	    [relation restrict $SP r1 {[tuple extract $r1 P#] eq "P2"}] $S
     } -result {
 	Relation
 	{S# string SNAME string STATUS int CITY string}
@@ -2307,8 +2570,7 @@ namespace eval ::ral::test {
 
     test date-example-8.0 {Get supplier info for suppliers who do not\
 	supply part P2} -body {
-	relation semiminus $S\
-	    [relation restrict $SP r1 {[tuple extract $r1 P#] eq "P2"}]
+	relation semiminus [relation restrictwith $SP {${P#} eq "P2"}] $S
     } -result {
 	Relation
 	{S# string SNAME string STATUS int CITY string}

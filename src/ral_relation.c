@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.7 $
-$Date: 2006/03/27 02:20:35 $
+$Revision: 1.8 $
+$Date: 2006/04/06 02:07:30 $
  *--
  */
 
@@ -96,8 +96,6 @@ static void Ral_RelationRemoveTupleIndex(Ral_Relation, Ral_Tuple) ;
 static void Ral_RelationTupleSortKey(const Ral_Tuple, Tcl_DString *) ;
 static int Ral_RelationTupleCompareAscending(const void *, const void *) ;
 static int Ral_RelationTupleCompareDescending(const void *, const void *) ;
-static void Ral_RelationFindJoinTuples(Ral_Relation, Ral_Relation,
-    Ral_JoinMap) ;
 static void Ral_RelationGetJoinMapKey(Ral_Tuple, Ral_JoinMap, int,
     Tcl_DString *) ;
 static int Ral_RelationFindJoinId(Ral_Relation, Ral_JoinMap, int) ;
@@ -114,10 +112,11 @@ Ral_RelationError Ral_RelationLastError = REL_OK ;
 /*
 STATIC DATA ALLOCATION
 */
+static Ral_RelationIter sortBegin ;
 static Ral_IntVector sortAttrs ;
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.7 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.8 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -367,26 +366,6 @@ Ral_RelationUpdate(
     return result ;
 }
 
-int
-Ral_RelationCopy(
-    Ral_Relation src,
-    Ral_RelationIter start,
-    Ral_RelationIter finish,
-    Ral_Relation dst,
-    Ral_IntVector orderMap)
-{
-    int allCopied = 1 ;
-
-    assert(Ral_RelationHeadingEqual(src->heading, dst->heading)) ;
-
-    Ral_RelationReserve(dst, finish - start) ;
-    while (start != finish) {
-	allCopied = Ral_RelationPushBack(dst, *start++, orderMap) && allCopied ;
-    }
-
-    return allCopied ;
-}
-
 Ral_Relation
 Ral_RelationUnion(
     Ral_Relation r1,
@@ -596,32 +575,6 @@ Ral_RelationProject(
     }
 
     return projRel ;
-}
-
-Ral_Relation
-Ral_RelationExtend(
-    Ral_Relation relation,
-    int addAttr)
-{
-    Ral_RelationHeading extHeading =
-	Ral_RelationHeadingExtend(relation->heading, addAttr) ;
-    Ral_TupleHeading extTupleHeading = extHeading->tupleHeading ;
-    Ral_Relation extRel = Ral_RelationNew(extHeading) ;
-    Ral_RelationIter end = Ral_RelationEnd(relation) ;
-    Ral_RelationIter iter ;
-
-    Ral_RelationReserve(extRel, Ral_RelationCardinality(relation)) ;
-    for (iter = Ral_RelationBegin(relation) ; iter != end ; ++iter) {
-	Ral_Tuple extTuple = Ral_TupleExtend(*iter, extTupleHeading) ;
-	int status ;
-	/*
-	 * Should always be able to insert the extended tuple.
-	 */
-	status = Ral_RelationPushBack(extRel, extTuple, NULL) ;
-	assert(status != 0) ;
-    }
-
-    return extRel ;
 }
 
 /*
@@ -934,6 +887,11 @@ Ral_RelationJoin(
 
 /*
  * Semi-join of two relations using the attributes in the join map.
+ * N.B. that we invert the sense of this relative to Date's definition,
+ * so that is can be n-adic from left to right. So:
+ *	semijoin A B ==> a relation that is the same type as B.
+ * So the semijoin of A and B yields a relation containing those tuples
+ * in B that have a correspondence in A.
  */
 Ral_Relation
 Ral_RelationSemiJoin(
@@ -944,7 +902,7 @@ Ral_RelationSemiJoin(
     Ral_Relation semiJoinRel ;
     Ral_JoinMapIter tupleMapEnd ;
     Ral_JoinMapIter tupleMapIter ;
-    Ral_RelationIter r1Begin = Ral_RelationBegin(r1) ;
+    Ral_RelationIter r2Begin = Ral_RelationBegin(r2) ;
 
     /*
      * Finish building the join map by finding which tuples are
@@ -952,25 +910,26 @@ Ral_RelationSemiJoin(
      */
     Ral_RelationFindJoinTuples(r1, r2, map) ;
     /*
-     * The relation heading for a semijoin is the same as the first
+     * The relation heading for a semijoin is the same as the second
      * relation in the operation
      */
-    semiJoinRel = Ral_RelationNew(r1->heading) ;
+    semiJoinRel = Ral_RelationNew(r2->heading) ;
     /*
      * Add in the tuples.  Step through the matches found in the join map and
      * compose the indicated tuples. The tuples of the semijoin will simply be
-     * those from the first relation that matched.
+     * those from the second relation that matched.
      */
     Ral_RelationReserve(semiJoinRel, Ral_JoinMapTupleSize(map)) ;
     tupleMapEnd = Ral_JoinMapTupleEnd(map) ;
     for (tupleMapIter = Ral_JoinMapTupleBegin(map) ;
 	tupleMapIter != tupleMapEnd ; ++tupleMapIter) {
-	Ral_Tuple r1Tuple = *(r1Begin + tupleMapIter->m[0]) ;
-
+	Ral_Tuple r2Tuple = *(r2Begin + tupleMapIter->m[1]) ;
 	/*
-	 * Ignore any duplicates.
+	 * Ignore any duplicates. It is quite possible that many tuples
+	 * in r1 match the same tuple in r2 and this would show up as
+	 * a match in the join map.
 	 */
-	Ral_RelationPushBack(semiJoinRel, r1Tuple, NULL) ;
+	Ral_RelationPushBack(semiJoinRel, r2Tuple, NULL) ;
     }
 
     return semiJoinRel ;
@@ -978,6 +937,7 @@ Ral_RelationSemiJoin(
 
 /*
  * Semi-minus of two relations using the attributes in the join map.
+ * Like semi-join we invert the sense relative to Date's definition.
  */
 Ral_Relation
 Ral_RelationSemiMinus(
@@ -986,8 +946,8 @@ Ral_RelationSemiMinus(
     Ral_JoinMap map)
 {
     Ral_Relation semiMinusRel ;
-    Ral_RelationIter r1End = Ral_RelationEnd(r1) ;
-    Ral_RelationIter r1Iter ;
+    Ral_RelationIter r2End = Ral_RelationEnd(r2) ;
+    Ral_RelationIter r2Iter ;
     Ral_IntVector tupleMatches ;
     Ral_IntVectorIter nomatch ;
 
@@ -997,23 +957,23 @@ Ral_RelationSemiMinus(
      */
     Ral_RelationFindJoinTuples(r1, r2, map) ;
     /*
-     * The relation heading for a semiminus is the same as the first
+     * The relation heading for a semiminus is the same as the second
      * relation in the operation
      */
-    semiMinusRel = Ral_RelationNew(r1->heading) ;
+    semiMinusRel = Ral_RelationNew(r2->heading) ;
     /*
      * Add in the tuples.  The tuples we want are the ones that did
      * NOT match. We get these from the join map.
      */
-    tupleMatches = Ral_JoinMapTupleMap(map, 0, Ral_RelationCardinality(r1)) ;
+    tupleMatches = Ral_JoinMapTupleMap(map, 1, Ral_RelationCardinality(r2)) ;
     nomatch = Ral_IntVectorBegin(tupleMatches) ;
-    for (r1Iter = Ral_RelationBegin(r1) ; r1Iter != r1End ; ++r1Iter) {
+    for (r2Iter = Ral_RelationBegin(r2) ; r2Iter != r2End ; ++r2Iter) {
 	if (*nomatch++) {
 	    int status ;
 	    /*
 	     * There should not be any duplicates.
 	     */
-	    status = Ral_RelationPushBack(semiMinusRel, *r1Iter, NULL) ;
+	    status = Ral_RelationPushBack(semiMinusRel, *r2Iter, NULL) ;
 	    assert(status != 0) ;
 	}
     }
@@ -1024,33 +984,339 @@ Ral_RelationSemiMinus(
 }
 
 Ral_Relation
+Ral_RelationDivide(
+    Ral_Relation dend,
+    Ral_Relation dsor,
+    Ral_Relation med)
+{
+    Ral_RelationHeading dendHeading = dend->heading ;
+    Ral_TupleHeading dendTupleHeading = dendHeading->tupleHeading ;
+    Ral_RelationHeading dsorHeading = dsor->heading ;
+    Ral_TupleHeading dsorTupleHeading = dsorHeading->tupleHeading ;
+    int dsorCard = Ral_RelationCardinality(dsor) ;
+    Ral_RelationHeading medHeading = med->heading ;
+    Ral_TupleHeading medTupleHeading = medHeading->tupleHeading ;
+    Ral_Relation quot ;
+    Ral_TupleHeading trialTupleHeading ;
+    Ral_Tuple trialTuple ;
+    Ral_IntVector trialOrder ;
+    Ral_RelationIter dendEnd ;
+    Ral_RelationIter dendIter ;
+    Ral_RelationIter dsorEnd ;
+    Ral_RelationIter medEnd ;
+
+    /*
+     * The heading of the dividend must be disjoint from the heading of the
+     * divisor.
+     *
+     * The heading of the mediator must be the union of the dividend and
+     * divisor headings.
+     *
+     * The quotient, which has the same heading as the dividend, is then
+     * computed by iterating over the dividend and for each tuple, determining
+     * if all the tuples composed by combining a dividend tuple with all the
+     * divisor tuples are contained in the mediator.  If they are, then that
+     * dividend tuple is a tuple of the quotient.
+     */
+    if (Ral_TupleHeadingCommonAttributes(dendTupleHeading, dsorTupleHeading,
+	NULL) != 0) {
+	Ral_RelationLastError = REL_NOT_DISJOINT ;
+	return NULL ;
+    }
+    if (Ral_TupleHeadingCommonAttributes(dendTupleHeading, medTupleHeading,
+	NULL) != Ral_TupleHeadingSize(dendTupleHeading) ||
+	Ral_TupleHeadingCommonAttributes(dsorTupleHeading, medTupleHeading,
+	NULL) != Ral_TupleHeadingSize(dsorTupleHeading)) {
+	Ral_RelationLastError = REL_NOT_UNION ;
+	return NULL ;
+    }
+    /*
+     * Create the quotient. It has the same heading as the dividend.
+     */
+    quot = Ral_RelationNew(dendHeading) ;
+    /*
+     * Create a tuple heading that is the union of divisor and dividend.
+     * We union the two headings here to make it easier to copy the
+     * values from the dividend and divsor into the trial tuple.
+     */
+    trialTupleHeading = Ral_TupleHeadingUnion(dendTupleHeading,
+	dsorTupleHeading) ;
+    trialTuple = Ral_TupleNew(trialTupleHeading) ;
+    /*
+     * Create an order map between the tuple heading and that of the mediator.
+     * There is no guarantee that the mediator is in the same order as
+     * the union of the dividend and divisor headings.
+     */
+    trialOrder = Ral_TupleHeadingNewOrderMap(medTupleHeading,
+	trialTupleHeading) ;
+    /*
+     * Iterate over the dividend modifying a tuple with the divsor values
+     * and then find it in the mediator.
+     */
+    dendEnd = Ral_RelationEnd(dend) ;
+    dsorEnd = Ral_RelationEnd(dsor) ;
+    medEnd = Ral_RelationEnd(med) ;
+    for (dendIter = Ral_RelationBegin(dend) ; dendIter != dendEnd ;
+	++dendIter) {
+	Ral_Tuple dendTuple = *dendIter ;
+	Ral_TupleIter trialIter = Ral_TupleBegin(trialTuple) ;
+	Ral_RelationIter dsorIter ;
+	int matches = 0 ;
+
+	/*
+	 * Copy in the values from the dividend. N.B. that the copy cleans
+	 * up any values that might already be there.
+	 */
+	trialIter += Ral_TupleCopyValues(Ral_TupleBegin(dendTuple),
+	    Ral_TupleEnd(dendTuple), trialIter) ;
+	/*
+	 * Iterate through each tuple in the divisor.
+	 */
+	for (dsorIter = Ral_RelationBegin(dsor) ; dsorIter != dsorEnd ;
+	    ++dsorIter) {
+	    Ral_Tuple dsorTuple = *dsorIter ;
+	    /*
+	     * Copy in the tuple values from the divisor.
+	     */
+	    Ral_TupleCopyValues(Ral_TupleBegin(dsorTuple),
+		Ral_TupleEnd(dsorTuple), trialIter) ;
+	    /*
+	     * Tally if we can find this tuple in the mediator.
+	     */
+	    matches += Ral_RelationFind(med, 0, trialTuple, trialOrder)
+		!= medEnd ;
+	}
+	/*
+	 * If the number of matches equals the cardinality of the divisor then
+	 * that tuple of the dividend is added to the quotient.
+	 */
+	if (matches == dsorCard) {
+	    int status ;
+	    status = Ral_RelationPushBack(quot, dendTuple, NULL) ;
+	    assert(status != 0) ;
+	}
+    }
+
+    Ral_TupleDelete(trialTuple) ;
+    Ral_IntVectorDelete(trialOrder) ;
+
+    return quot ;
+}
+
+int
+Ral_RelationCopy(
+    Ral_Relation src,
+    Ral_RelationIter start,
+    Ral_RelationIter finish,
+    Ral_Relation dst,
+    Ral_IntVector orderMap)
+{
+    int allCopied = 1 ;
+
+    assert(Ral_RelationHeadingEqual(src->heading, dst->heading)) ;
+
+    Ral_RelationReserve(dst, finish - start) ;
+    while (start != finish) {
+	allCopied = Ral_RelationPushBack(dst, *start++, orderMap) && allCopied ;
+    }
+
+    return allCopied ;
+}
+
+/*
+ * Find the tuples that match according to the attributes in the
+ * join map. The result is recorded back into the join map.
+ */
+void
+Ral_RelationFindJoinTuples(
+    Ral_Relation r1,
+    Ral_Relation r2,
+    Ral_JoinMap map)
+{
+    int idNum ;
+    /*
+     * First we want to determine if the join is across identifiers and
+     * referring attributes. If so, then we can use the hash tables to
+     * speed the process along. Otherwise we will have to iterate through
+     * both relations finding the matching tuples.
+     *
+     * So first compare the identifiers in "r1" to the join map and see
+     * if we can find a match. Then compare the identifiers in "r2" to the
+     * join map, again looking for a match. Finally, we resort to doing it
+     * the hard way.
+     */
+    idNum = Ral_RelationFindJoinId(r1, map, 0) ;
+    if (idNum >= 0) {
+	/*
+	 * "r2" refers to "idNum" of "r1".
+	 * For this case, the identifier given by "idNum" matches the 1st
+	 * attribute vector in the join map and is an identifier of "r1".  Find
+	 * the tuples in "r2" that match the attributes in the second attribute
+	 * vector of the join map. The resulting map is place back into "map".
+	 */
+	Ral_RelationIter r2Iter ;
+	Ral_RelationIter r2Begin = Ral_RelationBegin(r2) ;
+	Ral_RelationIter r2End = Ral_RelationEnd(r2) ;
+	Ral_IntVector refAttrs = Ral_JoinMapGetAttr(map, 1) ;
+	/*
+	 * Iterate through the tuples in r2, and find and find any corresponding
+	 * match in r1, based on the ID given by idNum.
+	 */
+	for (r2Iter = r2Begin ; r2Iter != r2End ; ++r2Iter) {
+	    int r1Index = Ral_RelationFindTupleReference(r1, idNum, *r2Iter,
+		refAttrs) ;
+
+	    if (r1Index >= 0) {
+		Ral_JoinMapAddTupleMapping(map, r1Index, r2Iter - r2Begin) ;
+	    }
+	}
+	Ral_IntVectorDelete(refAttrs) ;
+    } else {
+	idNum = Ral_RelationFindJoinId(r2, map, 1) ;
+	if (idNum >= 0) {
+	    /*
+	     * "r1" refers to "idNum" of "r2"
+	     * Here tuples in "r1" refer to an identifier in "r2". The
+	     * identifier is given by "idNum". Find the tuples in "r1" whose
+	     * attributes match the corresponding attributes in "r2".
+	     */
+	    Ral_RelationIter r1Iter ;
+	    Ral_RelationIter r1Begin = Ral_RelationBegin(r1) ;
+	    Ral_RelationIter r1End = Ral_RelationEnd(r1) ;
+	    Ral_IntVector refAttrs = Ral_JoinMapGetAttr(map, 0) ;
+	    /*
+	     * Iterate through the tuples in r1, and find any corresponding
+	     * match in r2, based on the ID given by idNum.
+	     */
+	    for (r1Iter = r1Begin ; r1Iter != r1End ; ++r1Iter) {
+		int r2Index = Ral_RelationFindTupleReference(r2, idNum, *r1Iter,
+		    refAttrs) ;
+
+		if (r2Index >= 0) {
+		    Ral_JoinMapAddTupleMapping(map, r1Iter - r1Begin, r2Index) ;
+		}
+	    }
+	    Ral_IntVectorDelete(refAttrs) ;
+	} else {
+	    /*
+	     * Join attributes do not constitute an identifier in either
+	     * relation. Must join by searching both relations.
+	     */
+	    Ral_RelationIter r1Iter ;
+	    Ral_RelationIter r1Begin = Ral_RelationBegin(r1) ;
+	    Ral_RelationIter r1End = Ral_RelationEnd(r1) ;
+	    Ral_RelationIter r2Iter ;
+	    Ral_RelationIter r2Begin = Ral_RelationBegin(r2) ;
+	    Ral_RelationIter r2End = Ral_RelationEnd(r2) ;
+	    Tcl_DString *r1Keys ;
+	    Tcl_DString *key1 ;
+	    Tcl_DString *r2Keys ;
+	    Tcl_DString *key2 ;
+
+	    /*
+	     * First compute the keys for all the tuples in both relations.
+	     */
+	    r1Keys = (Tcl_DString*)ckalloc(
+		sizeof(*r1Keys) * Ral_RelationCardinality(r1)) ;
+	    r2Keys = (Tcl_DString *)ckalloc(
+		sizeof(*r2Keys) * Ral_RelationCardinality(r2)) ;
+
+	    key1 = r1Keys ;
+	    for (r1Iter = r1Begin ; r1Iter != r1End ; ++r1Iter) {
+		Ral_RelationGetJoinMapKey(*r1Iter, map, 0, key1++) ;
+	    }
+
+	    key2 = r2Keys ;
+	    for (r2Iter = r2Begin ; r2Iter != r2End ; ++r2Iter) {
+		Ral_RelationGetJoinMapKey(*r2Iter, map, 1, key2++) ;
+	    }
+	    /*
+	     * Search through the tuples and find the corresponding matches.
+	     */
+	    key1 = r1Keys ;
+	    for (r1Iter = r1Begin ; r1Iter != r1End ; ++r1Iter) {
+		int r1Index = r1Iter - r1Begin ;
+		key2 = r2Keys ;
+		for (r2Iter = r2Begin ; r2Iter != r2End ; ++r2Iter) {
+		    if (strcmp(Tcl_DStringValue(key1), Tcl_DStringValue(key2))
+			== 0) {
+			Ral_JoinMapAddTupleMapping(map, r1Index,
+			    r2Iter - r2Begin) ;
+		    }
+		    ++key2 ;
+		}
+		++key1 ;
+	    }
+	    /*
+	     * Clean up the key information.
+	     */
+	    key1 = r1Keys ;
+	    for (r1Iter = r1Begin ; r1Iter != r1End ; ++r1Iter) {
+		Tcl_DStringFree(key1++) ;
+	    }
+	    key2 = r2Keys ;
+	    for (r2Iter = r2Begin ; r2Iter != r2End ; ++r2Iter) {
+		Tcl_DStringFree(key2++) ;
+	    }
+	    ckfree((char *)r1Keys) ;
+	    ckfree((char *)r2Keys) ;
+	}
+    }
+}
+
+/*
+ * Return a vector that contains tuple indices in the order corresponding
+ * to the sort.
+ * Caller must delete the returned vector.
+ */
+Ral_IntVector
 Ral_RelationSortAscending(
     Ral_Relation relation,
     Ral_IntVector attrs)
 {
-    Ral_Relation sortedRel = Ral_RelationDup(relation) ;
+    Ral_IntVector sortVect = Ral_IntVectorNew(
+	Ral_RelationCardinality(relation), 0) ;
+
+    Ral_IntVectorFillConsecutive(sortVect, 0) ;
+    assert(sortBegin == NULL) ;
+    sortBegin = Ral_RelationBegin(relation) ;
+    assert(sortAttrs == NULL) ;
     sortAttrs = attrs ;
 
-    qsort(Ral_RelationBegin(sortedRel), Ral_RelationCardinality(sortedRel),
-	sizeof(Ral_RelationIter), Ral_RelationTupleCompareAscending) ;
-    sortAttrs = NULL ;
+    qsort(Ral_IntVectorBegin(sortVect), Ral_IntVectorSize(sortVect),
+	sizeof(Ral_IntVectorValueType), Ral_RelationTupleCompareAscending) ;
 
-    return sortedRel ;
+#   ifndef NDEBUG
+    sortBegin = NULL ;
+    sortAttrs = NULL ;
+#   endif
+
+    return sortVect ;
 }
 
-Ral_Relation
+Ral_IntVector
 Ral_RelationSortDescending(
     Ral_Relation relation,
     Ral_IntVector attrs)
 {
-    Ral_Relation sortedRel = Ral_RelationDup(relation) ;
+    Ral_IntVector sortVect = Ral_IntVectorNew(
+	Ral_RelationCardinality(relation), 0) ;
+
+    Ral_IntVectorFillConsecutive(sortVect, 0) ;
+    assert(sortBegin == NULL) ;
+    sortBegin = Ral_RelationBegin(relation) ;
+    assert(sortAttrs == NULL) ;
     sortAttrs = attrs ;
 
-    qsort(Ral_RelationBegin(sortedRel), Ral_RelationCardinality(sortedRel),
-	sizeof(Ral_RelationIter), Ral_RelationTupleCompareDescending) ;
-    sortAttrs = NULL ;
+    qsort(Ral_IntVectorBegin(sortVect), Ral_IntVectorSize(sortVect),
+	sizeof(Ral_IntVectorValueType), Ral_RelationTupleCompareDescending) ;
 
-    return sortedRel ;
+#   ifndef NDEBUG
+    sortBegin = NULL ;
+    sortAttrs = NULL ;
+#   endif
+
+    return sortVect ;
 }
 
 Ral_RelationIter
@@ -1076,7 +1342,7 @@ Ral_RelationFindKey(
  * Find a tuple in a relation.
  * The tuple is located with respect to the identifier given in "idNum".
  * If "map" is NULL, then "tuple" is assumed to be ordered the same as the
- * tuple heading in "relation".  Othewise, "map" provides the reordering
+ * tuple heading in "relation".  Otherwise, "map" provides the reordering
  * mapping.
  */
 Ral_RelationIter
@@ -1093,6 +1359,28 @@ Ral_RelationFind(
      */
     return found != relation->finish && Ral_TupleEqualValues(tuple, *found) ?
 	    found : relation->finish ;
+}
+
+Ral_Relation
+Ral_RelationExtract(
+    Ral_Relation relation,
+    Ral_IntVector tupleSet)
+{
+    Ral_Relation subRel = Ral_RelationNew(relation->heading) ;
+    Ral_IntVectorIter end = Ral_IntVectorEnd(tupleSet) ;
+    Ral_IntVectorIter iter ;
+    Ral_RelationIter relBegin = Ral_RelationBegin(relation) ;
+
+    Ral_RelationReserve(subRel, Ral_IntVectorSize(tupleSet)) ;
+
+    for (iter = Ral_IntVectorBegin(tupleSet) ; iter != end ; ++iter) {
+	int status ;
+
+	status = Ral_RelationPushBack(subRel, *(relBegin + *iter), NULL) ;
+	assert(status != 0) ;
+    }
+
+    return subRel ;
 }
 
 void
@@ -1731,12 +2019,14 @@ Ral_RelationTupleCompareAscending(
     const void *v1,
     const void *v2)
 {
+    const Ral_IntVectorValueType *i1 = v1 ;
+    const Ral_IntVectorValueType *i2 = v2 ;
     Tcl_DString sortKey1 ;
     Tcl_DString sortKey2 ;
     int result ;
 
-    Ral_RelationTupleSortKey(*(Ral_RelationIter)v1, &sortKey1) ;
-    Ral_RelationTupleSortKey(*(Ral_RelationIter)v2, &sortKey2) ;
+    Ral_RelationTupleSortKey(*(sortBegin + *i1), &sortKey1) ;
+    Ral_RelationTupleSortKey(*(sortBegin + *i2), &sortKey2) ;
 
     result = strcmp(Tcl_DStringValue(&sortKey1), Tcl_DStringValue(&sortKey2)) ;
 
@@ -1751,12 +2041,14 @@ Ral_RelationTupleCompareDescending(
     const void *v1,
     const void *v2)
 {
+    const Ral_IntVectorValueType *i1 = v1 ;
+    const Ral_IntVectorValueType *i2 = v2 ;
     Tcl_DString sortKey1 ;
     Tcl_DString sortKey2 ;
     int result ;
 
-    Ral_RelationTupleSortKey(*(Ral_RelationIter)v1, &sortKey1) ;
-    Ral_RelationTupleSortKey(*(Ral_RelationIter)v2, &sortKey2) ;
+    Ral_RelationTupleSortKey(*(sortBegin + *i1), &sortKey1) ;
+    Ral_RelationTupleSortKey(*(sortBegin + *i2), &sortKey2) ;
 
     /*
      * N.B. inverted order of first and second tuple to obtain
@@ -1768,147 +2060,6 @@ Ral_RelationTupleCompareDescending(
     Tcl_DStringFree(&sortKey2) ;
 
     return result ;
-}
-
-/*
- * Find the tuples that match according to the attributes in the
- * join map. The result is recorded back into the join map.
- */
-static void
-Ral_RelationFindJoinTuples(
-    Ral_Relation r1,
-    Ral_Relation r2,
-    Ral_JoinMap map)
-{
-    int idNum ;
-    /*
-     * First we want to determine if the join is across identifiers and
-     * referring attributes. If so, then we can use the hash tables to
-     * speed the process along. Otherwise we will have to iterate through
-     * both relations finding the matching tuples.
-     *
-     * So first compare the identifiers in "r1" to the join map and see
-     * if we can find a match. Then compare the identifiers in "r2" to the
-     * join map, again looking for a match. Finally, we resort to doing it
-     * the hard way.
-     */
-    idNum = Ral_RelationFindJoinId(r1, map, 0) ;
-    if (idNum >= 0) {
-	/*
-	 * "r2" refers to "idNum" of "r1".
-	 * For this case, the identifier given by "idNum" matches the 1st
-	 * attribute vector in the join map and is an identifier of "r1".  Find
-	 * the tuples in "r2" that match the attributes in the second attribute
-	 * vector of the join map. The resulting map is place back into "map".
-	 */
-	Ral_RelationIter r2Iter ;
-	Ral_RelationIter r2Begin = Ral_RelationBegin(r2) ;
-	Ral_RelationIter r2End = Ral_RelationEnd(r2) ;
-	Ral_IntVector refAttrs = Ral_JoinMapGetAttr(map, 1) ;
-	/*
-	 * Iterate through the tuples in r2, and find and find any corresponding
-	 * match in r1, based on the ID given by idNum.
-	 */
-	for (r2Iter = r2Begin ; r2Iter != r2End ; ++r2Iter) {
-	    int r1Index = Ral_RelationFindTupleReference(r1, idNum, *r2Iter,
-		refAttrs) ;
-
-	    if (r1Index >= 0) {
-		Ral_JoinMapAddTupleMapping(map, r1Index, r2Iter - r2Begin) ;
-	    }
-	}
-	Ral_IntVectorDelete(refAttrs) ;
-    } else {
-	idNum = Ral_RelationFindJoinId(r2, map, 1) ;
-	if (idNum >= 0) {
-	    /*
-	     * "r1" refers to "idNum" of "r2"
-	     * Here tuples in "r1" refer to an identifier in "r2". The
-	     * identifier is given by "idNum". Find the tuples in "r1" whose
-	     * attributes match the corresponding attributes in "r2".
-	     */
-	    Ral_RelationIter r1Iter ;
-	    Ral_RelationIter r1Begin = Ral_RelationBegin(r1) ;
-	    Ral_RelationIter r1End = Ral_RelationEnd(r1) ;
-	    Ral_IntVector refAttrs = Ral_JoinMapGetAttr(map, 0) ;
-	    /*
-	     * Iterate through the tuples in r1, and find any corresponding
-	     * match in r2, based on the ID given by idNum.
-	     */
-	    for (r1Iter = r1Begin ; r1Iter != r1End ; ++r1Iter) {
-		int r2Index = Ral_RelationFindTupleReference(r2, idNum, *r1Iter,
-		    refAttrs) ;
-
-		if (r2Index >= 0) {
-		    Ral_JoinMapAddTupleMapping(map, r1Iter - r1Begin, r2Index) ;
-		}
-	    }
-	    Ral_IntVectorDelete(refAttrs) ;
-	} else {
-	    /*
-	     * Join attributes do not constitute an identifier in either
-	     * relation. Must join by searching both relations.
-	     */
-	    Ral_RelationIter r1Iter ;
-	    Ral_RelationIter r1Begin = Ral_RelationBegin(r1) ;
-	    Ral_RelationIter r1End = Ral_RelationEnd(r1) ;
-	    Ral_RelationIter r2Iter ;
-	    Ral_RelationIter r2Begin = Ral_RelationBegin(r2) ;
-	    Ral_RelationIter r2End = Ral_RelationEnd(r2) ;
-	    Tcl_DString *r1Keys ;
-	    Tcl_DString *key1 ;
-	    Tcl_DString *r2Keys ;
-	    Tcl_DString *key2 ;
-
-	    /*
-	     * First compute the keys for all the tuples in both relations.
-	     */
-	    r1Keys = (Tcl_DString*)ckalloc(
-		sizeof(*r1Keys) * Ral_RelationCardinality(r1)) ;
-	    r2Keys = (Tcl_DString *)ckalloc(
-		sizeof(*r2Keys) * Ral_RelationCardinality(r2)) ;
-
-	    key1 = r1Keys ;
-	    for (r1Iter = r1Begin ; r1Iter != r1End ; ++r1Iter) {
-		Ral_RelationGetJoinMapKey(*r1Iter, map, 0, key1++) ;
-	    }
-
-	    key2 = r2Keys ;
-	    for (r2Iter = r2Begin ; r2Iter != r2End ; ++r2Iter) {
-		Ral_RelationGetJoinMapKey(*r2Iter, map, 1, key2++) ;
-	    }
-	    /*
-	     * Search through the tuples and find the corresponding matches.
-	     */
-	    key1 = r1Keys ;
-	    for (r1Iter = r1Begin ; r1Iter != r1End ; ++r1Iter) {
-		int r1Index = r1Iter - r1Begin ;
-		key2 = r2Keys ;
-		for (r2Iter = r2Begin ; r2Iter != r2End ; ++r2Iter) {
-		    if (strcmp(Tcl_DStringValue(key1), Tcl_DStringValue(key2))
-			== 0) {
-			Ral_JoinMapAddTupleMapping(map, r1Index,
-			    r2Iter - r2Begin) ;
-		    }
-		    ++key2 ;
-		}
-		++key1 ;
-	    }
-	    /*
-	     * Clean up the key information.
-	     */
-	    key1 = r1Keys ;
-	    for (r1Iter = r1Begin ; r1Iter != r1End ; ++r1Iter) {
-		Tcl_DStringFree(key1++) ;
-	    }
-	    key2 = r2Keys ;
-	    for (r2Iter = r2Begin ; r2Iter != r2End ; ++r2Iter) {
-		Tcl_DStringFree(key2++) ;
-	    }
-	    ckfree((char *)r1Keys) ;
-	    ckfree((char *)r2Keys) ;
-	}
-    }
 }
 
 static void

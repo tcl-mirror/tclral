@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationheading.h,v $
-$Revision: 1.7 $
-$Date: 2006/03/27 02:20:35 $
+$Revision: 1.8 $
+$Date: 2006/04/06 02:07:30 $
  *--
  */
 #ifndef _ral_relationheading_h_
@@ -104,7 +104,8 @@ extern Ral_RelationHeading Ral_RelationHeadingNew(Ral_TupleHeading, int) ;
 extern Ral_RelationHeading Ral_RelationHeadingSubset(Ral_RelationHeading,
     Ral_IntVector) ;
 extern Ral_RelationHeading Ral_RelationHeadingDup(Ral_RelationHeading) ;
-extern Ral_RelationHeading Ral_RelationHeadingExtend(Ral_RelationHeading, int) ;
+extern Ral_RelationHeading Ral_RelationHeadingExtend(Ral_RelationHeading,
+    Ral_TupleHeading) ;
 extern void Ral_RelationHeadingDelete(Ral_RelationHeading) ;
 extern void Ral_RelationHeadingReference(Ral_RelationHeading) ;
 extern void Ral_RelationHeadingUnreference(Ral_RelationHeading) ;

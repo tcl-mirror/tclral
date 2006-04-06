@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_vector.c,v $
-$Revision: 1.7 $
-$Date: 2006/03/27 02:20:35 $
+$Revision: 1.8 $
+$Date: 2006/04/06 02:07:30 $
  *--
  */
 
@@ -77,6 +77,7 @@ EXTERNAL FUNCTION REFERENCES
 /*
 FORWARD FUNCTION REFERENCES
 */
+static int int_ind_compare(const void *, const void *) ;
 
 /*
 EXTERNAL DATA REFERENCES
@@ -89,7 +90,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_vector.c,v $ $Revision: 1.7 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_vector.c,v $ $Revision: 1.8 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -208,6 +209,21 @@ Ral_IntVectorFill(
 
     for (i = v->start ; i < v->finish ; ++i) {
 	*i = value ;
+    }
+}
+
+/*
+ * Fill a vector with consecutive integers begining at "start".
+ */
+void
+Ral_IntVectorFillConsecutive(
+    Ral_IntVector v,
+    Ral_IntVectorValueType start)
+{
+    Ral_IntVectorIter i = v->start ;
+
+    for (i = v->start ; i < v->finish ; ++i) {
+	*i = start++ ;
     }
 }
 
@@ -342,17 +358,6 @@ Ral_IntVectorErase(
     v->finish -= last - first ;
 
     return first ;
-}
-
-static int
-int_ind_compare(
-    const void *m1,
-    const void *m2)
-{
-    const Ral_IntVectorValueType *i1 = m1 ;
-    const Ral_IntVectorValueType *i2 = m2 ;
-
-    return *i1 - *i2 ;
 }
 
 int
@@ -923,4 +928,19 @@ const char *
 Ral_VectorVersion(void)
 {
     return rcsid ;
+}
+
+/*
+ * PRIVATE FUNCTIONS
+ */
+
+static int
+int_ind_compare(
+    const void *m1,
+    const void *m2)
+{
+    const Ral_IntVectorValueType *i1 = m1 ;
+    const Ral_IntVectorValueType *i2 = m2 ;
+
+    return *i1 - *i2 ;
 }

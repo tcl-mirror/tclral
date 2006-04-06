@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_vector.h,v $
-$Revision: 1.5 $
-$Date: 2006/03/27 02:20:35 $
+$Revision: 1.6 $
+$Date: 2006/04/06 02:07:30 $
  *--
  */
 #ifndef _ral_vector_h_
@@ -107,6 +107,8 @@ extern void Ral_IntVectorReserve(Ral_IntVector, int) ;
 
 extern int Ral_IntVectorEmpty(Ral_IntVector) ;
 extern void Ral_IntVectorFill(Ral_IntVector, Ral_IntVectorValueType) ;
+extern void Ral_IntVectorFillConsecutive(Ral_IntVector,
+    Ral_IntVectorValueType) ;
 
 extern Ral_IntVectorValueType Ral_IntVectorFetch(Ral_IntVector, int) ;
 extern void Ral_IntVectorStore(Ral_IntVector, int,
