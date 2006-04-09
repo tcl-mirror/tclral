@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.h,v $
-$Revision: 1.8 $
-$Date: 2006/04/06 02:07:30 $
+$Revision: 1.9 $
+$Date: 2006/04/09 01:35:47 $
  *--
  */
 #ifndef _ral_relation_h_
@@ -152,6 +152,7 @@ typedef enum Ral_RelationError {
     REL_NOT_A_PROJECTION,
     REL_NOT_DISJOINT,
     REL_NOT_UNION,
+    REL_TOO_MANY_ATTRS,
 
 
     REL_HEADING_ERR,
@@ -206,6 +207,8 @@ extern Ral_Relation Ral_RelationIntersect(Ral_Relation, Ral_Relation) ;
 extern Ral_Relation Ral_RelationMinus(Ral_Relation, Ral_Relation) ;
 extern Ral_Relation Ral_RelationTimes(Ral_Relation, Ral_Relation) ;
 extern Ral_Relation Ral_RelationProject(Ral_Relation, Ral_IntVector) ;
+extern Ral_Relation Ral_RelationGroup(Ral_Relation, const char *,
+    Ral_IntVector) ;
 extern Ral_Relation Ral_RelationUngroup(Ral_Relation, const char *) ;
 extern Ral_Relation Ral_RelationJoin(Ral_Relation, Ral_Relation, Ral_JoinMap) ;
 extern Ral_Relation Ral_RelationSemiJoin(Ral_Relation, Ral_Relation,

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuplecmd.c,v $
-$Revision: 1.7 $
-$Date: 2006/03/19 19:48:31 $
+$Revision: 1.8 $
+$Date: 2006/04/09 01:35:47 $
  *--
  */
 
@@ -104,7 +104,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tuplecmd.c,v $ $Revision: 1.7 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tuplecmd.c,v $ $Revision: 1.8 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -185,7 +185,7 @@ TupleAssignCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
-    Tcl_Obj *tupleObj ;
+    Tcl_Obj *tupleObj = objv[2] ;
     Ral_Tuple tuple ;
     Ral_TupleHeading heading ;
     Ral_TupleHeadingIter hiter ;
@@ -197,7 +197,6 @@ TupleAssignCmd(
 	return TCL_ERROR ;
     }
 
-    tupleObj = *(objv + 2) ;
     if (Tcl_ConvertToType(interp, tupleObj, &Ral_TupleObjType) != TCL_OK) {
 	return TCL_ERROR ;
     }
@@ -295,18 +294,10 @@ TupleEliminateCmd(
     Tcl_Obj *tupleObj ;
     Ral_Tuple tuple ;
     Ral_TupleHeading heading ;
-    int degree ;
-    Ral_IntVector elimMap ;
-    int i ;
-    int elimCount = 0 ;
-    Ral_IntVectorIter viter ;
-    Ral_IntVectorIter vend ;
-    Ral_TupleHeading newHeading ;
-    Ral_Tuple newTuple ;
-    Ral_TupleHeadingIter hiter ;
-    Ral_TupleHeadingIter hend ;
-    Tcl_Obj **values ;
-    Tcl_Obj **newValues ;
+    Ral_IntVector elimList ;
+    Ral_IntVector attrList ;
+    Ral_TupleHeading elimHeading ;
+    Ral_Tuple elimTuple ;
 
     if (objc < 3) {
 	Tcl_WrongNumArgs(interp, 2, objv, "tupleValue ?attr? ...") ;
@@ -317,6 +308,8 @@ TupleEliminateCmd(
     if (Tcl_ConvertToType(interp, tupleObj, &Ral_TupleObjType) != TCL_OK) {
 	return TCL_ERROR ;
     }
+    tuple = tupleObj->internalRep.otherValuePtr ;
+    heading = tuple->heading ;
 
     objc -= 3 ;
     /*
@@ -328,76 +321,34 @@ TupleEliminateCmd(
 	return TCL_OK ;
     }
     objv += 3 ;
-    tuple = tupleObj->internalRep.otherValuePtr ;
-    heading = tuple->heading ;
     /*
      * Check that attributes to eliminate actually belong to the tuple.
      * Build a mapping structure that determines if we delete the attribute.
      */
-    degree = Ral_TupleDegree(tuple) ;
-    elimMap = Ral_IntVectorNew(degree, 0) ;
-    for (i = 0 ; i < objc ; ++i) {
-	const char *attrName = Tcl_GetString(objv[i]) ;
+    elimList = Ral_IntVectorNewEmpty(objc) ;
+    while (objc-- > 0) {
+	const char *attrName = Tcl_GetString(*objv++) ;
 	int attrIndex = Ral_TupleHeadingIndexOf(heading, attrName) ;
 
 	if (attrIndex < 0) {
-	    Ral_IntVectorDelete(elimMap) ;
 	    Ral_TupleObjSetError(interp, TUP_UNKNOWN_ATTR, attrName) ;
+	    Ral_IntVectorDelete(elimList) ;
 	    return TCL_ERROR ;
-	} else {
-	    assert(attrIndex < degree) ;
-	    Ral_IntVectorStore(elimMap, attrIndex, 1) ;
 	}
+	Ral_IntVectorSetAdd(elimList, attrIndex) ;
     }
     /*
-     * Count how many attributes are to be eliminated.  Do this as a separate
-     * step, just in case the same attribute is mentioned multiple times to be
-     * eliminated.
+     * Create the complement map which contains the attribute to retain.
      */
-    elimCount = 0 ;
-    vend = Ral_IntVectorEnd(elimMap) ;
-    for (viter = Ral_IntVectorBegin(elimMap) ; viter != vend ; ++viter) {
-	elimCount += *viter != 0 ;
-    }
-    /*
-     * At this point we must not be trying to eliminate more attributes
-     * than were in the tuple in the first place.
-     */
-    assert(elimCount <= degree) ;
-    /*
-     * Build a new heading. It will have as many fewer attributes as we counted
-     * above.
-     */
-    newHeading = Ral_TupleHeadingNew(degree - elimCount) ;
-    newTuple = Ral_TupleNew(newHeading) ;
-    /*
-     * Iterate through the old heading adding the attributes and values
-     * to the new tuple that are not marked to be eliminated.
-     */
-    hend = Ral_TupleHeadingEnd(heading) ;
-    values = tuple->values ;
-    newValues = newTuple->values ;
-    viter = Ral_IntVectorBegin(elimMap) ;
-    for (hiter = Ral_TupleHeadingBegin(heading) ; hiter != hend ; ++hiter) {
-	/*
-	 * Check if this attribute is to be included.
-	 */
-	if (!*viter++) {
-	    Ral_Attribute attr = *hiter ;
-	    /*
-	     * Add the name to the heading of the new tuple.
-	     */
-	    Ral_TupleHeadingPushBack(newHeading, Ral_AttributeDup(attr)) ;
-	    /*
-	     * Add the value to the new tuple.
-	     */
-	    Tcl_IncrRefCount(*newValues++ = *values) ;
-	}
-	++values ;
-    }
+    attrList = Ral_IntVectorSetComplement(elimList,
+	Ral_TupleHeadingSize(heading)) ;
+    Ral_IntVectorDelete(elimList) ;
 
-    Ral_IntVectorDelete(elimMap) ;
-    Tcl_SetObjResult(interp, Ral_TupleObjNew(newTuple)) ;
+    elimHeading = Ral_TupleHeadingSubset(heading, attrList) ;
+    elimTuple = Ral_TupleSubset(tuple, elimHeading, attrList) ;
+    Ral_IntVectorDelete(attrList) ;
+
+    Tcl_SetObjResult(interp, Ral_TupleObjNew(elimTuple)) ;
     return TCL_OK ;
 }
 
@@ -408,15 +359,13 @@ TupleEqualCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
-    Tcl_Obj *t1Obj ;
-    Tcl_Obj *t2Obj ;
+    Tcl_Obj *t1Obj = objv[2] ;
+    Tcl_Obj *t2Obj = objv[3] ;
 
     if (objc != 4) {
 	Tcl_WrongNumArgs(interp, 2, objv, "tuple1 tuple2") ;
 	return TCL_ERROR ;
     }
-    t1Obj = *(objv + 2) ;
-    t2Obj = *(objv + 3) ;
 
     if (Tcl_ConvertToType(interp, t1Obj, &Ral_TupleObjType) != TCL_OK)
 	return TCL_ERROR ;
@@ -657,13 +606,9 @@ TupleProjectCmd(
     Tcl_Obj *tupleObj ;
     Ral_Tuple tuple ;
     Ral_TupleHeading heading ;
-    Ral_Tuple newTuple ;
-    Ral_TupleHeading newHeading ;
-    Ral_TupleHeadingIter hiter ;
-    Ral_TupleHeadingIter hbegin ;
-    Ral_TupleHeadingIter hend ;
-    Tcl_Obj **values ;
-    Tcl_Obj **newValues ;
+    Ral_IntVector attrList ;
+    Ral_TupleHeading projHeading ;
+    Ral_Tuple projTuple ;
 
     if (objc < 3) {
 	Tcl_WrongNumArgs(interp, 2, objv, "tupleValue ?attr? ...") ;
@@ -680,31 +625,25 @@ TupleProjectCmd(
     objc -= 3 ;
     objv += 3 ;
 
-    newHeading = Ral_TupleHeadingNew(objc) ;
-    newTuple = Ral_TupleNew(newHeading) ;
-    values = tuple->values ;
-    newValues = newTuple->values ;
-    hbegin = Ral_TupleHeadingBegin(heading) ;
-    hend = Ral_TupleHeadingEnd(heading) ;
-
+    attrList = Ral_IntVectorNewEmpty(objc) ;
     while (objc-- > 0) {
 	const char *attrName = Tcl_GetString(*objv++) ;
-	hiter = Ral_TupleHeadingFind(heading, attrName) ;
+	int attrIndex = Ral_TupleHeadingIndexOf(heading, attrName) ;
 
-	if (hiter == hend) {
+	if (attrIndex < 0) {
 	    Ral_TupleObjSetError(interp, TUP_UNKNOWN_ATTR, attrName) ;
-	    goto errorOut ;
+	    Ral_IntVectorDelete(attrList) ;
+	    return TCL_ERROR ;
 	}
-	Ral_TupleHeadingPushBack(newHeading, Ral_AttributeDup(*hiter)) ;
-	Tcl_IncrRefCount(*newValues++ = values[hiter - hbegin]) ;
+	Ral_IntVectorSetAdd(attrList, attrIndex) ;
     }
 
-    Tcl_SetObjResult(interp, Ral_TupleObjNew(newTuple)) ;
-    return TCL_OK ;
+    projHeading = Ral_TupleHeadingSubset(heading, attrList) ;
+    projTuple = Ral_TupleSubset(tuple, projHeading, attrList) ;
+    Ral_IntVectorDelete(attrList) ;
 
-errorOut:
-    Ral_TupleDelete(newTuple) ;
-    return TCL_ERROR ;
+    Tcl_SetObjResult(interp, Ral_TupleObjNew(projTuple)) ;
+    return TCL_OK ;
 }
 
 /* tuple rename tupleValue ?oldname newname ... ? */

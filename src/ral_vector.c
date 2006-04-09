@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_vector.c,v $
-$Revision: 1.8 $
-$Date: 2006/04/06 02:07:30 $
+$Revision: 1.9 $
+$Date: 2006/04/09 01:35:47 $
  *--
  */
 
@@ -90,7 +90,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_vector.c,v $ $Revision: 1.8 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_vector.c,v $ $Revision: 1.9 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -461,6 +461,21 @@ Ral_IntVectorFind(
 }
 
 int
+Ral_IntVectorIndexOf(
+    Ral_IntVector v,
+    Ral_IntVectorValueType value)
+{
+    Ral_IntVectorIter i ;
+
+    for (i = v->start ; i < v->finish ; ++i) {
+	if (*i == value) {
+	    return i - v->start ;
+	}
+    }
+    return -1 ;
+}
+
+int
 Ral_IntVectorEqual(
     Ral_IntVector v1,
     Ral_IntVector v2)
@@ -494,6 +509,27 @@ Ral_IntVectorSubsetOf(
     }
 
     return found == Ral_IntVectorSize(v1) ;
+}
+
+/*
+ * Return a boolean to indicate if any values in v2 are found in v1,
+ * i.e. return true if the set intersection is not empty.
+ */
+int
+Ral_IntVectorContainsAny(
+    Ral_IntVector v1,
+    Ral_IntVector v2)
+{
+    Ral_IntVectorIter end1 = Ral_IntVectorEnd(v1) ;
+    Ral_IntVectorIter end2 = Ral_IntVectorEnd(v2) ;
+    Ral_IntVectorIter iter2 ;
+
+    for (iter2 = Ral_IntVectorBegin(v2) ; iter2 != end2 ; ++iter2) {
+	if (Ral_IntVectorFind(v1, *iter2) != end1) {
+	    return 1 ;
+	}
+    }
+    return 0 ;
 }
 
 Ral_IntVectorIter

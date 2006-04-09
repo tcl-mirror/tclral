@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationheading.c,v $
-$Revision: 1.9 $
-$Date: 2006/04/06 02:07:30 $
+$Revision: 1.10 $
+$Date: 2006/04/09 01:35:47 $
  *--
  */
 
@@ -89,7 +89,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.9 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.10 $" ;
 
 static const char relationKeyword[] = "Relation" ;
 static const char openList = '{' ;
@@ -133,51 +133,68 @@ Ral_RelationHeadingSubset(
 {
     Ral_TupleHeading tupleHeading =
 	Ral_TupleHeadingSubset(heading->tupleHeading, attrList) ;
-    int idCount ;
-    Ral_IntVector *idArray = heading->identifiers ;
     Ral_IntVector foundIds = Ral_IntVectorNewEmpty(heading->idCount) ;
-    int foundCount ;
+    Ral_RelationIdIter idIter ;
+    Ral_RelationIdIter idBegin = Ral_RelationHeadingIdBegin(heading) ;
+    Ral_RelationIdIter idEnd = Ral_RelationHeadingIdEnd(heading) ;
     Ral_RelationHeading subHeading ;
-
     /*
      * Scan the identifiers to determine if they are retained in the
      * subset.
      */
-    for (idCount = 0 ; idCount < heading->idCount ; ++idCount) {
-	Ral_IntVector id = *idArray++ ;
-	if (Ral_IntVectorSubsetOf(id, attrList)) {
-	    Ral_IntVectorPushBack(foundIds, idCount) ;
+    for (idIter = idBegin ; idIter != idEnd ; ++idIter) {
+	if (Ral_IntVectorSubsetOf(*idIter, attrList)) {
+	    Ral_IntVectorPushBack(foundIds, idIter - idBegin) ;
 	}
     }
 
-    foundCount = Ral_IntVectorSize(foundIds) ;
-    if (foundCount) {
-	Ral_IntVectorIter end = Ral_IntVectorEnd(foundIds) ;
-	Ral_IntVectorIter attrStart = Ral_IntVectorBegin(attrList) ;
+    subHeading = Ral_RelationHeadingIdSubset(heading, tupleHeading, foundIds,
+	attrList) ;
+    Ral_IntVectorDelete(foundIds) ;
+    return subHeading ;
+}
+
+/*
+ * Create a new relation heading from "tupleHeading" using the
+ * identifiers in "heading" that are contained in "idList". The identifiers
+ * in the new heading have their numbers remapped according to the
+ * contents of "attrList".
+ */
+Ral_RelationHeading
+Ral_RelationHeadingIdSubset(
+    Ral_RelationHeading heading,
+    Ral_TupleHeading tupleHeading,
+    Ral_IntVector idList,
+    Ral_IntVector attrList)
+{
+    int idCount = Ral_IntVectorSize(idList) ;
+    Ral_RelationIdIter idBegin = Ral_RelationHeadingIdBegin(heading) ;
+    Ral_RelationHeading subHeading ;
+
+    if (idCount) {
+	Ral_IntVectorIter end = Ral_IntVectorEnd(idList) ;
 	Ral_IntVectorIter iter ;
+	int newIdCount = 0 ;
 	/*
 	 * Create a new relation heading to hold the identifiers
 	 * and copy them in.
 	 */
-	subHeading = Ral_RelationHeadingNew(tupleHeading, foundCount) ;
-	idCount = 0 ;
-	for (iter = Ral_IntVectorBegin(foundIds) ; iter != end ; ++iter) {
-	    int idIndex = *iter ;
-	    Ral_IntVector id = heading->identifiers[idIndex] ;
-	    Ral_IntVector newId = Ral_IntVectorDup(id) ;
-	    Ral_IntVectorIter idEnd = Ral_IntVectorEnd(newId) ;
-	    Ral_IntVectorIter idIter ;
+	subHeading = Ral_RelationHeadingNew(tupleHeading, idCount) ;
+	for (iter = Ral_IntVectorBegin(idList) ; iter != end ; ++iter) {
+	    Ral_IntVector newId = Ral_IntVectorDup(*(idBegin + *iter)) ;
+	    Ral_IntVectorIter newIdEnd = Ral_IntVectorEnd(newId) ;
+	    Ral_IntVectorIter newIdIter ;
 	    int status ;
 	    /*
 	     * Remap new id
 	     */
-	    for (idIter = Ral_IntVectorBegin(newId) ; idIter != idEnd ;
-		++idIter) {
-		Ral_IntVectorIter found = Ral_IntVectorFind(attrList, *idIter) ;
-		assert(found != Ral_IntVectorEnd(attrList)) ;
-		*idIter = found - attrStart ;
+	    for (newIdIter = Ral_IntVectorBegin(newId) ; newIdIter != newIdEnd ;
+		++newIdIter) {
+		int found = Ral_IntVectorIndexOf(attrList, *newIdIter) ;
+		assert(found != -1) ;
+		*newIdIter = found ;
 	    }
-	    status = Ral_RelationHeadingAddIdentifier(subHeading, idCount++,
+	    status = Ral_RelationHeadingAddIdentifier(subHeading, newIdCount++,
 		newId) ;
 	    assert(status != 0) ;
 	}
@@ -186,20 +203,15 @@ Ral_RelationHeadingSubset(
 	 * None of the identifiers survived the subset, so make all
 	 * the attributes the single identifier.
 	 */
-	int degree = Ral_TupleHeadingSize(tupleHeading) ;
-	Ral_IntVector allId = Ral_IntVectorNewEmpty(degree) ;
-	int i ;
+	Ral_IntVector allId = Ral_IntVectorNew(
+	    Ral_TupleHeadingSize(tupleHeading), 0) ;
 	int status ;
 
-	for (i = 0 ; i < degree ; ++i) {
-	    Ral_IntVectorPushBack(allId, i) ;
-	}
+	Ral_IntVectorFillConsecutive(allId, 0) ;
 	subHeading = Ral_RelationHeadingNew(tupleHeading, 1) ;
 	status = Ral_RelationHeadingAddIdentifier(subHeading, 0, allId) ;
 	assert(status != 0) ;
     }
-
-    Ral_IntVectorDelete(foundIds) ;
 
     return subHeading ;
 }

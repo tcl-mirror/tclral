@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_vector.h,v $
-$Revision: 1.6 $
-$Date: 2006/04/06 02:07:30 $
+$Revision: 1.7 $
+$Date: 2006/04/09 01:35:47 $
  *--
  */
 #ifndef _ral_vector_h_
@@ -129,8 +129,10 @@ extern Ral_IntVector Ral_IntVectorBooleanMap(Ral_IntVector, int) ;
 extern void Ral_IntVectorSort(Ral_IntVector) ;
 extern Ral_IntVectorIter Ral_IntVectorFind(Ral_IntVector,
     Ral_IntVectorValueType) ;
+extern int Ral_IntVectorIndexOf(Ral_IntVector, Ral_IntVectorValueType) ;
 extern int Ral_IntVectorEqual(Ral_IntVector, Ral_IntVector) ;
 extern int Ral_IntVectorSubsetOf(Ral_IntVector, Ral_IntVector) ;
+extern int Ral_IntVectorContainsAny(Ral_IntVector, Ral_IntVector) ;
 extern Ral_IntVectorIter Ral_IntVectorCopy(Ral_IntVector, Ral_IntVectorIter,
     Ral_IntVectorIter, Ral_IntVector, Ral_IntVectorIter) ;
 

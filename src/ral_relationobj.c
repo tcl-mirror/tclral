@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationobj.c,v $
-$Revision: 1.8 $
-$Date: 2006/04/06 02:07:30 $
+$Revision: 1.9 $
+$Date: 2006/04/09 01:35:47 $
  *--
  */
 
@@ -105,7 +105,7 @@ Tcl_ObjType Ral_RelationObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.8 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.9 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -440,6 +440,7 @@ Ral_RelationObjSetError(
 	"relation is not a projection of the summarized relation",
 	"divisor heading must be disjoint from the dividend heading",
 	"mediator heading must be a union of the dividend and divisor headings",
+	"too many attributes specified",
 
 	"bad relation heading format",
 	"bad value type for value",
@@ -466,6 +467,7 @@ Ral_RelationObjSetError(
 	"NOT_A_PROJECTION",
 	"NOT_DISJOINT",
 	"NOT_UNION",
+	"TOO_MANY_ATTRS",
 
 	"HEADING_ERR",
 	"BAD_VALUE",
