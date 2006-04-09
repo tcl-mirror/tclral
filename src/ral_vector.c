@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_vector.c,v $
-$Revision: 1.9 $
-$Date: 2006/04/09 01:35:47 $
+$Revision: 1.10 $
+$Date: 2006/04/09 22:15:58 $
  *--
  */
 
@@ -90,7 +90,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_vector.c,v $ $Revision: 1.9 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_vector.c,v $ $Revision: 1.10 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -473,6 +473,48 @@ Ral_IntVectorIndexOf(
 	}
     }
     return -1 ;
+}
+
+Ral_IntVector
+Ral_IntVectorIntersect(
+    Ral_IntVector v1,
+    Ral_IntVector v2)
+{
+    Ral_IntVectorIter v1Iter ;
+    Ral_IntVectorIter v1End = Ral_IntVectorEnd(v1) ;
+    Ral_IntVectorIter v2End = Ral_IntVectorEnd(v2) ;
+    Ral_IntVector intersect ;
+
+    intersect = Ral_IntVectorNewEmpty(1) ;
+    for (v1Iter = Ral_IntVectorBegin(v1) ; v1Iter != v1End ; ++v1Iter) {
+	Ral_IntVectorValueType v1Value = *v1Iter ;
+	if (Ral_IntVectorFind(v2, v1Value) != v2End) {
+	    Ral_IntVectorPushBack(intersect, v1Value) ;
+	}
+    }
+
+    return intersect ;
+}
+
+Ral_IntVector
+Ral_IntVectorMinus(
+    Ral_IntVector v1,
+    Ral_IntVector v2)
+{
+    Ral_IntVectorIter v1Iter ;
+    Ral_IntVectorIter v1End = Ral_IntVectorEnd(v1) ;
+    Ral_IntVectorIter v2End = Ral_IntVectorEnd(v2) ;
+    Ral_IntVector diff ;
+
+    diff = Ral_IntVectorNewEmpty(1) ;
+    for (v1Iter = Ral_IntVectorBegin(v1) ; v1Iter != v1End ; ++v1Iter) {
+	Ral_IntVectorValueType v1Value = *v1Iter ;
+	if (Ral_IntVectorFind(v2, v1Value) == v2End) {
+	    Ral_IntVectorPushBack(diff, v1Value) ;
+	}
+    }
+
+    return diff ;
 }
 
 int

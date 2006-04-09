@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationheading.c,v $
-$Revision: 1.10 $
-$Date: 2006/04/09 01:35:47 $
+$Revision: 1.11 $
+$Date: 2006/04/09 22:15:58 $
  *--
  */
 
@@ -89,7 +89,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.10 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.11 $" ;
 
 static const char relationKeyword[] = "Relation" ;
 static const char openList = '{' ;
@@ -122,6 +122,25 @@ Ral_RelationHeadingNew(
      * Note at this point the vector pointers in the "identifiers" member
      * are all NULL.
      */
+
+    return heading ;
+}
+
+/*
+ * Create a new heading with a default id consisting of all the attributes.
+ */
+Ral_RelationHeading
+Ral_RelationHeadingNewDefaultId(
+    Ral_TupleHeading tupleHeading)
+{
+    Ral_RelationHeading heading =Ral_RelationHeadingNew(tupleHeading, 1) ;
+    Ral_IntVector allId =
+	Ral_IntVectorNew(Ral_TupleHeadingSize(tupleHeading), 0) ;
+    int status ;
+
+    Ral_IntVectorFillConsecutive(allId, 0) ;
+    status = Ral_RelationHeadingAddIdentifier(heading, 0, allId) ;
+    assert(status != 0) ;
 
     return heading ;
 }
@@ -203,14 +222,7 @@ Ral_RelationHeadingIdSubset(
 	 * None of the identifiers survived the subset, so make all
 	 * the attributes the single identifier.
 	 */
-	Ral_IntVector allId = Ral_IntVectorNew(
-	    Ral_TupleHeadingSize(tupleHeading), 0) ;
-	int status ;
-
-	Ral_IntVectorFillConsecutive(allId, 0) ;
-	subHeading = Ral_RelationHeadingNew(tupleHeading, 1) ;
-	status = Ral_RelationHeadingAddIdentifier(subHeading, 0, allId) ;
-	assert(status != 0) ;
+	subHeading = Ral_RelationHeadingNewDefaultId(tupleHeading) ;
     }
 
     return subHeading ;

@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.10 $
-# $Date: 2006/04/09 01:35:48 $
+# $Revision: 1.11 $
+# $Date: 2006/04/09 22:15:58 $
 #  *--
 
 package require tcltest 2.2
@@ -1064,6 +1064,136 @@ namespace eval ::ral::test {
 	}
 	set nameList
     } -result {Jones Smith Clark Adams Blake}
+
+    # relation group subcommand
+    test relation-group-1.0 {group two attributes} -body {
+	relation group $SP PQ P# QTY
+    } -result {
+	Relation
+	{S# string PQ {Relation {P# string QTY int} P#}}
+	S#
+	{
+	    {S# S1 PQ {
+		{P# P1 QTY 300}
+		{P# P2 QTY 200}
+		{P# P3 QTY 400}
+		{P# P4 QTY 200}
+		{P# P5 QTY 100}
+		{P# P6 QTY 100}}
+	    }
+	    {S# S2 PQ {
+		{P# P1 QTY 300}
+		{P# P2 QTY 400}}
+	    }
+	    {S# S3 PQ {
+		{P# P2 QTY 200}}
+	    }
+	    {S# S4 PQ {
+		{P# P2 QTY 200}
+		{P# P4 QTY 300}
+		{P# P5 QTY 400}}
+	    }
+	}
+    } -match relation
+
+    test relation-group-2.0 {group two attributes} -body {
+	relation group $SP SQ S# QTY
+    } -result {
+	Relation
+	{P# string SQ {Relation {S# string QTY int} S#}}
+	P#
+	{
+	    {P# P1 SQ {{S# S1 QTY 300} {S# S2 QTY 300}}}
+	    {P# P2 SQ {
+		{S# S1 QTY 200}
+		{S# S2 QTY 400}
+		{S# S3 QTY 200}
+		{S# S4 QTY 200}}
+	    }
+	    {P# P3 SQ {{S# S1 QTY 400}}}
+	    {P# P4 SQ {{S# S1 QTY 200} {S# S4 QTY 300}}}
+	    {P# P5 SQ {{S# S1 QTY 100} {S# S4 QTY 400}}}
+	    {P# P6 SQ {{S# S1 QTY 100}}}
+	}
+    } -match relation
+
+    test relation-group-3.0 {group; no ids in grouped attribute} -setup {
+	set r1 {
+	    Relation
+	    {Name string Number int Street string}
+	    Name
+	    {
+		{Name Andrew Number 599 Street Blackwood}
+		{Name Jane Street Main Number 300}
+		{Name Alice Street Main Number 300}
+		{Name Fred Street Maple Number 599}
+	    }
+	}
+    } -body {
+	relation group $r1 Addr Number Street
+    } -result {
+	Relation
+	{Name string Addr
+	    {Relation {Number int Street string} {{Number Street}}}
+	}
+	Name
+	{
+	    {Name Andrew Addr {{Number 599 Street Blackwood}}}
+	    {Name Jane Addr {{Number 300 Street Main}}}
+	    {Name Alice Addr {{Number 300 Street Main}}}
+	    {Name Fred Addr {{Number 599 Street Maple}}}
+	}
+    } -match relation
+
+    test relation-group-4.0 {group; all ids in grouped attribute} -setup {
+	set r1 {
+	    Relation
+	    {Name string Number int Street string}
+	    {{Name Number Street}}
+	    {
+		{Name Andrew Number 599 Street Blackwood}
+		{Name Jane Street Main Number 300}
+		{Name Alice Street Main Number 300}
+		{Name Fred Street Maple Number 599}
+	    }
+	}
+    } -body {
+	relation group $r1 Addr Number Street
+    } -result {
+	Relation
+	{Name string Addr
+	    {Relation {Number int Street string} {{Number Street}}}
+	}
+	Name
+	{
+	    {Name Andrew Addr {{Number 599 Street Blackwood}}}
+	    {Name Jane Addr {{Number 300 Street Main}}}
+	    {Name Alice Addr {{Number 300 Street Main}}}
+	    {Name Fred Addr {{Number 599 Street Maple}}}
+	}
+    } -match relation
+
+    test relation-group-5.0 {group, unreversable} -setup {
+	set three {
+	    Relation
+	    {A int X string}
+	    {{A X}}
+	    {
+		{A 1 X a}
+		{A 1 X b}
+		{A 1 X c}
+	    }
+	}
+    } -body {
+	relation group $three RVX X
+    } -result {
+	Relation
+	{A int RVX {Relation {X string} X}}
+	A
+	{
+	    {A 1 RVX {{X a} {X b} {X c}}}
+	}
+    } -match relation
 
     # relation heading subcommand
     test relation-heading-1.0 {dum relation} -body {
@@ -2245,12 +2375,22 @@ namespace eval ::ral::test {
 
     # relation ungroup subcommand
     test relation-ungroup-1.0 {two attribute relation} -body {
-	set r {Relation {Name string\
-	    Dog {Relation {DogName string Breed string} DogName}} Name\
-	    {{Name Fred Dog\
-		{{DogName Rover Breed Terrier}\
-		{DogName Missy Breed Poodle}}}\
-	    {Name Alice Dog {{DogName Tiger Breed Setter}}}}}
+	set r {
+	    Relation
+	    {Name string
+		Dog {Relation {DogName string Breed string} DogName}
+	    }
+	    Name
+	    {
+		{Name Fred Dog {
+		    {DogName Rover Breed Terrier}
+		    {DogName Missy Breed Poodle}}
+		}
+		{Name Alice Dog {
+		    {DogName Tiger Breed Setter}}
+		}
+	    }
+	}
 	relation ungroup $r Dog
     } -result {
 	Relation
@@ -2264,12 +2404,18 @@ namespace eval ::ral::test {
     } -match relation
 
     test relation-ungroup-2.0 {duplicate attribute name} -body {
-	set r {Relation {Name string\
-	    Dog {Relation {Name string Breed string} Name}} Name\
-	    {{Name Fred Dog\
-		{{Name Rover Breed Terrier}\
-		{Name Missy Breed Poodle}}}\
-	    {Name Alice Dog {{Name Tiger Breed Setter}}}}}
+	set r {
+	    Relation
+	    {Name string Dog {Relation {Name string Breed string} Name}}
+	    Name
+	    {
+		{Name Fred Dog {
+		    {Name Rover Breed Terrier}
+		    {Name Missy Breed Poodle}}
+		}
+		{Name Alice Dog {{Name Tiger Breed Setter}}}
+	    }
+	}
 	relation ungroup $r Dog
     } -result {duplicate attribute name, "during ungroup operation"}\
     -returnCodes error
@@ -2316,13 +2462,18 @@ namespace eval ::ral::test {
     -returnCodes error
 
     test relation-ungroup-3.0 {common tuples in the relation attribute} -body {
-	set r {Relation {Name string\
-	    Dog {Relation {DogName string Breed string} DogName}}\
-		{{Name Dog}}\
-	    {{Name Fred Dog\
-		{{DogName Rover Breed Terrier}\
-		{DogName Missy Breed Poodle}}}\
-	    {Name Fred Dog {{DogName Rover Breed Terrier}}}}}
+	set r {
+	    Relation
+	    {Name string Dog {Relation {DogName string Breed string} DogName}}
+	    {{Name Dog}}
+	    {
+		{Name Fred Dog {
+		    {DogName Rover Breed Terrier}
+		    {DogName Missy Breed Poodle}}
+		}
+		{Name Fred Dog {{DogName Rover Breed Terrier}}}
+	    }
+	}
 	relation ungroup $r Dog
     } -result {
 	Relation
@@ -2343,20 +2494,12 @@ namespace eval ::ral::test {
 		DogName} Weight int}
 	    Name
 	    {
-		{
-		    Name Fred
-		    Dog {
+		{Name Fred Dog {
 			{DogName Rover Breed Terrier}
-			{DogName Missy Breed Poodle}
-		    }
-		    Weight 20
+			{DogName Missy Breed Poodle}} Weight 20
 		}
-		{
-		    Name Alice
-		    Dog {
-			{DogName Tiger Breed Setter}
-		    }
-		    Weight 40
+		{Name Alice Dog {
+			{DogName Tiger Breed Setter}} Weight 40
 		}
 	    }
 	}
@@ -2369,6 +2512,29 @@ namespace eval ::ral::test {
 	    {Name Fred Weight 20 DogName Rover Breed Terrier}
 	    {Name Fred Weight 20 DogName Missy Breed Poodle}
 	    {Name Alice Weight 40 DogName Tiger Breed Setter}
+	}
+    } -match relation
+
+    test relation-ungroup-5.0 {ungroup; functionally dependent} -setup {
+	set two {
+	    Relation
+	    {A int RVX {Relation {X string} X}}
+	    {{A RVX}}
+	    {
+		{A 1 RVX {{X a} {X b}}}
+		{A 1 RVX {{X a} {X c}}}
+	    }
+	}
+    } -body {
+	relation ungroup $two RVX
+    } -result {
+	Relation
+	{A int X string}
+	{{A X}}
+	{
+	    {A 1 X a}
+	    {A 1 X b}
+	    {A 1 X c}
 	}
     } -match relation
 

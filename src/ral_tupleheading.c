@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleheading.c,v $
-$Revision: 1.10 $
-$Date: 2006/04/06 02:07:30 $
+$Revision: 1.11 $
+$Date: 2006/04/09 22:15:58 $
  *--
  */
 
@@ -91,7 +91,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tupleheading.c,v $ $Revision: 1.10 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tupleheading.c,v $ $Revision: 1.11 $" ;
 
 static const char tupleKeyword[] = "Tuple" ;
 static const char openList = '{' ;
@@ -580,6 +580,30 @@ Ral_TupleHeadingCommonAttributes(
     }
 
     return count ;
+}
+
+/*
+ * Remap attribute indices.
+ * "v" is a set of attribute indices for "h1".
+ * Modify "v" in place so that the indices refer to the
+ * same named attributes in "h2".
+ */
+void
+Ral_TupleHeadingMapIndices(
+    Ral_TupleHeading h1,
+    Ral_IntVector v,
+    Ral_TupleHeading h2)
+{
+    Ral_TupleHeadingIter h1Begin = Ral_TupleHeadingBegin(h1) ;
+    Ral_IntVectorIter vEnd = Ral_IntVectorEnd(v) ;
+    Ral_IntVectorIter vIter ;
+
+    for (vIter = Ral_IntVectorBegin(v) ; vIter != vEnd ; ++vIter) {
+	Ral_Attribute attr = *(h1Begin + *vIter) ;
+	int newIndex = Ral_TupleHeadingIndexOf(h2, attr->name) ;
+	assert(newIndex != -1) ;
+	*vIter = newIndex ;
+    }
 }
 
 int

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.9 $
-$Date: 2006/04/09 01:35:47 $
+$Revision: 1.10 $
+$Date: 2006/04/09 22:15:58 $
  *--
  */
 
@@ -116,7 +116,7 @@ static Ral_RelationIter sortBegin ;
 static Ral_IntVector sortAttrs ;
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.9 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.10 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -585,26 +585,89 @@ Ral_RelationGroup(
 {
     Ral_RelationHeading heading = relation->heading ;
     Ral_TupleHeading tupleHeading = heading->tupleHeading ;
+    Ral_TupleHeading attrTupleHeading ;
+    Ral_RelationHeading attrHeading ;
+    Ral_RelationIdIter relIdIter ;
+    Ral_RelationIdIter relIdEnd = Ral_RelationHeadingIdEnd(heading) ;
+    Ral_RelationIdIter relIdBegin = Ral_RelationHeadingIdBegin(heading) ;
+    Ral_IntVector idSet ;
+    int idCount ;
     Ral_TupleHeadingIter thIter ;
     int nAttrs = Ral_TupleHeadingSize(tupleHeading) ;
     int nGrpAttrs = Ral_IntVectorSize(grpAttrs) ;
-    Ral_RelationHeading attrHeading ;
     Ral_TupleHeading grpTupleHeading ;
     Ral_RelationHeading grpHeading ;
     Ral_Relation group ;
     Ral_IntVector attrMap ;
     Ral_IntVectorIter attrMapIter ;
     Ral_IntVectorIter attrMapEnd ;
-    Ral_TupleHeadingIter relAttrIter ;
-    Ral_RelationIdIter relIdIter ;
-    Ral_RelationIdIter relIdEnd = Ral_RelationHeadingIdEnd(heading) ;
-    Ral_RelationIdIter relIdBegin = Ral_RelationHeadingIdBegin(heading) ;
-    Ral_IntVector foundIds ;
+    Ral_TupleHeadingIter grpAttrIter ;
+    Ral_RelationIter relIter ;
+    Ral_RelationIter relEnd = Ral_RelationEnd(relation) ;
+    Ral_IntVector idMap ;
+    Ral_IntVector grpId ;
+    Ral_IntVectorIter grpAttrsBegin = Ral_IntVectorBegin(grpAttrs) ;
+    Ral_IntVectorIter grpAttrsEnd = Ral_IntVectorEnd(grpAttrs) ;
 
     /*
-     * Create the relation heading for the grouped attribute.
+     * Create the relation heading for the grouped attribute.  Examine each
+     * identifier of the old Heading to determine the set of attributes that
+     * are both in the attribute map and in the identifier.  If that set is
+     * non-empty, then look up the name of the attribute in the old heading and
+     * map it to a new index in the tupleHeading.
      */
-    attrHeading = Ral_RelationHeadingSubset(heading, grpAttrs) ;
+    attrTupleHeading = Ral_TupleHeadingSubset(tupleHeading, grpAttrs) ;
+    idSet = Ral_IntVectorNewEmpty(heading->idCount) ;
+    for (relIdIter = relIdBegin ; relIdIter != relIdEnd ; ++relIdIter) {
+	Ral_IntVector id = *relIdIter ;
+	if (Ral_IntVectorContainsAny(id, grpAttrs)) {
+	    Ral_IntVectorPushBack(idSet, relIdIter - relIdBegin) ;
+	}
+    }
+    idCount = Ral_IntVectorSize(idSet) ;
+    if (idCount) {
+	Ral_IntVectorIter idIter ;
+	Ral_IntVectorIter idEnd = Ral_IntVectorEnd(idSet) ;
+
+	attrHeading = Ral_RelationHeadingNew(attrTupleHeading, idCount) ;
+
+	/*
+	 * Go through the identifiers that contain at least on of the
+	 * grouped attributes and form an identifier from those attributes
+	 * that appear in the relation identifier. We must of course remap
+	 * the attribute indices to the new order of the grouped attribute
+	 * tuple heading.
+	 */
+	idCount = 0 ;
+	for (idIter = Ral_IntVectorBegin(idSet) ; idIter != idEnd ; ++idIter) {
+	    Ral_IntVector commonAttrs ;
+	    int status ;
+
+	    relIdIter = relIdBegin + *idIter ;
+	    assert(relIdIter < relIdEnd) ;
+	    commonAttrs = Ral_IntVectorIntersect(*relIdIter, grpAttrs) ;
+	    assert(Ral_IntVectorSize(commonAttrs) != 0) ;
+	    /*
+	     * Remap the attribute indices.
+	     */
+	    Ral_TupleHeadingMapIndices(tupleHeading, commonAttrs,
+		attrTupleHeading) ;
+	    /*
+	     * Install the new identifier.
+	     */
+	    status = Ral_RelationHeadingAddIdentifier(attrHeading, idCount++,
+		commonAttrs) ;
+	    assert(status != 0) ;
+	}
+    } else {
+	/*
+	 * Didn't find any grouped attributes that were part of an identifier.
+	 * So we make the default identifier.
+	 */
+	attrHeading = Ral_RelationHeadingNewDefaultId(attrTupleHeading) ;
+    }
+    Ral_IntVectorDelete(idSet) ;
+
     /*
      * The grouped relation has a heading that contains all the attributes
      * minus those that go into the relation valued attribute plus one for the
@@ -619,7 +682,7 @@ Ral_RelationGroup(
     attrMapEnd = Ral_IntVectorEnd(attrMap) ;
     for (attrMapIter = Ral_IntVectorBegin(attrMap) ; attrMapIter != attrMapEnd ;
 	++attrMapIter) {
-	if (*attrMapIter) {
+	if (!*attrMapIter) {
 	    int status ;
 
 	    status = Ral_TupleHeadingAppend(tupleHeading, thIter, thIter + 1,
@@ -631,33 +694,145 @@ Ral_RelationGroup(
     /*
      * Add the new relation valued attribute.
      */
-    relAttrIter = Ral_TupleHeadingPushBack(grpTupleHeading,
+    grpAttrIter = Ral_TupleHeadingPushBack(grpTupleHeading,
 	Ral_AttributeNewRelationType(newAttrName, attrHeading)) ;
-    assert(relAttrIter != Ral_TupleHeadingEnd(grpTupleHeading)) ;
+    assert(grpAttrIter != Ral_TupleHeadingEnd(grpTupleHeading)) ;
     /*
-     * The grouped relation has identifiers that are the same as the original
-     * relation minus any identifiers that contain attributes that were grouped
-     * away into the relation valued attribute.  Of course if that means that
-     * all the identifiers are discarded, then we must make all the attributes
-     * of the new grouped relation the single identifier.
+     * The grouped relation has identifiers that are the same as the
+     * original relation minus any attributes contained in the new
+     * relational attribute. If that leaves an identifier to be the
+     * empty set then it must be eliminated. And of course if that means
+     * that all the identifiers are empty, then we must make all the
+     * attributes of the new grouped relation the single identifier.
+     * N.B. that the new relation valued attribute is never an identifier.
      */
-    foundIds = Ral_IntVectorNewEmpty(heading->idCount) ;
-    for (relIdIter = Ral_RelationHeadingIdBegin(heading) ;
-	relIdIter != relIdEnd ; ++relIdIter) {
-	if (!Ral_IntVectorContainsAny(*relIdIter, grpAttrs)) {
-	    Ral_IntVectorPushBack(foundIds, relIdIter - relIdBegin) ;
+    idCount = 0 ;
+    for (relIdIter = relIdBegin ; relIdIter != relIdEnd ; ++relIdIter) {
+	Ral_IntVector id = *relIdIter ;
+	if (!Ral_IntVectorSubsetOf(id, grpAttrs)) {
+	    ++idCount ;
 	}
     }
-    grpHeading = Ral_RelationHeadingIdSubset(heading, grpTupleHeading,
-	foundIds, grpAttrs) ;
-    Ral_IntVectorDelete(foundIds) ;
+    if (idCount) {
+	grpHeading = Ral_RelationHeadingNew(grpTupleHeading, idCount) ;
+	idCount = 0 ;
+	for (relIdIter = relIdBegin ; relIdIter != relIdEnd ; ++relIdIter) {
+	    Ral_IntVector id = *relIdIter ;
+	    Ral_IntVector grpId = Ral_IntVectorMinus(id, grpAttrs) ;
 
-    /*
-     * Now add the tuple to the new relation.
-     */
+	    if (Ral_IntVectorSize(grpId) != 0) {
+		int status ;
+		/*
+		 * Remap the attribute indices.
+		 */
+		Ral_TupleHeadingMapIndices(tupleHeading, grpId,
+		    grpTupleHeading) ;
+		status = Ral_RelationHeadingAddIdentifier(grpHeading, idCount++,
+		    grpId) ;
+		assert(status != 0) ;
+	    } else {
+		Ral_IntVectorDelete(grpId) ;
+	    }
+	}
+    } else {
+	/*
+	 * All the identifiers were subsets of the grouped attributes.
+	 * Therefore create a single identifier that consists of all
+	 * the attributes except the relation valued attribute.
+	 */
+	Ral_IntVector allId =
+	    Ral_IntVectorNew(Ral_TupleHeadingSize(grpTupleHeading) - 1, 0) ;
+	grpHeading = Ral_RelationHeadingNew(grpTupleHeading, 1) ;
+	int status ;
+
+	Ral_IntVectorFillConsecutive(allId, 0) ;
+	status = Ral_RelationHeadingAddIdentifier(grpHeading, 0, allId) ;
+	assert(status != 0) ;
+    }
+
     group = Ral_RelationNew(grpHeading) ;
+    /*
+     * Now add the tuples to the new relation.
+     * First we must generate a map between an identifier in the
+     * grouped relation and the corresponding indices of the original
+     * relation.
+     */
+    grpId = *Ral_RelationHeadingIdBegin(grpHeading) ;
+    idMap = Ral_IntVectorDup(grpId) ;
+    Ral_TupleHeadingMapIndices(grpTupleHeading, idMap, tupleHeading) ;
+    /*
+     * Iterate through the tuples of the relation and using the values
+     * attempt to find the tuple in the new grouped relation. If it is
+     * found, the we need to construct a tuple for the grouped attribute.
+     * If not, then we need to add a new tuple that includes a relation
+     * valued attribute.
+     */
+    for (relIter = Ral_RelationBegin(relation) ; relIter != relEnd ;
+	++relIter) {
+	Ral_Tuple tuple = *relIter ;
+	Ral_TupleIter tupleBegin = Ral_TupleBegin(tuple) ;
+	int grpIndex = Ral_RelationFindTupleReference(group, 0, tuple, idMap) ;
+	Ral_Tuple grpTuple ;
+	Ral_IntVectorIter grpAttrsIter ;
+	Ral_Tuple attrTuple ;
+	Ral_TupleIter attrTupleBegin ;
+	Ral_Relation attrRel ;
+	Tcl_Obj *attrObj ;
 
-    return NULL ;
+	if (grpIndex == -1) {
+	    int status ;
+	    Ral_TupleIter grpIter ;
+	    Ral_TupleIter tupleIter = tupleBegin ;
+	    /*
+	     * Tuple is not in the grouped relation.
+	     * Use the values in the attribute map to find the
+	     * values to place in the new grouped tuple.
+	     */
+	    grpTuple = Ral_TupleNew(grpTupleHeading) ;
+	    grpIter = Ral_TupleBegin(grpTuple) ;
+	    for (attrMapIter = Ral_IntVectorBegin(attrMap) ;
+		attrMapIter != attrMapEnd ; ++attrMapIter) {
+		if (!*attrMapIter) {
+		    Ral_TupleCopyValues(tupleIter, tupleIter + 1,
+			grpIter++) ;
+		}
+		++tupleIter ;
+	    }
+	    attrRel = Ral_RelationNew(attrHeading) ;
+	    attrObj = Ral_RelationObjNew(attrRel) ;
+	    Tcl_IncrRefCount(*grpIter = attrObj) ;
+
+	    status = Ral_RelationPushBack(group, grpTuple, NULL) ;
+	    assert(status != 0) ;
+	} else {
+	    grpTuple = *(Ral_RelationBegin(group) + grpIndex) ;
+	    attrObj = *(Ral_TupleEnd(grpTuple) - 1) ;
+	    if (Tcl_ConvertToType(NULL, attrObj, &Ral_RelationObjType)
+		!= TCL_OK) {
+		Ral_IntVectorDelete(attrMap) ;
+		return NULL ;
+	    }
+	    attrRel = attrObj->internalRep.otherValuePtr ;
+	}
+	/*
+	 * Add values to the relation valued attribute.
+	 */
+	attrTuple = Ral_TupleNew(attrTupleHeading) ;
+	attrTupleBegin = Ral_TupleBegin(attrTuple) ;
+	for (grpAttrsIter = grpAttrsBegin ; grpAttrsIter != grpAttrsEnd ;
+	    ++grpAttrsIter) {
+	    Ral_TupleIter tupleIter = tupleBegin + *grpAttrsIter ;
+	    Ral_TupleCopyValues(tupleIter, tupleIter + 1,
+		attrTupleBegin++) ;
+	}
+	/*
+	 * Ignore duplicates.
+	 */
+	Ral_RelationPushBack(attrRel, attrTuple, NULL) ;
+    }
+
+    Ral_IntVectorDelete(attrMap) ;
+    return group ;
 }
 
 /*

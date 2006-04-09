@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.8 $
-$Date: 2006/04/09 01:35:47 $
+$Revision: 1.9 $
+$Date: 2006/04/09 22:15:58 $
  *--
  */
 
@@ -130,7 +130,7 @@ static const char *orderOptions[] = {
     "-descending",
     NULL
 } ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.8 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.9 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -820,11 +820,6 @@ RelationGroupCmd(
     objc -= 4 ;
     objv += 4 ;
 
-    if (objc > Ral_TupleHeadingSize(tupleHeading)) {
-	Ral_RelationObjSetError(interp, REL_TOO_MANY_ATTRS,
-	    "attempt to group more attributes than exist in the relation") ;
-	return TCL_ERROR ;
-    }
     /*
      * Examine the attribute arguments to determine if the attributes exist and
      * build a map to use later to determine which attributes will be in the
@@ -840,6 +835,15 @@ RelationGroupCmd(
 	    return TCL_ERROR ;
 	}
 	Ral_IntVectorSetAdd(grpAttrs, attrIndex) ;
+    }
+    /*
+     * You may not group away all of the attributes.
+     */
+    if (Ral_IntVectorSize(grpAttrs) >= Ral_TupleHeadingSize(tupleHeading)) {
+	Ral_RelationObjSetError(interp, REL_TOO_MANY_ATTRS,
+	    "attempt to group all attributes in the relation") ;
+	Ral_IntVectorDelete(grpAttrs) ;
+	return TCL_ERROR ;
     }
     /*
      * Check if the new relation valued attribute already exists. The name
