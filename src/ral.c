@@ -1,7 +1,7 @@
 /*
-This software is copyrighted 2004 by G. Andrew Mangogna.  The following
-terms apply to all files associated with the software unless explicitly
-disclaimed in individual files.
+This software is copyrighted 2004, 2005, 2006 by G. Andrew Mangogna.
+The following terms apply to all files associated with the software unless
+explicitly disclaimed in individual files.
 
 The authors hereby grant permission to use, copy, modify, distribute,
 and license this software and its documentation for any purpose, provided
@@ -49,8 +49,8 @@ ABSTRACT:
     Algebra.
 
 $RCSfile: ral.c,v $
-$Revision: 1.26 $
-$Date: 2006/03/19 19:48:31 $
+$Revision: 1.27 $
+$Date: 2006/04/16 19:00:12 $
  *--
  */
 
@@ -61,9 +61,14 @@ PRAGMAS
 /*
 INCLUDE FILES
 */
+#include <stdio.h>
+#include <string.h>
 #include "tcl.h"
 #include "ral_tuplecmd.h"
 #include "ral_relationcmd.h"
+#include "ral_relationobj.h"
+#include "ral_relvar.h"
+#include "ral_relvarcmd.h"
 
 /*
  * We use Tcl_CreateNamespace() and Tcl_Export().
@@ -99,7 +104,7 @@ STATIC DATA ALLOCATION
 static const char ral_pkgname[] = "ral" ;
 static const char ral_version[] = "0.8" ;
 static const char ral_rcsid[] =
-    "$Id: ral.c,v 1.26 2006/03/19 19:48:31 mangoa01 Exp $" ;
+    "$Id: ral.c,v 1.27 2006/04/16 19:00:12 mangoa01 Exp $" ;
 static const char ral_copyright[] =
     "This software is copyrighted 2004, 2005, 2006 by G. Andrew Mangogna."
     "Terms and conditions for use are distributed with the source code." ;
@@ -116,27 +121,53 @@ FUNCTION DEFINITIONS
 
 int
 Ral_Init(
-    Tcl_Interp * interp)
+    Tcl_Interp *interp)
 {
+#   define NAMEBUFSIZE	32 /* nice power of 2, for no good reason */
+
+    static const char nsSep[] = "::" ;
+    static const char tupleCmdName[] = "tuple" ;
+    static const char relationCmdName[] = "relation" ;
+    static const char relvarCmdName[] = "relvar" ;
+
+    char cmdName[NAMEBUFSIZE] ;
+    char *cmdSlot ;
     Tcl_Namespace *ralNs ;
 
     Tcl_InitStubs(interp, TCL_VERSION, 0) ;
 
     Tcl_RegisterObjType(&Ral_TupleObjType) ;
+    Tcl_RegisterObjType(&Ral_RelationObjType) ;
 
-    ralNs = Tcl_CreateNamespace(interp, "::ral", NULL, NULL) ;
+    strcpy(cmdName, nsSep) ;
+    strcat(cmdName, ral_pkgname) ;
+    ralNs = Tcl_CreateNamespace(interp, cmdName, NULL, NULL) ;
 
-    Tcl_CreateObjCommand(interp, "::ral::tuple", tupleCmd, NULL, NULL) ;
-    if (Tcl_Export(interp, ralNs, "tuple", 0) != TCL_OK) {
+    strcat(cmdName, nsSep) ;
+    cmdSlot = cmdName + strlen(cmdName) ;
+
+    strcpy(cmdSlot, tupleCmdName) ;
+    Tcl_CreateObjCommand(interp, cmdName, tupleCmd, NULL, NULL) ;
+    if (Tcl_Export(interp, ralNs, tupleCmdName, 0) != TCL_OK) {
 	return TCL_ERROR ;
     }
 
-    Tcl_CreateObjCommand(interp, "::ral::relation", relationCmd, NULL, NULL) ;
-    if (Tcl_Export(interp, ralNs, "relation", 0) != TCL_OK) {
+    strcpy(cmdSlot, relationCmdName) ;
+    Tcl_CreateObjCommand(interp, cmdName, relationCmd, NULL, NULL) ;
+    if (Tcl_Export(interp, ralNs, relationCmdName, 0) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+
+    strcpy(cmdSlot, relvarCmdName) ;
+    Tcl_CreateObjCommand(interp, cmdName, relvarCmd,
+	Ral_RelvarNewInfo(ral_pkgname, interp), NULL) ;
+    if (Tcl_Export(interp, ralNs, relvarCmdName, 0) != TCL_OK) {
 	return TCL_ERROR ;
     }
 
     Tcl_PkgProvide(interp, ral_pkgname, ral_version) ;
 
     return TCL_OK ;
+
+#   undef NAMEBUFSIZE
 }

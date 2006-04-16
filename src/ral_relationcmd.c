@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.9 $
-$Date: 2006/04/09 22:15:58 $
+$Revision: 1.10 $
+$Date: 2006/04/16 19:00:12 $
  *--
  */
 
@@ -87,6 +87,9 @@ FORWARD FUNCTION REFERENCES
 static int RelationCardinalityCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationChooseCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationDegreeCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
+#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
+static int RelationDictCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
+#endif
 static int RelationDivideCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationEliminateCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationEmptyofCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
@@ -109,6 +112,7 @@ static int RelationRestrictWithCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationSemijoinCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationSemiminusCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationSummarizeCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
+static int RelationTcloseCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationTimesCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationTupleCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationUngroupCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
@@ -130,7 +134,7 @@ static const char *orderOptions[] = {
     "-descending",
     NULL
 } ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.9 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.10 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -156,6 +160,9 @@ relationCmd(
 	{"cardinality", RelationCardinalityCmd},
 	{"choose", RelationChooseCmd},
 	{"degree", RelationDegreeCmd},
+#	    if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
+	{"dict", RelationDictCmd},
+#	    endif
 	{"divide", RelationDivideCmd},
 	{"eliminate", RelationEliminateCmd},
 	{"emptyof", RelationEmptyofCmd},
@@ -178,6 +185,7 @@ relationCmd(
 	{"semijoin", RelationSemijoinCmd},
 	{"semiminus", RelationSemiminusCmd},
 	{"summarize", RelationSummarizeCmd},
+	{"tclose", RelationTcloseCmd},
 	{"times", RelationTimesCmd},
 	{"tuple", RelationTupleCmd},
 	{"ungroup", RelationUngroupCmd},
@@ -225,9 +233,11 @@ RelationCardinalityCmd(
 	return TCL_ERROR ;
     }
 
-    relationObj = *(objv + 2) ;
-    if (Tcl_ConvertToType(interp, relationObj, &Ral_RelationObjType) != TCL_OK)
+    relationObj = objv[2] ;
+    if (Tcl_ConvertToType(interp, relationObj, &Ral_RelationObjType)
+	!= TCL_OK) {
 	return TCL_ERROR ;
+    }
     relation = relationObj->internalRep.otherValuePtr ;
 
     Tcl_SetObjResult(interp, Tcl_NewIntObj(Ral_RelationCardinality(relation))) ;
@@ -361,6 +371,56 @@ RelationDegreeCmd(
     Tcl_SetObjResult(interp, Tcl_NewIntObj(Ral_RelationDegree(relation))) ;
     return TCL_OK ;
 }
+
+#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
+static int
+RelationDictCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_Obj *relObj ;
+    Ral_Relation relation ;
+    Ral_RelationHeading heading ;
+    Tcl_Obj *dictObj ;
+
+    /* relation dict relation */
+    if (objc != 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relation") ;
+	return TCL_ERROR ;
+    }
+
+    relObj = objv[2] ;
+    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relObj->internalRep.otherValuePtr ;
+    heading = relation->heading ;
+
+    if (Ral_RelationDegree(relation) != 2) {
+	Ral_RelationObjSetError(interp, REL_DEGREE_TWO, Tcl_GetString(relObj)) ;
+	return TCL_ERROR ;
+    }
+
+    if (heading->idCount != 1) {
+	Ral_RelationObjSetError(interp, REL_SINGLE_IDENTIFIER,
+	    Tcl_GetString(relObj)) ;
+	return TCL_ERROR ;
+    }
+    if (Ral_IntVectorSize(*heading->identifiers) != 1) {
+	Ral_RelationObjSetError(interp, REL_SINGLE_ATTRIBUTE,
+	    Tcl_GetString(relObj)) ;
+	return TCL_ERROR ;
+    }
+
+    dictObj = Ral_RelationObjDict(interp, relation) ;
+    if (dictObj == NULL) {
+	return TCL_ERROR ;
+    }
+    Tcl_SetObjResult(interp, dictObj) ;
+    return TCL_OK ;
+}
+#endif
 
 static int
 RelationDivideCmd(
@@ -1862,6 +1922,48 @@ errorOut:
 }
 
 static int
+RelationTcloseCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_Obj *relObj ;
+    Ral_Relation relation ;
+    Ral_RelationHeading heading ;
+    Ral_TupleHeading tupleHeading ;
+    Ral_TupleHeadingIter thIter ;
+
+    /* relation tclose relation */
+    if (objc != 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relation") ;
+	return TCL_ERROR ;
+    }
+
+    relObj = objv[2] ;
+    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relObj->internalRep.otherValuePtr ;
+    heading = relation->heading ;
+    tupleHeading = heading->tupleHeading ;
+
+    if (Ral_RelationDegree(relation) != 2) {
+	Ral_RelationObjSetError(interp, REL_DEGREE_TWO, Tcl_GetString(relObj)) ;
+	return TCL_ERROR ;
+    }
+
+    thIter = Ral_TupleHeadingBegin(tupleHeading) ;
+    if (!Ral_AttributeTypeEqual(*thIter, *(thIter + 1))) {
+	Ral_RelationObjSetError(interp, REL_TYPE_MISMATCH,
+	    Tcl_GetString(relObj)) ;
+	return TCL_ERROR ;
+    }
+
+    Tcl_SetObjResult(interp, Ral_RelationObjNew(Ral_RelationTclose(relation))) ;
+    return TCL_OK ;
+}
+
+static int
 RelationTimesCmd(
     Tcl_Interp *interp,
     int objc,
@@ -1880,13 +1982,13 @@ RelationTimesCmd(
 	return TCL_ERROR ;
     }
 
-    r1Obj = *(objv + 2) ;
+    r1Obj = objv[2] ;
     if (Tcl_ConvertToType(interp, r1Obj, &Ral_RelationObjType) != TCL_OK) {
 	return TCL_ERROR ;
     }
     r1 = r1Obj->internalRep.otherValuePtr ;
 
-    r2Obj = *(objv + 3) ;
+    r2Obj = objv[3] ;
     if (Tcl_ConvertToType(interp, r2Obj, &Ral_RelationObjType) != TCL_OK) {
 	return TCL_ERROR ;
     }

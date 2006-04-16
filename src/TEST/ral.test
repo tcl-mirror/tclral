@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.11 $
-# $Date: 2006/04/09 22:15:58 $
+# $Revision: 1.12 $
+# $Date: 2006/04/16 19:00:12 $
 #  *--
 
 package require tcltest 2.2
@@ -68,6 +68,18 @@ proc tupleMatch {expected actual} {
 
 proc relationMatch {expected actual} {
     return [::ral::relation is $expected == $actual]
+}
+
+proc dictMatch {expected actual} {
+    if {[dict size $expected] != [dict size $actual]} {
+	return 0
+    }
+    dict for {exKey exVal} $expected {
+	if {[dict get $actual $exKey] != $exVal} {
+	    return 0
+	}
+    }
+    return 1
 }
 
 proc ::tcl::mathfunc::rcount {relation} {
@@ -93,10 +105,12 @@ namespace eval ::ral::test {
 
     customMatch tuple tupleMatch
     customMatch relation relationMatch
+    customMatch dict dictMatch
 
     set DEE {Relation {} {{}} {{}}}
     set DUM {Relation {} {{}} {}}
 
+    # The Date example relations.
     set S {
 	Relation
 	{S# string SNAME string STATUS int CITY string}
@@ -141,6 +155,7 @@ namespace eval ::ral::test {
 	    {S# S4 P# P5 QTY 400}
 	}
     }
+    # Some examples from the manual pages.
     set DOG {
 	Relation
 	{DogName string Breed string}
@@ -716,20 +731,46 @@ namespace eval ::ral::test {
     -match relation
 
     test relation-shimmer-5.1 {relation attr, degree 1, cardinality 1} -body {
-	set r {Relation {a1 {Relation {t1 string t2 string} {t1}}} {a1} {{a1 {{t1 foo t2 bar}}}}}
+	set r {
+	    Relation
+	    {a1 {Relation {t1 string t2 string} {t1}}}
+	    a1
+	    {
+		{a1 {{t1 foo t2 bar}}}
+	    }
+	}
 	relation cardinality $r
 	string length $r
 	set r
-    } -result {Relation {a1 {Relation {t1 string t2 string} t1}} a1 {{a1 {{t1 foo t2 bar}}}}}\
-    -match relation
+    } -result {
+	Relation
+	{a1 {Relation {t1 string t2 string} t1}}
+	a1
+	{
+	    {a1 {{t1 foo t2 bar}}}
+	}
+    } -match relation
 
     test relation-shimmer-5.2 {relation attr, degree 1, cardinality 1} -body {
-	set r {Relation {a1 {Relation {t1 string t2 string} {t1}}} {a1} {{a1 {{t1 foo t2 bar} {t1 foo2 t2 bar2}}}}}
+	set r {
+	    Relation
+	    {a1 {Relation {t1 string t2 string} {t1}}}
+	    a1
+	    {
+		{a1 {{t1 foo t2 bar} {t1 foo2 t2 bar2}}}
+	    }
+	}
 	relation cardinality $r
 	string length $r
 	set r
-    } -result {Relation {a1 {Relation {t1 string t2 string} t1}} a1 {{a1 {{t1 foo t2 bar} {t1 foo2 t2 bar2}}}}}\
-    -match relation
+    } -result {
+	Relation
+	{a1 {Relation {t1 string t2 string} t1}}
+	a1
+	{
+	    {a1 {{t1 foo t2 bar} {t1 foo2 t2 bar2}}}
+	}
+    } -match relation
 
     test relation-shimmer-6.0 {multiple identifiers} -body {
 	set r {
@@ -865,13 +906,34 @@ namespace eval ::ral::test {
     -match relation
 
     test relation-eliminate-4.0 {nullary eliminate, empty relation} -body {
-	set r1 {Relation\
-	    {Name string Number int Street string IsMale string}\
-	    Name\
-	    {}}
+	set r1 {
+	    Relation
+	    {Name string Number int Street string IsMale string}
+	    Name
+	    {}
+	}
 	relation eliminate $r1
-    } -result {Relation {Name string Number int Street string IsMale string} Name {}}\
-    -match relation
+    } -result {
+	Relation
+	{Name string Number int Street string IsMale string}
+	Name
+	{}
+    } -match relation
+
+    # relation dict subcommand
+    test relation-dict-1.0 {supplier number / city map} -body {
+	relation dict [relation project $S S# CITY]
+    } -result {
+	    S1 London
+	    S2 Paris
+	    S3 Paris
+	    S4 London
+	    S5 Athens
+    } -match dict
+
+    test relation-dict-2.0 {id problem} -body {
+	relation dict [relation project $S SNAME CITY]
+    } -result {identifier must have only a single attribute, "Relation {SNAME string CITY string} {{SNAME CITY}} {{SNAME Smith CITY London} {SNAME Jones CITY Paris} {SNAME Blake CITY Paris} {SNAME Clark CITY London} {SNAME Adams CITY Athens}}"} -returnCodes error
 
     # relation divide subcommand
     test relation-divide-1.0 {suppliers who supply P1} -setup {
@@ -1957,8 +2019,16 @@ namespace eval ::ral::test {
 	    {Name Jane Street Main Number 300 IsMale false}\
 	    {Name Fred Street Maple Number 599 IsMale true}}}
 	relation project $r1 Name
-    } -result {Relation {Name string} Name {{Name Andrew} {Name Jane} {Name Fred}}}\
-    -match relation
+    } -result {
+	Relation
+	{Name string}
+	Name
+	{
+	    {Name Andrew}
+	    {Name Jane}
+	    {Name Fred}
+	}
+    } -match relation
 
     test relation-project-2.0 {multiple attributes} -body {
 	set r1 {Relation \
@@ -1968,8 +2038,15 @@ namespace eval ::ral::test {
 	    {Name Jane Street Main Number 300 IsMale false}\
 	    {Name Fred Street Maple Number 599 IsMale true}}}
 	relation project $r1 Number IsMale
-    } -result {Relation {Number int IsMale string} {{Number IsMale}} {{Number 599 IsMale true} {Number 300 IsMale false}}}\
-    -match relation
+    } -result {
+	Relation
+	{Number int IsMale string}
+	{{Number IsMale}}
+	{
+	    {Number 599 IsMale true}
+	    {Number 300 IsMale false}
+	}
+    } -match relation
 
     test relation-project-3.0 {nullary projection, non-empty relation} -body {
 	set r1 {Relation \
@@ -2296,17 +2373,223 @@ namespace eval ::ral::test {
 	}
     } -match relation
 
+    # relation tclose subcommand
+    test relation-tclose-1.0 {single path} -body {
+	set r {
+	    Relation
+	    {A string B string}
+	    {{A B}}
+	    {
+		{A a B b}
+		{A b B c}
+	    }
+	}
+	relation tclose $r
+    } -result {
+	Relation
+	{A string B string}
+	{{A B}}
+	{
+	    {A a B b}
+	    {A b B c}
+	    {A a B c}
+	}
+    } -match relation
+
+    test relation-tclose-1.1 {reverse path} -body {
+	set r {
+	    Relation
+	    {A string B string}
+	    {{A B}}
+	    {
+		{A b B a}
+		{A c B b}
+	    }
+	}
+	relation tclose $r
+    } -result {
+	Relation
+	{A string B string}
+	{{A B}}
+	{
+	    {A b B a}
+	    {A c B b}
+	    {A c B a}
+	}
+    } -match relation
+
+    test relation-tclose-2.0 {joining path} -body {
+	set r {
+	    Relation
+	    {A string B string}
+	    {{A B}}
+	    {
+		{A a B b}
+		{A a B c}
+		{A b B d}
+		{A c B d}
+	    }
+	}
+	relation tclose $r
+    } -result {
+	Relation
+	{A string B string}
+	{{A B}}
+	{
+	    {A a B b}
+	    {A a B c}
+	    {A b B d}
+	    {A c B d}
+	    {A a B d}
+	}
+    } -match relation
+
+    test relation-tclose-2.1 {diverging path} -body {
+	set r {
+	    Relation
+	    {A string B string}
+	    {{A B}}
+	    {
+		{A a B b}
+		{A a B c}
+		{A b B d}
+		{A c B d}
+		{A c B e}
+		{A e B f}
+	    }
+	}
+	relation tclose $r
+    } -result {
+	Relation
+	{A string B string}
+	{{A B}}
+	{
+	    {A a B b}
+	    {A a B c}
+	    {A a B d}
+	    {A a B e}
+	    {A a B f}
+	    {A b B d}
+	    {A c B d}
+	    {A c B e}
+	    {A c B f}
+	    {A e B f}
+	}
+    } -match relation
+
+    test relation-tclose-3.0 {AHU example} -body {
+	set r {
+	    Relation
+	    {A string B string}
+	    {{A B}}
+	    {
+		{A v1 B v1}
+		{A v1 B v2}
+		{A v1 B v3}
+		{A v2 B v1}
+		{A v3 B v2}
+	    }
+	}
+	relation tclose $r
+    } -result {
+	Relation
+	{A string B string}
+	{{A B}}
+	{
+	    {A v1 B v1}
+	    {A v1 B v2}
+	    {A v1 B v3}
+	    {A v2 B v1}
+	    {A v2 B v2}
+	    {A v2 B v3}
+	    {A v3 B v1}
+	    {A v3 B v2}
+	    {A v3 B v3}
+	}
+    } -match relation
+
+    test relation-tclose-4.0 {tree} -body {
+	set r {
+	    Relation
+	    {A string B string}
+	    {{A B}}
+	    {
+		{A root B n1}
+		{A root B n2}
+		{A n1 B n3}
+		{A n1 B n4}
+		{A n2 B n5}
+		{A n2 B n6}
+	    }
+	}
+	relation tclose $r
+    } -result {
+	Relation
+	{A string B string}
+	{{A B}}
+	{
+	    {A root B n1}
+	    {A root B n2}
+	    {A root B n3}
+	    {A root B n4}
+	    {A root B n5}
+	    {A root B n6}
+	    {A n1 B n3}
+	    {A n1 B n4}
+	    {A n2 B n5}
+	    {A n2 B n6}
+	}
+    } -match relation
+
+    test relation-tclose-4.1 {reverse tree} -body {
+	set r {
+	    Relation
+	    {B string A string}
+	    {{B A}}
+	    {
+		{A root B n1}
+		{A root B n2}
+		{A n1 B n3}
+		{A n1 B n4}
+		{A n2 B n5}
+		{A n2 B n6}
+	    }
+	}
+	relation tclose $r
+    } -result {
+	Relation
+	{A string B string}
+	{{A B}}
+	{
+	    {A root B n1}
+	    {A root B n2}
+	    {A root B n3}
+	    {A root B n4}
+	    {A root B n5}
+	    {A root B n6}
+	    {A n1 B n3}
+	    {A n1 B n4}
+	    {A n2 B n5}
+	    {A n2 B n6}
+	}
+    } -match relation
+
     # relation times subcommand
     test relation-times-1.0 {single attribute, square relation} -body {
 	set r1 {Relation {Name string} Name {{Name Andrew}}}
 	set r2 {Relation {XName string} XName {{XName Andrew}}}
 	relation times $r1 $r2
-    } -result {Relation {Name string XName string} {{Name XName}}\
-	{{Name Andrew XName Andrew}}}\
-    -match relation
+    } -result {
+	Relation
+	{Name string XName string}
+	{{Name XName}}
+	{
+	    {Name Andrew XName Andrew}
+	}
+    } -match relation
 
     test relation-times-2.0 {single attribute times dee} -body {
-	set r2 {Relation {} {{}} {{}}}
+	set r1 {Relation {Name string} Name {{Name Andrew}}}
 	relation times $r1 $DEE
     } -result {Relation {Name string} Name {{Name Andrew}}}\
     -match relation
@@ -2314,17 +2597,21 @@ namespace eval ::ral::test {
     test relation-times-3.0 {single attribute times dum} -body {
 	set r1 {Relation {Name string} Name {{Name Andrew}}}
 	relation times $r1 $DUM
-    } -result {Relation {Name string} Name {}}\
-    -match relation
+    } -result {Relation {Name string} Name {}} -match relation
 
     test relation-times-4.0 {single attribute, cube relation} -body {
 	set r1 {Relation {Name string} Name {{Name Andrew}}}
 	set r2 {Relation {XName string} XName {{XName Andrew}}}
 	set r3 {Relation {YName string} YName {{YName Andrew}}}
 	relation times $r1 $r2 $r3
-    } -result {Relation {Name string XName string YName string}\
-	{{Name XName YName}} {{Name Andrew XName Andrew YName Andrew}}}\
-    -match relation
+    } -result {
+	Relation
+	{Name string XName string YName string}
+	{{Name XName YName}}
+	{
+	    {Name Andrew XName Andrew YName Andrew}
+	}
+    } -match relation
 
     test relation-times-5.0 {multiple attributes, square relation} -body {
 	set r1 {Relation {Name string} Name {{Name Andrew} {Name George}}}
@@ -2640,6 +2927,64 @@ namespace eval ::ral::test {
 	}
     } -match relation
 
+    # Relvar Tests
+
+    # relvar create subcommand
+    test relvar-create-1.0 {single attribute} -body {
+	relvar create N {Relation {Name string} Name}
+    } -cleanup {
+	relvar destroy N
+    } -result {Relation {Name string} Name {}} -match relation
+
+    # relvar assign subcommand
+    test relvar-assign-1.0 {single attribute} -body {
+	relvar create SV {
+	    Relation
+	    {S# string SNAME string STATUS int CITY string}
+	    S#
+	}
+	relvar assign SV $S
+    } -cleanup {
+	relvar destroy SV
+    } -result {
+	Relation
+	{S# string SNAME string STATUS int CITY string}
+	S#
+	{
+	    {S# S1 SNAME Smith STATUS 20 CITY London}
+	    {S# S2 SNAME Jones STATUS 10 CITY Paris}
+	    {S# S3 SNAME Blake STATUS 30 CITY Paris}
+	    {S# S4 SNAME Clark STATUS 20 CITY London}
+	    {S# S5 SNAME Adams STATUS 30 CITY Athens}
+	}
+    } -match relation
+
+    # relvar eval subcommand
+    test relvar-eval-1.0 {simple body} -setup {
+	relvar create SV {
+	    Relation
+	    {S# string SNAME string STATUS int CITY string}
+	    S#
+	}
+    } -body {
+	relvar eval {
+	    relvar assign SV $S
+	}
+    } -cleanup {
+	relvar destroy SV
+    } -result {
+	Relation
+	{S# string SNAME string STATUS int CITY string}
+	S#
+	{
+	    {S# S1 SNAME Smith STATUS 20 CITY London}
+	    {S# S2 SNAME Jones STATUS 10 CITY Paris}
+	    {S# S3 SNAME Blake STATUS 30 CITY Paris}
+	    {S# S4 SNAME Clark STATUS 20 CITY London}
+	    {S# S5 SNAME Adams STATUS 30 CITY Athens}
+	}
+    } -match relation
+
     # examples from the Date book
     test date-example-1.0 {Get suppliers who supply all parts} -body {
 	set pnums [relation project $P P#]
@@ -2758,8 +3103,8 @@ namespace eval ::ral::test {
 	{SA string SB string}
 	{{SA SB}}
 	{
-	    {SA S1	SB S4}
-	    {SA S2	SB S3}
+	    {SA S1 SB S4}
+	    {SA S2 SB S3}
 	}
     } -match relation
 

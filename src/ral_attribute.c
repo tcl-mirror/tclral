@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.c,v $
-$Revision: 1.7 $
-$Date: 2006/03/19 19:48:31 $
+$Revision: 1.8 $
+$Date: 2006/04/16 19:00:12 $
  *--
  */
 
@@ -96,7 +96,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.7 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.8 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -237,23 +237,35 @@ Ral_AttributeEqual(
 	return 0 ;
     }
 
+    return Ral_AttributeTypeEqual(a1, a2) ;
+}
+
+int
+Ral_AttributeTypeEqual(
+    Ral_Attribute a1,
+    Ral_Attribute a2)
+{
+    int result = 0 ;
+
     switch (a1->attrType) {
     case Tcl_Type:
-	return a1->tclType == a2->tclType ;
+	result = a1->tclType == a2->tclType ;
+	break ;
 
     case Tuple_Type:
-	return Ral_TupleHeadingEqual(a1->tupleHeading, a2->tupleHeading) ;
+	result = Ral_TupleHeadingEqual(a1->tupleHeading, a2->tupleHeading) ;
+	break ;
 
     case Relation_Type:
-	return Ral_RelationHeadingEqual(a1->relationHeading,
+	result = Ral_RelationHeadingEqual(a1->relationHeading,
 	    a2->relationHeading) ;
+	break ;
 
     default:
 	Tcl_Panic("Ral_AttributeEqual: unknown attribute type: %d",
 	    a1->attrType) ;
     }
-    /* Not reached */
-    return 1 ;
+    return result ;
 }
 
 int

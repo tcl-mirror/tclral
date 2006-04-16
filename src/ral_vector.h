@@ -1,5 +1,5 @@
 /*
-This software is copyrighted 2005 by G. Andrew Mangogna.  The following
+This software is copyrighted 2005, 2006 by G. Andrew Mangogna.  The following
 terms apply to all files associated with the software unless explicitly
 disclaimed in individual files.
 
@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_vector.h,v $
-$Revision: 1.8 $
-$Date: 2006/04/09 22:15:58 $
+$Revision: 1.9 $
+$Date: 2006/04/16 19:00:12 $
  *--
  */
 #ifndef _ral_vector_h_

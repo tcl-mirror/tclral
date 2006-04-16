@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationobj.c,v $
-$Revision: 1.9 $
-$Date: 2006/04/09 01:35:47 $
+$Revision: 1.10 $
+$Date: 2006/04/16 19:00:12 $
  *--
  */
 
@@ -105,7 +105,7 @@ Tcl_ObjType Ral_RelationObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.9 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.10 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -403,6 +403,40 @@ Ral_RelationFindJoinAttrs(
     return TCL_OK ;
 }
 
+#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
+Tcl_Obj *
+Ral_RelationObjDict(
+    Tcl_Interp *interp,
+    Ral_Relation relation)
+{
+    Ral_RelationHeading heading = relation->heading ;
+    Tcl_Obj *dictObj ;
+    int keyAttrIndex ;
+    int valAttrIndex ;
+    Ral_RelationIter rEnd = Ral_RelationEnd(relation) ;
+    Ral_RelationIter rIter ;
+
+    assert(Ral_RelationDegree(relation) == 2) ;
+    assert(heading->idCount == 1) ;
+    assert(Ral_IntVectorSize(*heading->identifiers) == 1) ;
+
+    keyAttrIndex = Ral_IntVectorFetch(*heading->identifiers, 0) ;
+    valAttrIndex = (keyAttrIndex + 1) % 2 ;
+
+    dictObj = Tcl_NewDictObj() ;
+    for (rIter = Ral_RelationBegin(relation) ; rIter != rEnd ; ++rIter) {
+	Ral_TupleIter tBegin = Ral_TupleBegin(*rIter) ;
+	if (Tcl_DictObjPut(interp, dictObj, *(tBegin + keyAttrIndex),
+	    *(tBegin + valAttrIndex)) != TCL_OK) {
+	    Tcl_DecrRefCount(dictObj) ;
+	    return NULL ;
+	}
+    }
+
+    return dictObj ;
+}
+#endif
+
 const char *
 Ral_RelationObjVersion(void)
 {
@@ -432,6 +466,7 @@ Ral_RelationObjSetError(
 	"headings not equal",
 	"duplicate attribute name",
 	"relation must have degree of one",
+	"relation must have degree of two",
 	"relation must have cardinality of one",
 	"bad list of pairs",
 	"bad list of triples",
@@ -441,6 +476,9 @@ Ral_RelationObjSetError(
 	"divisor heading must be disjoint from the dividend heading",
 	"mediator heading must be a union of the dividend and divisor headings",
 	"too many attributes specified",
+	"attributes must have the same type",
+	"only a single identifier may be specified",
+	"identifier must have only a single attribute",
 
 	"bad relation heading format",
 	"bad value type for value",
@@ -459,6 +497,7 @@ Ral_RelationObjSetError(
 	"HEADING_NOT_EQUAL",
 	"DUPLICATE_ATTR",
 	"DEGREE_ONE",
+	"DEGREE_TWO",
 	"CARDINALITY_ONE",
 	"BAD_PAIRS_LIST",
 	"BAD_TRIPLE_LIST",
@@ -468,6 +507,9 @@ Ral_RelationObjSetError(
 	"NOT_DISJOINT",
 	"NOT_UNION",
 	"TOO_MANY_ATTRS",
+	"TYPE_MISMATCH",
+	"SINGLE_IDENTIFIER",
+	"SINGLE_ATTRIBUTE",
 
 	"HEADING_ERR",
 	"BAD_VALUE",

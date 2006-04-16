@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.h,v $
-$Revision: 1.9 $
-$Date: 2006/04/09 01:35:47 $
+$Revision: 1.10 $
+$Date: 2006/04/16 19:00:12 $
  *--
  */
 #ifndef _ral_relation_h_
@@ -144,6 +144,7 @@ typedef enum Ral_RelationError {
     REL_HEADING_NOT_EQUAL,
     REL_DUPLICATE_ATTR,
     REL_DEGREE_ONE,
+    REL_DEGREE_TWO,
     REL_CARDINALITY_ONE,
     REL_BAD_PAIRS_LIST,
     REL_BAD_TRIPLE_LIST,
@@ -153,6 +154,9 @@ typedef enum Ral_RelationError {
     REL_NOT_DISJOINT,
     REL_NOT_UNION,
     REL_TOO_MANY_ATTRS,
+    REL_TYPE_MISMATCH,
+    REL_SINGLE_IDENTIFIER,
+    REL_SINGLE_ATTRIBUTE,
 
 
     REL_HEADING_ERR,
@@ -217,6 +221,7 @@ extern Ral_Relation Ral_RelationSemiMinus(Ral_Relation, Ral_Relation,
     Ral_JoinMap) ;
 extern Ral_Relation Ral_RelationDivide(Ral_Relation, Ral_Relation,
     Ral_Relation) ;
+extern Ral_Relation Ral_RelationTclose(Ral_Relation) ;
 
 extern Ral_IntVector Ral_RelationSortAscending(Ral_Relation, Ral_IntVector) ;
 extern Ral_IntVector Ral_RelationSortDescending(Ral_Relation, Ral_IntVector) ;

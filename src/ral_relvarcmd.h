@@ -1,5 +1,5 @@
 /*
-This software is copyrighted 2005 by G. Andrew Mangogna.  The following
+This software is copyrighted 2006 by G. Andrew Mangogna.  The following
 terms apply to all files associated with the software unless explicitly
 disclaimed in individual files.
 
@@ -44,13 +44,13 @@ MODULE:
 
 ABSTRACT:
 
-$RCSfile: ral_relationobj.h,v $
-$Revision: 1.7 $
+$RCSfile: ral_relvarcmd.h,v $
+$Revision: 1.1 $
 $Date: 2006/04/16 19:00:12 $
  *--
  */
-#ifndef _ral_relationobj_h_
-#define _ral_relationobj_h_
+#ifndef _ral_relvarcmd_h_
+#define _ral_relvarcmd_h_
 
 /*
 PRAGMAS
@@ -60,9 +60,6 @@ PRAGMAS
 INCLUDE FILES
 */
 #include "tcl.h"
-#include "ral_relationheading.h"
-#include "ral_relation.h"
-#include <stdio.h>
 
 /*
 MACRO DEFINITIONS
@@ -77,30 +74,10 @@ TYPE DECLARATIONS
 */
 
 /*
-EXTERNAL DATA REFERENCES
-*/
-extern Tcl_ObjType Ral_RelationObjType ;
-
-/*
 FUNCTION DECLARATIONS
 */
+extern int relvarCmd(ClientData, Tcl_Interp *, int, Tcl_Obj *const*) ;
+extern const char *Ral_RelvarCmdVersion(void) ;
 
-extern Tcl_Obj *Ral_RelationObjNew(Ral_Relation) ;
-extern int Ral_RelationObjConvert(Ral_RelationHeading, Tcl_Interp *, Tcl_Obj *,
-    Tcl_Obj *) ;
-extern Ral_RelationHeading Ral_RelationHeadingNewFromObjs(Tcl_Interp *,
-    Tcl_Obj *, Tcl_Obj *) ;
-extern int Ral_RelationSetFromObj(Ral_Relation, Tcl_Interp *, Tcl_Obj *) ;
-extern int Ral_RelationInsertTupleObj(Ral_Relation, Tcl_Interp *, Tcl_Obj *) ;
-extern int Ral_RelationObjParseJoinArgs(Tcl_Interp *, int *, Tcl_Obj *const**,
-    Ral_Relation, Ral_Relation, Ral_JoinMap) ;
-extern int Ral_RelationFindJoinAttrs(Tcl_Interp *, Ral_Relation, Ral_Relation,
-    Tcl_Obj *, Ral_JoinMap) ;
-#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
-extern Tcl_Obj *Ral_RelationObjDict(Tcl_Interp *, Ral_Relation) ;
-#endif
-extern const char *Ral_RelationObjVersion(void) ;
-extern void Ral_RelationObjSetError(Tcl_Interp *, Ral_RelationError,
-    const char *) ;
 
-#endif /* _ral_relationobj_h_ */
+#endif /* _ral_relvarcmd_h_ */

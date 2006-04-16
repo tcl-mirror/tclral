@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.10 $
-$Date: 2006/04/09 22:15:58 $
+$Revision: 1.11 $
+$Date: 2006/04/16 19:00:12 $
  *--
  */
 
@@ -116,7 +116,7 @@ static Ral_RelationIter sortBegin ;
 static Ral_IntVector sortAttrs ;
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.10 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.11 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -373,8 +373,6 @@ Ral_RelationUnion(
 {
     Ral_Relation unionRel ;
     int copyStatus ;
-    Ral_RelationIter iter2 ;
-    Ral_RelationIter end2 = Ral_RelationEnd(r2) ;
     Ral_IntVector orderMap ;
     /*
      * Headings must be equal to perform a union.
@@ -397,13 +395,11 @@ Ral_RelationUnion(
     orderMap = Ral_TupleHeadingNewOrderMap(r1->heading->tupleHeading,
 	r2->heading->tupleHeading) ;
     /*
-     * Iterate through the tuples of the second relation and attempt to insert
-     * them into the union.  Just push it in and ignore any return status. If
-     * there is already a matching tuple it will not be inserted.
+     * Copy in the tuples from the second relation.  Ignore any return status.
+     * If there is already a matching tuple it will not be inserted.
      */
-    for (iter2 = Ral_RelationBegin(r2) ; iter2 != end2 ; ++iter2) {
-	Ral_RelationPushBack(unionRel, *iter2, orderMap) ;
-    }
+    Ral_RelationCopy(r2, Ral_RelationBegin(r2), Ral_RelationEnd(r2), unionRel,
+	orderMap) ;
 
     Ral_IntVectorDelete(orderMap) ;
 
@@ -1520,6 +1516,157 @@ Ral_RelationFindJoinTuples(
 	    ckfree((char *)r2Keys) ;
 	}
     }
+}
+
+/*
+ * Compute the transitive closure of the relation.
+ * Assume that there are two attributes and the are of the same type.
+ * Return the transitive closure.
+ */
+Ral_Relation
+Ral_RelationTclose(
+    Ral_Relation relation)
+{
+    Ral_RelationHeading heading = relation->heading ;
+    Ral_TupleHeading tupleHeading = heading->tupleHeading ;
+    Ral_RelationIter rIter ;
+    Ral_RelationIter rBegin = Ral_RelationBegin(relation) ;
+    Ral_RelationIter rEnd = Ral_RelationEnd(relation) ;
+    int index = 0 ;
+    Tcl_HashTable vertices ;
+    Ral_PtrVector valueMap ;
+    char *Ckij[2] ;
+    char *Ck ;
+    char *Ck_1 ;
+    int nVertices ;
+    int size ;
+    int i ;
+    int j ;
+    int k ;
+    Ral_Relation tclose ;
+
+    /*
+     * We treat the two attributes as if they defined the edge in a graph. So
+     * first we must come up with a list of vertices.  This amounts to
+     * projecting each attribute and taking the resulting union. We will do
+     * that by using a hash table and a vector. The hash table will be used to
+     * look up attribute and determine if we have already seen it. The vector
+     * will then used to associate consecutive indices with the values.  This
+     * will also help us decode the result in the end.
+     */
+    Tcl_InitObjHashTable(&vertices) ;
+    valueMap = Ral_PtrVectorNew(Ral_RelationCardinality(relation) * 2) ;
+    for (rIter = rBegin ; rIter != rEnd ; ++rIter) {
+	Ral_TupleIter tIter = Ral_TupleBegin(*rIter) ;
+	Tcl_Obj *value ;
+	Tcl_HashEntry *entry ;
+	int newPtr ;
+
+	value = *tIter++ ;
+	entry = Tcl_CreateHashEntry(&vertices, (const char *)value, &newPtr) ;
+	if (newPtr) {
+	    Tcl_SetHashValue(entry, index++) ;
+	    Ral_PtrVectorPushBack(valueMap, value) ;
+	}
+	value = *tIter ;
+	entry = Tcl_CreateHashEntry(&vertices, (const char *)value, &newPtr) ;
+	if (newPtr) {
+	    Tcl_SetHashValue(entry, index++) ;
+	    Ral_PtrVectorPushBack(valueMap, value) ;
+	}
+    }
+
+    /*
+     * Allocate two N x N arrays to hold the information for the transitive
+     * closure algorithm. One array is used to compute the C0 information,
+     * then the C0 is used to compute the C1 information and then the
+     * arrays are used alternatively. The values in the array will be either
+     * 0 or 1.
+     */
+    nVertices = Ral_PtrVectorSize(valueMap) ;
+    size = nVertices * nVertices ;
+    Ckij[0] = ckalloc(size) ;
+    memset(Ckij[0], 0, size) ;
+    Ckij[1] = ckalloc(size) ;
+
+    Ck = Ckij[0] ;
+    /*
+     * For the C0ij, if we set the diagonals to 1 and then we get the
+     * reflexive and transitive closure. In things relational, we are not
+     * so interested in the reflexive case.
+     */
+#   if 0
+    for (i = 0 ; i < nVertices ; ++i) {
+	Ck[i * nVertices + i] = 1 ;
+    }
+#   endif
+    /*
+     * Look up in the relation for each tuple and seed the set of
+     * edges defined there. This completes the calculation of C0ij, the
+     * paths involving no vertices other than the endpoints.
+     */
+    for (rIter = rBegin ; rIter != rEnd ; ++rIter) {
+	Ral_TupleIter tIter = Ral_TupleBegin(*rIter) ;
+	Tcl_HashEntry *entry ;
+
+	entry = Tcl_FindHashEntry(&vertices, (const char *)*tIter++) ;
+	assert(entry != NULL) ;
+	i = (int)Tcl_GetHashValue(entry) ;
+	entry = Tcl_FindHashEntry(&vertices, (const char *)*tIter) ;
+	assert(entry != NULL) ;
+	j = (int)Tcl_GetHashValue(entry) ;
+	Ck[i * nVertices + j] = 1 ;
+    }
+    /*
+     * Done with the hash table.
+     */
+    Tcl_DeleteHashTable(&vertices) ;
+
+    /*
+     * Now iterate over all the subsets of vertices and compute the
+     * magic formula. See Aho, Hopcroft and Ullman, "The Design and
+     * Analysis of Computer Algorithms", p. 199.
+     */
+    for (k = 0 ; k < nVertices ; ++k) {
+	int k_row = k * nVertices ;
+	Ck_1 = Ckij[k % 2] ;
+	Ck = Ckij[(k + 1) % 2] ;
+	for (i = 0 ; i < size ; i += nVertices) {
+	    for (j = 0 ; j < nVertices ; ++j) {
+		Ck[i + j] = Ck_1[i + j] | (Ck_1[i + k] & Ck_1[k_row + j]) ;
+	    }
+	}
+    }
+    /*
+     * At this point, "Ck" has a one in every element where there is some path
+     * from "i" to "j". Now construct the relation.  We know the new relation
+     * will have at least as many tuples as the original relation (since it is
+     * always a subset of the closure).  The we traverse the "Ck" array and
+     * every where that there is a one, we add that pair to the result.  We use
+     * the vector generated earlier to look up the tuple values.
+     */
+    tclose = Ral_RelationNew(heading) ;
+    Ral_RelationReserve(tclose, Ral_RelationCardinality(relation)) ;
+    for (i = 0 ; i < nVertices ; ++i) {
+	int i_row = i * nVertices ;
+	for (j = 0 ; j < nVertices ; ++j) {
+	    if (Ck[i_row++]) {
+		Ral_Tuple tuple = Ral_TupleNew(tupleHeading) ;
+		Ral_TupleIter tIter = Ral_TupleBegin(tuple) ;
+		Tcl_IncrRefCount(*tIter++ = Ral_PtrVectorFetch(valueMap, i)) ;
+		Tcl_IncrRefCount(*tIter = Ral_PtrVectorFetch(valueMap, j)) ;
+		/*
+		 * Ignore duplicates.
+		 */
+		Ral_RelationPushBack(tclose, tuple, NULL) ;
+	    }
+	}
+    }
+
+    ckfree(Ckij[0]) ;
+    ckfree(Ckij[1]) ;
+    Ral_PtrVectorDelete(valueMap) ;
+    return tclose ;
 }
 
 /*
