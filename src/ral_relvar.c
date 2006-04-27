@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.c,v $
-$Revision: 1.1 $
-$Date: 2006/04/16 19:00:12 $
+$Revision: 1.2 $
+$Date: 2006/04/27 14:48:56 $
  *--
  */
 
@@ -61,6 +61,7 @@ INCLUDE FILES
 #include <assert.h>
 #include "ral_relvar.h"
 #include "ral_relationobj.h"
+#include "ral_relation.h"
 
 /*
 MACRO DEFINITIONS
@@ -92,7 +93,7 @@ Ral_RelvarError Ral_RelvarLastError = RELVAR_OK ;
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.1 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.2 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -108,7 +109,7 @@ Ral_RelvarNew(
     Tcl_HashEntry *entry ;
     Ral_Relvar relvar = NULL ;
 
-    entry = Tcl_CreateHashEntry(&info->relvarTable, name, &newPtr) ;
+    entry = Tcl_CreateHashEntry(&info->relvars, name, &newPtr) ;
     if (newPtr) {
 	    /* +1 for NUL terminator */
 	relvar = (Ral_Relvar)ckalloc(sizeof(*relvar) + strlen(name) + 1) ;
@@ -134,11 +135,36 @@ Ral_RelvarDelete(
     Ral_RelvarInfo info,
     const char *name)
 {
-    Tcl_HashEntry *entry = Tcl_FindHashEntry(&info->relvarTable, name) ;
+    Tcl_HashEntry *entry ;
+    Ral_Relvar relvar ;
+    Ral_Relation relation ;
+    Ral_RelvarTransaction currTrans ;
+    int added ;
 
+    /*
+     * Clean out the variable name from the hash table so that subsequent
+     * commands will not see it.
+     */
+    entry = Tcl_FindHashEntry(&info->relvars, name) ;
     assert(entry != NULL) ;
-    relvarCleanup(Tcl_GetHashValue(entry)) ;
+    relvar = (Ral_Relvar)Tcl_GetHashValue(entry) ;
     Tcl_DeleteHashEntry(entry) ;
+    /*
+     * Remove all the tuples.
+     */
+    assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
+    relation = relvar->relObj->internalRep.otherValuePtr ;
+    Ral_RelationErase(relation, Ral_RelationBegin(relation),
+	Ral_RelationEnd(relation)) ;
+    /*
+     * Insert the relvar into the pending delete set.  We must not clean it out
+     * all of its data structure until the end of the transaction so that
+     * constraint evaluation can take place.
+     */
+    assert(Ral_PtrVectorSize(info->transactions) > 0) ;
+    currTrans = Ral_PtrVectorBack(info->transactions) ;
+    added = Ral_PtrVectorSetAdd(currTrans->pendingDelete, relvar) ;
+    assert(added != 0) ;
 }
 
 Ral_Relvar
@@ -149,7 +175,7 @@ Ral_RelvarFind(
     Tcl_HashEntry *entry ;
     Ral_Relvar relvar = NULL ;
 
-    entry = Tcl_FindHashEntry(&info->relvarTable, name) ;
+    entry = Tcl_FindHashEntry(&info->relvars, name) ;
     if (entry) {
 	relvar = Tcl_GetHashValue(entry) ;
     }
@@ -165,7 +191,8 @@ Ral_RelvarNewInfo(
     Ral_RelvarInfo info = (Ral_RelvarInfo)ckalloc(sizeof(*info)) ;
     memset(info, 0, sizeof(*info)) ;
     info->transactions = Ral_PtrVectorNew(1) ;
-    Tcl_InitHashTable(&info->relvarTable, TCL_STRING_KEYS) ;
+    Tcl_InitHashTable(&info->relvars, TCL_STRING_KEYS) ;
+    Tcl_InitHashTable(&info->constraints, TCL_STRING_KEYS) ;
     Tcl_SetAssocData(interp, name, Ral_RelvarDeleteInfo, info) ;
 
     return (ClientData)info ;
@@ -181,19 +208,26 @@ Ral_RelvarDeleteInfo(
     Tcl_HashSearch search ;
 
     Ral_PtrVectorDelete(info->transactions) ;
-    for (entry = Tcl_FirstHashEntry(&info->relvarTable, &search) ;
+    for (entry = Tcl_FirstHashEntry(&info->relvars, &search) ;
 	entry ; entry = Tcl_NextHashEntry(&search)) {
 	relvarCleanup(Tcl_GetHashValue(entry)) ;
     }
-    Tcl_DeleteHashTable(&info->relvarTable) ;
+    Tcl_DeleteHashTable(&info->relvars) ;
+    for (entry = Tcl_FirstHashEntry(&info->constraints, &search) ;
+	entry ; entry = Tcl_NextHashEntry(&search)) {
+	 Ral_ConstraintDelete(Tcl_GetHashValue(entry)) ;
+    }
+    Tcl_DeleteHashTable(&info->relvars) ;
     ckfree((char *)info) ;
 }
 
 void
 Ral_RelvarStartTransaction(
-    Ral_RelvarInfo info)
+    Ral_RelvarInfo info,
+    int single)
 {
     Ral_RelvarTransaction newTrans = Ral_RelvarNewTransaction() ;
+    newTrans->isSingleCmd = single ;
     Ral_PtrVectorPushBack(info->transactions, newTrans) ;
 }
 
@@ -207,12 +241,16 @@ Ral_RelvarEndTransaction(
     Ral_PtrVectorIter modEnd ;
 
     trans = Ral_PtrVectorBack(info->transactions) ;
+    assert(trans->isSingleCmd == 0) ;
     Ral_PtrVectorPopBack(info->transactions) ;
 
     modEnd = Ral_PtrVectorEnd(trans->modified) ;
     if (!failed) {
 	/*
 	 * Iterate across the transaction evaluating the constraints.
+	 * HERE
+	 * Build a set of constraints that the modified relvars
+	 * participate in and then evaluate all the  constraints found.
 	 */
 	for (modIter = Ral_PtrVectorBegin(trans->modified) ; modIter != modEnd ;
 	    ++modIter) {
@@ -226,7 +264,7 @@ Ral_RelvarEndTransaction(
 	 */
 	for (modIter = Ral_PtrVectorBegin(trans->modified) ; modIter != modEnd ;
 	    ++modIter) {
-	    Ral_RelvarRestore(*modIter) ;
+	    Ral_RelvarRestorePrev(*modIter) ;
 	}
     } else {
 	/*
@@ -234,7 +272,15 @@ Ral_RelvarEndTransaction(
 	 */
 	for (modIter = Ral_PtrVectorBegin(trans->modified) ; modIter != modEnd ;
 	    ++modIter) {
-	    Ral_RelvarDiscard(*modIter) ;
+	    Ral_RelvarDiscardPrev(*modIter) ;
+	}
+	/*
+	 * Get rid of any relvars marked as pending delete.
+	 */
+	modEnd = Ral_PtrVectorEnd(trans->pendingDelete) ;
+	for (modIter = Ral_PtrVectorBegin(trans->pendingDelete) ;
+	    modIter != modEnd ; ++modIter) {
+	    relvarCleanup(*modIter) ;
 	}
     }
     /*
@@ -248,36 +294,44 @@ Ral_RelvarStartCommand(
     Ral_RelvarInfo info,
     Ral_Relvar relvar)
 {
-    Ral_Relation rel = relvar->relObj->internalRep.otherValuePtr ;
+    Ral_RelvarTransaction currTrans ;
     if (Ral_PtrVectorSize(info->transactions) == 0) {
+	Ral_RelvarStartTransaction(info, 1) ;
+    }
+    assert(Ral_PtrVectorSize(info->transactions) > 0) ;
+    currTrans = Ral_PtrVectorBack(info->transactions) ;
+    int added = Ral_PtrVectorSetAdd(currTrans->modified, relvar) ;
+    if (added) {
+	Ral_Relation rel = relvar->relObj->internalRep.otherValuePtr ;
 	Ral_PtrVectorPushBack(relvar->transStack, Ral_RelationDup(rel)) ;
-    } else {
-	Ral_RelvarTransaction currTrans =
-	    Ral_PtrVectorBack(info->transactions) ;
-	int added = Ral_PtrVectorSetAdd(currTrans->modified, relvar) ;
-	if (added) {
-	    Ral_PtrVectorPushBack(relvar->transStack, Ral_RelationDup(rel)) ;
-	}
     }
 }
 
 void
 Ral_RelvarEndCommand(
     Ral_RelvarInfo info,
-    Ral_Relvar relvar)
+    Ral_Relvar relvar,
+    int failed)
 {
-    if (Ral_PtrVectorSize(info->transactions) == 0) {
+    Ral_RelvarTransaction currTrans ;
+    assert(Ral_PtrVectorSize(info->transactions) > 0) ;
+
+    currTrans = Ral_PtrVectorBack(info->transactions) ;
+    if (currTrans->isSingleCmd) {
+	assert(Ral_PtrVectorSize(info->transactions) == 1) ;
 	assert(Ral_PtrVectorSize(relvar->transStack) == 1) ;
 	/*
 	 * Evaluate constraint on this relvar.
 	 * If passed, discard the pushed relation value.
 	 * If failed, discard the current value and restore.
 	 */
-	if (Ral_RelvarConstraints(relvar)) {
-	    Ral_RelvarDiscard(relvar) ;
+	if (!failed && Ral_RelvarConstraints(relvar)) {
+	    Ral_RelvarDiscardPrev(relvar) ;
 	} else {
-	    Ral_RelvarRestore(relvar) ;
+	    Ral_RelvarRestorePrev(relvar) ;
 	}
+	Ral_PtrVectorPopBack(info->transactions) ;
+	Ral_RelvarDeleteTransaction(currTrans) ;
     }
 }
 
@@ -290,6 +344,7 @@ Ral_RelvarNewTransaction(void)
     trans->modified = Ral_PtrVectorNew(1) ; /* 1, so that we don't reallocate
 					     * immediately
 					     */
+    trans->pendingDelete = Ral_PtrVectorNew(0) ;
     return trans ;
 }
 
@@ -298,13 +353,102 @@ Ral_RelvarDeleteTransaction(
     Ral_RelvarTransaction trans)
 {
     Ral_PtrVectorDelete(trans->modified) ;
+    Ral_PtrVectorDelete(trans->pendingDelete) ;
     ckfree((char *)trans) ;
+}
+
+Ral_Constraint
+Ral_ConstraintAssocCreate(
+    const char *name,
+    Ral_RelvarInfo info)
+{
+    int newPtr ;
+    Tcl_HashEntry *entry ;
+    Ral_Constraint constraint = NULL ;
+
+    entry = Tcl_CreateHashEntry(&info->constraints, name, &newPtr) ;
+    if (newPtr) {
+	constraint = Ral_ConstraintNewAssociation(name) ;
+	Tcl_SetHashValue(entry, constraint) ;
+    }
+
+    return constraint ;
+}
+
+static Ral_Constraint
+Ral_ConstraintNew(
+    const char *name)
+{
+    Ral_Constraint constraint ;
+
+    constraint = (Ral_Constraint)ckalloc(sizeof(*constraint) + strlen(name)
+	+ 1) ; /* +1 for NUL terminator */
+    constraint->name = (char *)(constraint + 1) ;
+    strcpy(constraint->name, name) ;
+
+    return constraint ;
+}
+
+Ral_Constraint
+Ral_ConstraintNewAssociation(
+    const char *name)
+{
+    Ral_Constraint constraint = Ral_ConstraintNew(name) ;
+
+    constraint->type = ConstraintAssociation ;
+    constraint->association = (Ral_AssociationConstraint)ckalloc(
+	sizeof(struct Ral_AssociationConstraint)) ;
+
+    return constraint ;
+}
+
+Ral_Constraint
+Ral_ConstraintNewPartition(
+    const char *name)
+{
+    Ral_Constraint constraint = Ral_ConstraintNew(name) ;
+
+    constraint->type = ConstraintPartition ;
+    constraint->partition = (Ral_PartitionConstraint)ckalloc(
+	sizeof(struct Ral_PartitionConstraint)) ;
+
+    return constraint ;
+}
+
+void
+Ral_ConstraintDelete(
+    Ral_Constraint constraint)
+{
+    switch (constraint->type) {
+    case ConstraintAssociation:
+	{
+	    Ral_AssociationConstraint assoc = constraint->association ;
+	    if (assoc->referenceMap) {
+		Ral_JoinMapDelete(assoc->referenceMap) ;
+	    }
+	    ckfree((char *)assoc) ;
+	}
+	break ;
+
+    case ConstraintPartition:
+	ckfree((char *)constraint->partition) ;
+	break ;
+
+    default:
+	Tcl_Panic("Ral_ConstraintDelete: unknown constraint type, %d",
+	    constraint->type) ;
+    }
+
+    ckfree((char *)constraint) ;
 }
 
 int
 Ral_RelvarConstraints(
     Ral_Relvar relvar)
 {
+    /*
+     * For now, everything succeeds.
+     */
     return 1 ;
 }
 
@@ -345,7 +489,7 @@ Ral_RelvarSetRelation(
  * have to set the underlying relation back to the old value.
  */
 void
-Ral_RelvarRestore(
+Ral_RelvarRestorePrev(
     Ral_Relvar relvar)
 {
     Ral_Relation oldRel = Ral_PtrVectorBack(relvar->transStack) ;
@@ -354,7 +498,7 @@ Ral_RelvarRestore(
 }
 
 void
-Ral_RelvarDiscard(
+Ral_RelvarDiscardPrev(
     Ral_Relvar relvar)
 {
     Ral_RelationDelete(Ral_PtrVectorBack(relvar->transStack)) ;
@@ -375,14 +519,6 @@ relvarCleanup(
 	Ral_RelationDelete(Ral_PtrVectorBack(relvar->transStack)) ;
     }
     Ral_PtrVectorDelete(relvar->transStack) ;
-
-    for ( ; Ral_PtrVectorSize(relvar->constraints) != 0 ;
-	Ral_PtrVectorPopBack(relvar->constraints)) {
-	/*
-	 * HERE
-	 * Ral_RelvarConstraintDelete(Ral_PtrVectorBack(relvar->constraints)) ;
-	 */
-    }
     Ral_PtrVectorDelete(relvar->constraints) ;
 
     ckfree((char *)relvar) ;

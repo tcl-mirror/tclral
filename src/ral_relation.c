@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.11 $
-$Date: 2006/04/16 19:00:12 $
+$Revision: 1.12 $
+$Date: 2006/04/27 14:48:56 $
  *--
  */
 
@@ -116,7 +116,7 @@ static Ral_RelationIter sortBegin ;
 static Ral_IntVector sortAttrs ;
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.11 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.12 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -1535,9 +1535,7 @@ Ral_RelationTclose(
     int index = 0 ;
     Tcl_HashTable vertices ;
     Ral_PtrVector valueMap ;
-    char *Ckij[2] ;
-    char *Ck ;
-    char *Ck_1 ;
+    char *Ckij ;
     int nVertices ;
     int size ;
     int i ;
@@ -1577,29 +1575,14 @@ Ral_RelationTclose(
     }
 
     /*
-     * Allocate two N x N arrays to hold the information for the transitive
-     * closure algorithm. One array is used to compute the C0 information,
-     * then the C0 is used to compute the C1 information and then the
-     * arrays are used alternatively. The values in the array will be either
-     * 0 or 1.
+     * The closure algorithm works in a single N x N array.  The values in the
+     * array will be either 0 or 1.
      */
     nVertices = Ral_PtrVectorSize(valueMap) ;
     size = nVertices * nVertices ;
-    Ckij[0] = ckalloc(size) ;
-    memset(Ckij[0], 0, size) ;
-    Ckij[1] = ckalloc(size) ;
+    Ckij = ckalloc(size) ;
+    memset(Ckij, 0, size) ;
 
-    Ck = Ckij[0] ;
-    /*
-     * For the C0ij, if we set the diagonals to 1 and then we get the
-     * reflexive and transitive closure. In things relational, we are not
-     * so interested in the reflexive case.
-     */
-#   if 0
-    for (i = 0 ; i < nVertices ; ++i) {
-	Ck[i * nVertices + i] = 1 ;
-    }
-#   endif
     /*
      * Look up in the relation for each tuple and seed the set of
      * edges defined there. This completes the calculation of C0ij, the
@@ -1615,7 +1598,7 @@ Ral_RelationTclose(
 	entry = Tcl_FindHashEntry(&vertices, (const char *)*tIter) ;
 	assert(entry != NULL) ;
 	j = (int)Tcl_GetHashValue(entry) ;
-	Ck[i * nVertices + j] = 1 ;
+	Ckij[i * nVertices + j] = 1 ;
     }
     /*
      * Done with the hash table.
@@ -1625,23 +1608,22 @@ Ral_RelationTclose(
     /*
      * Now iterate over all the subsets of vertices and compute the
      * magic formula. See Aho, Hopcroft and Ullman, "The Design and
-     * Analysis of Computer Algorithms", p. 199.
+     * Analysis of Computer Algorithms", p. 199. Also see Aho, Hopcroft
+     * and Ullman, "Data Structures and Algorithms", p. 212.
      */
     for (k = 0 ; k < nVertices ; ++k) {
 	int k_row = k * nVertices ;
-	Ck_1 = Ckij[k % 2] ;
-	Ck = Ckij[(k + 1) % 2] ;
 	for (i = 0 ; i < size ; i += nVertices) {
 	    for (j = 0 ; j < nVertices ; ++j) {
-		Ck[i + j] = Ck_1[i + j] | (Ck_1[i + k] & Ck_1[k_row + j]) ;
+		Ckij[i + j] |= Ckij[i + k] & Ckij[k_row + j] ;
 	    }
 	}
     }
     /*
-     * At this point, "Ck" has a one in every element where there is some path
+     * At this point, "Ckij" has a 1 in every element where there is some path
      * from "i" to "j". Now construct the relation.  We know the new relation
      * will have at least as many tuples as the original relation (since it is
-     * always a subset of the closure).  The we traverse the "Ck" array and
+     * always a subset of the closure).  The we traverse the "Ckij" array and
      * every where that there is a one, we add that pair to the result.  We use
      * the vector generated earlier to look up the tuple values.
      */
@@ -1650,7 +1632,7 @@ Ral_RelationTclose(
     for (i = 0 ; i < nVertices ; ++i) {
 	int i_row = i * nVertices ;
 	for (j = 0 ; j < nVertices ; ++j) {
-	    if (Ck[i_row++]) {
+	    if (Ckij[i_row++]) {
 		Ral_Tuple tuple = Ral_TupleNew(tupleHeading) ;
 		Ral_TupleIter tIter = Ral_TupleBegin(tuple) ;
 		Tcl_IncrRefCount(*tIter++ = Ral_PtrVectorFetch(valueMap, i)) ;
@@ -1663,8 +1645,7 @@ Ral_RelationTclose(
 	}
     }
 
-    ckfree(Ckij[0]) ;
-    ckfree(Ckij[1]) ;
+    ckfree(Ckij) ;
     Ral_PtrVectorDelete(valueMap) ;
     return tclose ;
 }

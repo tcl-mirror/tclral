@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationobj.c,v $
-$Revision: 1.10 $
-$Date: 2006/04/16 19:00:12 $
+$Revision: 1.11 $
+$Date: 2006/04/27 14:48:56 $
  *--
  */
 
@@ -105,7 +105,7 @@ Tcl_ObjType Ral_RelationObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.10 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.11 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -315,7 +315,6 @@ Ral_RelationInsertTupleObj(
     if (!Ral_RelationPushBack(relation, tuple, NULL)) {
 	Ral_RelationObjSetError(interp, REL_DUPLICATE_TUPLE,
 	    Tcl_GetString(tupleObj)) ;
-	Ral_TupleDelete(tuple) ;
 	return TCL_ERROR ;
     }
 
@@ -402,40 +401,6 @@ Ral_RelationFindJoinAttrs(
 
     return TCL_OK ;
 }
-
-#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
-Tcl_Obj *
-Ral_RelationObjDict(
-    Tcl_Interp *interp,
-    Ral_Relation relation)
-{
-    Ral_RelationHeading heading = relation->heading ;
-    Tcl_Obj *dictObj ;
-    int keyAttrIndex ;
-    int valAttrIndex ;
-    Ral_RelationIter rEnd = Ral_RelationEnd(relation) ;
-    Ral_RelationIter rIter ;
-
-    assert(Ral_RelationDegree(relation) == 2) ;
-    assert(heading->idCount == 1) ;
-    assert(Ral_IntVectorSize(*heading->identifiers) == 1) ;
-
-    keyAttrIndex = Ral_IntVectorFetch(*heading->identifiers, 0) ;
-    valAttrIndex = (keyAttrIndex + 1) % 2 ;
-
-    dictObj = Tcl_NewDictObj() ;
-    for (rIter = Ral_RelationBegin(relation) ; rIter != rEnd ; ++rIter) {
-	Ral_TupleIter tBegin = Ral_TupleBegin(*rIter) ;
-	if (Tcl_DictObjPut(interp, dictObj, *(tBegin + keyAttrIndex),
-	    *(tBegin + valAttrIndex)) != TCL_OK) {
-	    Tcl_DecrRefCount(dictObj) ;
-	    return NULL ;
-	}
-    }
-
-    return dictObj ;
-}
-#endif
 
 const char *
 Ral_RelationObjVersion(void)

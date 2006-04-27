@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.1 $
-$Date: 2006/04/16 19:00:12 $
+$Revision: 1.2 $
+$Date: 2006/04/27 14:48:56 $
  *--
  */
 
@@ -79,6 +79,8 @@ EXTERNAL FUNCTION REFERENCES
 /*
 FORWARD FUNCTION REFERENCES
 */
+static int RelvarAssociationCmd(Tcl_Interp *, int, Tcl_Obj *const*,
+    Ral_RelvarInfo) ;
 static int RelvarCreateCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarDeleteCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarDeleteOneCmd(Tcl_Interp *, int, Tcl_Obj *const*,
@@ -86,10 +88,9 @@ static int RelvarDeleteOneCmd(Tcl_Interp *, int, Tcl_Obj *const*,
 static int RelvarDestroyCmd(Tcl_Interp *, int, Tcl_Obj *const*,
     Ral_RelvarInfo) ;
 static int RelvarEvalCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
-static int RelvarGetCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarInsertCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarNamesCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
-static int RelvarAssignCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
+static int RelvarSetCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarUpdateCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarUpdateOneCmd(Tcl_Interp *, int, Tcl_Obj *const*,
     Ral_RelvarInfo) ;
@@ -105,7 +106,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.1 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.2 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -122,15 +123,15 @@ relvarCmd(
 	const char *cmdName ;
 	int (*cmdFunc)(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
     } cmdTable[] = {
-	{"assign", RelvarAssignCmd},
+	{"association", RelvarAssociationCmd},
 	{"create", RelvarCreateCmd},
 	{"delete", RelvarDeleteCmd},
 	{"deleteone", RelvarDeleteOneCmd},
 	{"destroy", RelvarDestroyCmd},
 	{"eval", RelvarEvalCmd},
-	{"get", RelvarGetCmd},
 	{"insert", RelvarInsertCmd},
 	{"names", RelvarNamesCmd},
+	{"set", RelvarSetCmd},
 	{"update", RelvarUpdateCmd},
 	{"updateone", RelvarUpdateOneCmd},
 	{NULL, NULL},
@@ -163,52 +164,63 @@ Ral_RelvarCmdVersion(void)
  */
 
 static int
-RelvarAssignCmd(
+RelvarAssociationCmd(
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const*objv,
     Ral_RelvarInfo rInfo)
 {
-    Ral_Relvar relvar ;
-    Ral_Relation relvalue ;
-    Tcl_Obj *valueObj ;
-    Ral_Relation relation ;
+    enum AssocCmdType {
+	AssocCreate,
+	AssocDelete,
+	AssocInfo,
+    } ;
+    static const char *assocCmds[] = {
+	"create",
+	"delete",
+	"info",
+	NULL
+    } ;
+    int result = TCL_ERROR ;
+    int index ;
 
-    /* relvar assign relvar relationValue */
-    if (objc != 4) {
-	Tcl_WrongNumArgs(interp, 2, objv, "relvar relationValue") ;
+    /* relvar association create name relvar1 attr-list1 spec1
+     * relvar2 attr-list2 spec2 */
+    /* relvar association delete name */
+    /* relvar association info name */
+    if (objc < 4) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+	    "create | delete | info name ?args?") ;
 	return TCL_ERROR ;
     }
 
-    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2]),
-	NULL) ;
-    if (relvar == NULL) {
-	return TCL_ERROR ;
-    }
-    if (Tcl_ConvertToType(interp, relvar->relObj, &Ral_RelationObjType)
-	!= TCL_OK) {
-	return TCL_ERROR ;
-    }
-    relvalue = relvar->relObj->internalRep.otherValuePtr ;
-
-    valueObj = objv[3] ;
-    if (Tcl_ConvertToType(interp, valueObj, &Ral_RelationObjType) != TCL_OK) {
-	return TCL_ERROR ;
-    }
-    relation = valueObj->internalRep.otherValuePtr ;
-
-    if (!Ral_RelationHeadingEqual(relvalue->heading, relation->heading)) {
-	Ral_RelvarObjSetError(interp, RELVAR_HEADING_MISMATCH,
-	    "during assignment operation") ;
+    if (Tcl_GetIndexFromObj(interp, (Tcl_Obj *)objv[2], assocCmds,
+	"association subcommand", 0, &index) != TCL_OK) {
 	return TCL_ERROR ;
     }
 
-    Ral_RelvarStartCommand(rInfo, relvar) ;
-    Ral_RelvarSetRelation(relvar, relation) ;
-    Ral_RelvarEndCommand(rInfo, relvar) ;
+    switch ((enum AssocCmdType)index) {
+    case AssocCreate:
+	if (objc != 10) {
+	    Tcl_WrongNumArgs(interp, 2, objv,
+		"name relvar1 attr-list1 spec1 relvar2 attr-list2 spec2") ;
+	    return TCL_ERROR ;
+	}
+	result = Ral_RelvarObjCreateAssoc(interp, objv + 3, rInfo) ;
+	break ;
 
-    Tcl_SetObjResult(interp, relvar->relObj) ;
-    return TCL_OK ;
+    case AssocDelete:
+	break ;
+
+    case AssocInfo:
+	break ;
+
+    default:
+	Tcl_Panic("Unknown association command type, %d", index) ;
+    }
+
+    Tcl_ResetResult(interp) ;
+    return result ;
 }
 
 static int
@@ -279,12 +291,15 @@ RelvarDestroyCmd(
     Tcl_Obj *const*objv,
     Ral_RelvarInfo rInfo)
 {
-    /* relvar get relvar */
+    /* relvar destroy relvar */
     if (objc != 3) {
 	Tcl_WrongNumArgs(interp, 2, objv, "relvar") ;
 	return TCL_ERROR ;
     }
 
+    /*
+     * HERE -- not this simple.
+     */
     return Ral_RelvarObjDelete(interp, rInfo, objv[2]) ;
 }
 
@@ -305,7 +320,7 @@ RelvarEvalCmd(
     }
     scriptObj = objv[2] ;
 
-    Ral_RelvarStartTransaction(rInfo) ;
+    Ral_RelvarStartTransaction(rInfo, 0) ;
 
     result = Tcl_EvalObjEx(interp, scriptObj, 0) ;
     if (result == TCL_ERROR) {
@@ -322,17 +337,19 @@ RelvarEvalCmd(
 }
 
 static int
-RelvarGetCmd(
+RelvarInsertCmd(
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const*objv,
     Ral_RelvarInfo rInfo)
 {
     Ral_Relvar relvar ;
+    Ral_Relation relation ;
+    int inserted = 0 ;
 
-    /* relvar get relvar */
-    if (objc != 3) {
-	Tcl_WrongNumArgs(interp, 2, objv, "relvar") ;
+    /* relvar insert relvarName ?name-value-list ...? */
+    if (objc < 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relvarName ?name-value-list ...?") ;
 	return TCL_ERROR ;
     }
 
@@ -341,18 +358,28 @@ RelvarGetCmd(
     if (relvar == NULL) {
 	return TCL_ERROR ;
     }
+    relation = relvar->relObj->internalRep.otherValuePtr ;
+
+    objc -= 3 ;
+    objv += 3 ;
+
+    Ral_RelvarStartCommand(rInfo, relvar) ;
+    Ral_RelationReserve(relation, objc) ;
+    while (objc-- > 0) {
+	if (Ral_RelationInsertTupleObj(relation, interp, *objv++) != TCL_OK) {
+	    Ral_RelvarEndCommand(rInfo, relvar, 1) ;
+	    return TCL_ERROR ;
+	}
+	++inserted ;
+    }
+
+    if (inserted) {
+	Tcl_InvalidateStringRep(relvar->relObj) ;
+    }
+
+    Ral_RelvarEndCommand(rInfo, relvar, 0) ;
     Tcl_SetObjResult(interp, relvar->relObj) ;
     return TCL_OK ;
-}
-
-static int
-RelvarInsertCmd(
-    Tcl_Interp *interp,
-    int objc,
-    Tcl_Obj *const*objv,
-    Ral_RelvarInfo rInfo)
-{
-    return TCL_ERROR ;
 }
 
 static int
@@ -362,7 +389,92 @@ RelvarNamesCmd(
     Tcl_Obj *const*objv,
     Ral_RelvarInfo rInfo)
 {
-    return TCL_ERROR ;
+    const char *pattern ;
+    Tcl_Obj *nameList ;
+    Tcl_HashEntry *entry ;
+    Tcl_HashSearch search ;
+    Tcl_HashTable *relvarMap = &rInfo->relvars ;
+
+    /* relvar names ?pattern? */
+    if (objc < 2 || objc > 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "?pattern?") ;
+	return TCL_ERROR ;
+    }
+
+    pattern = objc == 3 ? Tcl_GetString(objv[2]) : NULL ;
+    nameList = Tcl_NewListObj(0, NULL) ;
+
+    for (entry = Tcl_FirstHashEntry(relvarMap, &search) ; entry ;
+	entry = Tcl_NextHashEntry(&search)) {
+	const char *relvarName ;
+
+	relvarName = (const char *)Tcl_GetHashKey(relvarMap, entry) ;
+	if (pattern && !Tcl_StringMatch(relvarName, pattern)) {
+	    continue ;
+	}
+	if (Tcl_ListObjAppendElement(interp, nameList,
+	    Tcl_NewStringObj(relvarName, -1)) != TCL_OK) {
+	    Tcl_DecrRefCount(nameList) ;
+	    return TCL_ERROR ;
+	}
+    }
+
+    Tcl_SetObjResult(interp, nameList) ;
+    return TCL_OK ;
+}
+
+static int
+RelvarSetCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv,
+    Ral_RelvarInfo rInfo)
+{
+    Ral_Relvar relvar ;
+    Ral_Relation relvalue ;
+
+    /* relvar set relvar relationValue */
+    if (objc < 3 || objc > 4) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relvar ?relationValue?") ;
+	return TCL_ERROR ;
+    }
+
+    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2]),
+	NULL) ;
+    if (relvar == NULL) {
+	return TCL_ERROR ;
+    }
+    if (Tcl_ConvertToType(interp, relvar->relObj, &Ral_RelationObjType)
+	!= TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relvalue = relvar->relObj->internalRep.otherValuePtr ;
+
+    if (objc > 3) {
+	Tcl_Obj *valueObj ;
+	Ral_Relation relation ;
+
+	valueObj = objv[3] ;
+	if (Tcl_ConvertToType(interp, valueObj, &Ral_RelationObjType)
+	    != TCL_OK) {
+	    return TCL_ERROR ;
+	}
+	relation = valueObj->internalRep.otherValuePtr ;
+
+	if (!Ral_RelationHeadingEqual(relvalue->heading, relation->heading)) {
+	    char *headingStr = Ral_RelationHeadingStringOf(relation->heading) ;
+	    Ral_RelvarObjSetError(interp, RELVAR_HEADING_MISMATCH, headingStr) ;
+	    ckfree(headingStr) ;
+	    return TCL_ERROR ;
+	}
+
+	Ral_RelvarStartCommand(rInfo, relvar) ;
+	Ral_RelvarSetRelation(relvar, relation) ;
+	Ral_RelvarEndCommand(rInfo, relvar, 0) ;
+    }
+
+    Tcl_SetObjResult(interp, relvar->relObj) ;
+    return TCL_OK ;
 }
 
 static int

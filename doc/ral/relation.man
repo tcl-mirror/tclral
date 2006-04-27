@@ -45,8 +45,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.1 $
-# $Date: 2006/04/09 01:35:47 $
+# $Revision: 1.2 $
+# $Date: 2006/04/27 14:48:56 $
 #  *--
 }]
 [moddesc "Relation Operators"]
@@ -218,6 +218,29 @@ OwnerName  DogName  Acquired
 
 [section COMMANDS]
 [list_begin definitions]
+
+[call [cmd "::ral::relation array"] [arg relationValue] [arg arrayVarName]]
+
+The [cmd array] subcommand converts the relation value
+given by [arg relationValue] into an array variable named [arg arrayVarName].
+The [arg relationValue] must be a binary relation with a single identifier
+that has a single attribute.
+The array variable will be created if necessary.
+The values of the identifying attribute of [arg relationValue] will become
+the array indices of [arg arrayVarName]
+the other attribute values will be set to the corresponding array values.
+
+[example {
+% relation array $DOG dogarray
+% parray dogarray
+dogarray(Fido)   = Poodle
+dogarray(Fred)   = Spaniel
+dogarray(Jumper) = Mutt
+dogarray(Rover)  = Retriever
+dogarray(Sam)    = Collie
+dogarray(Spot)   = Terrier
+}]
+
 [call [cmd "::ral::relation cardinality"] [arg relationValue]]
 
 The [cmd cardinality] subcommand returns the number tuples contained
@@ -250,13 +273,13 @@ identifier are known and evaluating an expression over all the tuples
 in [arg relationValue] is superfluous.
 
 [example {
-% relformat [relation choose DOG {DogName Fred}]
+% relformat [relation choose DOG DogName Fred]
 DogName    Breed
  string   string
 ================
    Fred  Spaniel
 
-% relformat [relation choose $DOG {DogName Jane}]
+% relformat [relation choose $DOG DogName Jane]
 DogName    Breed
  string   string
 ================
@@ -271,6 +294,27 @@ heading of [arg relationValue]
 % relation degree $DOG
 2
 }]
+
+[call [cmd "::ral::relation dict"] [arg relationValue]]
+
+The [cmd dict] subcommand returns a dictionary object for an appropriately
+structured [arg relationValue].
+The [arg relationValue] must be a binary relation with a single identifier
+that has a single attribute.
+The returned dictionary will have the values of the identifying attribute
+as the dictionary keys and the other attribute values
+as the corresponding dictionary values.
+
+[example {
+% dict for {name breed} [relation dict $DOG] {
+     puts "$name ==> $breed"
+}
+Fred ==> Spaniel
+Sam ==> Collie
+Rover ==> Retriever
+Spot ==> Terrier
+Fido ==> Poodle
+Jumper ==> Mutt}]
 
 [call [cmd "::ral::relation divide"] [arg dividend] [arg divisor]\
     [arg mediator]]
@@ -674,8 +718,9 @@ DogName    Breed
     [arg expression]]
 
 The [cmd restrictwith] subcommand behaves like the [cmd restrict] subcommand
-except that the value of the tuple is placed in Tcl variable that have
-the same name as the attributes of the tuple.
+except that the values of the tuple attributes are
+placed in Tcl variables that have
+the same name as the attributes.
 Each tuple in the body of [arg relationValue] is successively considered
 and each attribute of the tuple is assigned to a Tcl variable that is the
 same name as the attribute and [arg expression] is evaluated.
@@ -827,6 +872,62 @@ AverageAge
 ==========
         36
 }]
+
+[call [cmd "::ral::relation tclose"] [arg relationValue]]
+
+The [cmd tclose] subcommand returns a new relation value that is the
+transitive closure of [arg relationValue].
+The [arg relationValue] must be a binary relation and each attribute must
+be of the same type.
+The returned relation has a heading that is the same as [arg relationValue].
+The pairs of attribute values in [arg relationValue] may be considered as
+defining the edges of a graph.
+The body of the transitive closure will contain all pairs of the two
+attributes where there exists some path between the vertices in the implied
+graph.
+The original [arg relationValue] is necessarily a subset of the transitive
+closure relation.
+
+The [cmd tclose] subcommand often useful when there is a hierarchical
+relationship among the data values.
+Consider the employee / supervisor reporting relationship.
+If we are interested in all people who report directly or indirectly
+to John, then we have:
+[example {
+set REPORTS_TO {
+    Relation
+    {Employee string Supervisor string}
+    {{Employee Supervisor}}
+    {
+        {Employee Sue Supervisor John}
+        {Employee Bob Supervisor John}
+        {Employee Jane Supervisor Sue}
+        {Employee Joe Supervisor Sue}
+        {Employee Carl Supervisor Bob}
+        {Employee James Supervisor Alice}
+    }
+}
+puts\
+    [relformat\ 
+        [relation project\ 
+            [relation restrictwith\ 
+                [relation tclose $REPORTS_TO]\ 
+                {$Supervisor eq "John"}\ 
+            ]\ 
+            Employee \ 
+        ]\ 
+        "Direct/Indirect Reports to John" \ 
+    ]
+Direct/Indirect Reports to John
+-------------------------------
+Employee
+  string
+========
+     Sue
+     Bob
+    Jane
+     Joe
+    Carl}]
 
 [call [cmd "::ral::relation times"] [arg relationValue1] [arg relationValue2]\
     [opt "relationValue3 ..."]]

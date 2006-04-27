@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationheading.c,v $
-$Revision: 1.11 $
-$Date: 2006/04/09 22:15:58 $
+$Revision: 1.12 $
+$Date: 2006/04/27 14:48:56 $
  *--
  */
 
@@ -89,7 +89,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.11 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.12 $" ;
 
 static const char relationKeyword[] = "Relation" ;
 static const char openList = '{' ;
@@ -912,6 +912,9 @@ Ral_RelationHeadingPrint(
     ckfree(str) ;
 }
 
+/*
+ * Call must free the returned memory.
+ */
 char *
 Ral_RelationHeadingStringOf(
     Ral_RelationHeading h)

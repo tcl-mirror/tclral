@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.h,v $
-$Revision: 1.1 $
-$Date: 2006/04/16 19:00:12 $
+$Revision: 1.2 $
+$Date: 2006/04/27 14:48:56 $
  *--
  */
 #ifndef _ral_relvar_h_
@@ -77,15 +77,19 @@ FORWARD CLASS REFERENCES
 TYPE DECLARATIONS
 */
 typedef enum {
-    ConstraintReference,
-    ConstraintReferencedBy,
+    ConstraintAssociation,
     ConstraintPartition,
 } Ral_ConstraintType ;
 
-typedef struct Ral_ReferenceConstraint {
-    struct Ral_Relvar *relvar ;
-    Ral_JoinMap assocReference ;
-} *Ral_ReferenceConstraint ;
+typedef struct Ral_AssociationConstraint {
+    struct Ral_Relvar *referringRelvar ;
+    int referringCond ;
+    int referringMult ;
+    struct Ral_Relvar *referredToRelvar ;
+    int referredToCond ;
+    int referredToMult ;
+    Ral_JoinMap referenceMap ;
+} *Ral_AssociationConstraint ;
 
 typedef struct Ral_SubsetReference {
     struct Ral_Relvar *relvar ;
@@ -93,14 +97,16 @@ typedef struct Ral_SubsetReference {
 } *Ral_SubsetReference ;
 
 typedef struct Ral_PartitionConstraint {
+    struct Ral_Relvar *referredToRelvar ;
     Ral_PtrVector subsetMap ;	/* list of subtype references */
 } *Ral_PartitionConstraint ;
 
 typedef struct Ral_Constraint {
     Ral_ConstraintType type ;
+    char *name ;
     union {
-	Ral_ReferenceConstraint referenceConstraint ;
-	Ral_PartitionConstraint partitionConstraint ;
+	Ral_AssociationConstraint association ;
+	Ral_PartitionConstraint partition ;
     } ;
 } *Ral_Constraint ;
 
@@ -108,16 +114,19 @@ typedef struct Ral_Relvar {
     char *name ;		/* fully resolved name */
     Tcl_Obj *relObj ;		/* relation valued object */
     Ral_PtrVector transStack ;	/* a stack of Ral_Relation */
-    Ral_PtrVector constraints ;	/* a list of Ral_Constraint */
+    Ral_PtrVector constraints ;	/* a list of Ral_Constraint  */
 } *Ral_Relvar ;
 
 typedef struct Ral_RelvarTransaction {
+    int isSingleCmd ;		/* transaction for a single command only */
     Ral_PtrVector modified ;	/* a set of Ral_Relvar */
+    Ral_PtrVector pendingDelete ;   /* a set of Ral_Relvar */
 } *Ral_RelvarTransaction ;
 
 typedef struct Ral_RelvarInfo {
     Ral_PtrVector transactions ;    /* a stack of Ral_RelvarTransactions */
-    Tcl_HashTable relvarTable ;
+    Tcl_HashTable relvars ;	    /* mapping name ==> Ral_Relvar */
+    Tcl_HashTable constraints ;	    /* mapping name ==> Ral_Constraint */
 } *Ral_RelvarInfo ;
 
 /*
@@ -129,6 +138,10 @@ typedef enum Ral_RelvarError {
     RELVAR_DUP_NAME,
     RELVAR_UNKNOWN_NAME,
     RELVAR_HEADING_MISMATCH,
+    RELVAR_REFATTR_MISMATCH,
+    RELVAR_DUP_CONSTRAINT,
+    RELVAR_NOT_ID,
+    RELVAR_NOT_EMPTY,
 } Ral_RelvarError ;
 
 /*
@@ -149,15 +162,23 @@ extern ClientData Ral_RelvarNewInfo(const char *, Tcl_Interp *) ;
 extern void Ral_RelvarDeleteInfo(ClientData, Tcl_Interp *) ;
 extern Ral_Relvar Ral_RelvarLookupRelvar(Tcl_Interp *, Ral_RelvarInfo,
     Tcl_Obj *) ;
-extern void Ral_RelvarStartTransaction(Ral_RelvarInfo) ;
+
+extern void Ral_RelvarStartTransaction(Ral_RelvarInfo, int) ;
 extern void Ral_RelvarEndTransaction(Ral_RelvarInfo, int) ;
 extern void Ral_RelvarStartCommand(Ral_RelvarInfo, Ral_Relvar) ;
-extern void Ral_RelvarEndCommand(Ral_RelvarInfo, Ral_Relvar) ;
+extern void Ral_RelvarEndCommand(Ral_RelvarInfo, Ral_Relvar, int) ;
+
 extern Ral_RelvarTransaction Ral_RelvarNewTransaction(void) ;
 extern void Ral_RelvarDeleteTransaction(Ral_RelvarTransaction) ;
+
+extern Ral_Constraint Ral_ConstraintAssocCreate(const char *, Ral_RelvarInfo) ;
+extern Ral_Constraint Ral_ConstraintNewAssociation(const char *) ;
+extern Ral_Constraint Ral_ConstraintNewPartition(const char *) ;
+extern void Ral_ConstraintDelete(Ral_Constraint) ;
 extern int Ral_RelvarConstraints(Ral_Relvar) ;
+
 extern void Ral_RelvarSetRelation(Ral_Relvar, Ral_Relation) ;
-extern void Ral_RelvarRestore(Ral_Relvar) ;
-extern void Ral_RelvarDiscard(Ral_Relvar) ;
+extern void Ral_RelvarRestorePrev(Ral_Relvar) ;
+extern void Ral_RelvarDiscardPrev(Ral_Relvar) ;
 
 #endif /* _ral_relvar_h_ */

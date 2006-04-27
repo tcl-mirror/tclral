@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.12 $
-# $Date: 2006/04/16 19:00:12 $
+# $Revision: 1.13 $
+# $Date: 2006/04/27 14:48:56 $
 #  *--
 
 package require tcltest 2.2
@@ -161,12 +161,12 @@ namespace eval ::ral::test {
 	{DogName string Breed string}
 	DogName
 	{
-	    {Fido Poodle}
-	    {Sam Collie}
-	    {Spot Terrier}
-	    {Rover Retriever}
-	    {Fred Spaniel}
-	    {Jumper Mutt}
+	    {DogName Fido Breed Poodle}
+	    {DogName Sam Breed Collie}
+	    {DogName Spot Breed Terrier}
+	    {DogName Rover Breed Retriever}
+	    {DogName Fred Breed Spaniel}
+	    {DogName Jumper Breed Mutt}
 	}
     }
     set OWNER {
@@ -707,20 +707,48 @@ namespace eval ::ral::test {
     -match relation
 
     test relation-shimmer-4.1 {tuple attr, degree 1, cardinality 1} -body {
-	set r {Relation {a1 {Tuple {t1 string t2 string}}} {a1} {{a1 {t1 foo t2 bar}}}}
+	set r {
+	    Relation
+	    {a1 {Tuple {t1 string t2 string}}}
+	    a1
+	    {
+		{a1 {t1 foo t2 bar}}
+	    }
+	}
 	relation cardinality $r
 	string length $r
 	set r
-    } -result {Relation {a1 {Tuple {t1 string t2 string}}} a1 {{a1 {t1 foo t2 bar}}}}\
-    -match relation
+    } -result {
+	Relation
+	{a1 {Tuple {t1 string t2 string}}}
+	a1
+	{
+	    {a1 {t1 foo t2 bar}}
+	}
+    } -match relation
 
     test relation-shimmer-4.2 {tuple attr, degree 1, cardinality 2} -body {
-	set r {Relation {a1 {Tuple {t1 string t2 string}}} {a1} {{a1 {t1 foo t2 bar}} {a1 {t1 foo2 t2 bar2}}}}
+	set r {
+	    Relation
+	    {a1 {Tuple {t1 string t2 string}}}
+	    a1
+	    {
+		{a1 {t1 foo t2 bar}}
+		{a1 {t1 foo2 t2 bar2}}
+	    }
+	}
 	relation cardinality $r
 	string length $r
 	set r
-    } -result {Relation {a1 {Tuple {t1 string t2 string}}} a1 {{a1 {t1 foo t2 bar}} {a1 {t1 foo2 t2 bar2}}}}\
-    -match relation
+    } -result {
+	Relation
+	{a1 {Tuple {t1 string t2 string}}}
+	a1
+	{
+	    {a1 {t1 foo t2 bar}}
+	    {a1 {t1 foo2 t2 bar2}}
+	}
+    } -match relation
 
     test relation-shimmer-5.0 {relation attr, degree 1, cardinality 0} -body {
 	set r {Relation {a1 {Relation {t1 string t2 string} {t1}}} {a1} {}}
@@ -794,6 +822,20 @@ namespace eval ::ral::test {
 	    {a1 d a2 e a3 f}
 	}
     } -match relation
+
+    # relation array subcommand
+    test relation-array-1.0 {supplier number / city map} -body {
+	relation array [relation project $S S# CITY] smap
+	array get smap
+    } -cleanup {
+	unset smap
+    } -result {
+	    S1 London
+	    S2 Paris
+	    S3 Paris
+	    S4 London
+	    S5 Athens
+    } -match dict
 
     # relation cardinality subcommand
     test relation-cardinality-1.0 {dum relation} -body {
@@ -1126,6 +1168,44 @@ namespace eval ::ral::test {
 	}
 	set nameList
     } -result {Jones Smith Clark Adams Blake}
+
+    test relation-foreach-5.0 {unset tuple variable} -body {
+	set nameList [list]
+	relation foreach sup $S {
+	    unset sup
+	}
+	set S
+    } -result {
+	Relation
+	{S# string SNAME string STATUS int CITY string}
+	S#
+	{
+	    {S# S1 SNAME Smith STATUS 20 CITY London}
+	    {S# S2 SNAME Jones STATUS 10 CITY Paris}
+	    {S# S3 SNAME Blake STATUS 30 CITY Paris}
+	    {S# S4 SNAME Clark STATUS 20 CITY London}
+	    {S# S5 SNAME Adams STATUS 30 CITY Athens}
+	}
+    } -match relation
+
+    test relation-foreach-5.1 {update tuple variable} -body {
+	set nameList [list]
+	relation foreach sup $S {
+	    tuple update sup {CITY Sunnyvale}
+	}
+	set S
+    } -result {
+	Relation
+	{S# string SNAME string STATUS int CITY string}
+	S#
+	{
+	    {S# S1 SNAME Smith STATUS 20 CITY London}
+	    {S# S2 SNAME Jones STATUS 10 CITY Paris}
+	    {S# S3 SNAME Blake STATUS 30 CITY Paris}
+	    {S# S4 SNAME Clark STATUS 20 CITY London}
+	    {S# S5 SNAME Adams STATUS 30 CITY Athens}
+	}
+    } -match relation
 
     # relation group subcommand
     test relation-group-1.0 {group two attributes} -body {
@@ -2936,14 +3016,14 @@ namespace eval ::ral::test {
 	relvar destroy N
     } -result {Relation {Name string} Name {}} -match relation
 
-    # relvar assign subcommand
-    test relvar-assign-1.0 {single attribute} -body {
+    # relvar set subcommand
+    test relvar-set-1.0 {single attribute} -body {
 	relvar create SV {
 	    Relation
 	    {S# string SNAME string STATUS int CITY string}
 	    S#
 	}
-	relvar assign SV $S
+	relvar set SV $S
     } -cleanup {
 	relvar destroy SV
     } -result {
@@ -2968,7 +3048,7 @@ namespace eval ::ral::test {
 	}
     } -body {
 	relvar eval {
-	    relvar assign SV $S
+	    relvar set SV $S
 	}
     } -cleanup {
 	relvar destroy SV
@@ -2984,6 +3064,101 @@ namespace eval ::ral::test {
 	    {S# S5 SNAME Adams STATUS 30 CITY Athens}
 	}
     } -match relation
+
+    # relvar insert subcommand
+    test relvar-insert-1.0 {insert single tuple} -setup {
+	relvar create N {Relation {Name string Age int City string} Name}
+    } -cleanup {
+	relvar destroy N
+    } -body {
+	relvar insert N {Name Andrew Age 20 City Sunnyvale}
+    } -result {
+	Relation
+	{Name string Age int City string}
+	Name
+	{
+	    {Name Andrew Age 20 City Sunnyvale}
+	}
+    } -match relation
+
+    test relvar-insert-2.0 {insert multiple tuples} -setup {
+	relvar create N {Relation {Name string Age int City string} Name}
+    } -cleanup {
+	relvar destroy N
+    } -body {
+	relvar insert N\
+	    {Name Andrew Age 20 City Sunnyvale}\
+	    {Age 20 Name George City {San Jose}}\
+	    {Name Fred City Saratoga Age 20}
+    } -result {
+	Relation
+	{Name string Age int City string}
+	Name
+	{
+	    {Name Andrew Age 20 City Sunnyvale}
+	    {Name George Age 20 City {San Jose}}
+	    {Name Fred Age 20 City Saratoga}
+	}
+    } -match relation
+
+    test relvar-insert-3.0 {duplicate tuple} -setup {
+	relvar create N {Relation {Name string Age int City string} Name}
+    } -cleanup {
+	relvar destroy N
+    } -body {
+	relvar insert N\
+	    {Name Andrew Age 20 City Sunnyvale}\
+	    {Age 20 Name George City {San Jose}}\
+	    {Name Andrew City Sunnyvale Age 20}
+    } -result {duplicate tuple, "Name Andrew City Sunnyvale Age 20"}\
+    -returnCodes error
+
+    test relvar-insert-4.0 {value preserved on error} -setup {
+	relvar create N {Relation {Name string Age int City string} Name}
+	relvar insert N\
+	    {Name Andrew Age 20 City Sunnyvale}\
+	    {Age 20 Name George City {San Jose}}\
+	    {Name Fred City Saratoga Age 20}
+    } -cleanup {
+	relvar destroy N
+    } -body {
+	catch {relvar insert N {Name Andrew Age 20 City Sunnyvale}}
+	relvar set N
+    } -result {
+	Relation
+	{Name string Age int City string}
+	Name
+	{
+	    {Name Andrew Age 20 City Sunnyvale}
+	    {Name George Age 20 City {San Jose}}
+	    {Name Fred Age 20 City Saratoga}
+	}
+    } -match relation
+
+    # relvar names subcommand
+    test relvar-names-1.0 {simple list of names} -setup {
+	relvar create SV {
+	    Relation
+	    {S# string SNAME string STATUS int CITY string}
+	    S#
+	}
+	relvar create PV {
+	    Relation
+	    {P# string PNAME string COLOR string WEIGHT double CITY string}
+	    P#
+	}
+	relvar create SPV {
+	    Relation
+	    {S# string P# string QTY int}
+	    {{S# P#}}
+	}
+    } -body {
+	lsort [relvar names]
+    } -cleanup {
+	relvar destroy SV
+	relvar destroy PV
+	relvar destroy SPV
+    } -result {::ral::test::PV ::ral::test::SPV ::ral::test::SV}
 
     # examples from the Date book
     test date-example-1.0 {Get suppliers who supply all parts} -body {
@@ -3057,9 +3232,13 @@ namespace eval ::ral::test {
     least one red part} -body {
 	relation project\
 	    [relation join\
-	    [relation project\
-	    [relation join\
-		[relation restrictwith $P {$COLOR eq "Red"}] $SP] S#] $S] SNAME
+		[relation project\
+		    [relation join\
+			[relation restrictwith $P {$COLOR eq "Red"}]\
+			$SP]\
+		    S#]\
+		$S]\
+	    SNAME
     } -result {
 	Relation
 	{SNAME string}

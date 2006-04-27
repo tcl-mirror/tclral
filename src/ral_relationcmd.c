@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.10 $
-$Date: 2006/04/16 19:00:12 $
+$Revision: 1.11 $
+$Date: 2006/04/27 14:48:56 $
  *--
  */
 
@@ -84,6 +84,7 @@ EXTERNAL FUNCTION REFERENCES
 /*
 FORWARD FUNCTION REFERENCES
 */
+static int RelationArrayCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationCardinalityCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationChooseCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationDegreeCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
@@ -134,7 +135,7 @@ static const char *orderOptions[] = {
     "-descending",
     NULL
 } ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.10 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.11 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -157,6 +158,7 @@ relationCmd(
 	const char *cmdName ;
 	int (*const cmdFunc)(Tcl_Interp *, int, Tcl_Obj *const*) ;
     } cmdTable[] = {
+	{"array", RelationArrayCmd},
 	{"cardinality", RelationCardinalityCmd},
 	{"choose", RelationChooseCmd},
 	{"degree", RelationDegreeCmd},
@@ -218,6 +220,66 @@ Ral_RelationCmdVersion(void)
  * Relations Sub-Command Functions
  * ======================================================================
  */
+static int
+RelationArrayCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_Obj *relObj ;
+    Tcl_Obj *arrayNameObj ;
+    Ral_Relation relation ;
+    Ral_RelationHeading heading ;
+    int keyAttrIndex ;
+    int valAttrIndex ;
+    Ral_RelationIter rEnd ;
+    Ral_RelationIter rIter ;
+
+    /* relation array relation arrayName */
+    if (objc != 4) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relation arrayName") ;
+	return TCL_ERROR ;
+    }
+
+    relObj = objv[2] ;
+    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relObj->internalRep.otherValuePtr ;
+    heading = relation->heading ;
+
+    if (Ral_RelationDegree(relation) != 2) {
+	Ral_RelationObjSetError(interp, REL_DEGREE_TWO, Tcl_GetString(relObj)) ;
+	return TCL_ERROR ;
+    }
+
+    if (heading->idCount != 1) {
+	Ral_RelationObjSetError(interp, REL_SINGLE_IDENTIFIER,
+	    Tcl_GetString(relObj)) ;
+	return TCL_ERROR ;
+    }
+    if (Ral_IntVectorSize(*heading->identifiers) != 1) {
+	Ral_RelationObjSetError(interp, REL_SINGLE_ATTRIBUTE,
+	    Tcl_GetString(relObj)) ;
+	return TCL_ERROR ;
+    }
+    arrayNameObj = objv[3] ;
+
+    keyAttrIndex = Ral_IntVectorFetch(*heading->identifiers, 0) ;
+    valAttrIndex = (keyAttrIndex + 1) % 2 ;
+
+    rEnd = Ral_RelationEnd(relation) ;
+    for (rIter = Ral_RelationBegin(relation) ; rIter != rEnd ; ++rIter) {
+	Ral_TupleIter tBegin = Ral_TupleBegin(*rIter) ;
+	if (Tcl_ObjSetVar2(interp, arrayNameObj, *(tBegin + keyAttrIndex),
+	    *(tBegin + valAttrIndex), TCL_LEAVE_ERR_MSG) == NULL) {
+	    return TCL_ERROR ;
+	}
+    }
+
+    Tcl_ResetResult(interp) ;
+    return TCL_OK ;
+}
 static int
 RelationCardinalityCmd(
     Tcl_Interp *interp,
@@ -383,6 +445,10 @@ RelationDictCmd(
     Ral_Relation relation ;
     Ral_RelationHeading heading ;
     Tcl_Obj *dictObj ;
+    int keyAttrIndex ;
+    int valAttrIndex ;
+    Ral_RelationIter rEnd ;
+    Ral_RelationIter rIter ;
 
     /* relation dict relation */
     if (objc != 3) {
@@ -413,10 +479,20 @@ RelationDictCmd(
 	return TCL_ERROR ;
     }
 
-    dictObj = Ral_RelationObjDict(interp, relation) ;
-    if (dictObj == NULL) {
-	return TCL_ERROR ;
+    keyAttrIndex = Ral_IntVectorFetch(*heading->identifiers, 0) ;
+    valAttrIndex = (keyAttrIndex + 1) % 2 ;
+
+    dictObj = Tcl_NewDictObj() ;
+    rEnd = Ral_RelationEnd(relation) ;
+    for (rIter = Ral_RelationBegin(relation) ; rIter != rEnd ; ++rIter) {
+	Ral_TupleIter tBegin = Ral_TupleBegin(*rIter) ;
+	if (Tcl_DictObjPut(interp, dictObj, *(tBegin + keyAttrIndex),
+	    *(tBegin + valAttrIndex)) != TCL_OK) {
+	    Tcl_DecrRefCount(dictObj) ;
+	    return TCL_ERROR ;
+	}
     }
+
     Tcl_SetObjResult(interp, dictObj) ;
     return TCL_OK ;
 }
@@ -808,6 +884,16 @@ RelationForeachCmd(
 	mapIter != mapEnd ; ++mapIter) {
 	Tcl_Obj *tupleObj = Ral_TupleObjNew(*(relBegin + *mapIter)) ;
 
+	/*
+	 * Count the tuple object so that if there is any attempt
+	 * to update or unset the tuple variable we don't loose
+	 * the tuple.
+	 * Mainly we want the tuple object to appear to be "shared"
+	 * so any calls to "tuple update" don't modify the underlying
+	 * tuple in the relation.
+	 */
+	Tcl_IncrRefCount(tupleObj) ;
+
 	if (Tcl_ObjSetVar2(interp, varNameObj, NULL, tupleObj,
 	    TCL_LEAVE_ERR_MSG) == NULL) {
 	    Tcl_DecrRefCount(tupleObj) ;
@@ -816,6 +902,8 @@ RelationForeachCmd(
 	}
 
 	result = Tcl_EvalObjEx(interp, scriptObj, 0) ;
+	Tcl_DecrRefCount(tupleObj) ;
+
 	if (result != TCL_OK) {
 	    if (result == TCL_CONTINUE) {
 		result = TCL_OK ;

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.1 $
-$Date: 2006/04/16 19:00:12 $
+$Revision: 1.2 $
+$Date: 2006/04/27 14:48:56 $
  *--
  */
 
@@ -61,6 +61,7 @@ INCLUDE FILES
 #include <string.h>
 #include "ral_relvarobj.h"
 #include "ral_relvar.h"
+#include "ral_relationobj.h"
 #include "ral_utils.h"
 
 /*
@@ -93,7 +94,7 @@ EXTERNAL DATA DEFINITIONS
 STATIC DATA ALLOCATION
 */
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.1 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.2 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -159,7 +160,10 @@ Ral_RelvarObjDelete(
     if (relvar == NULL) {
 	return TCL_ERROR ;
     }
-
+    if (Tcl_ConvertToType(interp, relvar->relObj, &Ral_RelationObjType)
+	!= TCL_OK) {
+	return TCL_ERROR ;
+    }
     /*
      * Remove the trace.
      */
@@ -170,13 +174,12 @@ Ral_RelvarObjDelete(
      */
     status = Tcl_UnsetVar(interp, fullName, TCL_LEAVE_ERR_MSG) ;
     assert(status == TCL_OK) ;
-    /*
-     * HERE -- much more complicated with constraints processing.
-     * For now, just clean up the variable space.
-     */
-    Ral_RelvarDelete(info, fullName) ;
-    ckfree(fullName) ;
 
+    Ral_RelvarStartCommand(info, relvar) ;
+    Ral_RelvarDelete(info, fullName) ;
+    Ral_RelvarEndCommand(info, relvar, 0) ;
+
+    ckfree(fullName) ;
     Tcl_ResetResult(interp) ;
     return TCL_OK ;
 }
@@ -235,6 +238,151 @@ Ral_RelvarObjResolveName(
     return Tcl_DStringValue(resolvedName) ;
 }
 
+int
+Ral_RelvarObjCreateAssoc(
+    Tcl_Interp *interp,
+    Tcl_Obj *const*objv,
+    Ral_RelvarInfo info)
+{
+    /* name relvar1 attr-list1 spec1 relvar2 attr-list2 spec2 */
+
+    static struct specMap {
+	const char *specString ;
+	int conditionality ;
+	int multiplicity ;
+    } specTable[] = {
+	{"1", 0, 0},
+	{"1..N", 0, 1},
+	{"0..1", 1, 0},
+	{"0..N", 1, 1},
+    } ;
+
+    Ral_Relvar relvar1 ;
+    Ral_Relation r1 ;
+    int elemc1 ;
+    Tcl_Obj **elemv1 ;
+    int specIndex1 ;
+    Ral_Relvar relvar2 ;
+    Ral_Relation r2 ;
+    int elemc2 ;
+    Tcl_Obj **elemv2 ;
+    int specIndex2 ;
+    const char *name = Tcl_GetString(objv[0]) ;
+    Ral_JoinMap refMap ;
+    Ral_TupleHeading th1 ;
+    Ral_TupleHeading th2 ;
+    Ral_IntVector refAttrs ;
+    int isNotId ;
+    Ral_Constraint constraint ;
+    Ral_AssociationConstraint assoc ;
+
+    relvar1 = Ral_RelvarObjFindRelvar(interp, info, Tcl_GetString(objv[1]),
+	NULL) ;
+    if (relvar1 == NULL) {
+	return TCL_ERROR ;
+    }
+    if (Tcl_ConvertToType(interp, relvar1->relObj, &Ral_RelationObjType)
+	!= TCL_OK) {
+	return TCL_ERROR ;
+    }
+    r1 = relvar1->relObj->internalRep.otherValuePtr ;
+    if (Ral_RelationCardinality(r1) != 0) {
+	Ral_RelvarObjSetError(interp, RELVAR_NOT_EMPTY,
+	    Tcl_GetString(relvar1->relObj)) ;
+    }
+    if (Tcl_ListObjGetElements(interp, objv[2], &elemc1, &elemv1) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    if (Tcl_GetIndexFromObjStruct(interp, objv[3], specTable,
+	sizeof(struct specMap), "association specification", 0, &specIndex1)
+	!= TCL_OK) {
+	return TCL_ERROR ;
+    }
+
+    relvar2 = Ral_RelvarObjFindRelvar(interp, info, Tcl_GetString(objv[4]),
+	NULL) ;
+    if (relvar2 == NULL) {
+	return TCL_ERROR ;
+    }
+    if (Tcl_ConvertToType(interp, relvar2->relObj, &Ral_RelationObjType)
+	!= TCL_OK) {
+	return TCL_ERROR ;
+    }
+    r2 = relvar2->relObj->internalRep.otherValuePtr ;
+    if (Ral_RelationCardinality(r2) != 0) {
+	Ral_RelvarObjSetError(interp, RELVAR_NOT_EMPTY,
+	    Tcl_GetString(relvar2->relObj)) ;
+    }
+    if (Tcl_ListObjGetElements(interp, objv[5], &elemc2, &elemv2) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    if (Tcl_GetIndexFromObjStruct(interp, objv[6], specTable,
+	sizeof(struct specMap), "association specification", 0, &specIndex2)
+	!= TCL_OK) {
+	return TCL_ERROR ;
+    }
+
+    if (elemc1 != elemc2) {
+	Ral_RelvarObjSetError(interp, RELVAR_REFATTR_MISMATCH,
+	    Tcl_GetString(objv[5])) ;
+	return TCL_ERROR ;
+    }
+
+    refMap = Ral_JoinMapNew(0, 0) ;
+    th1 = r1->heading->tupleHeading ;
+    th2 = r2->heading->tupleHeading ;
+    while (elemc1-- > 0) {
+	int attrIndex1 = Ral_TupleHeadingIndexOf(th1, Tcl_GetString(*elemv1)) ;
+	int attrIndex2 = Ral_TupleHeadingIndexOf(th2, Tcl_GetString(*elemv2)) ;
+
+	if (attrIndex1 < 0) {
+	    Ral_RelationObjSetError(interp, REL_UNKNOWN_ATTR,
+		Tcl_GetString(*elemv1)) ;
+	    Ral_JoinMapDelete(refMap) ;
+	    return TCL_ERROR ;
+	}
+	if (attrIndex2 < 0) {
+	    Ral_RelationObjSetError(interp, REL_UNKNOWN_ATTR,
+		Tcl_GetString(*elemv2)) ;
+	    Ral_JoinMapDelete(refMap) ;
+	    return TCL_ERROR ;
+	}
+	Ral_JoinMapAddAttrMapping(refMap, attrIndex1, attrIndex2) ;
+    }
+
+    constraint = Ral_ConstraintAssocCreate(name, info) ;
+    if (constraint == NULL) {
+	Ral_RelvarObjSetError(interp, RELVAR_REFATTR_MISMATCH, name) ;
+	Ral_JoinMapDelete(refMap) ;
+	return TCL_ERROR ;
+    }
+    /*
+     * The referred to attributes in the second relvar must constitute an
+     * identifier of the relation.
+     */
+    refAttrs = Ral_JoinMapGetAttr(refMap, 1) ;
+    isNotId = Ral_RelationHeadingFindIdentifier(r2->heading, refAttrs) < 0 ;
+    Ral_IntVectorDelete(refAttrs) ;
+    if (isNotId) {
+	Ral_RelvarObjSetError(interp, RELVAR_NOT_ID, Tcl_GetString(objv[5])) ;
+	Ral_JoinMapDelete(refMap) ;
+	return TCL_ERROR ;
+    }
+
+    assoc = constraint->association ;
+    assoc->referringRelvar = relvar1 ;
+    assoc->referringCond = specTable[specIndex1].conditionality ;
+    assoc->referringMult = specTable[specIndex1].multiplicity ;
+    assoc->referredToRelvar = relvar2 ;
+    assoc->referredToCond = specTable[specIndex2].conditionality ;
+    assoc->referredToMult = specTable[specIndex2].multiplicity ;
+    assoc->referenceMap = refMap ;
+    Ral_PtrVectorPushBack(relvar1->constraints, constraint) ;
+    Ral_PtrVectorPushBack(relvar2->constraints, constraint) ;
+
+    return TCL_OK ;
+}
+
 void
 Ral_RelvarObjSetError(
     Tcl_Interp *interp,
@@ -250,12 +398,19 @@ Ral_RelvarObjSetError(
 	"duplicate relvar name",
 	"unknown relvar name",
 	"relation heading mismatch",
+	"mismatch between referential attributes",
+	"duplicate constraint name",
+	"association may only be applied to empty relvars",
     } ;
     static const char *errorStrings[] = {
 	"OK",
 	"DUP_NAME",
 	"UNKNOWN_NAME",
 	"HEADING_MISMATCH",
+	"REFATTR_MISMATCH",
+	"DUP_CONSTRAINT",
+	"NOT_ID",
+	"NOT_EMPTY",
     } ;
 
     Ral_ObjSetError(interp, "RELVAR", resultStrings[error],
@@ -304,3 +459,7 @@ relvarTraceProc(
 
     return result ;
 }
+
+/*
+ * PRIVATE FUNCTIONS
+ */
