@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.2 $
-$Date: 2006/04/27 14:48:56 $
+$Revision: 1.3 $
+$Date: 2006/05/07 03:53:28 $
  *--
  */
 
@@ -106,7 +106,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.2 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.3 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -179,6 +179,7 @@ RelvarAssociationCmd(
 	"create",
 	"delete",
 	"info",
+	"names",
 	NULL
     } ;
     int result = TCL_ERROR ;
@@ -188,6 +189,7 @@ RelvarAssociationCmd(
      * relvar2 attr-list2 spec2 */
     /* relvar association delete name */
     /* relvar association info name */
+    /* relvar association names pattern */
     if (objc < 4) {
 	Tcl_WrongNumArgs(interp, 2, objv,
 	    "create | delete | info name ?args?") ;
@@ -291,16 +293,26 @@ RelvarDestroyCmd(
     Tcl_Obj *const*objv,
     Ral_RelvarInfo rInfo)
 {
-    /* relvar destroy relvar */
-    if (objc != 3) {
-	Tcl_WrongNumArgs(interp, 2, objv, "relvar") ;
+    int result ;
+
+    /* relvar destroy ?relvar1 relvar2 ...? */
+    if (objc < 2) {
+	Tcl_WrongNumArgs(interp, 2, objv, "?relvar1 relvar2 ...?") ;
 	return TCL_ERROR ;
     }
 
-    /*
-     * HERE -- not this simple.
-     */
-    return Ral_RelvarObjDelete(interp, rInfo, objv[2]) ;
+    objc -= 2 ;
+    objv += 2 ;
+
+    Ral_RelvarStartTransaction(rInfo, 0) ;
+    while (objc-- > 0) {
+	result = Ral_RelvarObjDelete(interp, rInfo, *objv++) ;
+	if (result != TCL_OK) {
+	    break ;
+	}
+    }
+
+    return Ral_RelvarObjEndTrans(interp, rInfo, result == TCL_ERROR) ;
 }
 
 static int
@@ -331,9 +343,7 @@ RelvarEvalCmd(
 	Tcl_AddObjErrorInfo(interp, msg, -1) ;
     }
 
-    Ral_RelvarEndTransaction(rInfo, result == TCL_ERROR) ;
-
-    return result ;
+    return Ral_RelvarObjEndTrans(interp, rInfo, result == TCL_ERROR) ;
 }
 
 static int
@@ -346,6 +356,7 @@ RelvarInsertCmd(
     Ral_Relvar relvar ;
     Ral_Relation relation ;
     int inserted = 0 ;
+    int result ;
 
     /* relvar insert relvarName ?name-value-list ...? */
     if (objc < 3) {
@@ -367,8 +378,7 @@ RelvarInsertCmd(
     Ral_RelationReserve(relation, objc) ;
     while (objc-- > 0) {
 	if (Ral_RelationInsertTupleObj(relation, interp, *objv++) != TCL_OK) {
-	    Ral_RelvarEndCommand(rInfo, relvar, 1) ;
-	    return TCL_ERROR ;
+	    return Ral_RelvarObjEndCmd(interp, rInfo, relvar, 1) ;
 	}
 	++inserted ;
     }
@@ -377,9 +387,11 @@ RelvarInsertCmd(
 	Tcl_InvalidateStringRep(relvar->relObj) ;
     }
 
-    Ral_RelvarEndCommand(rInfo, relvar, 0) ;
-    Tcl_SetObjResult(interp, relvar->relObj) ;
-    return TCL_OK ;
+    result = Ral_RelvarObjEndCmd(interp, rInfo, relvar, 0) ;
+    if (result == TCL_OK) {
+	Tcl_SetObjResult(interp, relvar->relObj) ;
+    }
+    return result ;
 }
 
 static int
@@ -432,6 +444,7 @@ RelvarSetCmd(
 {
     Ral_Relvar relvar ;
     Ral_Relation relvalue ;
+    int result = TCL_OK ;
 
     /* relvar set relvar relationValue */
     if (objc < 3 || objc > 4) {
@@ -470,11 +483,13 @@ RelvarSetCmd(
 
 	Ral_RelvarStartCommand(rInfo, relvar) ;
 	Ral_RelvarSetRelation(relvar, relation) ;
-	Ral_RelvarEndCommand(rInfo, relvar, 0) ;
+	result = Ral_RelvarObjEndCmd(interp, rInfo, relvar, 0) ;
     }
 
-    Tcl_SetObjResult(interp, relvar->relObj) ;
-    return TCL_OK ;
+    if (result == TCL_OK) {
+	Tcl_SetObjResult(interp, relvar->relObj) ;
+    }
+    return result ;
 }
 
 static int

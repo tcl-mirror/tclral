@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_vector.h,v $
-$Revision: 1.9 $
-$Date: 2006/04/16 19:00:12 $
+$Revision: 1.10 $
+$Date: 2006/05/07 03:53:28 $
  *--
  */
 #ifndef _ral_vector_h_
@@ -130,6 +130,7 @@ extern void Ral_IntVectorSort(Ral_IntVector) ;
 extern Ral_IntVectorIter Ral_IntVectorFind(Ral_IntVector,
     Ral_IntVectorValueType) ;
 extern int Ral_IntVectorIndexOf(Ral_IntVector, Ral_IntVectorValueType) ;
+extern int Ral_IntVectorOffsetOf(Ral_IntVector, Ral_IntVectorIter) ;
 extern Ral_IntVector Ral_IntVectorIntersect(Ral_IntVector, Ral_IntVector) ;
 extern Ral_IntVector Ral_IntVectorMinus(Ral_IntVector, Ral_IntVector) ;
 extern int Ral_IntVectorEqual(Ral_IntVector, Ral_IntVector) ;

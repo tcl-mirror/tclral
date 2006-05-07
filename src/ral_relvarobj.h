@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.h,v $
-$Revision: 1.2 $
-$Date: 2006/04/27 14:48:56 $
+$Revision: 1.3 $
+$Date: 2006/05/07 03:53:28 $
  *--
  */
 #ifndef _ral_relvarobj_h_
@@ -91,6 +91,8 @@ extern Ral_Relvar Ral_RelvarObjFindRelvar(Tcl_Interp *, Ral_RelvarInfo,
     const char *, char **) ;
 extern int Ral_RelvarObjCreateAssoc(Tcl_Interp *, Tcl_Obj *const*,
     Ral_RelvarInfo) ;
+extern int Ral_RelvarObjEndTrans(Tcl_Interp *, Ral_RelvarInfo, int) ;
+extern int Ral_RelvarObjEndCmd(Tcl_Interp *, Ral_RelvarInfo, Ral_Relvar, int) ;
 extern void Ral_RelvarObjSetError(Tcl_Interp *, Ral_RelvarError, const char *) ;
 
 #endif /* _ral_relvarobj_h_ */

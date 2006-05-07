@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.h,v $
-$Revision: 1.2 $
-$Date: 2006/04/27 14:48:56 $
+$Revision: 1.3 $
+$Date: 2006/05/07 03:53:28 $
  *--
  */
 #ifndef _ral_relvar_h_
@@ -164,9 +164,10 @@ extern Ral_Relvar Ral_RelvarLookupRelvar(Tcl_Interp *, Ral_RelvarInfo,
     Tcl_Obj *) ;
 
 extern void Ral_RelvarStartTransaction(Ral_RelvarInfo, int) ;
-extern void Ral_RelvarEndTransaction(Ral_RelvarInfo, int) ;
+extern int Ral_RelvarEndTransaction(Ral_RelvarInfo, int, Tcl_DString *) ;
 extern void Ral_RelvarStartCommand(Ral_RelvarInfo, Ral_Relvar) ;
-extern void Ral_RelvarEndCommand(Ral_RelvarInfo, Ral_Relvar, int) ;
+extern int Ral_RelvarEndCommand(Ral_RelvarInfo, Ral_Relvar, int,
+    Tcl_DString *) ;
 
 extern Ral_RelvarTransaction Ral_RelvarNewTransaction(void) ;
 extern void Ral_RelvarDeleteTransaction(Ral_RelvarTransaction) ;
@@ -175,7 +176,7 @@ extern Ral_Constraint Ral_ConstraintAssocCreate(const char *, Ral_RelvarInfo) ;
 extern Ral_Constraint Ral_ConstraintNewAssociation(const char *) ;
 extern Ral_Constraint Ral_ConstraintNewPartition(const char *) ;
 extern void Ral_ConstraintDelete(Ral_Constraint) ;
-extern int Ral_RelvarConstraints(Ral_Relvar) ;
+extern int Ral_RelvarConstraintEval(Ral_Constraint, Tcl_DString *) ;
 
 extern void Ral_RelvarSetRelation(Ral_Relvar, Ral_Relation) ;
 extern void Ral_RelvarRestorePrev(Ral_Relvar) ;

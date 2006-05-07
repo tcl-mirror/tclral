@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuple.c,v $
-$Revision: 1.9 $
-$Date: 2006/04/06 02:07:30 $
+$Revision: 1.10 $
+$Date: 2006/05/07 03:53:28 $
  *--
  */
 
@@ -92,7 +92,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_tuple.c,v $ $Revision: 1.9 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tuple.c,v $ $Revision: 1.10 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -626,6 +626,36 @@ Ral_TupleStringOf(
     /* +1 for NUL terminator */
     str = ckalloc(Ral_TupleScan(tuple, &typeFlags, &valueFlags) + 1) ;
     length = Ral_TupleConvert(tuple, str, &typeFlags, &valueFlags) ;
+    str[length] = '\0' ;
+
+    return str ;
+}
+
+char *
+Ral_TupleValueStringOf(
+    Ral_Tuple tuple)
+{
+    Ral_TupleHeading heading = tuple->heading ;
+    Ral_AttributeTypeScanFlags typeFlags ;
+    Ral_AttributeValueScanFlags valueFlags ;
+    char *str ;
+    int length ;
+
+    memset(&typeFlags, 0, sizeof(typeFlags)) ;
+    typeFlags.attrType = Tuple_Type ;
+    memset(&valueFlags, 0, sizeof(valueFlags)) ;
+    valueFlags.attrType = Tuple_Type ;
+
+    /*
+     * Scan the header just to get the typeFlags set properly.
+     */
+    Ral_TupleHeadingScan(heading, &typeFlags) ;
+    /*
+     * Scan and convert only the value portion of the tuple.
+     * +1 for NUL terminator
+     */
+    str = ckalloc(Ral_TupleScanValue(tuple, &typeFlags, &valueFlags) + 1) ;
+    length = Ral_TupleConvertValue(tuple, str, &typeFlags, &valueFlags) ;
     str[length] = '\0' ;
 
     return str ;

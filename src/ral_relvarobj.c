@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.2 $
-$Date: 2006/04/27 14:48:56 $
+$Revision: 1.3 $
+$Date: 2006/05/07 03:53:28 $
  *--
  */
 
@@ -94,7 +94,7 @@ EXTERNAL DATA DEFINITIONS
 STATIC DATA ALLOCATION
 */
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.2 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.3 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -177,7 +177,7 @@ Ral_RelvarObjDelete(
 
     Ral_RelvarStartCommand(info, relvar) ;
     Ral_RelvarDelete(info, fullName) ;
-    Ral_RelvarEndCommand(info, relvar, 0) ;
+    Ral_RelvarObjEndCmd(interp, info, relvar, 0) ;
 
     ckfree(fullName) ;
     Tcl_ResetResult(interp) ;
@@ -246,7 +246,7 @@ Ral_RelvarObjCreateAssoc(
 {
     /* name relvar1 attr-list1 spec1 relvar2 attr-list2 spec2 */
 
-    static struct specMap {
+    static struct {
 	const char *specString ;
 	int conditionality ;
 	int multiplicity ;
@@ -255,6 +255,7 @@ Ral_RelvarObjCreateAssoc(
 	{"1..N", 0, 1},
 	{"0..1", 1, 0},
 	{"0..N", 1, 1},
+	{NULL, 0, 0}
     } ;
 
     Ral_Relvar relvar1 ;
@@ -276,6 +277,10 @@ Ral_RelvarObjCreateAssoc(
     Ral_Constraint constraint ;
     Ral_AssociationConstraint assoc ;
 
+    /*
+     * Look up the relvars and make sure that the values are truly a
+     * relation.
+     */
     relvar1 = Ral_RelvarObjFindRelvar(interp, info, Tcl_GetString(objv[1]),
 	NULL) ;
     if (relvar1 == NULL) {
@@ -290,12 +295,18 @@ Ral_RelvarObjCreateAssoc(
 	Ral_RelvarObjSetError(interp, RELVAR_NOT_EMPTY,
 	    Tcl_GetString(relvar1->relObj)) ;
     }
+    /*
+     * Get the elements from the attribute list.
+     */
     if (Tcl_ListObjGetElements(interp, objv[2], &elemc1, &elemv1) != TCL_OK) {
 	return TCL_ERROR ;
     }
+    /*
+     * Check the association specifier.
+     */
     if (Tcl_GetIndexFromObjStruct(interp, objv[3], specTable,
-	sizeof(struct specMap), "association specification", 0, &specIndex1)
-	!= TCL_OK) {
+	sizeof(specTable[0]), "association specification", 0,
+	&specIndex1) != TCL_OK) {
 	return TCL_ERROR ;
     }
 
@@ -317,17 +328,25 @@ Ral_RelvarObjCreateAssoc(
 	return TCL_ERROR ;
     }
     if (Tcl_GetIndexFromObjStruct(interp, objv[6], specTable,
-	sizeof(struct specMap), "association specification", 0, &specIndex2)
-	!= TCL_OK) {
+	sizeof(specTable[0]), "association specification", 0,
+	&specIndex2) != TCL_OK) {
 	return TCL_ERROR ;
     }
 
+    /*
+     * The same number of attributes must be specified on each side of the
+     * association.
+     */
     if (elemc1 != elemc2) {
 	Ral_RelvarObjSetError(interp, RELVAR_REFATTR_MISMATCH,
 	    Tcl_GetString(objv[5])) ;
 	return TCL_ERROR ;
     }
 
+    /*
+     * Construct the mapping of attributes in the referring relation
+     * to those in the referred to relation.
+     */
     refMap = Ral_JoinMapNew(0, 0) ;
     th1 = r1->heading->tupleHeading ;
     th2 = r2->heading->tupleHeading ;
@@ -377,10 +396,53 @@ Ral_RelvarObjCreateAssoc(
     assoc->referredToCond = specTable[specIndex2].conditionality ;
     assoc->referredToMult = specTable[specIndex2].multiplicity ;
     assoc->referenceMap = refMap ;
+    /*
+     * Record which constraints apply to a given relvar. This is what allows
+     * us to find the constraints that apply to a relvar when it is modified.
+     */
     Ral_PtrVectorPushBack(relvar1->constraints, constraint) ;
     Ral_PtrVectorPushBack(relvar2->constraints, constraint) ;
 
     return TCL_OK ;
+}
+
+int
+Ral_RelvarObjEndTrans(
+    Tcl_Interp *interp,
+    Ral_RelvarInfo info,
+    int failed)
+{
+    Tcl_DString errMsg ;
+    int success ;
+
+    Tcl_DStringInit(&errMsg) ;
+    success = Ral_RelvarEndTransaction(info, failed, &errMsg) ;
+    if (!(failed || success)) {
+	Tcl_DStringResult(interp, &errMsg) ;
+    }
+    Tcl_DStringFree(&errMsg) ;
+
+    return success ? TCL_OK : TCL_ERROR ;
+}
+
+int
+Ral_RelvarObjEndCmd(
+    Tcl_Interp *interp,
+    Ral_RelvarInfo info,
+    Ral_Relvar relvar,
+    int failed)
+{
+    Tcl_DString errMsg ;
+    int success ;
+
+    Tcl_DStringInit(&errMsg) ;
+    success = Ral_RelvarEndCommand(info, relvar, failed, &errMsg) ;
+    if (!(failed || success)) {
+	Tcl_DStringResult(interp, &errMsg) ;
+    }
+    Tcl_DStringFree(&errMsg) ;
+
+    return success ? TCL_OK : TCL_ERROR ;
 }
 
 void
@@ -459,7 +521,3 @@ relvarTraceProc(
 
     return result ;
 }
-
-/*
- * PRIVATE FUNCTIONS
- */

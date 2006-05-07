@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.12 $
-$Date: 2006/04/27 14:48:56 $
+$Revision: 1.13 $
+$Date: 2006/05/07 03:53:28 $
  *--
  */
 
@@ -116,7 +116,7 @@ static Ral_RelationIter sortBegin ;
 static Ral_IntVector sortAttrs ;
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.12 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.13 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -306,6 +306,18 @@ Ral_RelationPushBack(
     Ral_TupleUnreference(tuple) ;
 
     return status ;
+}
+
+Ral_Tuple
+Ral_RelationTupleAt(
+    Ral_Relation relation,
+    int offset)
+{
+    if (relation->start + offset >= relation->finish) {
+	Tcl_Panic("Ral_RelationTupleAt: attempt to access non-existant tuple "
+	    "at offset %d", offset) ;
+    }
+    return *(relation->start + offset) ;
 }
 
 /*

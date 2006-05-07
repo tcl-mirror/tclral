@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.c,v $
-$Revision: 1.2 $
-$Date: 2006/04/27 14:48:56 $
+$Revision: 1.3 $
+$Date: 2006/05/07 03:53:28 $
  *--
  */
 
@@ -80,6 +80,16 @@ FORWARD FUNCTION REFERENCES
 */
 static void relvarCleanup(Ral_Relvar) ;
 static void relvarSetIntRep(Ral_Relvar, Ral_Relation) ;
+static int relvarAssocConstraintEval(const char *, Ral_AssociationConstraint,
+    Tcl_DString *) ;
+static int relvarPartitionConstraintEval(const char *,
+    Ral_PartitionConstraint, Tcl_DString *) ;
+static int relvarEvalTupleCounts(Ral_IntVector, int, int, Ral_IntVector,
+    Ral_IntVector) ;
+static void relvarAssocConstraintErrorMsg(Tcl_DString *, const char *,
+    Ral_AssociationConstraint, Ral_Relvar, Ral_IntVector, const char *) ;
+static void relvarAssocConstraintToString(const char *,
+    Ral_AssociationConstraint, Tcl_DString *) ;
 
 /*
 EXTERNAL DATA REFERENCES
@@ -93,7 +103,7 @@ Ral_RelvarError Ral_RelvarLastError = RELVAR_OK ;
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.2 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.3 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -137,7 +147,6 @@ Ral_RelvarDelete(
 {
     Tcl_HashEntry *entry ;
     Ral_Relvar relvar ;
-    Ral_Relation relation ;
     Ral_RelvarTransaction currTrans ;
     int added ;
 
@@ -150,12 +159,11 @@ Ral_RelvarDelete(
     relvar = (Ral_Relvar)Tcl_GetHashValue(entry) ;
     Tcl_DeleteHashEntry(entry) ;
     /*
-     * Remove all the tuples.
+     * Remove the object.
      */
     assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
-    relation = relvar->relObj->internalRep.otherValuePtr ;
-    Ral_RelationErase(relation, Ral_RelationBegin(relation),
-	Ral_RelationEnd(relation)) ;
+    Tcl_DecrRefCount(relvar->relObj) ;
+    relvar->relObj = NULL ; /* just to be tidy */
     /*
      * Insert the relvar into the pending delete set.  We must not clean it out
      * all of its data structure until the end of the transaction so that
@@ -231,10 +239,11 @@ Ral_RelvarStartTransaction(
     Ral_PtrVectorPushBack(info->transactions, newTrans) ;
 }
 
-void
+int
 Ral_RelvarEndTransaction(
     Ral_RelvarInfo info,
-    int failed)
+    int failed,
+    Tcl_DString *errMsg)
 {
     Ral_RelvarTransaction trans ;
     Ral_PtrVectorIter modIter ;
@@ -246,16 +255,32 @@ Ral_RelvarEndTransaction(
 
     modEnd = Ral_PtrVectorEnd(trans->modified) ;
     if (!failed) {
+	Ral_PtrVector constraints = Ral_PtrVectorNew(0) ;
+	Ral_PtrVectorIter cEnd ;
+	Ral_PtrVectorIter cIter ;
 	/*
 	 * Iterate across the transaction evaluating the constraints.
-	 * HERE
 	 * Build a set of constraints that the modified relvars
-	 * participate in and then evaluate all the  constraints found.
+	 * participate in and then evaluate all the constraints in that set.
+	 * "trans->modified" is the set of relvars that were modified
+	 * during the transaction.
 	 */
 	for (modIter = Ral_PtrVectorBegin(trans->modified) ; modIter != modEnd ;
 	    ++modIter) {
-	    failed += !Ral_RelvarConstraints(*modIter) ;
+	    Ral_Relvar modRelvar = *modIter ;
+	    Ral_PtrVectorIter rcEnd = Ral_PtrVectorEnd(modRelvar->constraints) ;
+	    Ral_PtrVectorIter rcIter ;
+	    for (rcIter = Ral_PtrVectorBegin(modRelvar->constraints) ;
+		rcIter != rcEnd ; ++rcIter) {
+		Ral_PtrVectorSetAdd(constraints, *rcIter) ;
+	    }
 	}
+	cEnd = Ral_PtrVectorEnd(constraints) ;
+	for (cIter = Ral_PtrVectorBegin(constraints) ; cIter != cEnd ;
+	    ++cIter) {
+	    failed += !Ral_RelvarConstraintEval(*cIter, errMsg) ;
+	}
+	Ral_PtrVectorDelete(constraints) ;
     }
     if (failed) {
 	/*
@@ -287,6 +312,8 @@ Ral_RelvarEndTransaction(
      * Delete the transaction.
      */
     Ral_RelvarDeleteTransaction(trans) ;
+
+    return !failed ;
 }
 
 void
@@ -307,11 +334,12 @@ Ral_RelvarStartCommand(
     }
 }
 
-void
+int
 Ral_RelvarEndCommand(
     Ral_RelvarInfo info,
     Ral_Relvar relvar,
-    int failed)
+    int failed,
+    Tcl_DString *errMsg)
 {
     Ral_RelvarTransaction currTrans ;
     assert(Ral_PtrVectorSize(info->transactions) > 0) ;
@@ -321,18 +349,28 @@ Ral_RelvarEndCommand(
 	assert(Ral_PtrVectorSize(info->transactions) == 1) ;
 	assert(Ral_PtrVectorSize(relvar->transStack) == 1) ;
 	/*
-	 * Evaluate constraint on this relvar.
+	 * Evaluate constraints on this relvar.
 	 * If passed, discard the pushed relation value.
 	 * If failed, discard the current value and restore.
 	 */
-	if (!failed && Ral_RelvarConstraints(relvar)) {
-	    Ral_RelvarDiscardPrev(relvar) ;
-	} else {
+	if (!failed) {
+	    Ral_PtrVectorIter cEnd = Ral_PtrVectorEnd(relvar->constraints) ;
+	    Ral_PtrVectorIter cIter ;
+	    for (cIter = Ral_PtrVectorBegin(relvar->constraints) ;
+		cIter != cEnd ; ++cIter) {
+		failed += !Ral_RelvarConstraintEval(*cIter, errMsg) ;
+	    }
+	}
+	if (failed) {
 	    Ral_RelvarRestorePrev(relvar) ;
+	} else {
+	    Ral_RelvarDiscardPrev(relvar) ;
 	}
 	Ral_PtrVectorPopBack(info->transactions) ;
 	Ral_RelvarDeleteTransaction(currTrans) ;
     }
+
+    return !failed ;
 }
 
 Ral_RelvarTransaction
@@ -443,13 +481,26 @@ Ral_ConstraintDelete(
 }
 
 int
-Ral_RelvarConstraints(
-    Ral_Relvar relvar)
+Ral_RelvarConstraintEval(
+    Ral_Constraint constraint,
+    Tcl_DString *errMsg)
 {
-    /*
-     * For now, everything succeeds.
-     */
-    return 1 ;
+    switch (constraint->type) {
+    case ConstraintAssociation:
+	return relvarAssocConstraintEval(constraint->name,
+	    constraint->association, errMsg) ;
+	break ;
+
+    case ConstraintPartition:
+	return relvarPartitionConstraintEval(constraint->name,
+	    constraint->partition, errMsg) ;
+	break ;
+
+    default:
+	Tcl_Panic("unknown constraint type, %d", constraint->type) ;
+	return 0 ;
+    }
+    /* NOT REACHED */
 }
 
 void
@@ -512,7 +563,9 @@ static void
 relvarCleanup(
     Ral_Relvar relvar)
 {
-    Tcl_DecrRefCount(relvar->relObj) ;
+    if (relvar->relObj) {
+	Tcl_DecrRefCount(relvar->relObj) ;
+    }
 
     for ( ; Ral_PtrVectorSize(relvar->transStack) != 0 ;
 	Ral_PtrVectorPopBack(relvar->transStack)) {
@@ -534,4 +587,200 @@ relvarSetIntRep(
     relvar->relObj->internalRep.otherValuePtr = relation ;
     relvar->relObj->typePtr = &Ral_RelationObjType ;
     Tcl_InvalidateStringRep(relvar->relObj) ;
+}
+
+static int
+relvarAssocConstraintEval(
+    const char *name,
+    Ral_AssociationConstraint association,
+    Tcl_DString *errMsg)
+{
+    Ral_Relvar referringRelvar = association->referringRelvar ;
+    Ral_Relvar referredToRelvar = association->referredToRelvar ;
+    Ral_Relation referringRel ;
+    Ral_Relation referredToRel ;
+    Ral_IntVector cnts ;
+    Ral_IntVector multViolations ;
+    Ral_IntVector condViolations ;
+    int ref_result ;
+    int refTo_result ;
+
+    assert(referringRelvar->relObj->typePtr == &Ral_RelationObjType) ;
+    assert(referredToRelvar->relObj->typePtr == &Ral_RelationObjType) ;
+    referringRel = referringRelvar->relObj->internalRep.otherValuePtr ;
+    referredToRel = referredToRelvar->relObj->internalRep.otherValuePtr ;
+    /*
+     * Map the tuples as if they were to be joined.
+     */
+    Ral_RelationFindJoinTuples(referringRel, referredToRel,
+	association->referenceMap) ;
+    /*
+     * Now we count the tuples in the mapping and verify that the join
+     * would match the conditionality and multiplicity of the association.
+     * So if we count the number of times each tuple in the referredTo relation
+     * is found among the referring tuples, then if any of those counts is > 1
+     * then the referrring multiplicity must be true and if any == 0 then the
+     * referring conditionality must be true.
+     */
+    multViolations = Ral_IntVectorNewEmpty(0) ;
+    condViolations = Ral_IntVectorNewEmpty(0) ;
+    cnts = Ral_JoinMapTupleCounts(association->referenceMap, 1,
+	Ral_RelationCardinality(referredToRel)) ;
+    ref_result = relvarEvalTupleCounts(cnts, association->referringMult,
+	association->referringCond, multViolations, condViolations) ;
+    Ral_IntVectorDelete(cnts) ;
+    /*
+     * Leave error messages if requested.
+     */
+    if (!ref_result && errMsg) {
+	relvarAssocConstraintErrorMsg(errMsg, name, association,
+	    referredToRelvar, multViolations,
+	    "is referenced by multiple tuples") ;
+	relvarAssocConstraintErrorMsg(errMsg, name, association,
+	    referredToRelvar, condViolations,
+	    "is not referenced by any tuple") ;
+    }
+    Ral_IntVectorDelete(multViolations) ;
+    Ral_IntVectorDelete(condViolations) ;
+    /*
+     * Now do the same for the referred to direction.
+     */
+    multViolations = Ral_IntVectorNewEmpty(0) ;
+    condViolations = Ral_IntVectorNewEmpty(0) ;
+    cnts = Ral_JoinMapTupleCounts(association->referenceMap, 0,
+	Ral_RelationCardinality(referringRel)) ;
+    refTo_result = relvarEvalTupleCounts(cnts, association->referredToMult,
+	association->referredToCond, multViolations, condViolations) ;
+    Ral_IntVectorDelete(cnts) ;
+    if (!refTo_result && errMsg) {
+	relvarAssocConstraintErrorMsg(errMsg, name, association,
+	    referringRelvar, multViolations, "references multiple tuples") ;
+	relvarAssocConstraintErrorMsg(errMsg, name, association,
+	    referringRelvar, condViolations, "references no tuple") ;
+    }
+    Ral_IntVectorDelete(multViolations) ;
+    Ral_IntVectorDelete(condViolations) ;
+    /*
+     * Clean out the tuple matches from the join map.
+     */
+    Ral_JoinMapTupleEmpty(association->referenceMap) ;
+
+    return ref_result && refTo_result ;
+}
+
+static int
+relvarPartitionConstraintEval(
+    const char *name,
+    Ral_PartitionConstraint partition,
+    Tcl_DString *errMsg)
+{
+    return 1 ;
+}
+
+static int
+relvarEvalTupleCounts(
+    Ral_IntVector counts,
+    int multiplicity,
+    int conditionality,
+    Ral_IntVector multViolate,
+    Ral_IntVector condViolate)
+{
+    int result = 1 ;
+    Ral_IntVectorIter cEnd ;
+    Ral_IntVectorIter cIter ;
+
+    cEnd = Ral_IntVectorEnd(counts) ;
+    for (cIter = Ral_IntVectorBegin(counts) ; cIter != cEnd ; ++cIter) {
+	Ral_IntVectorValueType count = *cIter ;
+	if (count != 1) {
+	    if (count > 1 && multiplicity == 0) {
+		/*
+		 * multiplicity violation
+		 */
+		result = 0 ;
+		Ral_IntVectorSetAdd(multViolate,
+		    Ral_IntVectorOffsetOf(counts, cIter)) ;
+	    } else if (count == 0 && conditionality == 0) {
+		/*
+		 * conditionality violation.
+		 */
+		result = 0 ;
+		Ral_IntVectorSetAdd(condViolate,
+		    Ral_IntVectorOffsetOf(counts, cIter)) ;
+	    }
+	}
+    }
+
+    return result ;
+}
+
+static void
+relvarAssocConstraintErrorMsg(
+    Tcl_DString *msg,
+    const char *name,
+    Ral_AssociationConstraint assoc,
+    Ral_Relvar relvar,
+    Ral_IntVector violations,
+    const char *detail)
+{
+    Ral_Relation rel ;
+    Ral_IntVectorIter vEnd = Ral_IntVectorEnd(violations) ;
+    Ral_IntVectorIter vIter ;
+
+    assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
+    rel = relvar->relObj->internalRep.otherValuePtr ;
+
+    if (Ral_IntVectorSize(violations) == 0) {
+	return ;
+    }
+
+    Tcl_DStringAppend(msg, "for association ", -1) ;
+    relvarAssocConstraintToString(name, assoc, msg) ;
+    Tcl_DStringAppend(msg, ", in relvar ", -1) ;
+    Tcl_DStringAppend(msg, relvar->name, -1) ;
+    Tcl_DStringAppend(msg, "\n", -1) ;
+
+    for (vIter = Ral_IntVectorBegin(violations) ; vIter != vEnd ; ++vIter) {
+	Ral_Tuple errTuple = Ral_RelationTupleAt(rel, *vIter) ;
+	char *tupleString = Ral_TupleValueStringOf(errTuple) ;
+
+	Tcl_DStringAppend(msg, "tuple ", -1) ;
+	Tcl_DStringAppend(msg, tupleString, -1) ;
+	ckfree(tupleString) ;
+	Tcl_DStringAppend(msg, " ", -1) ;
+	Tcl_DStringAppend(msg, detail, -1) ;
+	Tcl_DStringAppend(msg, "\n", -1) ;
+    }
+    /*
+     * Get rid of the trailing newline.
+     */
+    Tcl_DStringSetLength(msg, Tcl_DStringLength(msg) - 1) ;
+}
+
+static void
+relvarAssocConstraintToString(
+    const char *name,
+    Ral_AssociationConstraint assoc,
+    Tcl_DString *result)
+{
+    static char const * const condMultStrings[2][2] = {
+	{"1", "1..N"},
+	{"0..1", "0..N"}
+    } ;
+
+    Ral_Relvar referringRelvar = assoc->referringRelvar ;
+    Ral_Relvar referredToRelvar = assoc->referredToRelvar ;
+
+    Tcl_DStringAppend(result, name, -1) ;
+    Tcl_DStringAppend(result, "(", -1) ;
+    Tcl_DStringAppend(result, referringRelvar->name, -1) ;
+    Tcl_DStringAppend(result, " [", -1) ;
+    Tcl_DStringAppend(result,
+	condMultStrings[assoc->referringCond][assoc->referringMult], -1) ;
+    Tcl_DStringAppend(result, "] <==> [", -1) ;
+    Tcl_DStringAppend(result,
+	condMultStrings[assoc->referredToCond][assoc->referredToMult], -1) ;
+    Tcl_DStringAppend(result, "] ", -1) ;
+    Tcl_DStringAppend(result, referredToRelvar->name, -1) ;
+    Tcl_DStringAppend(result, ")", -1) ;
 }

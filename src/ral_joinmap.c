@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_joinmap.c,v $
-$Revision: 1.2 $
-$Date: 2006/04/06 02:07:30 $
+$Revision: 1.3 $
+$Date: 2006/05/07 03:53:28 $
  *--
  */
 
@@ -89,7 +89,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_joinmap.c,v $ $Revision: 1.2 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_joinmap.c,v $ $Revision: 1.3 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -208,6 +208,13 @@ Ral_JoinMapTupleReserve(
 	map->tupleFinish = map->tupleStart + oldSize ;
 	map->tupleEndStorage = map->tupleStart + size ;
     }
+}
+
+void
+Ral_JoinMapTupleEmpty(
+    Ral_JoinMap map)
+{
+    map->tupleFinish = map->tupleStart ;
 }
 
 void
@@ -338,8 +345,36 @@ Ral_JoinMapTupleMap(
     Ral_JoinMapIter iter ;
 
     assert(offset < MAP_ELEMENT_COUNT) ;
+
     for (iter = Ral_JoinMapTupleBegin(map) ; iter != end ; ++iter) {
 	Ral_IntVectorStore(v, iter->m[offset], 0) ;
+    }
+
+    return v ;
+}
+
+/*
+ * Return a vector of "size" length where each entry contains the count of the
+ * number of times the corresponding tuple index appears in the "map" at the
+ * "offset".  The maximum value contained in "map" must be less than "size".
+ * Caller must delete the returned vector.
+ */
+Ral_IntVector
+Ral_JoinMapTupleCounts(
+    Ral_JoinMap map,
+    int offset,
+    int size)
+{
+    Ral_IntVector v = Ral_IntVectorNew(size, 0) ;
+    Ral_IntVectorIter vBegin = Ral_IntVectorBegin(v) ;
+    Ral_JoinMapIter end = Ral_JoinMapTupleEnd(map) ;
+    Ral_JoinMapIter iter ;
+
+    assert(offset < MAP_ELEMENT_COUNT) ;
+
+    for (iter = Ral_JoinMapTupleBegin(map) ; iter != end ; ++iter) {
+	assert(iter->m[offset] < size) ;
+	*(vBegin + iter->m[offset]) += 1 ;
     }
 
     return v ;

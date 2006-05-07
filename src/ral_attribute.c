@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.c,v $
-$Revision: 1.8 $
-$Date: 2006/04/16 19:00:12 $
+$Revision: 1.9 $
+$Date: 2006/05/07 03:53:28 $
  *--
  */
 
@@ -96,7 +96,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.8 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.9 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -365,6 +365,9 @@ Ral_AttributeNewFromObjs(
 /*
  * When an attribute is given a value in a Tuple or Relation, it must
  * be able to be coerced into the appropriate type.
+ * N.B. that we always allow the empty string as a "control" value
+ * for all types. This is necessary for conditional referential attributes
+ * that must never match a value.
  */
 int
 Ral_AttributeConvertValueToType(
@@ -373,6 +376,10 @@ Ral_AttributeConvertValueToType(
     Tcl_Obj *objPtr)
 {
     int result = TCL_OK ;
+
+    if (strlen(Tcl_GetString(objPtr)) == 0) {
+	return TCL_OK ;
+    }
 
     switch (attr->attrType) {
     case Tcl_Type:

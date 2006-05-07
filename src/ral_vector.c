@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_vector.c,v $
-$Revision: 1.10 $
-$Date: 2006/04/09 22:15:58 $
+$Revision: 1.11 $
+$Date: 2006/05/07 03:53:28 $
  *--
  */
 
@@ -90,12 +90,16 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_vector.c,v $ $Revision: 1.10 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_vector.c,v $ $Revision: 1.11 $" ;
 
 /*
 FUNCTION DEFINITIONS
 */
 
+/*
+ * Allocate a new vector that is "size" entries and fill those entries
+ * with "value".
+ */
 Ral_IntVector
 Ral_IntVectorNew(
     int size,
@@ -112,6 +116,10 @@ Ral_IntVectorNew(
     return v ;
 }
 
+/*
+ * Allocate a new vector that is "size" entries, but the vector contains
+ * no values.
+ */
 Ral_IntVector
 Ral_IntVectorNewEmpty(
     int size)
@@ -473,6 +481,17 @@ Ral_IntVectorIndexOf(
 	}
     }
     return -1 ;
+}
+
+int
+Ral_IntVectorOffsetOf(
+    Ral_IntVector v,
+    Ral_IntVectorIter iter)
+{
+    if (iter < v->start || iter >= v->finish) {
+	Tcl_Panic("Ral_IntVectorOffsetOf: out of bounds access") ;
+    }
+    return iter - v->start ;
 }
 
 Ral_IntVector
