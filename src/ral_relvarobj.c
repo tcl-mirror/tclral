@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.3 $
-$Date: 2006/05/07 03:53:28 $
+$Revision: 1.4 $
+$Date: 2006/05/13 01:10:13 $
  *--
  */
 
@@ -81,6 +81,9 @@ FORWARD FUNCTION REFERENCES
 */
 static char *relvarTraceProc(ClientData, Tcl_Interp *, const char *,
     const char *, int) ;
+static Tcl_Obj *relvarConstraintAttrNames(Tcl_Interp *, Ral_Relvar,
+    Ral_JoinMap, int) ;
+static Tcl_Obj *relvarAssocSpec(int, int) ;
 
 /*
 EXTERNAL DATA REFERENCES
@@ -94,7 +97,7 @@ EXTERNAL DATA DEFINITIONS
 STATIC DATA ALLOCATION
 */
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.3 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.4 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -108,25 +111,40 @@ Ral_RelvarObjNew(
     Ral_RelationHeading heading)
 {
     Tcl_DString resolve ;
-    const char *resolvedName =
-	Ral_RelvarObjResolveName(interp, name, &resolve) ;
-    Ral_Relvar relvar = Ral_RelvarNew(info, resolvedName, heading) ;
+    const char *resolvedName ;
+    Ral_Relvar relvar ;
+    Tcl_Obj *varName ;
     int status ;
 
+    /*
+     * Creating a relvar is not allowed during an "eval" script.
+     */
+    if (Ral_RelvarIsTransOnGoing(info)) {
+	Ral_RelvarObjSetError(interp, RELVAR_BAD_TRANS_OP, "create") ;
+	return TCL_ERROR ;
+    }
+    /*
+     * Create the relvar.
+     */
+    resolvedName = Ral_RelvarObjResolveName(interp, name, &resolve) ;
+    relvar = Ral_RelvarNew(info, resolvedName, heading) ;
     if (relvar == NULL) {
 	/*
 	 * Duplicate name.
 	 */
-	Ral_RelvarObjSetError(interp, Ral_RelvarLastError, resolvedName) ;
+	Ral_RelvarObjSetError(interp, RELVAR_DUP_NAME, resolvedName) ;
 	Tcl_DStringFree(&resolve) ;
 	return TCL_ERROR ;
     }
     /*
      * Create a variable by the same name.
      */
-    if (Tcl_ObjSetVar2(interp, Tcl_NewStringObj(resolvedName, -1), NULL,
-	relvar->relObj, TCL_LEAVE_ERR_MSG) == NULL) {
-	goto errorOut ;
+    varName = Tcl_NewStringObj(resolvedName, -1) ;
+    if (Tcl_ObjSetVar2(interp, varName, NULL, relvar->relObj,
+	TCL_LEAVE_ERR_MSG) == NULL) {
+	Tcl_DStringFree(&resolve) ;
+	Ral_RelvarObjDelete(interp, info, varName) ;
+	return TCL_ERROR ;
     }
     /*
      * Set up a trace to make the Tcl variable read only.
@@ -138,11 +156,6 @@ Ral_RelvarObjNew(
     Tcl_DStringFree(&resolve) ;
     Tcl_SetObjResult(interp, relvar->relObj) ;
     return TCL_OK ;
-
-errorOut:
-    Ral_RelvarDelete(info, resolvedName) ;
-    Tcl_DStringFree(&resolve) ;
-    return TCL_ERROR ;
 }
 
 int
@@ -153,7 +166,13 @@ Ral_RelvarObjDelete(
 {
     char *fullName ;
     Ral_Relvar relvar ;
-    int status ;
+    /*
+     * Deleting a relvar is not allowed during an "eval" script.
+     */
+    if (Ral_RelvarIsTransOnGoing(info)) {
+	Ral_RelvarObjSetError(interp, RELVAR_BAD_TRANS_OP, "delete") ;
+	return TCL_ERROR ;
+    }
 
     relvar = Ral_RelvarObjFindRelvar(interp, info, Tcl_GetString(nameObj),
 	&fullName) ;
@@ -162,6 +181,17 @@ Ral_RelvarObjDelete(
     }
     if (Tcl_ConvertToType(interp, relvar->relObj, &Ral_RelationObjType)
 	!= TCL_OK) {
+	ckfree(fullName) ;
+	return TCL_ERROR ;
+    }
+    /*
+     * Make sure that all the constraints associated with the
+     * relvar are gone. Can't have dangling references to the relvar
+     * via a constraint.
+     */
+    if (Ral_PtrVectorSize(relvar->constraints) != 0) {
+	Ral_RelvarObjSetError(interp, RELVAR_CONSTRAINTS_PRESENT, fullName) ;
+	ckfree(fullName) ;
 	return TCL_ERROR ;
     }
     /*
@@ -172,12 +202,12 @@ Ral_RelvarObjDelete(
     /*
      * Remove the variable.
      */
-    status = Tcl_UnsetVar(interp, fullName, TCL_LEAVE_ERR_MSG) ;
-    assert(status == TCL_OK) ;
+    if (Tcl_UnsetVar(interp, fullName, TCL_LEAVE_ERR_MSG) != TCL_OK) {
+	ckfree(fullName) ;
+	return TCL_ERROR ;
+    }
 
-    Ral_RelvarStartCommand(info, relvar) ;
     Ral_RelvarDelete(info, fullName) ;
-    Ral_RelvarObjEndCmd(interp, info, relvar, 0) ;
 
     ckfree(fullName) ;
     Tcl_ResetResult(interp) ;
@@ -196,7 +226,7 @@ Ral_RelvarObjFindRelvar(
 	Ral_RelvarObjResolveName(interp, name, &resolve) ;
     Ral_Relvar relvar = Ral_RelvarFind(info, resolvedName) ;
 
-    if (fullName) {
+    if (relvar && fullName) {
 	*fullName = ckalloc(strlen(resolvedName) + 1) ;
 	strcpy(*fullName, resolvedName) ;
     }
@@ -252,11 +282,12 @@ Ral_RelvarObjCreateAssoc(
 	int multiplicity ;
     } specTable[] = {
 	{"1", 0, 0},
-	{"1..N", 0, 1},
+	{"1..*", 0, 1},
 	{"0..1", 1, 0},
-	{"0..N", 1, 1},
+	{"0..*", 1, 1},
 	{NULL, 0, 0}
     } ;
+    static const char specErrMsg[] = "multiplicity specification" ;
 
     Ral_Relvar relvar1 ;
     Ral_Relation r1 ;
@@ -278,6 +309,13 @@ Ral_RelvarObjCreateAssoc(
     Ral_AssociationConstraint assoc ;
 
     /*
+     * Creating an association is not allowed during an "eval" script.
+     */
+    if (Ral_RelvarIsTransOnGoing(info)) {
+	Ral_RelvarObjSetError(interp, RELVAR_BAD_TRANS_OP, "association") ;
+	return TCL_ERROR ;
+    }
+    /*
      * Look up the relvars and make sure that the values are truly a
      * relation.
      */
@@ -291,10 +329,6 @@ Ral_RelvarObjCreateAssoc(
 	return TCL_ERROR ;
     }
     r1 = relvar1->relObj->internalRep.otherValuePtr ;
-    if (Ral_RelationCardinality(r1) != 0) {
-	Ral_RelvarObjSetError(interp, RELVAR_NOT_EMPTY,
-	    Tcl_GetString(relvar1->relObj)) ;
-    }
     /*
      * Get the elements from the attribute list.
      */
@@ -305,8 +339,7 @@ Ral_RelvarObjCreateAssoc(
      * Check the association specifier.
      */
     if (Tcl_GetIndexFromObjStruct(interp, objv[3], specTable,
-	sizeof(specTable[0]), "association specification", 0,
-	&specIndex1) != TCL_OK) {
+	sizeof(specTable[0]), specErrMsg, 0, &specIndex1) != TCL_OK) {
 	return TCL_ERROR ;
     }
 
@@ -320,16 +353,18 @@ Ral_RelvarObjCreateAssoc(
 	return TCL_ERROR ;
     }
     r2 = relvar2->relObj->internalRep.otherValuePtr ;
-    if (Ral_RelationCardinality(r2) != 0) {
-	Ral_RelvarObjSetError(interp, RELVAR_NOT_EMPTY,
-	    Tcl_GetString(relvar2->relObj)) ;
-    }
     if (Tcl_ListObjGetElements(interp, objv[5], &elemc2, &elemv2) != TCL_OK) {
 	return TCL_ERROR ;
     }
     if (Tcl_GetIndexFromObjStruct(interp, objv[6], specTable,
-	sizeof(specTable[0]), "association specification", 0,
-	&specIndex2) != TCL_OK) {
+	sizeof(specTable[0]), specErrMsg, 0, &specIndex2) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    /*
+     * The referred to multiplicity is cannot be many.
+     */
+    if (specTable[specIndex2].multiplicity) {
+	Ral_RelvarObjSetError(interp, RELVAR_BAD_MULT, Tcl_GetString(objv[6])) ;
 	return TCL_ERROR ;
     }
 
@@ -367,13 +402,8 @@ Ral_RelvarObjCreateAssoc(
 	    return TCL_ERROR ;
 	}
 	Ral_JoinMapAddAttrMapping(refMap, attrIndex1, attrIndex2) ;
-    }
-
-    constraint = Ral_ConstraintAssocCreate(name, info) ;
-    if (constraint == NULL) {
-	Ral_RelvarObjSetError(interp, RELVAR_REFATTR_MISMATCH, name) ;
-	Ral_JoinMapDelete(refMap) ;
-	return TCL_ERROR ;
+	++elemv1 ;
+	++elemv2 ;
     }
     /*
      * The referred to attributes in the second relvar must constitute an
@@ -388,6 +418,12 @@ Ral_RelvarObjCreateAssoc(
 	return TCL_ERROR ;
     }
 
+    constraint = Ral_ConstraintAssocCreate(name, info) ;
+    if (constraint == NULL) {
+	Ral_RelvarObjSetError(interp, RELVAR_DUP_CONSTRAINT, name) ;
+	Ral_JoinMapDelete(refMap) ;
+	return TCL_ERROR ;
+    }
     assoc = constraint->association ;
     assoc->referringRelvar = relvar1 ;
     assoc->referringCond = specTable[specIndex1].conditionality ;
@@ -399,10 +435,396 @@ Ral_RelvarObjCreateAssoc(
     /*
      * Record which constraints apply to a given relvar. This is what allows
      * us to find the constraints that apply to a relvar when it is modified.
+     * Treat the creation of the association as modifying the participating
+     * relvars.
      */
     Ral_PtrVectorPushBack(relvar1->constraints, constraint) ;
     Ral_PtrVectorPushBack(relvar2->constraints, constraint) ;
+    /*
+     * Mark the relvars involved in the constraint as modified so that
+     * the constraint will be checked.
+     */
+    Ral_RelvarStartTransaction(info, 0) ;
+    Ral_RelvarStartCommand(info, relvar1) ;
+    Ral_RelvarStartCommand(info, relvar2) ;
+    return Ral_RelvarObjEndTrans(interp, info, 0) ;
+}
 
+int
+Ral_RelvarObjCreatePartition(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv,
+    Ral_RelvarInfo info)
+{
+    /*
+     * name super super-attrs sub1 sub1-attrs
+     * ?sub2 sub2-attrs sub3 sub3-attrs ...?
+     */
+    Ral_Relvar super ;
+    Ral_Relation superRel ;
+    int supElemc ;
+    Tcl_Obj **supElemv ;
+    Ral_IntVector superAttrs ;
+    int nSupAttrs ;
+    Ral_TupleHeading supth ;
+    const char *partName ;
+    Ral_Constraint constraint ;
+    Ral_PartitionConstraint partition ;
+    Ral_PtrVector subList ;	/* set of sub type names */
+
+    /*
+     * Creating a partition is not allowed during an "eval" script.
+     */
+    if (Ral_RelvarIsTransOnGoing(info)) {
+	Ral_RelvarObjSetError(interp, RELVAR_BAD_TRANS_OP, "partition") ;
+	return TCL_ERROR ;
+    }
+    /*
+     * Look up the supertype and make sure that the value is truly a relation.
+     */
+    super = Ral_RelvarObjFindRelvar(interp, info, Tcl_GetString(objv[1]),
+	NULL) ;
+    if (super == NULL) {
+	return TCL_ERROR ;
+    }
+    if (Tcl_ConvertToType(interp, super->relObj, &Ral_RelationObjType)
+	!= TCL_OK) {
+	return TCL_ERROR ;
+    }
+    superRel = super->relObj->internalRep.otherValuePtr ;
+    /*
+     * Get the elements from the super type attribute list.
+     */
+    if (Tcl_ListObjGetElements(interp, objv[2], &supElemc, &supElemv)
+	!= TCL_OK) {
+	return TCL_ERROR ;
+    }
+    /*
+     * Gather the attribute indices for the super type into a vector that we
+     * can use later.  Verify that the supertype attributes constitute an
+     * identifier.
+     */
+    superAttrs = Ral_IntVectorNewEmpty(supElemc) ;
+    supth = superRel->heading->tupleHeading ;
+    while (supElemc-- > 0) {
+	const char *attrName = Tcl_GetString(*supElemv++) ;
+	int attrIndex = Ral_TupleHeadingIndexOf(supth, attrName) ;
+	int status ;
+
+	if (attrIndex < 0) {
+	    Ral_RelationObjSetError(interp, REL_UNKNOWN_ATTR, attrName) ;
+	    Ral_IntVectorDelete(superAttrs) ;
+	    return TCL_ERROR ;
+	}
+	status = Ral_IntVectorSetAdd(superAttrs, attrIndex) ;
+	if (!status) {
+	    Ral_RelationObjSetError(interp, REL_DUP_ATTR_IN_ID, attrName) ;
+	    Ral_IntVectorDelete(superAttrs) ;
+	    return TCL_ERROR ;
+	}
+	++supElemv ;
+    }
+    if (Ral_RelationHeadingFindIdentifier(superRel->heading, superAttrs) < 0) {
+	Ral_RelvarObjSetError(interp, RELVAR_NOT_ID, Tcl_GetString(objv[2])) ;
+	Ral_IntVectorDelete(superAttrs) ;
+	return TCL_ERROR ;
+    }
+    nSupAttrs = Ral_IntVectorSize(superAttrs) ;
+    /*
+     * Create the partition constraint.
+     */
+    partName = Tcl_GetString(objv[0]) ;
+    constraint = Ral_ConstraintPartitionCreate(partName, info) ;
+    if (constraint == NULL) {
+	Ral_RelvarObjSetError(interp, RELVAR_DUP_CONSTRAINT, partName) ;
+	Ral_IntVectorDelete(superAttrs) ;
+	return TCL_ERROR ;
+    }
+    partition = constraint->partition ;
+    partition->referredToRelvar = super ;
+
+    Ral_RelvarStartTransaction(info, 0) ;
+    Ral_RelvarStartCommand(info, super) ;
+    Ral_PtrVectorPushBack(super->constraints, constraint) ;
+    /*
+     * Loop over the subtype relations and attributes.
+     */
+    subList = Ral_PtrVectorNew(1) ;
+    assert ((objc - 3) % 2 == 0) ;
+    for (objc -= 3, objv += 3 ; objc > 0 ; objc -= 2, objv += 2) {
+	char *subName = Tcl_GetString(objv[0]) ;
+	Ral_Relvar sub ;
+	Ral_Relation subRel ;
+	int subElemc ;
+	Tcl_Obj **subElemv ;
+	Ral_TupleHeading subth ;
+	Ral_SubsetReference subRef ;
+	Ral_JoinMap refMap ;
+	Ral_IntVectorIter supAttrIter ;
+	/*
+	 * Get the subtype relvar and the attributes.
+	 */
+	if (!Ral_PtrVectorSetAdd(subList, subName)) {
+	    Ral_RelvarObjSetError(interp, RELVAR_DUP_NAME, subName) ;
+	    goto errorOut ;
+	}
+	sub = Ral_RelvarObjFindRelvar(interp, info, subName, NULL) ;
+	if (sub == NULL) {
+	    goto errorOut ;
+	}
+	if (Tcl_ConvertToType(interp, sub->relObj, &Ral_RelationObjType)
+	    != TCL_OK) {
+	    goto errorOut ;
+	}
+	subRel = sub->relObj->internalRep.otherValuePtr ;
+	/*
+	 * Get the elements from the sub type attribute list.
+	 */
+	if (Tcl_ListObjGetElements(interp, objv[1], &subElemc, &subElemv)
+	    != TCL_OK) {
+	    goto errorOut ;
+	}
+	if (nSupAttrs != subElemc) {
+	    Ral_RelvarObjSetError(interp, RELVAR_REFATTR_MISMATCH,
+		Tcl_GetString(objv[1])) ;
+	    goto errorOut ;
+	}
+	/*
+	 * Construct the mapping of attributes in the super type to
+	 * to those in the subtype relation. In this case,
+	 * the subtype is the "referring" relation and the supertype is
+	 * the "referred to" relation.
+	 */
+	subRef = (Ral_SubsetReference)ckalloc(sizeof(*subRef)) ;
+	subRef->relvar = sub ;
+	subRef->subsetMap = refMap = Ral_JoinMapNew(0, 0) ;
+	Ral_PtrVectorPushBack(partition->subsetReferences, subRef) ;
+	subth = subRel->heading->tupleHeading ;
+	supAttrIter = Ral_IntVectorBegin(superAttrs) ;
+	while (subElemc-- > 0) {
+	    int attrIndex =
+		Ral_TupleHeadingIndexOf(subth, Tcl_GetString(*subElemv)) ;
+
+	    if (attrIndex < 0) {
+		Ral_RelationObjSetError(interp, REL_UNKNOWN_ATTR,
+		    Tcl_GetString(*subElemv)) ;
+		goto errorOut ;
+	    }
+	    Ral_JoinMapAddAttrMapping(refMap, attrIndex, *supAttrIter++) ;
+	    ++subElemv ;
+	}
+	Ral_RelvarStartCommand(info, sub) ;
+	Ral_PtrVectorPushBack(sub->constraints, constraint) ;
+    }
+
+    Ral_IntVectorDelete(superAttrs) ;
+    Ral_PtrVectorDelete(subList) ;
+    return Ral_RelvarObjEndTrans(interp, info, 0) ;
+
+errorOut:
+    Ral_IntVectorDelete(superAttrs) ;
+    Ral_PtrVectorDelete(subList) ;
+    Ral_RelvarObjConstraintDelete(interp, partName, info) ;
+    return Ral_RelvarObjEndTrans(interp, info, 1) ;
+}
+
+int
+Ral_RelvarObjConstraintDelete(
+    Tcl_Interp *interp,
+    const char *name,
+    Ral_RelvarInfo info)
+{
+    if (!Ral_ConstraintDeleteByName(name, info)) {
+	Ral_RelvarObjSetError(interp, RELVAR_UNKNOWN_CONSTRAINT, name) ;
+	return TCL_ERROR ;
+    }
+    return TCL_OK ;
+}
+
+int
+Ral_RelvarObjConstraintInfo(
+    Tcl_Interp *interp,
+    Tcl_Obj * const nameObj,
+    Ral_RelvarInfo info)
+{
+    const char *name = Tcl_GetString(nameObj) ;
+    Ral_Constraint constraint ;
+    Tcl_Obj *resultObj ;
+    Tcl_Obj *attrList ;
+
+    /*
+     * Look up the constraint by it name.
+     */
+    constraint = Ral_ConstraintFindByName(name, info) ;
+    if (constraint == NULL) {
+	Ral_RelvarObjSetError(interp, RELVAR_UNKNOWN_CONSTRAINT, name) ;
+	return TCL_ERROR ;
+    }
+
+    resultObj = Tcl_NewListObj(0, 0) ;
+
+    switch (constraint->type) {
+    case ConstraintAssociation:
+    {
+	/* association name relvar1 attr-list1 spec1
+	 * relvar2 attr-list2 spec2
+	 */
+	Ral_AssociationConstraint assoc = constraint->association ;
+
+	if (Tcl_ListObjAppendElement(interp, resultObj,
+	    Tcl_NewStringObj("association", -1)) != TCL_OK) {
+	    goto errorOut ;
+	}
+	if (Tcl_ListObjAppendElement(interp, resultObj, nameObj) != TCL_OK) {
+	    goto errorOut ;
+	}
+	/*
+	 * The referring side.
+	 */
+	if (Tcl_ListObjAppendElement(interp, resultObj,
+	    Tcl_NewStringObj(assoc->referringRelvar->name, -1)) != TCL_OK) {
+	    goto errorOut ;
+	}
+	attrList = relvarConstraintAttrNames(interp, assoc->referringRelvar,
+	    assoc->referenceMap, 0) ;
+	if (attrList == NULL) {
+	    goto errorOut ;
+	}
+	if (Tcl_ListObjAppendElement(interp, resultObj, attrList) != TCL_OK) {
+	    goto errorOut ;
+	}
+	if (Tcl_ListObjAppendElement(interp, resultObj,
+	    relvarAssocSpec(assoc->referringCond, assoc->referringMult))
+	    != TCL_OK) {
+	    goto errorOut ;
+	}
+
+	/*
+	 * The referred to side.
+	 */
+	if (Tcl_ListObjAppendElement(interp, resultObj,
+	    Tcl_NewStringObj(assoc->referredToRelvar->name, -1)) != TCL_OK) {
+	    goto errorOut ;
+	}
+	attrList = relvarConstraintAttrNames(interp, assoc->referredToRelvar,
+	    assoc->referenceMap, 1) ;
+	if (attrList == NULL) {
+	    goto errorOut ;
+	}
+	if (Tcl_ListObjAppendElement(interp, resultObj, attrList) != TCL_OK) {
+	    goto errorOut ;
+	}
+	if (Tcl_ListObjAppendElement(interp, resultObj,
+	    relvarAssocSpec(assoc->referredToCond, assoc->referredToMult))
+	    != TCL_OK) {
+	    goto errorOut ;
+	}
+    }
+	break ;
+
+    case ConstraintPartition:
+    {
+	/*
+	 * partition name super super-attrs sub1 sub1-attrs
+	 * ?sub2 sub2-attrs sub3 sub3-attrs ...?
+	 */
+	Ral_PartitionConstraint partition = constraint->partition ;
+	Ral_PtrVectorIter refEnd =
+	    Ral_PtrVectorEnd(partition->subsetReferences) ;
+	Ral_PtrVectorIter refIter ;
+	Ral_SubsetReference subRef ;
+
+	if (Tcl_ListObjAppendElement(interp, resultObj,
+	    Tcl_NewStringObj("partition", -1)) != TCL_OK) {
+	    goto errorOut ;
+	}
+	if (Tcl_ListObjAppendElement(interp, resultObj, nameObj) != TCL_OK) {
+	    goto errorOut ;
+	}
+	/*
+	 * Super type side.
+	 * We need to reach in and get one of the subtype join maps.
+	 * The supertype attributes are the same for each subtype reference
+	 * and are at offset 1 (since they are the referred to attributes).
+	 */
+	assert(Ral_PtrVectorSize(partition->subsetReferences) > 0) ;
+	refIter = Ral_PtrVectorBegin(partition->subsetReferences) ;
+	subRef = *refIter ;
+	if (Tcl_ListObjAppendElement(interp, resultObj,
+	    Tcl_NewStringObj(partition->referredToRelvar->name, -1))
+	    != TCL_OK) {
+	    goto errorOut ;
+	}
+	attrList = relvarConstraintAttrNames(interp,
+	    partition->referredToRelvar, subRef->subsetMap, 1) ;
+	if (attrList == NULL) {
+	    goto errorOut ;
+	}
+	if (Tcl_ListObjAppendElement(interp, resultObj, attrList) != TCL_OK) {
+	    goto errorOut ;
+	}
+	/*
+	 * Loop over the sub types and add them to the result.
+	 */
+	for ( ; refIter != refEnd ; ++refIter) {
+	    subRef = *refIter ;
+	    if (Tcl_ListObjAppendElement(interp, resultObj,
+		Tcl_NewStringObj(subRef->relvar->name, -1)) != TCL_OK) {
+		goto errorOut ;
+	    }
+	    attrList = relvarConstraintAttrNames(interp, subRef->relvar,
+		subRef->subsetMap, 0) ;
+	    if (attrList == NULL) {
+		goto errorOut ;
+	    }
+	    if (Tcl_ListObjAppendElement(interp, resultObj, attrList)
+		!= TCL_OK) {
+		goto errorOut ;
+	    }
+	}
+    }
+	break ;
+
+    default:
+	Tcl_Panic("Ral_RelvarObjConstraintInfo: unknown constraint type, %d",
+	    constraint->type) ;
+    }
+
+    Tcl_SetObjResult(interp, resultObj) ;
+    return TCL_OK ;
+
+errorOut:
+    Tcl_DecrRefCount(resultObj) ;
+    return TCL_ERROR ;
+}
+
+
+int
+Ral_RelvarObjConstraintNames(
+    Tcl_Interp *interp,
+    const char *pattern,
+    Ral_RelvarInfo info)
+{
+    Tcl_Obj *nameList ;
+    Tcl_HashEntry *entry ;
+    Tcl_HashSearch search ;
+
+    nameList = Tcl_NewListObj(0, NULL) ;
+    for (entry = Tcl_FirstHashEntry(&info->constraints, &search) ; entry ;
+	entry = Tcl_NextHashEntry(&search)) {
+	const char *name = (const char *)Tcl_GetHashKey(&info->constraints,
+	    entry) ;
+
+	if (Tcl_StringMatch(name, pattern) &&
+	    Tcl_ListObjAppendElement(interp, nameList,
+		Tcl_NewStringObj(name, -1)) != TCL_OK) {
+	    Tcl_DecrRefCount(nameList) ;
+	    return TCL_ERROR ;
+	}
+    }
+
+    Tcl_SetObjResult(interp, nameList) ;
     return TCL_OK ;
 }
 
@@ -429,14 +851,13 @@ int
 Ral_RelvarObjEndCmd(
     Tcl_Interp *interp,
     Ral_RelvarInfo info,
-    Ral_Relvar relvar,
     int failed)
 {
     Tcl_DString errMsg ;
     int success ;
 
     Tcl_DStringInit(&errMsg) ;
-    success = Ral_RelvarEndCommand(info, relvar, failed, &errMsg) ;
+    success = Ral_RelvarEndCommand(info, failed, &errMsg) ;
     if (!(failed || success)) {
 	Tcl_DStringResult(interp, &errMsg) ;
     }
@@ -462,7 +883,11 @@ Ral_RelvarObjSetError(
 	"relation heading mismatch",
 	"mismatch between referential attributes",
 	"duplicate constraint name",
-	"association may only be applied to empty relvars",
+	"referred to attributes do not form an identifier",
+	"unknown constraint name",
+	"relvar has constraints in place",
+	"referred to identifiers can not have non-singular multiplicities",
+	"operation is not allowed during \"eval\" command",
     } ;
     static const char *errorStrings[] = {
 	"OK",
@@ -472,7 +897,10 @@ Ral_RelvarObjSetError(
 	"REFATTR_MISMATCH",
 	"DUP_CONSTRAINT",
 	"NOT_ID",
-	"NOT_EMPTY",
+	"UNKNOWN_CONSTRAINT",
+	"CONSTRAINTS_PRESENT",
+	"BAD_MULT",
+	"BAD_TRANS_OP",
     } ;
 
     Ral_ObjSetError(interp, "RELVAR", resultStrings[error],
@@ -520,4 +948,52 @@ relvarTraceProc(
     }
 
     return result ;
+}
+
+/*
+ * Return a list of attribute names that are part of the join map
+ * at the given offset.
+ */
+static Tcl_Obj *
+relvarConstraintAttrNames(
+    Tcl_Interp *interp,
+    Ral_Relvar relvar,
+    Ral_JoinMap map,
+    int offset)
+{
+    Ral_Relation relation ;
+    Ral_TupleHeading th ;
+    Ral_IntVector attrIndices = Ral_JoinMapGetAttr(map, offset) ;
+    Ral_IntVectorIter aEnd = Ral_IntVectorEnd(attrIndices) ;
+    Ral_IntVectorIter aIter ;
+    Tcl_Obj *nameList = Tcl_NewListObj(0, NULL) ;
+
+    assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
+    relation = relvar->relObj->internalRep.otherValuePtr ;
+    th = relation->heading->tupleHeading ;
+
+    for (aIter = Ral_IntVectorBegin(attrIndices) ; aIter != aEnd ; ++aIter) {
+	Ral_Attribute attr = Ral_TupleHeadingFetch(th, *aIter) ;
+	if (Tcl_ListObjAppendElement(interp, nameList,
+	    Tcl_NewStringObj(attr->name, -1)) != TCL_OK) {
+	    Tcl_DecrRefCount(nameList) ;
+	    return NULL ;
+	}
+    }
+
+    return nameList ;
+}
+
+static Tcl_Obj *
+relvarAssocSpec(
+    int cond,
+    int mult)
+{
+    static char const * const condMultStrings[2][2] = {
+	{"1", "1..*"},
+	{"0..1", "0..*"}
+    } ;
+    assert (cond < 2) ;
+    assert (mult < 2) ;
+    return Tcl_NewStringObj(condMultStrings[cond][mult], -1) ;
 }

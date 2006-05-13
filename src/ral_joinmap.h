@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_joinmap.h,v $
-$Revision: 1.3 $
-$Date: 2006/05/07 03:53:28 $
+$Revision: 1.4 $
+$Date: 2006/05/13 01:10:13 $
  *--
  */
 #ifndef _ral_joinmap_h_
@@ -120,7 +120,7 @@ extern Ral_IntVector Ral_JoinMapGetAttr(Ral_JoinMap, int) ;
 extern Ral_IntVector Ral_JoinMapAttrMap(Ral_JoinMap, int, int) ;
 extern int Ral_JoinMapFindAttr(Ral_JoinMap, int, int) ;
 extern Ral_IntVector Ral_JoinMapTupleMap(Ral_JoinMap, int, int) ;
-extern Ral_IntVector Ral_JoinMapTupleCounts(Ral_JoinMap, int, int) ;
+extern int Ral_JoinMapTupleCounts(Ral_JoinMap, int, Ral_IntVector) ;
 extern Ral_IntVector Ral_JoinMapMatchingTupleSet(Ral_JoinMap, int, int) ;
 
 extern const char *Ral_JoinMapVersion(void) ;

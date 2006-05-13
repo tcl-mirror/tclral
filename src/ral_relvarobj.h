@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.h,v $
-$Revision: 1.3 $
-$Date: 2006/05/07 03:53:28 $
+$Revision: 1.4 $
+$Date: 2006/05/13 01:10:13 $
  *--
  */
 #ifndef _ral_relvarobj_h_
@@ -91,8 +91,16 @@ extern Ral_Relvar Ral_RelvarObjFindRelvar(Tcl_Interp *, Ral_RelvarInfo,
     const char *, char **) ;
 extern int Ral_RelvarObjCreateAssoc(Tcl_Interp *, Tcl_Obj *const*,
     Ral_RelvarInfo) ;
+extern int Ral_RelvarObjCreatePartition(Tcl_Interp *, int, Tcl_Obj *const*,
+    Ral_RelvarInfo) ;
+extern int Ral_RelvarObjConstraintDelete(Tcl_Interp *, const char *,
+    Ral_RelvarInfo) ;
+extern int Ral_RelvarObjConstraintInfo(Tcl_Interp *, Tcl_Obj * const,
+    Ral_RelvarInfo) ;
+extern int Ral_RelvarObjConstraintNames(Tcl_Interp *, const char *,
+    Ral_RelvarInfo) ;
 extern int Ral_RelvarObjEndTrans(Tcl_Interp *, Ral_RelvarInfo, int) ;
-extern int Ral_RelvarObjEndCmd(Tcl_Interp *, Ral_RelvarInfo, Ral_Relvar, int) ;
+extern int Ral_RelvarObjEndCmd(Tcl_Interp *, Ral_RelvarInfo, int) ;
 extern void Ral_RelvarObjSetError(Tcl_Interp *, Ral_RelvarError, const char *) ;
 
 #endif /* _ral_relvarobj_h_ */

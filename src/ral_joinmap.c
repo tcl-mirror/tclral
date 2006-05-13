@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_joinmap.c,v $
-$Revision: 1.3 $
-$Date: 2006/05/07 03:53:28 $
+$Revision: 1.4 $
+$Date: 2006/05/13 01:10:13 $
  *--
  */
 
@@ -89,7 +89,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_joinmap.c,v $ $Revision: 1.3 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_joinmap.c,v $ $Revision: 1.4 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -359,13 +359,13 @@ Ral_JoinMapTupleMap(
  * "offset".  The maximum value contained in "map" must be less than "size".
  * Caller must delete the returned vector.
  */
-Ral_IntVector
+int
 Ral_JoinMapTupleCounts(
     Ral_JoinMap map,
     int offset,
-    int size)
+    Ral_IntVector v)
 {
-    Ral_IntVector v = Ral_IntVectorNew(size, 0) ;
+    int cnt = 0 ;
     Ral_IntVectorIter vBegin = Ral_IntVectorBegin(v) ;
     Ral_JoinMapIter end = Ral_JoinMapTupleEnd(map) ;
     Ral_JoinMapIter iter ;
@@ -373,11 +373,12 @@ Ral_JoinMapTupleCounts(
     assert(offset < MAP_ELEMENT_COUNT) ;
 
     for (iter = Ral_JoinMapTupleBegin(map) ; iter != end ; ++iter) {
-	assert(iter->m[offset] < size) ;
+	assert(iter->m[offset] < Ral_IntVectorSize(v)) ;
 	*(vBegin + iter->m[offset]) += 1 ;
+	++cnt ;
     }
 
-    return v ;
+    return cnt ;
 }
 
 /*

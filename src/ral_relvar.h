@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.h,v $
-$Revision: 1.3 $
-$Date: 2006/05/07 03:53:28 $
+$Revision: 1.4 $
+$Date: 2006/05/13 01:10:13 $
  *--
  */
 #ifndef _ral_relvar_h_
@@ -92,13 +92,13 @@ typedef struct Ral_AssociationConstraint {
 } *Ral_AssociationConstraint ;
 
 typedef struct Ral_SubsetReference {
-    struct Ral_Relvar *relvar ;
-    Ral_JoinMap subsetReference ;
+    struct Ral_Relvar *relvar ;	    /* subtype relvar */
+    Ral_JoinMap subsetMap ;	    /* join map from subtype to supertype */
 } *Ral_SubsetReference ;
 
 typedef struct Ral_PartitionConstraint {
     struct Ral_Relvar *referredToRelvar ;
-    Ral_PtrVector subsetMap ;	/* list of subtype references */
+    Ral_PtrVector subsetReferences ;	/* list of Ral_SubsetReference */
 } *Ral_PartitionConstraint ;
 
 typedef struct Ral_Constraint {
@@ -119,8 +119,7 @@ typedef struct Ral_Relvar {
 
 typedef struct Ral_RelvarTransaction {
     int isSingleCmd ;		/* transaction for a single command only */
-    Ral_PtrVector modified ;	/* a set of Ral_Relvar */
-    Ral_PtrVector pendingDelete ;   /* a set of Ral_Relvar */
+    Ral_PtrVector modifiedRelvars ;	/* a set of Ral_Relvar */
 } *Ral_RelvarTransaction ;
 
 typedef struct Ral_RelvarInfo {
@@ -141,7 +140,10 @@ typedef enum Ral_RelvarError {
     RELVAR_REFATTR_MISMATCH,
     RELVAR_DUP_CONSTRAINT,
     RELVAR_NOT_ID,
-    RELVAR_NOT_EMPTY,
+    RELVAR_UNKNOWN_CONSTRAINT,
+    RELVAR_CONSTRAINTS_PRESENT,
+    RELVAR_BAD_MULT,
+    RELVAR_BAD_TRANS_OP,
 } Ral_RelvarError ;
 
 /*
@@ -165,14 +167,20 @@ extern Ral_Relvar Ral_RelvarLookupRelvar(Tcl_Interp *, Ral_RelvarInfo,
 
 extern void Ral_RelvarStartTransaction(Ral_RelvarInfo, int) ;
 extern int Ral_RelvarEndTransaction(Ral_RelvarInfo, int, Tcl_DString *) ;
+extern int Ral_RelvarIsTransOnGoing(Ral_RelvarInfo) ;
+extern int Ral_RelvarTransModifiedRelvar(Ral_RelvarInfo, Ral_Relvar) ;
+
 extern void Ral_RelvarStartCommand(Ral_RelvarInfo, Ral_Relvar) ;
-extern int Ral_RelvarEndCommand(Ral_RelvarInfo, Ral_Relvar, int,
-    Tcl_DString *) ;
+extern int Ral_RelvarEndCommand(Ral_RelvarInfo, int, Tcl_DString *) ;
 
 extern Ral_RelvarTransaction Ral_RelvarNewTransaction(void) ;
 extern void Ral_RelvarDeleteTransaction(Ral_RelvarTransaction) ;
 
 extern Ral_Constraint Ral_ConstraintAssocCreate(const char *, Ral_RelvarInfo) ;
+extern Ral_Constraint Ral_ConstraintPartitionCreate(const char *,
+    Ral_RelvarInfo) ;
+extern int Ral_ConstraintDeleteByName(const char *, Ral_RelvarInfo) ;
+extern Ral_Constraint Ral_ConstraintFindByName(const char *, Ral_RelvarInfo) ;
 extern Ral_Constraint Ral_ConstraintNewAssociation(const char *) ;
 extern Ral_Constraint Ral_ConstraintNewPartition(const char *) ;
 extern void Ral_ConstraintDelete(Ral_Constraint) ;

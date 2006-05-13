@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.3 $
-$Date: 2006/05/07 03:53:28 $
+$Revision: 1.4 $
+$Date: 2006/05/13 01:10:13 $
  *--
  */
 
@@ -81,6 +81,8 @@ FORWARD FUNCTION REFERENCES
 */
 static int RelvarAssociationCmd(Tcl_Interp *, int, Tcl_Obj *const*,
     Ral_RelvarInfo) ;
+static int RelvarConstraintCmd(Tcl_Interp *, int, Tcl_Obj *const*,
+    Ral_RelvarInfo) ;
 static int RelvarCreateCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarDeleteCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarDeleteOneCmd(Tcl_Interp *, int, Tcl_Obj *const*,
@@ -90,6 +92,8 @@ static int RelvarDestroyCmd(Tcl_Interp *, int, Tcl_Obj *const*,
 static int RelvarEvalCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarInsertCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarNamesCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
+static int RelvarPartitionCmd(Tcl_Interp *, int, Tcl_Obj *const*,
+    Ral_RelvarInfo) ;
 static int RelvarSetCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarUpdateCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarUpdateOneCmd(Tcl_Interp *, int, Tcl_Obj *const*,
@@ -106,7 +110,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.3 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.4 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -124,6 +128,7 @@ relvarCmd(
 	int (*cmdFunc)(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
     } cmdTable[] = {
 	{"association", RelvarAssociationCmd},
+	{"constraint", RelvarConstraintCmd},
 	{"create", RelvarCreateCmd},
 	{"delete", RelvarDeleteCmd},
 	{"deleteone", RelvarDeleteOneCmd},
@@ -131,6 +136,7 @@ relvarCmd(
 	{"eval", RelvarEvalCmd},
 	{"insert", RelvarInsertCmd},
 	{"names", RelvarNamesCmd},
+	{"partition", RelvarPartitionCmd},
 	{"set", RelvarSetCmd},
 	{"update", RelvarUpdateCmd},
 	{"updateone", RelvarUpdateOneCmd},
@@ -170,13 +176,34 @@ RelvarAssociationCmd(
     Tcl_Obj *const*objv,
     Ral_RelvarInfo rInfo)
 {
-    enum AssocCmdType {
-	AssocCreate,
-	AssocDelete,
-	AssocInfo,
+    /* relvar association name relvar1 attr-list1 spec1
+     * relvar2 attr-list2 spec2 */
+    if (objc != 9) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+	    "name relvar1 attr-list1 spec1 relvar2 attr-list2 spec2") ;
+	return TCL_ERROR ;
+    }
+    Tcl_ResetResult(interp) ;
+    /*
+     * Creating an association is an implicit transaction as each
+     * relvar participating in the association is treated as modified.
+     */
+    return Ral_RelvarObjCreateAssoc(interp, objv + 2, rInfo) ;
+}
+
+static int
+RelvarConstraintCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv,
+    Ral_RelvarInfo rInfo)
+{
+    enum ConstraintCmdType {
+	ConstraintDelete,
+	ConstraintInfo,
+	ConstraintNames,
     } ;
-    static const char *assocCmds[] = {
-	"create",
+    static const char *constraintCmds[] = {
 	"delete",
 	"info",
 	"names",
@@ -185,43 +212,58 @@ RelvarAssociationCmd(
     int result = TCL_ERROR ;
     int index ;
 
-    /* relvar association create name relvar1 attr-list1 spec1
-     * relvar2 attr-list2 spec2 */
-    /* relvar association delete name */
-    /* relvar association info name */
-    /* relvar association names pattern */
-    if (objc < 4) {
+    if (objc < 3) {
 	Tcl_WrongNumArgs(interp, 2, objv,
-	    "create | delete | info name ?args?") ;
+	    "create | delete | info | names ?args?") ;
 	return TCL_ERROR ;
     }
 
-    if (Tcl_GetIndexFromObj(interp, (Tcl_Obj *)objv[2], assocCmds,
-	"association subcommand", 0, &index) != TCL_OK) {
+    if (Tcl_GetIndexFromObj(interp, (Tcl_Obj *)objv[2], constraintCmds,
+	"constraint subcommand", 0, &index) != TCL_OK) {
 	return TCL_ERROR ;
     }
 
-    switch ((enum AssocCmdType)index) {
-    case AssocCreate:
-	if (objc != 10) {
-	    Tcl_WrongNumArgs(interp, 2, objv,
-		"name relvar1 attr-list1 spec1 relvar2 attr-list2 spec2") ;
+    switch ((enum ConstraintCmdType)index) {
+    /* relvar constraint delete ?name1 name2 ...? */
+    case ConstraintDelete:
+	objc -= 3 ;
+	objv += 3 ;
+	while (objc-- > 0) {
+	    result = Ral_RelvarObjConstraintDelete(interp,
+		Tcl_GetString(*objv++), rInfo) ;
+	    if (result != TCL_OK) {
+		break ;
+	    }
+	}
+	return result ;
+
+    /* relvar constraint info name */
+    case ConstraintInfo:
+	if (objc != 4) {
+	    Tcl_WrongNumArgs(interp, 2, objv, "names") ;
 	    return TCL_ERROR ;
 	}
-	result = Ral_RelvarObjCreateAssoc(interp, objv + 3, rInfo) ;
+	result = Ral_RelvarObjConstraintInfo(interp, objv[3], rInfo) ;
 	break ;
 
-    case AssocDelete:
-	break ;
+    /* relvar constraint names ?pattern? */
+    case ConstraintNames:
+    {
+	const char *pattern ;
 
-    case AssocInfo:
+	if (objc > 4) {
+	    Tcl_WrongNumArgs(interp, 2, objv, "names ?pattern?") ;
+	    return TCL_ERROR ;
+	}
+	pattern = objc == 3 ? "*" : Tcl_GetString(objv[3]) ;
+	result = Ral_RelvarObjConstraintNames(interp, pattern, rInfo) ;
+    }
 	break ;
 
     default:
 	Tcl_Panic("Unknown association command type, %d", index) ;
     }
 
-    Tcl_ResetResult(interp) ;
     return result ;
 }
 
@@ -304,7 +346,6 @@ RelvarDestroyCmd(
     objc -= 2 ;
     objv += 2 ;
 
-    Ral_RelvarStartTransaction(rInfo, 0) ;
     while (objc-- > 0) {
 	result = Ral_RelvarObjDelete(interp, rInfo, *objv++) ;
 	if (result != TCL_OK) {
@@ -312,7 +353,7 @@ RelvarDestroyCmd(
 	}
     }
 
-    return Ral_RelvarObjEndTrans(interp, rInfo, result == TCL_ERROR) ;
+    return result ;
 }
 
 static int
@@ -343,7 +384,8 @@ RelvarEvalCmd(
 	Tcl_AddObjErrorInfo(interp, msg, -1) ;
     }
 
-    return Ral_RelvarObjEndTrans(interp, rInfo, result == TCL_ERROR) ;
+    return Ral_RelvarObjEndTrans(interp, rInfo, result == TCL_ERROR) == TCL_OK ?
+	result : TCL_ERROR ;
 }
 
 static int
@@ -378,7 +420,7 @@ RelvarInsertCmd(
     Ral_RelationReserve(relation, objc) ;
     while (objc-- > 0) {
 	if (Ral_RelationInsertTupleObj(relation, interp, *objv++) != TCL_OK) {
-	    return Ral_RelvarObjEndCmd(interp, rInfo, relvar, 1) ;
+	    return Ral_RelvarObjEndCmd(interp, rInfo, 1) ;
 	}
 	++inserted ;
     }
@@ -387,7 +429,7 @@ RelvarInsertCmd(
 	Tcl_InvalidateStringRep(relvar->relObj) ;
     }
 
-    result = Ral_RelvarObjEndCmd(interp, rInfo, relvar, 0) ;
+    result = Ral_RelvarObjEndCmd(interp, rInfo, 0) ;
     if (result == TCL_OK) {
 	Tcl_SetObjResult(interp, relvar->relObj) ;
     }
@@ -433,6 +475,31 @@ RelvarNamesCmd(
 
     Tcl_SetObjResult(interp, nameList) ;
     return TCL_OK ;
+}
+
+static int
+RelvarPartitionCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv,
+    Ral_RelvarInfo rInfo)
+{
+    /*
+     * relvar partition name super super-attrs sub1 sub1-attrs
+     * ?sub2 sub2-attrs sub3 sub3-attrs ...?
+     */
+    if (objc < 7 || (objc % 2) == 0) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+	    "name super super-attrs sub1 sub1-attrs"
+	     " ?sub2 sub2-attrs sub3 sub3-attrs ...?") ;
+	return TCL_ERROR ;
+    }
+    Tcl_ResetResult(interp) ;
+    /*
+     * Creating a partition is an implicit transaction as each
+     * relvar participating in the association is treated as modified.
+     */
+    return Ral_RelvarObjCreatePartition(interp, objc - 2, objv + 2, rInfo) ;
 }
 
 static int
@@ -483,7 +550,7 @@ RelvarSetCmd(
 
 	Ral_RelvarStartCommand(rInfo, relvar) ;
 	Ral_RelvarSetRelation(relvar, relation) ;
-	result = Ral_RelvarObjEndCmd(interp, rInfo, relvar, 0) ;
+	result = Ral_RelvarObjEndCmd(interp, rInfo, 0) ;
     }
 
     if (result == TCL_OK) {
