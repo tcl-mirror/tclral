@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.15 $
-# $Date: 2006/05/13 01:10:14 $
+# $Revision: 1.16 $
+# $Date: 2006/05/19 04:54:32 $
 #  *--
 
 package require tcltest 2.2
@@ -879,7 +879,7 @@ namespace eval ::ral::test {
 	    {Age 20 Name George City {San Jose}}\
 	    {City Saratoga Age 10 Name Fred}}}
 	relation choose $r City Sunnyvale
-    } -result {attributes do not constitute an identifier, "during choose operation"}\
+    } -result {attributes do not constitute an identifier, "during find operation"}\
     -returnCodes 1
 
     test relation-choose-4.0 {multiple identifiers} -body {
@@ -3007,14 +3007,7 @@ namespace eval ::ral::test {
 	}
     } -match relation
 
-    # Relvar Tests
-
-    # relvar create subcommand
-    test relvar-create-1.0 {single attribute} -body {
-	relvar create N {Relation {Name string} Name}
-    } -cleanup {
-	relvar destroy N
-    } -result {Relation {Name string} Name {}} -match relation
+    # relvar Tests
 
     # relvar association subcommand
     test relvar-association-1.1 {one to one} -setup {
@@ -3282,6 +3275,112 @@ tuple {B1 c B2 foo} is not referenced by any tuple} -returnCodes error
     } -body {
 	relvar constraint info R1
     } -result {partition R1 ::ral::test::A A1 ::ral::test::B B1 ::ral::test::C C1}
+
+    # relvar create subcommand
+    test relvar-create-1.0 {single attribute} -body {
+	relvar create N {Relation {Name string} Name}
+    } -cleanup {
+	relvar destroy N
+    } -result {Relation {Name string} Name {}} -match relation
+
+    # relvar delete subcommand
+    test relvar-delete-1.0 {expression is false} -setup {
+	relvar create X {
+	    Relation
+	    {Name string Status int}
+	    Name
+	}
+	relvar insert X\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar destroy X
+    } -body {
+	relvar delete X t {0}
+    } -result {0}
+
+    test relvar-delete-2.0 {expression is true} -setup {
+	relvar create X {
+	    Relation
+	    {Name string Status int}
+	    Name
+	}
+	relvar insert X\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar destroy X
+    } -body {
+	relvar delete X t {1}
+    } -result {3}
+
+    test relvar-delete-3.0 {subset is deleted} -setup {
+	relvar create X {
+	    Relation
+	    {Name string Status int}
+	    Name
+	}
+	relvar insert X\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar destroy X
+    } -body {
+	relvar delete X t {[tuple extract $t Name] eq "George"}
+    } -result {1}
+
+    # relvar deleteone subcommand
+    test relvar-deleteone-1.0 {no match} -setup {
+	relvar create X {
+	    Relation
+	    {Name string Status int}
+	    Name
+	}
+	relvar insert X\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar destroy X
+    } -body {
+	relvar deleteone X Name Jane
+    } -result {0}
+
+    test relvar-deleteone-2.0 {match} -setup {
+	relvar create X {
+	    Relation
+	    {Name string Status int}
+	    Name
+	}
+	relvar insert X\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar destroy X
+    } -body {
+	relvar deleteone X Name Fred
+    } -result {1}
+
+    test relvar-deleteone-3.0 {bad identifier} -setup {
+	relvar create X {
+	    Relation
+	    {Name string Status int}
+	    Name
+	}
+	relvar insert X\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar destroy X
+    } -body {
+	relvar deleteone X Status 30
+    } -result {attributes do not constitute an identifier, "during find operation"}\
+    -returnCodes error
 
     # relvar partition subcommand
     test relvar-partition-1.1 {simple partition} -setup {

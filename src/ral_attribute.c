@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.c,v $
-$Revision: 1.9 $
-$Date: 2006/05/07 03:53:28 $
+$Revision: 1.10 $
+$Date: 2006/05/19 04:54:32 $
  *--
  */
 
@@ -96,7 +96,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.9 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.10 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -300,6 +300,52 @@ Ral_AttributeValueEqual(
     }
     /* Not reached */
     return 1 ;
+}
+
+Tcl_Obj *
+Ral_AttributeValueObj(
+    Tcl_Interp *interp,
+    Ral_Attribute a,
+    Tcl_Obj *value)
+{
+    Tcl_Obj *result = NULL ;
+
+    switch (a->attrType) {
+    case Tcl_Type:
+	result = value ;
+	break ;
+
+    case Tuple_Type:
+	if (Tcl_ConvertToType(interp, value, &Ral_TupleObjType) == TCL_OK) {
+	    Ral_Tuple tuple ;
+	    char *valueStr ;
+
+	    tuple = value->internalRep.otherValuePtr ;
+	    valueStr = Ral_TupleValueStringOf(tuple) ;
+	    result = Tcl_NewStringObj(valueStr, -1) ;
+	    ckfree(valueStr) ;
+	}
+	break ;
+
+    case Relation_Type:
+	if (Tcl_ConvertToType(interp, value, &Ral_RelationObjType) == TCL_OK) {
+	    Ral_Relation relation ;
+	    char *valueStr ;
+
+	    relation = value->internalRep.otherValuePtr ;
+	    valueStr = Ral_RelationValueStringOf(relation) ;
+	    result = Tcl_NewStringObj(valueStr, -1) ;
+	    ckfree(valueStr) ;
+	}
+	break ;
+
+    default:
+	Tcl_Panic("Ral_AttributeValueObj: unknown attribute type: %d",
+	    a->attrType) ;
+	break ;
+    }
+
+    return result ;
 }
 
 /*

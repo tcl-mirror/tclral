@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationobj.c,v $
-$Revision: 1.11 $
-$Date: 2006/04/27 14:48:56 $
+$Revision: 1.12 $
+$Date: 2006/05/19 04:54:32 $
  *--
  */
 
@@ -105,7 +105,7 @@ Tcl_ObjType Ral_RelationObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.11 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.12 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -402,6 +402,78 @@ Ral_RelationFindJoinAttrs(
     return TCL_OK ;
 }
 
+/*
+ * Returns a tuple that has values set for the given attributes.
+ * The attributes are examined to make sure that they form an identifier
+ * so that the resulting tuple can be used as a key to look up a particular
+ * tuple in the relation.
+ * Caller must delete the returned tuple.
+ */
+Ral_Tuple
+Ral_RelationKeyTuple(
+    Tcl_Interp *interp,
+    Ral_Relation relation,
+    int objc,
+    Tcl_Obj *const*objv,
+    int *idRef)
+{
+    Ral_RelationHeading heading = relation->heading ;
+    Ral_TupleHeading tupleHeading = heading->tupleHeading ;
+    Ral_IntVector id ;
+    Ral_Tuple key ;
+    int idNum ;
+
+    if (objc % 2 != 0) {
+	Ral_RelationObjSetError(interp, REL_BAD_PAIRS_LIST, "key tuple") ;
+	return NULL ;
+    }
+    /*
+     * Iterate through the name/value list and construct an identifier
+     * vector from the attribute names and a key tuple from the corresponding
+     * values.
+     */
+    id = Ral_IntVectorNewEmpty(objc / 2) ;
+    key = Ral_TupleNew(tupleHeading) ;
+    for ( ; objc > 0 ; objc -= 2, objv += 2) {
+	const char *attrName = Tcl_GetString(*objv) ;
+	int attrIndex = Ral_TupleHeadingIndexOf(tupleHeading, attrName) ;
+	int updated ;
+
+	if (attrIndex < 0) {
+	    Ral_RelationObjSetError(interp, REL_UNKNOWN_ATTR, attrName) ;
+	    goto error_out ;
+	}
+	Ral_IntVectorPushBack(id, attrIndex) ;
+
+	updated = Ral_TupleUpdateAttrValue(key, attrName, *(objv + 1)) ;
+	if (!updated) {
+	    Ral_TupleObjSetError(interp, Ral_TupleLastError,
+		Tcl_GetString(*(objv + 1))) ;
+	    goto error_out ;
+	}
+    }
+
+    /*
+     * Check if the attributes given do constitute an identifier.
+     */
+    idNum = Ral_RelationHeadingFindIdentifier(heading, id) ;
+    if (idNum < 0) {
+	Ral_RelationObjSetError(interp, REL_NOT_AN_IDENTIFIER,
+	    "during find operation") ;
+	goto error_out ;
+    } else if (idRef) {
+	*idRef = idNum ;
+    }
+    Ral_IntVectorDelete(id) ;
+
+    return key ;
+
+error_out:
+    Ral_IntVectorDelete(id) ;
+    Ral_TupleDelete(key) ;
+    return NULL ;
+}
+
 const char *
 Ral_RelationObjVersion(void)
 {
@@ -444,10 +516,6 @@ Ral_RelationObjSetError(
 	"attributes must have the same type",
 	"only a single identifier may be specified",
 	"identifier must have only a single attribute",
-
-	"bad relation heading format",
-	"bad value type for value",
-	"wrong number of attributes specified",
     } ;
     static const char *errorStrings[] = {
 	"OK",
@@ -475,10 +543,6 @@ Ral_RelationObjSetError(
 	"TYPE_MISMATCH",
 	"SINGLE_IDENTIFIER",
 	"SINGLE_ATTRIBUTE",
-
-	"HEADING_ERR",
-	"BAD_VALUE",
-	"WRONG_NUM_ATTRS",
     } ;
 
     Ral_ObjSetError(interp, "RELATION", resultStrings[error],

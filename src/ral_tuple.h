@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuple.h,v $
-$Revision: 1.8 $
-$Date: 2006/05/07 03:53:28 $
+$Revision: 1.9 $
+$Date: 2006/05/19 04:54:32 $
  *--
  */
 #ifndef _ral_tuple_h_
@@ -163,7 +163,7 @@ extern int Ral_TupleConvertValue(Ral_Tuple, char *,
     Ral_AttributeTypeScanFlags *, Ral_AttributeValueScanFlags *) ;
 extern void Ral_TuplePrint(Ral_Tuple, const char *, FILE *) ;
 extern char *Ral_TupleStringOf(Ral_Tuple) ;
-extern char * Ral_TupleValueStringOf(Ral_Tuple tuple) ;
+extern char * Ral_TupleValueStringOf(Ral_Tuple) ;
 extern const char *Ral_TupleVersion(void) ;
 
 #endif /* _ral_tuple_h_ */

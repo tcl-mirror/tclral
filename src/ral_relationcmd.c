@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.11 $
-$Date: 2006/04/27 14:48:56 $
+$Revision: 1.12 $
+$Date: 2006/05/19 04:54:32 $
  *--
  */
 
@@ -135,7 +135,7 @@ static const char *orderOptions[] = {
     "-descending",
     NULL
 } ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.11 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.12 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -316,7 +316,6 @@ RelationChooseCmd(
     Ral_Relation relation ;
     Ral_RelationHeading heading ;
     Ral_TupleHeading tupleHeading ;
-    Ral_IntVector id ;
     Ral_Tuple key ;
     int idNum ;
     Ral_Relation newRelation ;
@@ -344,42 +343,10 @@ RelationChooseCmd(
 	    "attribute / value arguments must be given in pairs") ;
 	return TCL_ERROR ;
     }
-    /*
-     * Iterate through the name/value list and construct an identifier
-     * vector from the attribute names and a key tuple from the corresponding
-     * values.
-     */
-    id = Ral_IntVectorNewEmpty(objc / 2) ;
-    key = Ral_TupleNew(tupleHeading) ;
-    for ( ; objc > 0 ; objc -= 2, objv += 2) {
-	const char *attrName = Tcl_GetString(*objv) ;
-	int attrIndex = Ral_TupleHeadingIndexOf(tupleHeading, attrName) ;
-	int updated ;
-
-	if (attrIndex < 0) {
-	    Ral_RelationObjSetError(interp, REL_UNKNOWN_ATTR, attrName) ;
-	    goto error_out ;
-	}
-	Ral_IntVectorPushBack(id, attrIndex) ;
-
-	updated = Ral_TupleUpdateAttrValue(key, attrName, *(objv + 1)) ;
-	if (!updated) {
-	    Ral_TupleObjSetError(interp, Ral_TupleLastError,
-		Tcl_GetString(*(objv + 1))) ;
-	    goto error_out ;
-	}
+    key = Ral_RelationKeyTuple(interp, relation, objc, objv, &idNum) ;
+    if (key == NULL) {
+	return TCL_ERROR ;
     }
-
-    /*
-     * Check if the attributes given do constitute an identifier.
-     */
-    idNum = Ral_RelationHeadingFindIdentifier(heading, id) ;
-    if (idNum < 0) {
-	Ral_RelationObjSetError(interp, REL_NOT_AN_IDENTIFIER,
-	    "during choose operation") ;
-	goto error_out ;
-    }
-    Ral_IntVectorDelete(id) ;
     /*
      * Create the result relation.
      */
@@ -403,11 +370,6 @@ RelationChooseCmd(
 
     Tcl_SetObjResult(interp, Ral_RelationObjNew(newRelation)) ;
     return TCL_OK ;
-
-error_out:
-    Ral_IntVectorDelete(id) ;
-    Ral_TupleDelete(key) ;
-    return TCL_ERROR ;
 }
 
 static int

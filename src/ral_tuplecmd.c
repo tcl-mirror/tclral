@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuplecmd.c,v $
-$Revision: 1.8 $
-$Date: 2006/04/09 01:35:47 $
+$Revision: 1.9 $
+$Date: 2006/05/19 04:54:32 $
  *--
  */
 
@@ -104,7 +104,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tuplecmd.c,v $ $Revision: 1.8 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tuplecmd.c,v $ $Revision: 1.9 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -555,7 +555,8 @@ TupleGetCmd(
 	Ral_Attribute attr = *hiter ;
 	if (Tcl_ListObjAppendElement(interp, resultObj,
 		Tcl_NewStringObj(attr->name, -1)) != TCL_OK ||
-	    Tcl_ListObjAppendElement(interp, resultObj, *values++) != TCL_OK) {
+		Tcl_ListObjAppendElement(interp, resultObj, *values++)
+		!= TCL_OK) {
 	    Tcl_DecrRefCount(resultObj) ;
 	    return TCL_ERROR ;
 	}

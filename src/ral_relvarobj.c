@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.4 $
-$Date: 2006/05/13 01:10:13 $
+$Revision: 1.5 $
+$Date: 2006/05/19 04:54:32 $
  *--
  */
 
@@ -97,7 +97,7 @@ EXTERNAL DATA DEFINITIONS
 STATIC DATA ALLOCATION
 */
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.4 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.5 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -888,6 +888,7 @@ Ral_RelvarObjSetError(
 	"relvar has constraints in place",
 	"referred to identifiers can not have non-singular multiplicities",
 	"operation is not allowed during \"eval\" command",
+	"bad list of pairs",
     } ;
     static const char *errorStrings[] = {
 	"OK",
@@ -901,6 +902,7 @@ Ral_RelvarObjSetError(
 	"CONSTRAINTS_PRESENT",
 	"BAD_MULT",
 	"BAD_TRANS_OP",
+	"BAD_PAIRS_LIST",
     } ;
 
     Ral_ObjSetError(interp, "RELVAR", resultStrings[error],

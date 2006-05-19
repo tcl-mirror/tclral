@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.h,v $
-$Revision: 1.11 $
-$Date: 2006/05/07 03:53:28 $
+$Revision: 1.12 $
+$Date: 2006/05/19 04:54:32 $
  *--
  */
 #ifndef _ral_relation_h_
@@ -157,11 +157,6 @@ typedef enum Ral_RelationError {
     REL_TYPE_MISMATCH,
     REL_SINGLE_IDENTIFIER,
     REL_SINGLE_ATTRIBUTE,
-
-
-    REL_HEADING_ERR,
-    REL_BAD_VALUE,
-    REL_WRONG_NUM_ATTRS,
 } Ral_RelationError ;
 
 /*
@@ -193,8 +188,9 @@ extern Ral_RelationIter Ral_RelationFind(Ral_Relation, int, Ral_Tuple,
 extern Ral_RelationIter Ral_RelationFindKey(Ral_Relation, int, Ral_Tuple,
     Ral_IntVector) ;
 extern Ral_Relation Ral_RelationExtract(Ral_Relation, Ral_IntVector) ;
-extern void Ral_RelationErase(Ral_Relation, Ral_RelationIter,
+extern Ral_RelationIter Ral_RelationErase(Ral_Relation, Ral_RelationIter,
     Ral_RelationIter) ;
+extern int Ral_RelationEraseTuple(Ral_Relation, int, Ral_Tuple, Ral_IntVector) ;
 
 extern int Ral_RelationCompare(Ral_Relation, Ral_Relation) ;
 extern int Ral_RelationEqual(Ral_Relation, Ral_Relation) ;
@@ -242,6 +238,7 @@ extern int Ral_RelationConvertValue(Ral_Relation, char *,
     Ral_AttributeTypeScanFlags *, Ral_AttributeValueScanFlags *) ;
 extern void Ral_RelationPrint(Ral_Relation, const char *, FILE *) ;
 extern char *Ral_RelationStringOf(Ral_Relation) ;
+extern char *Ral_RelationValueStringOf(Ral_Relation) ;
 
 extern const char * Ral_RelationVersion(void) ;
 

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.13 $
-$Date: 2006/05/07 03:53:28 $
+$Revision: 1.14 $
+$Date: 2006/05/19 04:54:32 $
  *--
  */
 
@@ -116,7 +116,7 @@ static Ral_RelationIter sortBegin ;
 static Ral_IntVector sortAttrs ;
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.13 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.14 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -1781,12 +1781,66 @@ Ral_RelationExtract(
     return subRel ;
 }
 
-void
+Ral_RelationIter
 Ral_RelationErase(
     Ral_Relation relation,
-    Ral_RelationIter start,
-    Ral_RelationIter finish)
+    Ral_RelationIter first,
+    Ral_RelationIter last)
 {
+    Ral_RelationIter iter ;
+
+    if (first < relation->start || first > relation->finish) {
+	Tcl_Panic("Ral_RelationErase: first iterator out of bounds") ;
+    }
+    if (last < relation->start || last > relation->finish) {
+	Tcl_Panic("Ral_RelationErase: last iterator out of bounds") ;
+    }
+    if (first > last) {
+	Tcl_Panic("Ral_RelationErase: first iterator greater than last") ;
+    }
+
+    /*
+     * Remove the indices for all tuples from the first to the finish.
+     */
+    for (iter = first ; iter != relation->finish ; ++iter) {
+	Ral_RelationRemoveTupleIndex(relation, *iter) ;
+    }
+    /*
+     * Remove a reference from the tuples from first to last.
+     */
+    for (iter = first ; iter != last ; ++iter) {
+	Ral_TupleUnreference(*iter) ;
+    }
+    /*
+     * Close up the array.
+     */
+    memmove(first, last, (relation->finish - last) * sizeof(*first)) ;
+    relation->finish -= last - first ;
+    /*
+     * Reindex the new arrangement of tuples.
+     */
+    for (iter = first ; iter != relation->finish ; ++iter) {
+	int status = Ral_RelationIndexTuple(relation, *iter, iter) ;
+	assert(status != 0) ;
+    }
+    return first ;
+}
+
+int
+Ral_RelationEraseTuple(
+    Ral_Relation relation,
+    int idNum,
+    Ral_Tuple key,
+    Ral_IntVector map)
+{
+    Ral_RelationIter found = Ral_RelationFindKey(relation, idNum, key, map) ;
+    Ral_RelationIter end = Ral_RelationEnd(relation) ;
+
+    if (found != end) {
+	Ral_RelationErase(relation, found, found + 1) ;
+    }
+
+    return found != end ;
 }
 
 /*
@@ -2208,6 +2262,37 @@ Ral_RelationStringOf(
     /* +1 for NUL terminator */
     str = ckalloc(Ral_RelationScan(relation, &typeFlags, &valueFlags) + 1) ;
     length = Ral_RelationConvert(relation, str, &typeFlags, &valueFlags) ;
+    str[length] = '\0' ;
+
+    return str ;
+}
+
+char *
+Ral_RelationValueStringOf(
+    Ral_Relation relation)
+{
+    Ral_RelationHeading heading = relation->heading ;
+    Ral_AttributeTypeScanFlags typeFlags ;
+    Ral_AttributeValueScanFlags valueFlags ;
+    char *str ;
+    int length ;
+
+    memset(&typeFlags, 0, sizeof(typeFlags)) ;
+    typeFlags.attrType = Relation_Type ;
+    memset(&valueFlags, 0, sizeof(valueFlags)) ;
+    valueFlags.attrType = Relation_Type ;
+
+    /*
+     * Scan the header just to get the typeFlags set properly.
+     */
+    Ral_RelationHeadingScan(heading, &typeFlags) ;
+    /*
+     * Scan and convert only the value portion of the relation.
+     * +1 for NUL terminator
+     */
+    str = ckalloc(Ral_RelationScanValue(relation, &typeFlags, &valueFlags)
+	+ 1) ;
+    length = Ral_RelationConvertValue(relation, str, &typeFlags, &valueFlags) ;
     str[length] = '\0' ;
 
     return str ;

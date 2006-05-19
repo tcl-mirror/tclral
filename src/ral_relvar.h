@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.h,v $
-$Revision: 1.4 $
-$Date: 2006/05/13 01:10:13 $
+$Revision: 1.5 $
+$Date: 2006/05/19 04:54:32 $
  *--
  */
 #ifndef _ral_relvar_h_
@@ -144,6 +144,7 @@ typedef enum Ral_RelvarError {
     RELVAR_CONSTRAINTS_PRESENT,
     RELVAR_BAD_MULT,
     RELVAR_BAD_TRANS_OP,
+    RELVAR_BAD_PAIRS_LIST,
 } Ral_RelvarError ;
 
 /*

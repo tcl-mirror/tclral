@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.4 $
-$Date: 2006/05/13 01:10:13 $
+$Revision: 1.5 $
+$Date: 2006/05/19 04:54:32 $
  *--
  */
 
@@ -63,6 +63,7 @@ INCLUDE FILES
 #include "ral_relvarobj.h"
 #include "ral_relvar.h"
 #include "ral_relationobj.h"
+#include "ral_tupleobj.h"
 
 /*
 MACRO DEFINITIONS
@@ -110,7 +111,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.4 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.5 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -315,7 +316,70 @@ RelvarDeleteCmd(
     Tcl_Obj *const*objv,
     Ral_RelvarInfo rInfo)
 {
-    return TCL_ERROR ;
+    Ral_Relvar relvar ;
+    Ral_Relation relation ;
+    Tcl_Obj *tupleNameObj ;
+    Tcl_Obj *exprObj ;
+    Ral_RelationIter rIter ;
+    int deleted = 0 ;
+    int result = TCL_OK ;
+
+    /* relvar delete relvarName tupleVarName expr */
+    if (objc != 5) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relvarName tupleVarName expr") ;
+	return TCL_ERROR ;
+    }
+    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2]),
+	NULL) ;
+    if (relvar == NULL) {
+	return TCL_ERROR ;
+    }
+    if (Tcl_ConvertToType(interp, relvar->relObj, &Ral_RelationObjType)
+	!= TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relvar->relObj->internalRep.otherValuePtr ;
+
+    Tcl_IncrRefCount(tupleNameObj = objv[3]) ;
+    Tcl_IncrRefCount(exprObj = objv[4]) ;
+
+    Ral_RelvarStartCommand(rInfo, relvar) ;
+    for (rIter = Ral_RelationBegin(relation) ;
+	    rIter != Ral_RelationEnd(relation) ;) {
+	int boolValue ;
+	Tcl_Obj *tupleObj ;
+
+	tupleObj = Ral_TupleObjNew(*rIter) ;
+	if (Tcl_ObjSetVar2(interp, tupleNameObj, NULL, tupleObj,
+	    TCL_LEAVE_ERR_MSG) == NULL) {
+	    Tcl_DecrRefCount(tupleObj) ;
+	    result = TCL_ERROR ;
+	    break ;
+	}
+	if (Tcl_ExprBooleanObj(interp, exprObj, &boolValue) != TCL_OK) {
+	    result = TCL_ERROR ;
+	    break ;
+	}
+	if (boolValue) {
+	    rIter = Ral_RelationErase(relation, rIter, rIter + 1) ;
+	    ++deleted ;
+	} else {
+	    ++rIter ;
+	}
+    }
+    Tcl_UnsetVar(interp, Tcl_GetString(tupleNameObj), 0) ;
+
+    Tcl_DecrRefCount(tupleNameObj) ;
+    Tcl_DecrRefCount(exprObj) ;
+    if (deleted) {
+	Tcl_InvalidateStringRep(relvar->relObj) ;
+    }
+
+    result = Ral_RelvarObjEndCmd(interp, rInfo, 0) ;
+    if (result == TCL_OK) {
+	Tcl_SetObjResult(interp, Tcl_NewIntObj(deleted)) ;
+    }
+    return result ;
 }
 
 static int
@@ -325,7 +389,51 @@ RelvarDeleteOneCmd(
     Tcl_Obj *const*objv,
     Ral_RelvarInfo rInfo)
 {
-    return TCL_ERROR ;
+    Ral_Relvar relvar ;
+    Ral_Relation relation ;
+    Ral_Tuple key ;
+    int idNum ;
+    int deleted ;
+    int result ;
+
+    /* relvar deleteone relvarName ?attrName1 value1 attrName2 value2 ...? */
+    if (objc < 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relvarName relvarName "
+	    "?attrName1 value1 attrName2 value2 ...?") ;
+	return TCL_ERROR ;
+    }
+
+    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2]),
+	NULL) ;
+    if (relvar == NULL) {
+	return TCL_ERROR ;
+    }
+    if (Tcl_ConvertToType(interp, relvar->relObj, &Ral_RelationObjType)
+	!= TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relvar->relObj->internalRep.otherValuePtr ;
+
+    objc -= 3 ;
+    objv += 3 ;
+
+    key = Ral_RelationKeyTuple(interp, relation, objc, objv, &idNum) ;
+    if (key == NULL) {
+	return TCL_ERROR ;
+    }
+    Ral_RelvarStartCommand(rInfo, relvar) ;
+    deleted = Ral_RelationEraseTuple(relation, idNum, key, NULL) ;
+    Ral_TupleDelete(key) ;
+
+    if (deleted) {
+	Tcl_InvalidateStringRep(relvar->relObj) ;
+    }
+
+    result = Ral_RelvarObjEndCmd(interp, rInfo, 0) ;
+    if (result == TCL_OK) {
+	Tcl_SetObjResult(interp, Tcl_NewBooleanObj(deleted)) ;
+    }
+    return result ;
 }
 
 static int
@@ -409,6 +517,10 @@ RelvarInsertCmd(
     relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2]),
 	NULL) ;
     if (relvar == NULL) {
+	return TCL_ERROR ;
+    }
+    if (Tcl_ConvertToType(interp, relvar->relObj, &Ral_RelationObjType)
+	!= TCL_OK) {
 	return TCL_ERROR ;
     }
     relation = relvar->relObj->internalRep.otherValuePtr ;
@@ -550,6 +662,7 @@ RelvarSetCmd(
 
 	Ral_RelvarStartCommand(rInfo, relvar) ;
 	Ral_RelvarSetRelation(relvar, relation) ;
+	Tcl_InvalidateStringRep(relvar->relObj) ;
 	result = Ral_RelvarObjEndCmd(interp, rInfo, 0) ;
     }
 
