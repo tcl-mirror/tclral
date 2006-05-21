@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.16 $
-# $Date: 2006/05/19 04:54:32 $
+# $Revision: 1.17 $
+# $Date: 2006/05/21 04:22:00 $
 #  *--
 
 package require tcltest 2.2
@@ -3051,7 +3051,7 @@ tuple {B1 b B2 bar} is not referenced by any tuple} -returnCodes error
     test relvar-association-2.1 {one conditional to one} -setup {
 	relvar create C {Relation {C1 string C2 int} C1}
 	relvar create D {Relation {D1 string D2 string} D1}
-	relvar association R2 C C1 0..1 D D1 1
+	relvar association R2 C C1 ? D D1 1
     } -cleanup {
 	relvar constraint delete R2
 	relvar destroy C D
@@ -3066,7 +3066,7 @@ tuple {B1 b B2 bar} is not referenced by any tuple} -returnCodes error
     test relvar-association-2.2 {one conditional to one -- fail} -setup {
 	relvar create C {Relation {C1 string C2 int} C1}
 	relvar create D {Relation {D1 string D2 string} D1}
-	relvar association R2 C C1 0..1 D D1 1
+	relvar association R2 C C1 ? D D1 1
     } -cleanup {
 	relvar constraint delete R2
 	relvar destroy C D
@@ -3077,13 +3077,13 @@ tuple {B1 b B2 bar} is not referenced by any tuple} -returnCodes error
 	    relvar insert D {D1 b D2 foo}
 	    relvar insert C {C1 c C2 42}
 	}
-    } -result {for association R2(::ral::test::C [0..1] ==> [1] ::ral::test::D), in relvar ::ral::test::C
+    } -result {for association R2(::ral::test::C [?] ==> [1] ::ral::test::D), in relvar ::ral::test::C
 tuple {C1 c C2 42} references no tuple} -returnCodes error
 
     test relvar-association-3.1 {one conditional to one conditional} -setup {
 	relvar create C {Relation {C1 string C2 int} C1}
 	relvar create D {Relation {D1 string D2 string} D1}
-	relvar association R2 C C1 0..1 D D1 0..1
+	relvar association R2 C C1 ? D D1 ?
     } -cleanup {
 	relvar constraint delete R2
 	relvar destroy C D
@@ -3099,7 +3099,7 @@ tuple {C1 c C2 42} references no tuple} -returnCodes error
     test relvar-association-4.1 {many to one} -setup {
 	relvar create A {Relation {A1 string BID string} A1}
 	relvar create B {Relation {B1 string B2 string} B1}
-	relvar association R1 A BID 1..* B B1 1
+	relvar association R1 A BID + B B1 1
     } -cleanup {
 	relvar constraint delete R1
 	relvar destroy A B
@@ -3117,7 +3117,7 @@ tuple {C1 c C2 42} references no tuple} -returnCodes error
     test relvar-association-4.2 {many to one -- fail referring} -setup {
 	relvar create A {Relation {A1 string BID string} A1}
 	relvar create B {Relation {B1 string B2 string} B1}
-	relvar association R1 A BID 1..* B B1 1
+	relvar association R1 A BID + B B1 1
     } -cleanup {
 	relvar constraint delete R1
 	relvar destroy A B
@@ -3130,13 +3130,13 @@ tuple {C1 c C2 42} references no tuple} -returnCodes error
 	    relvar insert B {B1 a B2 foo}
 	    relvar insert B {B1 b B2 foo}
 	}
-    } -result {for association R1(::ral::test::A [1..*] ==> [1] ::ral::test::B), in relvar ::ral::test::A
+    } -result {for association R1(::ral::test::A [+] ==> [1] ::ral::test::B), in relvar ::ral::test::A
 tuple {A1 d BID c} references no tuple} -returnCodes error
 
     test relvar-association-4.3 {many to one -- fail referred to} -setup {
 	relvar create A {Relation {A1 string BID string} A1}
 	relvar create B {Relation {B1 string B2 string} B1}
-	relvar association R1 A BID 1..* B B1 1
+	relvar association R1 A BID + B B1 1
     } -cleanup {
 	relvar constraint delete R1
 	relvar destroy A B
@@ -3150,13 +3150,13 @@ tuple {A1 d BID c} references no tuple} -returnCodes error
 	    relvar insert B {B1 b B2 foo}
 	    relvar insert B {B1 c B2 foo}
 	}
-    } -result {for association R1(::ral::test::A [1..*] ==> [1] ::ral::test::B), in relvar ::ral::test::B
+    } -result {for association R1(::ral::test::A [+] ==> [1] ::ral::test::B), in relvar ::ral::test::B
 tuple {B1 c B2 foo} is not referenced by any tuple} -returnCodes error
 
     test relvar-association-5.1 {many conditional to one} -setup {
 	relvar create A {Relation {A1 string BID string} A1}
 	relvar create B {Relation {B1 string B2 string} B1}
-	relvar association R1 A BID 0..* B B1 1
+	relvar association R1 A BID * B B1 1
     } -cleanup {
 	relvar constraint delete R1
 	relvar destroy A B
@@ -3175,7 +3175,7 @@ tuple {B1 c B2 foo} is not referenced by any tuple} -returnCodes error
     test relvar-association-5.2 {many to one conditional} -setup {
 	relvar create A {Relation {A1 string BID string} A1}
 	relvar create B {Relation {B1 string B2 string} B1}
-	relvar association R1 A BID 1..* B B1 0..1
+	relvar association R1 A BID + B B1 ?
     } -cleanup {
 	relvar constraint delete R1
 	relvar destroy A B
@@ -3194,7 +3194,7 @@ tuple {B1 c B2 foo} is not referenced by any tuple} -returnCodes error
     test relvar-association-5.3 {many conditional to one conditional} -setup {
 	relvar create A {Relation {A1 string BID string} A1}
 	relvar create B {Relation {B1 string B2 string} B1}
-	relvar association R1 A BID 0..* B B1 0..1
+	relvar association R1 A BID * B B1 ?
     } -cleanup {
 	relvar constraint delete R1
 	relvar destroy A B
@@ -3215,8 +3215,8 @@ tuple {B1 c B2 foo} is not referenced by any tuple} -returnCodes error
 	relvar create A {Relation {A1 string BID string} A1}
 	relvar create B {Relation {B1 string B2 string} B1}
     } -body {
-	relvar association R1 A BID 0..* B B1 0..1
-	relvar association R1 A BID 0..* B B1 0..1
+	relvar association R1 A BID * B B1 ?
+	relvar association R1 A BID * B B1 ?
     } -cleanup {
 	relvar constraint delete R1
 	relvar destroy A B
@@ -3226,26 +3226,26 @@ tuple {B1 c B2 foo} is not referenced by any tuple} -returnCodes error
 	relvar create A {Relation {A1 string BID string} A1}
 	relvar create B {Relation {B1 string B2 string} B1}
     } -body {
-	relvar association R1 A BID 0..X B B1 0..1
+	relvar association R1 A BID X B B1 ?
     } -cleanup {
 	relvar destroy A B
-    } -result {bad multiplicity specification "0..X": must be 1, 1..*, 0..1, or 0..*} -returnCodes error
+    } -result {bad multiplicity specification "X": must be 1, +, ?, or *} -returnCodes error
 
     test relvar-association-6.3 {bad multiplicity} -setup {
 	relvar create A {Relation {A1 string BID string} A1}
 	relvar create B {Relation {B1 string B2 string} B1}
     } -body {
-	relvar association R1 A BID 0..* B B1 0..*
+	relvar association R1 A BID * B B1 *
     } -cleanup {
 	relvar destroy A B
-    } -result {referred to identifiers can not have non-singular multiplicities, "0..*"} -returnCodes error
+    } -result {referred to identifiers can not have non-singular multiplicities, "*"} -returnCodes error
 
     # relvar constraint subcommand
     test relvar-constraint-1.1 {constraint names} -setup {
 	relvar create A {Relation {A1 string BID1 string BID2 int} A1}
 	relvar create B {Relation {B1 string B2 int} {B1 B2}}
-	relvar association R3 A BID1 0..* B B1 0..1
-	relvar association R4 A BID2 0..* B B2 0..1
+	relvar association R3 A BID1 * B B1 ?
+	relvar association R4 A BID2 * B B2 ?
     } -cleanup {
 	relvar constraint delete R3 R4
 	relvar destroy A B
@@ -3256,13 +3256,13 @@ tuple {B1 c B2 foo} is not referenced by any tuple} -returnCodes error
     test relvar-constraint-2.1 {constraint info -- association} -setup {
 	relvar create A {Relation {A1 string BID1 string BID2 int} A1}
 	relvar create B {Relation {B1 string B2 int} {B1 B2}}
-	relvar association R3 A BID1 0..* B B1 0..1
+	relvar association R3 A BID1 * B B1 ?
     } -cleanup {
 	relvar constraint delete R3
 	relvar destroy A B
     } -body {
 	relvar constraint info R3
-    } -result {association R3 ::ral::test::A BID1 0..* ::ral::test::B B1 0..1}
+    } -result {association R3 ::ral::test::A BID1 * ::ral::test::B B1 ?}
 
     test relvar-constraint-2.2 {constraint info -- partition} -setup {
 	relvar create A {Relation {A1 string} A1}
@@ -3702,6 +3702,199 @@ tuple {A1 b} is referred to by multiple tuples}\
     } -cleanup {
 	relvar destroy SV PV SPV
     } -result {::ral::test::PV ::ral::test::SPV ::ral::test::SV}
+
+    # relvar update subcommand
+    test relvar-update-1.0 {expression is false} -setup {
+	relvar create X {
+	    Relation
+	    {Name string Status int}
+	    Name
+	}
+	relvar insert X\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar destroy X
+    } -body {
+	relvar update X t {0} {
+	    tuple update t {Status -1}
+	}
+    } -result {0}
+
+    test relvar-update-2.0 {expression is true} -setup {
+	relvar create X {
+	    Relation
+	    {Name string Status int}
+	    Name
+	}
+	relvar insert X\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar destroy X
+    } -body {
+	relvar update X t {1} {
+	    tuple update t {Status -1}
+	}
+    } -result {3}
+
+    test relvar-update-2.1 {expression is true, check for updates} -setup {
+	relvar create X {
+	    Relation
+	    {Name string Status int}
+	    Name
+	}
+	relvar insert X\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar destroy X
+    } -body {
+	relvar update X t {1} {
+	    tuple update t {Status -1}
+	}
+	relvar set X
+    } -result {
+	Relation
+	{Name string Status int}
+	Name
+	{
+	    {Name George Status -1}\
+	    {Name Fred Status -1}\
+	    {Status -1 Name Alice}
+	}
+    } -match relation
+
+    test relvar-update-3.0 {subset is updated} -setup {
+	relvar create X {
+	    Relation
+	    {Name string Status int}
+	    Name
+	}
+	relvar insert X\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar destroy X
+    } -body {
+	relvar update X t {[tuple extract $t Name] eq "George"} {
+	    tuple update t {Status -1}
+	}
+    } -result {1}
+
+    test relvar-update-4.0 {update creates duplicate} -setup {
+	relvar create X {
+	    Relation
+	    {Name string Status int}
+	    Name
+	}
+	relvar insert X\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar destroy X
+    } -body {
+	relvar update X t {[tuple extract $t Name] eq "George"} {
+	    tuple update t {Name Fred}
+	}
+    } -result {duplicate tuple, "{Name Fred Status 20}"} -returnCodes error
+
+    # relvar updateone subcommand
+    test relvar-updateone-1.0 {no match} -setup {
+	relvar create X {
+	    Relation
+	    {Name string Status int}
+	    Name
+	}
+	relvar insert X\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar destroy X
+    } -body {
+	relvar updateone X {Name Jane} {Status -1}
+    } -result {0}
+
+    test relvar-updateone-2.0 {match} -setup {
+	relvar create X {
+	    Relation
+	    {Name string Status int}
+	    Name
+	}
+	relvar insert X\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar destroy X
+    } -body {
+	relvar updateone X {Name Fred} {Status -1}
+    } -result {1}
+
+    test relvar-updateone-2.1 {match, compare result} -setup {
+	relvar create X {
+	    Relation
+	    {Name string Status int}
+	    Name
+	}
+	relvar insert X\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar destroy X
+    } -body {
+	relvar updateone X {Name Fred} {Status -1}
+	relvar set X
+    } -result {
+	Relation
+	{Name string Status int}
+	Name
+	{
+	    {Name George Status 20}
+	    {Name Fred Status -1}
+	    {Name Alice Status 40}
+	}
+    } -match relation
+
+    test relvar-updateone-3.0 {wrong identifier} -setup {
+	relvar create X {
+	    Relation
+	    {Name string Status int}
+	    Name
+	}
+	relvar insert X\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar destroy X
+    } -body {
+	relvar updateone X {Status 20} {Name Jane}
+    } -result {attributes do not constitute an identifier, "during find operation"}\
+    -returnCodes error
+
+    test relvar-updateone-4.0 {update creates duplicate} -setup {
+	relvar create X {
+	    Relation
+	    {Name string Status int}
+	    Name
+	}
+	relvar insert X\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar destroy X
+    } -body {
+	relvar updateone X {Name George} {Name Fred}
+    } -result {duplicate tuple, "{Name Fred Status 20}"} -returnCodes error
 
     # examples from the Date book
     test date-example-1.0 {Get suppliers who supply all parts} -body {

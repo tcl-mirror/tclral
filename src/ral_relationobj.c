@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationobj.c,v $
-$Revision: 1.12 $
-$Date: 2006/05/19 04:54:32 $
+$Revision: 1.13 $
+$Date: 2006/05/21 04:22:00 $
  *--
  */
 
@@ -105,7 +105,7 @@ Tcl_ObjType Ral_RelationObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.12 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.13 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -410,7 +410,7 @@ Ral_RelationFindJoinAttrs(
  * Caller must delete the returned tuple.
  */
 Ral_Tuple
-Ral_RelationKeyTuple(
+Ral_RelationObjKeyTuple(
     Tcl_Interp *interp,
     Ral_Relation relation,
     int objc,
@@ -472,6 +472,52 @@ error_out:
     Ral_IntVectorDelete(id) ;
     Ral_TupleDelete(key) ;
     return NULL ;
+}
+
+int
+Ral_RelationObjUpdateTuple(
+    Tcl_Interp *interp,
+    Tcl_Obj *updateList,
+    Ral_Relation relation,
+    Ral_RelationIter tupleIter)
+{
+    int objc ;
+    Tcl_Obj **objv ;
+    Ral_Tuple tuple ;
+    int updated ;
+
+    if (Tcl_ListObjGetElements(interp, updateList, &objc, &objv) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    if (objc % 2 != 0) {
+	Ral_RelationObjSetError(interp, REL_BAD_PAIRS_LIST,
+	    Tcl_GetString(updateList)) ;
+	return TCL_ERROR ;
+    }
+    /*
+     * Clone the tuple. This is the only way that we can handle the potential
+     * for errors with unknown attributes, etc.
+     */
+    tuple = Ral_TupleDup(*tupleIter) ;
+    for ( ; objc > 0 ; objc -= 2, objv += 2) {
+	const char *attrName = Tcl_GetString(objv[0]) ;
+	updated = Ral_TupleUpdateAttrValue(tuple, attrName, objv[1]) ;
+
+	if (!updated) {
+	    Ral_TupleObjSetError(interp, Ral_TupleLastError, attrName) ;
+	    Ral_TupleDelete(tuple) ;
+	    return TCL_ERROR ;
+	}
+    }
+    if (!Ral_RelationUpdate(relation, tupleIter, tuple, NULL)) {
+	char *tupleStr = Ral_TupleValueStringOf(tuple) ;
+	Ral_RelationObjSetError(interp, REL_DUPLICATE_TUPLE, tupleStr) ;
+	ckfree(tupleStr) ;
+	Ral_TupleDelete(tuple) ;
+	return TCL_ERROR ;
+    }
+
+    return TCL_OK ;
 }
 
 const char *

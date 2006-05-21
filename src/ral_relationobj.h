@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationobj.h,v $
-$Revision: 1.9 $
-$Date: 2006/05/19 04:54:32 $
+$Revision: 1.10 $
+$Date: 2006/05/21 04:22:00 $
  *--
  */
 #ifndef _ral_relationobj_h_
@@ -96,8 +96,10 @@ extern int Ral_RelationObjParseJoinArgs(Tcl_Interp *, int *, Tcl_Obj *const**,
     Ral_Relation, Ral_Relation, Ral_JoinMap) ;
 extern int Ral_RelationFindJoinAttrs(Tcl_Interp *, Ral_Relation, Ral_Relation,
     Tcl_Obj *, Ral_JoinMap) ;
-extern Ral_Tuple Ral_RelationKeyTuple(Tcl_Interp *, Ral_Relation, int,
+extern Ral_Tuple Ral_RelationObjKeyTuple(Tcl_Interp *, Ral_Relation, int,
     Tcl_Obj *const*, int *) ;
+extern int Ral_RelationObjUpdateTuple(Tcl_Interp *, Tcl_Obj *,
+    Ral_Relation, Ral_RelationIter) ;
 extern const char *Ral_RelationObjVersion(void) ;
 extern void Ral_RelationObjSetError(Tcl_Interp *, Ral_RelationError,
     const char *) ;

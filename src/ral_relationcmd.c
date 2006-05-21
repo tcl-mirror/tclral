@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.12 $
-$Date: 2006/05/19 04:54:32 $
+$Revision: 1.13 $
+$Date: 2006/05/21 04:22:00 $
  *--
  */
 
@@ -135,7 +135,7 @@ static const char *orderOptions[] = {
     "-descending",
     NULL
 } ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.12 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.13 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -343,7 +343,7 @@ RelationChooseCmd(
 	    "attribute / value arguments must be given in pairs") ;
 	return TCL_ERROR ;
     }
-    key = Ral_RelationKeyTuple(interp, relation, objc, objv, &idNum) ;
+    key = Ral_RelationObjKeyTuple(interp, relation, objc, objv, &idNum) ;
     if (key == NULL) {
 	return TCL_ERROR ;
     }

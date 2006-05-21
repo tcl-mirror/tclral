@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.6 $
-# $Date: 2006/05/19 04:54:32 $
+# $Revision: 1.7 $
+# $Date: 2006/05/21 04:22:00 $
 #  *--
 
 namespace eval ::ral {
@@ -54,9 +54,13 @@ namespace eval ::ral {
     namespace export relation2matrix
     namespace export relformat
     namespace export serialize
+    namespace export serializeToFile
     namespace export deserialize
+    namespace export deserializeFromFile
     namespace export storeToMk
     namespace export loadFromMk
+    namespace export dump
+    namespace export dumpToFile
 
     if {![catch {package require report}]} {
 	# Default report style for Tuple types
@@ -177,6 +181,7 @@ proc ::ral::tupleformat {tupleValue {title {}} {noheading 0}} {
 
 # Serialization format:
 # List:
+#   {Version <library version>}
 #   {Relvars {<list of relvar defs>}}
 #   {Constraints {<list of constraints>}
 #   {Bodies {<list of relvar bodies>}
@@ -198,9 +203,11 @@ proc ::ral::tupleformat {tupleValue {title {}} {noheading 0}} {
 # Generate a string that encodes all the relvars.
 proc ::ral::serialize {{ns {}}} {
     set result [list]
-    set names [relvar names ${ns}*]
+
+    lappend result [list Version [package require ral]]
 
     # Convert the names to be relative
+    set names [lsort [relvar names ${ns}*]]
     set relNameList [list]
     foreach name $names {
 	lappend relNameList [namespace tail $name]\
@@ -228,18 +235,38 @@ proc ::ral::serialize {{ns {}}} {
     return $result
 }
 
+proc ::ral::serializeToFile {fileName {ns {}}} {
+    set chan [::open $fileName w]
+    set gotErr [catch {puts $chan [serialize $ns]} result]
+    ::close $chan
+    if {$gotErr} {
+	error $result
+    }
+    return
+}
+
 # Restore the relvar values from a string.
-proc ::ral::deserialize {value {ns {}}} {
-    set relvars [lindex $value 0]
-    set constraints [lindex $value 1]
-    set bodies [lindex $value 2]
+proc ::ral::deserialize {value {ns ::}} {
+    set version [lindex $value 0]
+    set relvars [lindex $value 1]
+    set constraints [lindex $value 2]
+    set bodies [lindex $value 3]
+
+    lassign $version versionKeyWord verNum
+    if {$versionKeyWord ne "Version"} {
+	error "expected keyword \"Version\", got \"$versionKeyWord\""
+    }
+    if {![package vsatisfies [package require ral] $verNum]} {
+	error "incompatible version number, \"$verNum\",\
+	    current library version is, \"[package require ral]\""
+    }
 
     lassign $relvars relvarKeyWord revarDefs
     if {$relvarKeyWord ne "Relvars"} {
 	error "expected keyword \"Relvars\", got \"$revarKeyWord\""
     }
     foreach {rvName rvHead} $revarDefs {
-	relvar create ${ns}::$rvName $rvHead
+	namespace eval $ns [list ::ral::relvar create $rvName $rvHead]
     }
 
     lassign $constraints cnstrKeyWord cnstrDef
@@ -247,7 +274,7 @@ proc ::ral::deserialize {value {ns {}}} {
 	error "expected keyword \"Constraints\", got \"$cnstrKeyWord\""
     }
     foreach constraint $cnstrDef {
-	eval relvar $constraint
+	namspace eval $ns ::ral::relvar $constraint
     }
 
     lassign $bodies bodyKeyWord bodyDefs
@@ -258,7 +285,8 @@ proc ::ral::deserialize {value {ns {}}} {
     relvar eval {
 	foreach body $bodyDefs {
 	    foreach {relvarName relvarBody} $body {
-		relvar insert ${ns}::$relvarName {expand}$relvarBody
+		namespace eval $ns ::ral::relvar insert [list $relvarName]\
+		    $relvarBody
 	    }
 	}
     }
@@ -266,7 +294,18 @@ proc ::ral::deserialize {value {ns {}}} {
     return
 }
 
-proc ::ral::storeToMk {fileName} {
+proc ::ral::deserializeFromFile {fileName {ns {}}} {
+    set chan [::open $fileName r]
+    set gotErr [catch {deserialize [read $chan]} result]
+    ::close $chan
+    if {$gotErr} {
+	error $result
+    }
+    return
+}
+
+# HERE -- put version infor into the storage
+proc ::ral::storeToMk {fileName {ns {}}} {
     package require Mk4tcl
 
     # Back up an existing file
@@ -286,7 +325,7 @@ proc ::ral::storeToMk {fileName} {
     # Get the names of the relvars and insert them into the catalog.
     # Convert the names to be relative before inserting.
     # Also create the views that will hold the values.
-    set names [relvar names]
+    set names [relvar names ${ns}*]
     foreach name $names {
 	set heading [relation heading [relvar set $name]]
 	::mk::row append db.__ral_relvar Name [namespace tail $name]\
@@ -343,26 +382,26 @@ proc ::ral::storeToMk {fileName} {
     ::mk::file close db
 }
 
-proc ::ral::loadFromMk {fileName {ns {}}} {
+proc ::ral::loadFromMk {fileName {ns ::}} {
     package require Mk4tcl
 
     ::mk::file open db $fileName -readonly
     # determine the relvar names and types by reading the catalog
     ::mk::loop rvCursor db.__ral_relvar {
 	set relvarInfo [::mk::get $rvCursor]
-	relvar create [dict get $relvarInfo Name] [dict get $relvarInfo Heading]
+	namespace eval $ns [list ::ral::relvar create\
+	    [dict get $relvarInfo Name] [dict get $relvarInfo Heading]]
     }
-
-    # create the associations
+    puts "relvars: [relvar names]"
+    # create the association constraints
     ::mk::loop assocCursor db.__ral_association {
-	set assocCmd [list relvar association]
+	set assocCmd [list ::ral::relvar association]
 	foreach {col value} [::mk::get $assocCursor] {
 	    lappend assocCmd $value
 	}
-	eval $assocCmd
+	namespace eval $ns $assocCmd
     }
-
-    # create the partitions
+    # create the partition constraints
     ::mk::loop partCursor db.__ral_partition {
 	set subtypes [list]
 	::mk::loop subCursor $partCursor.SubTypes {
@@ -371,22 +410,63 @@ proc ::ral::loadFromMk {fileName {ns {}}} {
 	    }
 	}
 	set partValues [::mk::get $partCursor]
-	relvar partition [dict get $partValues Name]\
-	    [dict get $partValues SupRelvar] {expand}$subtypes
+	namespace eval $ns [list ::ral::relvar partition\
+	    [dict get $partValues Name] [dict get $partValues SupRelvar]\
+	    [dict get $partValues SupAttr] {expand}$subtypes]
     }
-
     # fetch the relation values from the views
     relvar eval {
 	foreach name [relvar names ${ns}*] {
 	    set viewName [namespace tail $name]
 	    set heading [relation heading [relvar set $name]]
 	    ::mk::loop vCursor db.$viewName {
-		relvar insert $name [mkLoadTuple $vCursor $heading]
+		namespace eval $ns [list ::ral::relvar insert $name\
+		    [mkLoadTuple $vCursor $heading]]
 	    }
 	}
     }
 
     ::mk::file close db
+}
+
+proc ::ral::dump {{ns {}}} {
+    set result {}
+    set names [lsort [relvar names ${ns}*]]
+
+    append result "# Generated via ::ral::dump\n"
+    append result "package require ral [package require ral]\n"
+
+    # Convert the names to be relative
+    foreach name $names {
+	append result "::ral::relvar create [namespace tail $name]\
+	    [list [relation heading [relvar set $name]]]\n"
+    }
+
+    foreach cname [relvar constraint names] {
+	append result "::ral::relvar [getConstraint $cname]\n"
+    }
+
+    # perform the inserts inside of a transaction.
+    append result "::ral::relvar eval \{\n"
+    foreach name $names {
+	relation foreach t [relvar set $name] {
+	    append result "::ral::relvar insert [namespace tail $name]\
+		[list [tupleValue $t]]\n"
+	}
+    }
+    append result "\}"
+
+    return $result
+}
+
+proc ::ral::dumpToFile {fileName {ns {}}} {
+    set chan [::open $fileName w]
+    set gotErr [catch {puts $chan [dump $ns]} result]
+    ::close $chan
+    if {$gotErr} {
+	error $result
+    }
+    return
 }
 
 # PRIVATE PROCS

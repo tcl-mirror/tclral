@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.5 $
-$Date: 2006/05/19 04:54:32 $
+$Revision: 1.6 $
+$Date: 2006/05/21 04:22:00 $
  *--
  */
 
@@ -97,7 +97,7 @@ EXTERNAL DATA DEFINITIONS
 STATIC DATA ALLOCATION
 */
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.5 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.6 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -214,6 +214,18 @@ Ral_RelvarObjDelete(
     return TCL_OK ;
 }
 
+/*
+ * HERE
+ * This is wrong!
+ * It should be:
+ * (1) If name is fully resolved, then try to match it directly.
+ * (2) else construct a fully resolved name for the current namespace and
+ *     try to find that.
+ * (3) If that fails, construct a fully resolved name for the global
+ *     namespace.
+ * (4) If that fails, then it is an unknown relvar.
+ */
+
 Ral_Relvar
 Ral_RelvarObjFindRelvar(
     Tcl_Interp *interp,
@@ -282,9 +294,9 @@ Ral_RelvarObjCreateAssoc(
 	int multiplicity ;
     } specTable[] = {
 	{"1", 0, 0},
-	{"1..*", 0, 1},
-	{"0..1", 1, 0},
-	{"0..*", 1, 1},
+	{"+", 0, 1},
+	{"?", 1, 0},
+	{"*", 1, 1},
 	{NULL, 0, 0}
     } ;
     static const char specErrMsg[] = "multiplicity specification" ;
@@ -992,8 +1004,8 @@ relvarAssocSpec(
     int mult)
 {
     static char const * const condMultStrings[2][2] = {
-	{"1", "1..*"},
-	{"0..1", "0..*"}
+	{"1", "+"},
+	{"?", "*"}
     } ;
     assert (cond < 2) ;
     assert (mult < 2) ;

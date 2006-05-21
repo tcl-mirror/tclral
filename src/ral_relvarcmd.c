@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.5 $
-$Date: 2006/05/19 04:54:32 $
+$Revision: 1.6 $
+$Date: 2006/05/21 04:22:00 $
  *--
  */
 
@@ -111,7 +111,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.5 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.6 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -417,7 +417,7 @@ RelvarDeleteOneCmd(
     objc -= 3 ;
     objv += 3 ;
 
-    key = Ral_RelationKeyTuple(interp, relation, objc, objv, &idNum) ;
+    key = Ral_RelationObjKeyTuple(interp, relation, objc, objv, &idNum) ;
     if (key == NULL) {
 	return TCL_ERROR ;
     }
@@ -679,7 +679,131 @@ RelvarUpdateCmd(
     Tcl_Obj *const*objv,
     Ral_RelvarInfo rInfo)
 {
-    return TCL_ERROR ;
+    Ral_Relvar relvar ;
+    Ral_Relation relation ;
+    Tcl_Obj *tupleVarNameObj ;
+    Tcl_Obj *exprObj ;
+    Tcl_Obj *scriptObj ;
+    int updated = 0 ;
+    Ral_RelationIter rEnd ;
+    Ral_RelationIter rIter ;
+    int result = TCL_OK ;
+
+    /* relvar update relvarName tupleVarName expr script */
+    if (objc != 6) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+	    "relvarName tupleVarName expr script") ;
+	return TCL_ERROR ;
+    }
+
+    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2]),
+	NULL) ;
+    if (relvar == NULL) {
+	return TCL_ERROR ;
+    }
+    if (Tcl_ConvertToType(interp, relvar->relObj, &Ral_RelationObjType)
+	!= TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relvar->relObj->internalRep.otherValuePtr ;
+
+    Tcl_IncrRefCount(tupleVarNameObj = objv[3]) ;
+    Tcl_IncrRefCount(exprObj = objv[4]) ;
+    Tcl_IncrRefCount(scriptObj = objv[5]) ;
+
+    Ral_RelvarStartCommand(rInfo, relvar) ;
+
+    rEnd = Ral_RelationEnd(relation) ;
+    for (rIter = Ral_RelationBegin(relation) ; rIter != rEnd ; ++rIter) {
+	Tcl_Obj *tupleObj ;
+	int boolValue ;
+	Ral_Tuple tuple ;
+
+	/*
+	 * Clone the tuple into a Tcl object and store it into the
+	 * given variable.
+	 */
+	tupleObj = Ral_TupleObjNew(Ral_TupleDup(*rIter)) ;
+	if (Tcl_ObjSetVar2(interp, tupleVarNameObj, NULL, tupleObj,
+	    TCL_LEAVE_ERR_MSG) == NULL) {
+	    Tcl_DecrRefCount(tupleObj) ;
+	    result = TCL_ERROR ;
+	    break ;
+	}
+	/*
+	 * Evaluate the expression to see if this is a tuple that is
+	 * to be updated.
+	 */
+	if (Tcl_ExprBooleanObj(interp, exprObj, &boolValue) != TCL_OK) {
+	    result = TCL_ERROR ;
+	    break ;
+	}
+	if (!boolValue) {
+	    continue ;
+	}
+	/*
+	 * Evaluate the script.
+	 */
+	result = Tcl_EvalObjEx(interp, scriptObj, 0) ;
+	if (result != TCL_OK) {
+	    if (result == TCL_CONTINUE) {
+		result = TCL_OK ;
+	    } else if (result == TCL_BREAK) {
+		result = TCL_OK ;
+		break ;
+	    }else if (result == TCL_ERROR) {
+		static const char msgfmt[] =
+		    "\n    (\"relvar eval\" body line %d)" ;
+		char msg[sizeof(msgfmt) + TCL_INTEGER_SPACE] ;
+		sprintf(msg, msgfmt, interp->errorLine) ;
+		Tcl_AddObjErrorInfo(interp, msg, -1) ;
+		break ;
+	    } else {
+		break ;
+	    }
+	}
+	++updated ;
+	/*
+	 * Fetch the value of the variable. It could be different now
+	 * that the update has been performed. Once we get the new
+	 * tuple value, we can use it to update the relvar.
+	 */
+	tupleObj = Tcl_ObjGetVar2(interp, tupleVarNameObj, NULL,
+	    TCL_LEAVE_ERR_MSG) ;
+	if (tupleObj == NULL) {
+	    result = TCL_ERROR ;
+	    break ;
+	}
+	result = Tcl_ConvertToType(interp, tupleObj, &Ral_TupleObjType) ;
+	if (result != TCL_OK) {
+	    break ;
+	}
+	tuple = tupleObj->internalRep.otherValuePtr ;
+	if (!Ral_RelationUpdate(relation, rIter, tuple, NULL)) {
+	    char *tupleStr = Ral_TupleValueStringOf(tuple) ;
+	    Ral_RelationObjSetError(interp, REL_DUPLICATE_TUPLE, tupleStr) ;
+	    ckfree(tupleStr) ;
+	    result = TCL_ERROR ;
+	    break ;
+	}
+    }
+
+    if (updated) {
+	Tcl_InvalidateStringRep(relvar->relObj) ;
+    }
+
+    result = Ral_RelvarObjEndCmd(interp, rInfo, result != TCL_OK) ;
+
+    Tcl_UnsetVar(interp, Tcl_GetString(tupleVarNameObj), 0) ;
+    Tcl_DecrRefCount(scriptObj) ;
+    Tcl_DecrRefCount(tupleVarNameObj) ;
+    Tcl_DecrRefCount(exprObj) ;
+
+    if (result == TCL_OK) {
+	Tcl_SetObjResult(interp, Tcl_NewIntObj(updated)) ;
+    }
+
+    return result ;
 }
 
 static int
@@ -689,5 +813,60 @@ RelvarUpdateOneCmd(
     Tcl_Obj *const*objv,
     Ral_RelvarInfo rInfo)
 {
-    return TCL_ERROR ;
+    Ral_Relvar relvar ;
+    Ral_Relation relation ;
+    int elemc ;
+    Tcl_Obj **elemv ;
+    Ral_Tuple key ;
+    int idNum ;
+    Ral_RelationIter found ;
+    int result = TCL_OK ;
+    int updated = 0 ;
+
+    /* relvar updateone relvarName idValueList nameValueList */
+    if (objc != 5) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+	    "relvarName idValueList nameValueList") ;
+	return TCL_ERROR ;
+    }
+
+    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2]),
+	NULL) ;
+    if (relvar == NULL) {
+	return TCL_ERROR ;
+    }
+    if (Tcl_ConvertToType(interp, relvar->relObj, &Ral_RelationObjType)
+	!= TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relvar->relObj->internalRep.otherValuePtr ;
+
+    if (Tcl_ListObjGetElements(interp, objv[3], &elemc, &elemv) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+
+    key = Ral_RelationObjKeyTuple(interp, relation, elemc, elemv, &idNum) ;
+    if (key == NULL) {
+	return TCL_ERROR ;
+    }
+    found = Ral_RelationFindKey(relation, idNum, key, NULL) ;
+    Ral_TupleDelete(key) ;
+
+    if (found != Ral_RelationEnd(relation)) {
+	int failed = 0 ;
+	Ral_RelvarStartCommand(rInfo, relvar) ;
+
+	if (Ral_RelationObjUpdateTuple(interp, objv[4], relation, found)
+	    != TCL_OK) {
+	    failed = 1 ;
+	} else {
+	    Tcl_InvalidateStringRep(relvar->relObj) ;
+	}
+	result = Ral_RelvarObjEndCmd(interp, rInfo, failed) ;
+	updated = 1 ;
+    }
+    if (result == TCL_OK) {
+	Tcl_SetObjResult(interp, Tcl_NewBooleanObj(updated)) ;
+    }
+    return result ;
 }

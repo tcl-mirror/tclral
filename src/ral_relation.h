@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.h,v $
-$Revision: 1.12 $
-$Date: 2006/05/19 04:54:32 $
+$Revision: 1.13 $
+$Date: 2006/05/21 04:22:00 $
  *--
  */
 #ifndef _ral_relation_h_
@@ -182,6 +182,8 @@ extern void Ral_RelationReserve(Ral_Relation, int) ;
 
 extern int Ral_RelationPushBack(Ral_Relation, Ral_Tuple, Ral_IntVector) ;
 extern Ral_Tuple Ral_RelationTupleAt(Ral_Relation, int) ;
+extern int Ral_RelationUpdate(Ral_Relation, Ral_RelationIter, Ral_Tuple,
+    Ral_IntVector) ;
 
 extern Ral_RelationIter Ral_RelationFind(Ral_Relation, int, Ral_Tuple,
     Ral_IntVector) ;

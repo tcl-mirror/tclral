@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.14 $
-$Date: 2006/05/19 04:54:32 $
+$Revision: 1.15 $
+$Date: 2006/05/21 04:22:00 $
  *--
  */
 
@@ -116,7 +116,7 @@ static Ral_RelationIter sortBegin ;
 static Ral_IntVector sortAttrs ;
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.14 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.15 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -338,6 +338,7 @@ Ral_RelationUpdate(
     }
 
     assert(*pos != NULL) ;
+    assert(pos < Ral_RelationEnd(relation)) ;
 
     /*
      * Remove the index value for the identifiers for the tuple that
@@ -357,10 +358,14 @@ Ral_RelationUpdate(
     if (Ral_RelationIndexTuple(relation, newTuple, pos)) {
 	/*
 	 * If the new tuple is unique, then discard the old one and
-	 * install the new one into place.
+	 * install the new one into the same place. Note that we increment
+	 * the reference count of the new tuple before decrementing the
+	 * reference count of the old one, just in case that they are the
+	 * same tuple (i.e. we are updating the same physical location).
 	 */
+	Ral_TupleReference(newTuple) ;
 	Ral_TupleUnreference(*pos) ;
-	Ral_TupleReference(*pos = newTuple) ;
+	*pos = newTuple ;
     } else {
 	/*
 	 * The indexing failed ==> that the new tuple is not unique in

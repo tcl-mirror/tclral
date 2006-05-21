@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.c,v $
-$Revision: 1.4 $
-$Date: 2006/05/13 01:10:13 $
+$Revision: 1.5 $
+$Date: 2006/05/21 04:22:00 $
  *--
  */
 
@@ -109,7 +109,7 @@ Ral_RelvarError Ral_RelvarLastError = RELVAR_OK ;
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.4 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.5 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -1033,8 +1033,8 @@ relvarAssocConstraintToString(
     Tcl_DString *result)
 {
     static char const * const condMultStrings[2][2] = {
-	{"1", "1..*"},
-	{"0..1", "0..*"}
+	{"1", "+"},
+	{"?", "*"}
     } ;
 
     Ral_Relvar referringRelvar = assoc->referringRelvar ;
