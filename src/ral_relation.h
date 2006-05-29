@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.h,v $
-$Revision: 1.13 $
-$Date: 2006/05/21 04:22:00 $
+$Revision: 1.14 $
+$Date: 2006/05/29 21:07:42 $
  *--
  */
 #ifndef _ral_relation_h_
@@ -157,6 +157,8 @@ typedef enum Ral_RelationError {
     REL_TYPE_MISMATCH,
     REL_SINGLE_IDENTIFIER,
     REL_SINGLE_ATTRIBUTE,
+    REL_WITHIN_NOT_SUBSET,
+    REL_BAD_RANK_TYPE,
 } Ral_RelationError ;
 
 /*
@@ -241,6 +243,9 @@ extern int Ral_RelationConvertValue(Ral_Relation, char *,
 extern void Ral_RelationPrint(Ral_Relation, const char *, FILE *) ;
 extern char *Ral_RelationStringOf(Ral_Relation) ;
 extern char *Ral_RelationValueStringOf(Ral_Relation) ;
+
+const char *Ral_RelationGetIdKey(Ral_Tuple, Ral_IntVector,
+    Ral_IntVector, Tcl_DString *) ;
 
 extern const char * Ral_RelationVersion(void) ;
 

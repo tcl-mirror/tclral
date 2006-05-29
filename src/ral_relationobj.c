@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationobj.c,v $
-$Revision: 1.13 $
-$Date: 2006/05/21 04:22:00 $
+$Revision: 1.14 $
+$Date: 2006/05/29 21:07:42 $
  *--
  */
 
@@ -105,7 +105,7 @@ Tcl_ObjType Ral_RelationObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.13 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.14 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -562,6 +562,8 @@ Ral_RelationObjSetError(
 	"attributes must have the same type",
 	"only a single identifier may be specified",
 	"identifier must have only a single attribute",
+	"\"-within\" option attributes are not the subset of any identifier",
+	"attribute is not a valid type for rank operation",
     } ;
     static const char *errorStrings[] = {
 	"OK",
@@ -589,6 +591,8 @@ Ral_RelationObjSetError(
 	"TYPE_MISMATCH",
 	"SINGLE_IDENTIFIER",
 	"SINGLE_ATTRIBUTE",
+	"WITHIN_NOT_SUBSET",
+	"BAD_RANK_TYPE",
     } ;
 
     Ral_ObjSetError(interp, "RELATION", resultStrings[error],

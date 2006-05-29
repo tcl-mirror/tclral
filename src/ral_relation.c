@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.15 $
-$Date: 2006/05/21 04:22:00 $
+$Revision: 1.16 $
+$Date: 2006/05/29 21:07:42 $
  *--
  */
 
@@ -80,8 +80,6 @@ EXTERNAL FUNCTION REFERENCES
 /*
 FORWARD FUNCTION REFERENCES
 */
-static Tcl_DString *Ral_RelationGetIdKey(Ral_Tuple, Ral_IntVector,
-    Ral_IntVector) ;
 static Tcl_HashEntry *Ral_RelationFindIndexEntry(Ral_Relation, int, Ral_Tuple,
     Ral_IntVector) ;
 static int Ral_RelationFindTupleIndex(Ral_Relation, int, Ral_Tuple,
@@ -116,7 +114,7 @@ static Ral_RelationIter sortBegin ;
 static Ral_IntVector sortAttrs ;
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.15 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.16 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -2303,6 +2301,33 @@ Ral_RelationValueStringOf(
     return str ;
 }
 
+/*
+ * Generate a key string by concatenating the string representation of
+ * the attributes that are part of an identifier. If "orderMap" is not
+ * NULL it is used to reorder to attribute access in "tuple". This allows
+ * "tuple" to be of a different order than the tuple heading to which "idMap"
+ * applies.
+ */
+const char *
+Ral_RelationGetIdKey(
+    Ral_Tuple tuple,
+    Ral_IntVector idMap,
+    Ral_IntVector orderMap,
+    Tcl_DString *idKey)
+{
+    Ral_IntVectorIter iter ;
+    Ral_IntVectorIter end = Ral_IntVectorEnd(idMap) ;
+
+    Tcl_DStringInit(idKey) ;
+    for (iter = Ral_IntVectorBegin(idMap) ; iter != end ; ++iter) {
+	int attrIndex = orderMap ? Ral_IntVectorFetch(orderMap, *iter) : *iter ;
+	assert(attrIndex < Ral_TupleDegree(tuple)) ;
+	Tcl_DStringAppend(idKey, Tcl_GetString(tuple->values[attrIndex]), -1) ;
+    }
+
+    return Tcl_DStringValue(idKey) ;
+}
+
 
 const char *
 Ral_RelationVersion(void)
@@ -2314,34 +2339,6 @@ Ral_RelationVersion(void)
  * PRIVATE FUNCTIONS
  */
 
-/*
- * Generate a key string by concatenating the string representation of
- * the attributes that are part of an identifier. If "orderMap" is not
- * NULL it is used to reorder to attribute access in "tuple". This allows
- * "tuple" to be of a different order than the tuple heading to which "idMap"
- * applies.
- */
-static Tcl_DString *
-Ral_RelationGetIdKey(
-    Ral_Tuple tuple,
-    Ral_IntVector idMap,
-    Ral_IntVector orderMap)
-{
-    static Tcl_DString idKey ;
-
-    Ral_IntVectorIter iter ;
-    Ral_IntVectorIter end = Ral_IntVectorEnd(idMap) ;
-
-    Tcl_DStringInit(&idKey) ;
-    for (iter = Ral_IntVectorBegin(idMap) ; iter != end ; ++iter) {
-	int attrIndex = orderMap ? Ral_IntVectorFetch(orderMap, *iter) : *iter ;
-	assert(attrIndex < Ral_TupleDegree(tuple)) ;
-	Tcl_DStringAppend(&idKey, Tcl_GetString(tuple->values[attrIndex]), -1) ;
-    }
-
-    return &idKey ;
-}
-
 static Tcl_HashEntry *
 Ral_RelationFindIndexEntry(
     Ral_Relation relation,
@@ -2349,16 +2346,16 @@ Ral_RelationFindIndexEntry(
     Ral_Tuple tuple,
     Ral_IntVector orderMap)
 {
-    Tcl_DString *idKey ;
+    Tcl_DString idKey ;
+    const char *id ;
     Tcl_HashEntry *entry ;
 
     assert(idIndex < relation->heading->idCount) ;
 
-    idKey = Ral_RelationGetIdKey(tuple, relation->heading->identifiers[idIndex],
-	orderMap) ;
-    entry = Tcl_FindHashEntry(relation->indexVector + idIndex,
-	Tcl_DStringValue(idKey)) ;
-    Tcl_DStringFree(idKey) ;
+    id = Ral_RelationGetIdKey(tuple, relation->heading->identifiers[idIndex],
+	orderMap, &idKey) ;
+    entry = Tcl_FindHashEntry(relation->indexVector + idIndex, id) ;
+    Tcl_DStringFree(&idKey) ;
 
     return entry ;
 }
@@ -2387,17 +2384,17 @@ Ral_RelationFindTupleReference(
     Ral_Tuple tuple,
     Ral_IntVector attrSet)
 {
-    Tcl_DString *idKey ;
+    Tcl_DString idKey ;
+    const char *id ;
     Tcl_HashEntry *entry ;
 
     assert(idIndex < relation->heading->idCount) ;
     assert(Ral_IntVectorSize(relation->heading->identifiers[idIndex]) ==
 	Ral_IntVectorSize(attrSet)) ;
 
-    idKey = Ral_RelationGetIdKey(tuple, attrSet, NULL) ;
-    entry = Tcl_FindHashEntry(relation->indexVector + idIndex,
-	Tcl_DStringValue(idKey)) ;
-    Tcl_DStringFree(idKey) ;
+    id = Ral_RelationGetIdKey(tuple, attrSet, NULL, &idKey) ;
+    entry = Tcl_FindHashEntry(relation->indexVector + idIndex, id) ;
+    Tcl_DStringFree(&idKey) ;
 
     return entry ? (int)Tcl_GetHashValue(entry) : -1 ;
 }
@@ -2424,7 +2421,8 @@ Ral_RelationIndexIdentifier(
 {
     Ral_IntVector idMap ;
     Tcl_HashTable *index ;
-    Tcl_DString *idKey ;
+    Tcl_DString idKey ;
+    const char *id ;
     Tcl_HashEntry *entry ;
     int newPtr ;
 
@@ -2433,9 +2431,9 @@ Ral_RelationIndexIdentifier(
     idMap = relation->heading->identifiers[idIndex] ;
     index = relation->indexVector + idIndex ;
 
-    idKey = Ral_RelationGetIdKey(tuple, idMap, NULL) ;
-    entry = Tcl_CreateHashEntry(index, Tcl_DStringValue(idKey), &newPtr) ;
-    Tcl_DStringFree(idKey) ;
+    id = Ral_RelationGetIdKey(tuple, idMap, NULL, &idKey) ;
+    entry = Tcl_CreateHashEntry(index, id, &newPtr) ;
+    Tcl_DStringFree(&idKey) ;
     /*
      * Check that there are no duplicate tuples.
      */

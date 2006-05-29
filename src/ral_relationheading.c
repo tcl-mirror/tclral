@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationheading.c,v $
-$Revision: 1.12 $
-$Date: 2006/04/27 14:48:56 $
+$Revision: 1.13 $
+$Date: 2006/05/29 21:07:42 $
  *--
  */
 
@@ -89,7 +89,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.12 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.13 $" ;
 
 static const char relationKeyword[] = "Relation" ;
 static const char openList = '{' ;
@@ -259,7 +259,8 @@ Ral_RelationHeadingDup(
 Ral_RelationHeading
 Ral_RelationHeadingExtend(
     Ral_RelationHeading heading,
-    Ral_TupleHeading extTupleHeading)
+    Ral_TupleHeading extTupleHeading,
+    int addIds)
 {
     Ral_RelationHeading extHeading ;
     Ral_RelationIdIter srcIdIter ;
@@ -272,7 +273,8 @@ Ral_RelationHeadingExtend(
      * The exception is the "dum" and "dee" relations. Extending them
      * results in identifiers begin created from the extended attributes.
      */
-    extHeading = Ral_RelationHeadingNew(extTupleHeading, heading->idCount) ;
+    extHeading = Ral_RelationHeadingNew(extTupleHeading,
+	heading->idCount + addIds) ;
     dstIdIter = Ral_RelationHeadingIdBegin(extHeading) ;
     if (Ral_RelationHeadingDegree(heading) == 0) {
 	/*
@@ -498,6 +500,9 @@ Ral_RelationHeadingAddIdentifier(
     /*
      * Take possession of the identifier vector.
      */
+    if (heading->identifiers[idNum]) {
+	Ral_IntVectorDelete(heading->identifiers[idNum]) ;
+    }
     heading->identifiers[idNum] = id ;
     return 1 ;
 }

@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.7 $
-# $Date: 2006/05/21 04:22:00 $
+# $Revision: 1.8 $
+# $Date: 2006/05/29 21:07:42 $
 #  *--
 
 namespace eval ::ral {
@@ -216,7 +216,7 @@ proc ::ral::serialize {{ns {}}} {
     lappend result [list Relvars $relNameList]
 
     set constraints [list]
-    foreach cname [relvar constraint names] {
+    foreach cname [lsort [relvar constraint names]] {
 	lappend constaints [getConstraint $cname]
     }
     lappend result [list Constraints $constraints]
@@ -304,7 +304,6 @@ proc ::ral::deserializeFromFile {fileName {ns {}}} {
     return
 }
 
-# HERE -- put version infor into the storage
 proc ::ral::storeToMk {fileName {ns {}}} {
     package require Mk4tcl
 
@@ -314,6 +313,13 @@ proc ::ral::storeToMk {fileName {ns {}}} {
     }
 
     ::mk::file open db $fileName
+    # Add some versioning information into a view. Just a sanity check
+    # when the data is loaded later.
+    ::mk::view layout db.__ral_version {Version Date Comment}
+    ::mk::row append db.__ral_version\
+	Version [package require ral]\
+	Date [clock format [clock seconds]]\
+	Comment "Created by: \"[info level 0]\""
     # Create a set of views that are used as catalogs to hold
     # the relvar info that will be needed to reconstruct the values.
     ::mk::view layout db.__ral_relvar {Name Heading}
@@ -386,13 +392,24 @@ proc ::ral::loadFromMk {fileName {ns ::}} {
     package require Mk4tcl
 
     ::mk::file open db $fileName -readonly
+    # Check that a "version" view exists and that the information
+    # is consistent before we proceed.
+    set views [::mk::file views db]
+    if {[lsearch $views __ral_version] < 0} {
+	error "Cannot find TclRAL catalogs in \"$fileName\":\
+	    file may not contain relvar information"
+    }
+    set verNum [::mk::get db.__ral_version!0 Version]
+    if {![package vsatisfies [package require ral] $verNum]} {
+	error "incompatible version number, \"$verNum\",\
+	    current library version is, \"[package require ral]\""
+    }
     # determine the relvar names and types by reading the catalog
     ::mk::loop rvCursor db.__ral_relvar {
 	set relvarInfo [::mk::get $rvCursor]
 	namespace eval $ns [list ::ral::relvar create\
 	    [dict get $relvarInfo Name] [dict get $relvarInfo Heading]]
     }
-    puts "relvars: [relvar names]"
     # create the association constraints
     ::mk::loop assocCursor db.__ral_association {
 	set assocCmd [list ::ral::relvar association]
@@ -442,7 +459,7 @@ proc ::ral::dump {{ns {}}} {
 	    [list [relation heading [relvar set $name]]]\n"
     }
 
-    foreach cname [relvar constraint names] {
+    foreach cname [lsort [relvar constraint names]] {
 	append result "::ral::relvar [getConstraint $cname]\n"
     }
 

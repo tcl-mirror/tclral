@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.17 $
-# $Date: 2006/05/21 04:22:00 $
+# $Revision: 1.18 $
+# $Date: 2006/05/29 21:07:42 $
 #  *--
 
 package require tcltest 2.2
@@ -1080,61 +1080,6 @@ namespace eval ::ral::test {
 	    {Name Fred Age 20}}}
 	relation extend $r1 t AgeInMonths int {[tuple extract $t foo] * 12}
     } -result {unknown attribute name, "foo"} -returnCodes error
-
-    test relation-extend-3.0 {specify ordering} -body {
-	set r1 {
-	    Relation
-	    {Name string Age int}
-	    Name
-	    {
-		{Name Andrew Age 20}
-		{Name George Age 20}
-		{Name Fred Age 20}
-	    }
-	}
-	set cnt -1
-	relation extend $r1 -ascending Name t Order int {[incr cnt]}
-    } -match relation -result {
-	Relation
-	{Name string Age int Order int}
-	Name
-	{
-	    {Name Andrew Age 20 Order 0}
-	    {Name George Age 20 Order 2}
-	    {Name Fred Age 20 Order 1}
-	}
-    }
-
-    test relation-extend-3.1 {specify ordering; bad command} -body {
-	set r1 {
-	    Relation
-	    {Name string Age int}
-	    Name
-	    {
-		{Name Andrew Age 20}
-		{Name George Age 20}
-		{Name Fred Age 20}
-	    }
-	}
-	set cnt -1
-	relation extend $r1 -ascending t Order int {[incr cnt]}
-    } -returnCodes error -result {unknown attribute name, "t"}
-
-    test relation-extend-3.2 {specify ordering; bad command} -body {
-	set r1 {
-	    Relation
-	    {Name string Age int}
-	    Name
-	    {
-		{Name Andrew Age 20}
-		{Name George Age 20}
-		{Name Fred Age 20}
-	    }
-	}
-	set cnt -1
-	relation extend $r1 -ascending Name
-    } -returnCodes error -result {wrong # args: should be "relation extend relationValue ?-ascending | -descending attrList? tupleVarName ?attr1 type1 expr1 ... attrN typeN exprN?"}
-    # HERE -- add tests
 
     # relation foreach subcommand
     test relation-foreach-1.0 {simple visit of suppliers} -body {
@@ -2178,6 +2123,38 @@ namespace eval ::ral::test {
     } -result {Relation {Number int Street string IsMale string} {{Number Street}} {{Number 599 Street Blackwood IsMale true} {Number 300 Street Main IsMale false} {Number 599 Street Maple IsMale true}}}\
     -match relation
 
+    # relation rank subcommand
+    test relation-rank-1.0 {rank descending} -body {
+	relation rank $P -descending WEIGHT WEIGHT_RANK
+    } -result {
+	Relation
+	{P# string PNAME string COLOR string WEIGHT double CITY string WEIGHT_RANK int}
+	P#
+	{
+	    {P# P1 PNAME Nut COLOR Red WEIGHT 12.0 CITY London WEIGHT_RANK 5}
+	    {P# P2 PNAME Bolt COLOR Green WEIGHT 17.0 CITY Paris WEIGHT_RANK 2}
+	    {P# P3 PNAME Screw COLOR Blue WEIGHT 17.0 CITY Oslo WEIGHT_RANK 2}
+	    {P# P4 PNAME Screw COLOR Red WEIGHT 14.0 CITY London WEIGHT_RANK 4}
+	    {P# P5 PNAME Cam COLOR Blue WEIGHT 12.0 CITY Paris WEIGHT_RANK 5}
+	    {P# P6 PNAME Cog COLOR Red WEIGHT 19.0 CITY London WEIGHT_RANK 1}
+	}
+    } -match relation
+
+    test relation-rank-2.0 {rank ascending} -body {
+	relation rank $S -ascending STATUS SR
+    } -result {
+	Relation
+	{S# string SNAME string STATUS int CITY string SR int}
+	S#
+	{
+	    {S# S1 SNAME Smith STATUS 20 CITY London SR 2}
+	    {S# S2 SNAME Jones STATUS 10 CITY Paris SR 1}
+	    {S# S3 SNAME Blake STATUS 30 CITY Paris SR 4}
+	    {S# S4 SNAME Clark STATUS 20 CITY London SR 2}
+	    {S# S5 SNAME Adams STATUS 30 CITY Athens SR 4}
+	}
+    } -match relation
+
     # relation rename subcommand
     test relation-rename-1.0 {single attribute} -body {
 	set r {Relation {Name string} Name {{Name Andrew}}}
@@ -2317,6 +2294,54 @@ namespace eval ::ral::test {
 	    {S# S4 SNAME Clark STATUS 20 CITY London}
 	}
     } -match relation
+
+    test relation-semijoin-4.0 {reflexive association; one direction} -setup {
+	set Item {
+	    Relation
+	    {A1 string PrevA1 string}
+	    A1
+	    {
+		{A1 a PrevA1 {}}
+		{A1 b PrevA1 a}
+		{A1 c PrevA1 b}
+	    }
+	}
+    } -cleanup {
+    } -body {
+	relation semijoin $Item $Item -using {A1 PrevA1}
+    } -result {
+	Relation
+	{A1 string PrevA1 string}
+	A1
+	{
+	    {A1 b PrevA1 a}
+	    {A1 c PrevA1 b}
+	}
+    } -match relation
+
+    test relation-semijoin-4.1 {reflexive association; other direction} -setup {
+	set Item {
+	    Relation
+	    {A1 string PrevA1 string}
+	    A1
+	    {
+		{A1 a PrevA1 {}}
+		{A1 b PrevA1 a}
+		{A1 c PrevA1 b}
+	    }
+	}
+    } -cleanup {
+    } -body {
+	relation semijoin $Item $Item -using {PrevA1 A1}
+    } -result {
+	Relation
+	{A1 string PrevA1 string}
+	A1
+	{
+	    {A1 a PrevA1 {}}
+	    {A1 b PrevA1 a}
+	}
+    } -match relation
     # HERE -- add tests
 
     # relation semiminus subcommand
@@ -2450,6 +2475,81 @@ namespace eval ::ral::test {
 	    {Acquired 2000 NumAcquired 2}
 	    {Acquired 2002 NumAcquired 1}
 	    {Acquired 2003 NumAcquired 1}
+	}
+    } -match relation
+
+    # relation tag subcommand
+    test relation-tag-1.0 {relation scope -- ascending} -body {
+	relation tag $S -ascending SNAME NameOrder
+    } -result {
+	Relation
+	{S# string SNAME string STATUS int CITY string NameOrder int}
+	{S# NameOrder}
+	{
+	    {S# S1 SNAME Smith STATUS 20 CITY London NameOrder 4}
+	    {S# S2 SNAME Jones STATUS 10 CITY Paris NameOrder 3}
+	    {S# S3 SNAME Blake STATUS 30 CITY Paris NameOrder 1}
+	    {S# S4 SNAME Clark STATUS 20 CITY London NameOrder 2}
+	    {S# S5 SNAME Adams STATUS 30 CITY Athens NameOrder 0}
+	}
+    } -match relation
+
+    test relation-tag-2.0 {relation scope -- descending} -body {
+	relation tag $S -descending SNAME NameOrder
+    } -result {
+	Relation
+	{S# string SNAME string STATUS int CITY string NameOrder int}
+	{S# NameOrder}
+	{
+	    {S# S1 SNAME Smith STATUS 20 CITY London NameOrder 0}
+	    {S# S2 SNAME Jones STATUS 10 CITY Paris NameOrder 1}
+	    {S# S3 SNAME Blake STATUS 30 CITY Paris NameOrder 3}
+	    {S# S4 SNAME Clark STATUS 20 CITY London NameOrder 2}
+	    {S# S5 SNAME Adams STATUS 30 CITY Athens NameOrder 4}
+	}
+    } -match relation
+
+    test relation-tag-3.0 {within scope} -body {
+	relation tag $SP -within S# SOrder
+    } -result {
+	Relation
+	{S# string P# string QTY int SOrder int}
+	{{S# P#} {S# SOrder}}
+	{
+	    {S# S1 P# P1 QTY 300 SOrder 0}
+	    {S# S1 P# P2 QTY 200 SOrder 1}
+	    {S# S1 P# P3 QTY 400 SOrder 2}
+	    {S# S1 P# P4 QTY 200 SOrder 3}
+	    {S# S1 P# P5 QTY 100 SOrder 4}
+	    {S# S1 P# P6 QTY 100 SOrder 5}
+	    {S# S2 P# P1 QTY 300 SOrder 0}
+	    {S# S2 P# P2 QTY 400 SOrder 1}
+	    {S# S3 P# P2 QTY 200 SOrder 0}
+	    {S# S4 P# P2 QTY 200 SOrder 0}
+	    {S# S4 P# P4 QTY 300 SOrder 1}
+	    {S# S4 P# P5 QTY 400 SOrder 2}
+	}
+    } -match relation
+
+    test relation-tag-3.1 {within scope -- descending P#} -body {
+	relation tag $SP -ascending QTY -within S# SOrder
+    } -result {
+	Relation
+	{S# string P# string QTY int SOrder int}
+	{{S# P#} {S# SOrder}}
+	{
+	    {S# S1 P# P1 QTY 300 SOrder 4}
+	    {S# S1 P# P2 QTY 200 SOrder 2}
+	    {S# S1 P# P3 QTY 400 SOrder 5}
+	    {S# S1 P# P4 QTY 200 SOrder 3}
+	    {S# S1 P# P5 QTY 100 SOrder 0}
+	    {S# S1 P# P6 QTY 100 SOrder 1}
+	    {S# S2 P# P1 QTY 300 SOrder 0}
+	    {S# S2 P# P2 QTY 400 SOrder 1}
+	    {S# S3 P# P2 QTY 200 SOrder 0}
+	    {S# S4 P# P2 QTY 200 SOrder 0}
+	    {S# S4 P# P4 QTY 300 SOrder 1}
+	    {S# S4 P# P5 QTY 400 SOrder 2}
 	}
     } -match relation
 
