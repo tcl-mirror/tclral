@@ -3,7 +3,7 @@ dnl	This file is an input file used by the GNU "autoconf" program to
 dnl	generate the file "configure", which is run during Tcl installation
 dnl	to configure the system for the local environment.
 #
-# RCS: @(#) $Id: configure.in,v 1.2 2004/10/04 01:23:45 mangoa01 Exp $
+# RCS: @(#) $Id: configure.in,v 1.3 2006/06/04 17:03:22 mangoa01 Exp $
 
 #-----------------------------------------------------------------------
 # Sample configure.in for Tcl Extensions.  The only places you should
@@ -19,7 +19,7 @@ dnl	to configure the system for the local environment.
 # so you can encode the package version directly into the source files.
 #-----------------------------------------------------------------------
 
-AC_INIT([ral], [0.7])
+AC_INIT([ral], [0.8])
 
 #--------------------------------------------------------------------
 # Call TEA_INIT as the first TEA_ macro to set up initial vars.
@@ -72,6 +72,21 @@ TEA_SETUP_COMPILER
 #-----------------------------------------------------------------------
 
 TEA_ADD_SOURCES([src/ral.c])
+TEA_ADD_SOURCES([src/ral_attribute.c])
+TEA_ADD_SOURCES([src/ral_joinmap.c])
+TEA_ADD_SOURCES([src/ral_relation.c])
+TEA_ADD_SOURCES([src/ral_relationcmd.c])
+TEA_ADD_SOURCES([src/ral_relationheading.c])
+TEA_ADD_SOURCES([src/ral_relationobj.c])
+TEA_ADD_SOURCES([src/ral_relvar.c])
+TEA_ADD_SOURCES([src/ral_relvarcmd.c])
+TEA_ADD_SOURCES([src/ral_relvarobj.c])
+TEA_ADD_SOURCES([src/ral_tuple.c])
+TEA_ADD_SOURCES([src/ral_tuplecmd.c])
+TEA_ADD_SOURCES([src/ral_tupleheading.c])
+TEA_ADD_SOURCES([src/ral_tupleobj.c])
+TEA_ADD_SOURCES([src/ral_utils.c])
+TEA_ADD_SOURCES([src/ral_vector.c])
 TEA_ADD_HEADERS([])
 TEA_ADD_INCLUDES([])
 TEA_ADD_LIBS([])

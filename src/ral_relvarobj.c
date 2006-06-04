@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.6 $
-$Date: 2006/05/21 04:22:00 $
+$Revision: 1.7 $
+$Date: 2006/06/04 17:03:22 $
  *--
  */
 
@@ -81,6 +81,10 @@ FORWARD FUNCTION REFERENCES
 */
 static char *relvarTraceProc(ClientData, Tcl_Interp *, const char *,
     const char *, int) ;
+static const char *relvarResolveName(Tcl_Interp *, const char *,
+    Tcl_DString *) ;
+static int relvarNameIsAbsName(const char *) ;
+static int relvarGetNamespaceName(Tcl_Interp *, const char *, Tcl_DString *) ;
 static Tcl_Obj *relvarConstraintAttrNames(Tcl_Interp *, Ral_Relvar,
     Ral_JoinMap, int) ;
 static Tcl_Obj *relvarAssocSpec(int, int) ;
@@ -97,7 +101,7 @@ EXTERNAL DATA DEFINITIONS
 STATIC DATA ALLOCATION
 */
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.6 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.7 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -126,7 +130,7 @@ Ral_RelvarObjNew(
     /*
      * Create the relvar.
      */
-    resolvedName = Ral_RelvarObjResolveName(interp, name, &resolve) ;
+    resolvedName = relvarResolveName(interp, name, &resolve) ;
     relvar = Ral_RelvarNew(info, resolvedName, heading) ;
     if (relvar == NULL) {
 	/*
@@ -215,9 +219,6 @@ Ral_RelvarObjDelete(
 }
 
 /*
- * HERE
- * This is wrong!
- * It should be:
  * (1) If name is fully resolved, then try to match it directly.
  * (2) else construct a fully resolved name for the current namespace and
  *     try to find that.
@@ -225,7 +226,6 @@ Ral_RelvarObjDelete(
  *     namespace.
  * (4) If that fails, then it is an unknown relvar.
  */
-
 Ral_Relvar
 Ral_RelvarObjFindRelvar(
     Tcl_Interp *interp,
@@ -233,51 +233,53 @@ Ral_RelvarObjFindRelvar(
     const char *name,
     char **fullName)
 {
-    Tcl_DString resolve ;
-    const char *resolvedName =
-	Ral_RelvarObjResolveName(interp, name, &resolve) ;
-    Ral_Relvar relvar = Ral_RelvarFind(info, resolvedName) ;
+    Ral_Relvar relvar ;
 
-    if (relvar && fullName) {
-	*fullName = ckalloc(strlen(resolvedName) + 1) ;
-	strcpy(*fullName, resolvedName) ;
+    if (relvarNameIsAbsName(name)) {
+	/*
+	 * Absolute name.
+	 */
+	relvar = Ral_RelvarFind(info, name) ;
+	if (relvar && fullName) {
+	    *fullName = ckalloc(strlen(name) + 1) ;
+	    strcpy(*fullName, name) ;
+	}
+    } else {
+	/*
+	 * Relative name. First try the current namespace.
+	 */
+	Tcl_DString resolve ;
+	int globalName ;
+	const char *resolvedName ;
+
+	globalName = relvarGetNamespaceName(interp, name, &resolve) ;
+	resolvedName = Tcl_DStringValue(&resolve) ;
+	relvar = Ral_RelvarFind(info, resolvedName) ;
+	/*
+	 * Check if we found the relvar by the namespace name. If not and
+	 * we were not in the global namespace, then we have to try the
+	 * global one. This matches the normal rules of Tcl name resolution.
+	 */
+	if (relvar == NULL && !globalName) {
+	    Tcl_DStringFree(&resolve) ;
+	    Tcl_DStringInit(&resolve) ;
+	    Tcl_DStringAppend(&resolve, "::", -1) ;
+	    Tcl_DStringAppend(&resolve, name, -1) ;
+	    resolvedName = Tcl_DStringValue(&resolve) ;
+	    relvar = Ral_RelvarFind(info, resolvedName) ;
+	}
+
+	if (relvar && fullName) {
+	    *fullName = ckalloc(strlen(resolvedName) + 1) ;
+	    strcpy(*fullName, resolvedName) ;
+	}
+	Tcl_DStringFree(&resolve) ;
     }
-    Tcl_DStringFree(&resolve) ;
 
     if (relvar == NULL) {
-	Ral_RelvarObjSetError(interp, RELVAR_UNKNOWN_NAME, name) ;
+        Ral_RelvarObjSetError(interp, RELVAR_UNKNOWN_NAME, name) ;
     }
     return relvar ;
-}
-
-const char *
-Ral_RelvarObjResolveName(
-    Tcl_Interp *interp,
-    const char *name,
-    Tcl_DString *resolvedName)
-{
-    int nameLen = strlen(name) ;
-
-    Tcl_DStringInit(resolvedName) ;
-
-    if (nameLen >= 2 && name[0] == ':' && name[1] == ':') {
-	/*
-	 * absolute reference.
-	 */
-	Tcl_DStringAppend(resolvedName, name, -1) ;
-    } else if(interp) {
-	/*
-	 * construct an absolute name from the current namespace.
-	 */
-	Tcl_Namespace *curr = Tcl_GetCurrentNamespace(interp) ;
-	if (curr->parentPtr) {
-	    Tcl_DStringAppend(resolvedName, curr->fullName, -1) ;
-	}
-	Tcl_DStringAppend(resolvedName, "::", -1) ;
-	Tcl_DStringAppend(resolvedName, name, -1) ;
-    }
-
-    return Tcl_DStringValue(resolvedName) ;
 }
 
 int
@@ -943,7 +945,7 @@ relvarTraceProc(
 	Ral_RelvarInfo info = (Ral_RelvarInfo) clientData ;
 	Tcl_DString resolve ;
 	const char *resolvedName =
-	    Ral_RelvarObjResolveName(interp, name1, &resolve) ;
+	    relvarResolveName(interp, name1, &resolve) ;
 	Ral_Relvar relvar = Ral_RelvarFind(info, resolvedName) ;
 	Tcl_Obj *newValue ;
 
@@ -957,11 +959,59 @@ relvarTraceProc(
 	assert(newValue == relvar->relObj) ;
 	result = "relvar may only be modified using \"::ral::relvar\" command" ;
     } else {
-	fprintf(stderr, "relvarTraceProc: trace on non-write, flags = %#x\n",
-	    flags) ;
+	Tcl_Panic("relvarTraceProc: trace on non-write, flags = %#x\n", flags) ;
     }
 
     return result ;
+}
+
+static const char *
+relvarResolveName(
+    Tcl_Interp *interp,
+    const char *name,
+    Tcl_DString *resolvedName)
+{
+    if (relvarNameIsAbsName(name)) {
+	/*
+	 * absolute reference.
+	 */
+	Tcl_DStringAppend(resolvedName, name, -1) ;
+    } else if(interp) {
+	relvarGetNamespaceName(interp, name, resolvedName) ;
+    }
+
+    return Tcl_DStringValue(resolvedName) ;
+}
+
+static int
+relvarNameIsAbsName(
+    const char *name)
+{
+    return strlen(name) >= 2 && name[0] == ':' && name[1] == ':' ;
+}
+
+/*
+ * Construct an absolute name from the current namespace.
+ * Returns whether or not the current namespace is the global namespace.
+ */
+static int
+relvarGetNamespaceName(
+    Tcl_Interp *interp,
+    const char *name,
+    Tcl_DString *nsVarName)
+{
+    int isGlobal = 1 ;
+    Tcl_Namespace *curr = Tcl_GetCurrentNamespace(interp) ;
+
+    Tcl_DStringInit(nsVarName) ;
+    if (curr->parentPtr) {
+	Tcl_DStringAppend(nsVarName, curr->fullName, -1) ;
+	isGlobal = 0 ;
+    }
+    Tcl_DStringAppend(nsVarName, "::", -1) ;
+    Tcl_DStringAppend(nsVarName, name, -1) ;
+
+    return isGlobal ;
 }
 
 /*

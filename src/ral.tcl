@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.8 $
-# $Date: 2006/05/29 21:07:42 $
+# $Revision: 1.9 $
+# $Date: 2006/06/04 17:03:22 $
 #  *--
 
 namespace eval ::ral {
@@ -101,21 +101,27 @@ proc ::ral::tuple2matrix {tupleValue {noheading 0}} {
 
     set m [::struct::matrix]
     $m add columns [tuple degree $tupleValue]
-    set attrReportMap [addHeading $m [tuple heading $tupleValue]]
-    addTuple $m $tupleValue $attrReportMap
+    set heading [tuple heading $tupleValue]
+    if {!$noheading} {
+	addHeading $m $heading
+    }
+    addTuple $m $tupleValue [getFormatMap $heading]
 
     return $m
 }
 
 # Convert a relation into a matrix.
-proc ::ral::relation2matrix {relValue {noheading 0}} {
+proc ::ral::relation2matrix {relValue {sortAttr {}} {noheading 0}} {
     package require struct::matrix 2
 
     set m [::struct::matrix]
     $m add columns [relation degree $relValue]
-    set attrReportMap [addHeading $m [relation heading $relValue]]
-
-    relation foreach t $relValue {
+    set heading [relation heading $relValue]
+    set attrReportMap [getFormatMap $heading]
+    if {!$noheading} {
+	addHeading $m $heading
+    }
+    relation foreach t $relValue -ascending $sortAttr {
 	addTuple $m $t $attrReportMap
     }
 
@@ -126,7 +132,7 @@ proc ::ral::relation2matrix {relValue {noheading 0}} {
 # It provides a very simple text formatting of relation values into a
 # tabular layout. Rather than writing the output to a channel "relformat"
 # returns the string as its return value.
-proc ::ral::relformat {relValue {title {}} {noheading 0}} {
+proc ::ral::relformat {relValue {title {}} {sortAttrs {}} {noheading 0}} {
     package require report
 
     # Determine which columns hold attributes that are part of some identifier
@@ -146,8 +152,8 @@ proc ::ral::relformat {relValue {title {}} {noheading 0}} {
     variable reportCounter
     set reportName rep[incr reportCounter]
     ::report::report $reportName [relation degree $relValue]\
-	style ::ral::relationAsTable $idCols
-    set m [relation2matrix $relValue $noheading]
+	style ::ral::relationAsTable $idCols [expr {$noheading ? 0 : 2}]
+    set m [relation2matrix $relValue $sortAttrs $noheading]
     set result [string trimright [$reportName printmatrix $m]]
     if {$title ne ""} {
 	append result "\n" $title "\n" [string repeat - [string length $title]]
@@ -166,7 +172,7 @@ proc ::ral::tupleformat {tupleValue {title {}} {noheading 0}} {
     variable reportCounter
     set reportName rep[incr reportCounter]
     ::report::report $reportName [tuple degree $tupleValue]\
-	style ::ral::tupleAsTable
+	style ::ral::tupleAsTable [expr {$noheading ? 0 : 2}]
     set m [tuple2matrix $tupleValue $noheading]
     set result [string trimright [$reportName printmatrix $m]]
     if {$title ne ""} {
@@ -489,30 +495,33 @@ proc ::ral::dumpToFile {fileName {ns {}}} {
 # PRIVATE PROCS
 
 # Add heading rows to the matrix.
-# Returns a dictionary mapping attribute names to a formatting function.
-# Ordinary scalar values attributes are not contained in the mapping. Relation
-# and tuple valued attributes will be in the dictionary keyed by the attribute
-# name with values corresponding to the "relformat" or "tupleformat" command.
 proc ::ral::addHeading {matrix heading} {
     set attrNames [list]
     set attrTypes [list]
-    set attrReportMap [dict create]
     foreach {name type} [lindex $heading 1] {
 	lappend attrNames $name
-	set typeKey [lindex $type 0]
-	if {$typeKey eq "Tuple"} {
-	    dict set attrReportMap $name ::ral::tupleformat
-	    lappend attrTypes $typeKey
-	} elseif {$typeKey eq "Relation"} {
-	    dict set attrReportMap $name ::ral::relformat
-	    lappend attrTypes $typeKey
-	} else {
-	    lappend attrTypes $type
-	}
+	lappend attrTypes $type
     }
     $matrix add row $attrNames
     $matrix add row $attrTypes
 
+    return
+}
+
+# Returns a dictionary mapping attribute names to a formatting function.
+# Ordinary scalar values attributes are not contained in the mapping. Relation
+# and tuple valued attributes will be in the dictionary keyed by the attribute
+# name with values corresponding to the "relformat" or "tupleformat" command.
+proc ::ral::getFormatMap {heading} {
+    set attrReportMap [dict create]
+    foreach {name type} [lindex $heading 1] {
+	set typeKey [lindex $type 0]
+	if {$typeKey eq "Tuple"} {
+	    dict set attrReportMap $name ::ral::tupleformat
+	} elseif {$typeKey eq "Relation"} {
+	    dict set attrReportMap $name ::ral::relformat
+	}
+    }
     return $attrReportMap
 }
 
@@ -654,3 +663,5 @@ proc ::ral::mkLoadRelation {cursor heading} {
     }
     return $value
 }
+
+package provide ral 0.8

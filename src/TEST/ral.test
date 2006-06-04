@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.18 $
-# $Date: 2006/05/29 21:07:42 $
+# $Revision: 1.19 $
+# $Date: 2006/06/04 17:03:22 $
 #  *--
 
 package require tcltest 2.2
@@ -4150,6 +4150,89 @@ tuple {A1 b} is referred to by multiple tuples}\
 	    {S# S5 SNAME Adams STATUS 30 CITY Athens}
 	}
     } -match relation
+
+    test relformat-1.0 {basic operation} -body {
+	relformat $S
+    } -result {+======+------+------+------+
+|S#    |SNAME |STATUS|CITY  |
+|string|string|int   |string|
++======+------+------+------+
+|S1    |Smith |20    |London|
+|S2    |Jones |10    |Paris |
+|S3    |Blake |30    |Paris |
+|S4    |Clark |20    |London|
+|S5    |Adams |30    |Athens|
++======+------+------+------+}
+
+    test relformat-2.0 {title} -body {
+	relformat $S "Suppliers"
+    } -result {+======+------+------+------+
+|S#    |SNAME |STATUS|CITY  |
+|string|string|int   |string|
++======+------+------+------+
+|S1    |Smith |20    |London|
+|S2    |Jones |10    |Paris |
+|S3    |Blake |30    |Paris |
+|S4    |Clark |20    |London|
+|S5    |Adams |30    |Athens|
++======+------+------+------+
+Suppliers
+---------}
+
+    test relformat-3.0 {sorting} -body {
+	relformat $S "Suppliers" SNAME
+    } -result {+======+------+------+------+
+|S#    |SNAME |STATUS|CITY  |
+|string|string|int   |string|
++======+------+------+------+
+|S5    |Adams |30    |Athens|
+|S3    |Blake |30    |Paris |
+|S4    |Clark |20    |London|
+|S2    |Jones |10    |Paris |
+|S1    |Smith |20    |London|
++======+------+------+------+
+Suppliers
+---------}
+
+    test relformat-4.0 {relation valued attribute} -body {
+	relformat [relation group $SP PQ P# QTY]
+    } -result {+======+-------------------------------+
+|S#    |PQ                             |
+|string|Relation {P# string QTY int} P#|
++======+-------------------------------+
+|S1    |+======+---+                   |
+|      ||P#    |QTY|                   |
+|      ||string|int|                   |
+|      |+======+---+                   |
+|      ||P1    |300|                   |
+|      ||P2    |200|                   |
+|      ||P3    |400|                   |
+|      ||P4    |200|                   |
+|      ||P5    |100|                   |
+|      ||P6    |100|                   |
+|      |+======+---+                   |
+|S2    |+======+---+                   |
+|      ||P#    |QTY|                   |
+|      ||string|int|                   |
+|      |+======+---+                   |
+|      ||P1    |300|                   |
+|      ||P2    |400|                   |
+|      |+======+---+                   |
+|S3    |+======+---+                   |
+|      ||P#    |QTY|                   |
+|      ||string|int|                   |
+|      |+======+---+                   |
+|      ||P2    |200|                   |
+|      |+======+---+                   |
+|S4    |+======+---+                   |
+|      ||P#    |QTY|                   |
+|      ||string|int|                   |
+|      |+======+---+                   |
+|      ||P2    |200|                   |
+|      ||P4    |300|                   |
+|      ||P5    |400|                   |
+|      |+======+---+                   |
++======+-------------------------------+}
 
     cleanupTests
 }
