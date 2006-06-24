@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.c,v $
-$Revision: 1.11 $
-$Date: 2006/06/24 18:07:38 $
+$Revision: 1.12 $
+$Date: 2006/06/24 18:26:22 $
  *--
  */
 
@@ -96,7 +96,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.11 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.12 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -175,7 +175,8 @@ Ral_Attribute
 Ral_AttributeDup(
     Ral_Attribute a)
 {
-    Ral_Attribute newAttr ;
+    Ral_Attribute newAttr = NULL ; /* to silence the compiler over
+				      the default case */
 
     switch (a->attrType) {
     case Tcl_Type:
@@ -484,7 +485,7 @@ Ral_AttributeScanType(
     Ral_Attribute a,
     Ral_AttributeTypeScanFlags *flags)
 {
-    int length ;
+    int length = 0 ; /* to silence the compiler over the default case */
 
     flags->attrType = a->attrType ;
     switch (a->attrType) {
@@ -516,7 +517,7 @@ Ral_AttributeConvertType(
     char *dst,
     Ral_AttributeTypeScanFlags *flags)
 {
-    int length ;
+    int length = 0 ; /* to silence the compiler over the default case */
 
     switch (a->attrType) {
     case Tcl_Type:
@@ -558,7 +559,7 @@ Ral_AttributeScanValue(
     Ral_AttributeTypeScanFlags *typeFlags,
     Ral_AttributeValueScanFlags *valueFlags)
 {
-    int length ;
+    int length = 0 ; /* to silence the compiler over the default case */
 
     valueFlags->attrType = a->attrType ;
     switch (a->attrType) {
@@ -593,7 +594,7 @@ Ral_AttributeConvertValue(
     Ral_AttributeTypeScanFlags *typeFlags,
     Ral_AttributeValueScanFlags *valueFlags)
 {
-    int length ;
+    int length = 0 ; /* to silence the compiler over the default case */
 
     switch (a->attrType) {
     case Tcl_Type:

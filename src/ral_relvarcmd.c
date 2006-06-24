@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.7 $
-$Date: 2006/06/24 18:07:38 $
+$Revision: 1.8 $
+$Date: 2006/06/24 18:26:22 $
  *--
  */
 
@@ -111,7 +111,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.7 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.8 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -452,7 +452,7 @@ RelvarDestroyCmd(
     Tcl_Obj *const*objv,
     Ral_RelvarInfo rInfo)
 {
-    int result ;
+    int result = TCL_OK ;
 
     /* relvar destroy ?relvar1 relvar2 ...? */
     if (objc < 2) {

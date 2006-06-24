@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.15 $
-$Date: 2006/06/24 18:07:38 $
+$Revision: 1.16 $
+$Date: 2006/06/24 18:26:22 $
  *--
  */
 
@@ -139,7 +139,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.15 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.16 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -662,12 +662,15 @@ RelationExtendCmd(
 	Ral_TupleHeadingIter inserted ;
 
 	if (attr == NULL) {
-	    goto errorOut2 ;
+	    Ral_TupleHeadingDelete(extTupleHeading) ;
+	    return TCL_ERROR ;
 	}
 	inserted = Ral_TupleHeadingPushBack(extTupleHeading, attr) ;
 	if (inserted == Ral_TupleHeadingEnd(extTupleHeading)) {
 	    Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_DUPLICATE_ATTR, *v) ;
-	    goto errorOut2 ;
+	    Ral_InterpSetError(interp, &errInfo) ;
+	    Ral_TupleHeadingDelete(extTupleHeading) ;
+	    return TCL_ERROR ;
 	}
     }
     extHeading = Ral_RelationHeadingExtend(heading, extTupleHeading, 0) ;
@@ -705,7 +708,8 @@ RelationExtendCmd(
 		exprResult, &errInfo) != TCL_OK) {
 		Ral_TupleDelete(extTuple) ;
 		Tcl_DecrRefCount(exprResult) ;
-		goto errorOut2 ;
+		Ral_InterpSetError(interp, &errInfo) ;
+		goto errorOut ;
 	    }
 	    Tcl_IncrRefCount(*extIter++ = exprResult) ;
 	    Tcl_DecrRefCount(exprResult) ;
@@ -722,9 +726,6 @@ RelationExtendCmd(
     Tcl_DecrRefCount(varNameObj) ;
     Tcl_SetObjResult(interp, Ral_RelationObjNew(extRelation)) ;
     return TCL_OK ;
-
-errorOut2:
-    Ral_InterpSetError(interp, &errInfo) ;
 
 errorOut:
     Tcl_UnsetVar(interp, Tcl_GetString(varNameObj), 0) ;
@@ -2069,14 +2070,14 @@ RelationSummarizeCmd(
 	Ral_TupleHeadingIter inserted ;
 
 	if (attr == NULL) {
+	    Ral_TupleHeadingDelete(sumTupleHeading) ;
 	    Ral_InterpSetError(interp, &errInfo) ;
-	    goto errorOut ;
 	}
 	inserted = Ral_TupleHeadingPushBack(sumTupleHeading, attr) ;
 	if (inserted == Ral_TupleHeadingEnd(sumTupleHeading)) {
+	    Ral_TupleHeadingDelete(sumTupleHeading) ;
 	    Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_DUPLICATE_ATTR, *v) ;
 	    Ral_InterpSetError(interp, &errInfo) ;
-	    goto errorOut ;
 	}
     }
     sumHeading = Ral_RelationHeadingExtend(perHeading, sumTupleHeading, 0) ;
