@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_utils.h,v $
-$Revision: 1.2 $
-$Date: 2006/02/20 20:15:10 $
+$Revision: 1.3 $
+$Date: 2006/06/24 18:07:39 $
  *--
  */
 #ifndef _ral_utils_h_
@@ -73,13 +73,137 @@ FORWARD CLASS REFERENCES
 TYPE DECLARATIONS
 */
 
+typedef enum {
+    Ral_CmdUnknown,
+    Ral_CmdTuple,
+    Ral_CmdRelation,
+    Ral_CmdRelvar,
+    Ral_CmdSetFromAny,
+} Ral_Command ;
+
+typedef enum {
+    Ral_OptNone,
+    Ral_OptArray,
+    Ral_OptAssign,
+    Ral_OptAssociation,
+    Ral_OptCardinality,
+    Ral_OptChoose,
+    Ral_OptConstraint,
+    Ral_OptCreate,
+    Ral_OptDegree,
+    Ral_OptDelete,
+    Ral_OptDeleteone,
+    Ral_OptDestroy,
+    Ral_OptDict,
+    Ral_OptDivide,
+    Ral_OptEliminate,
+    Ral_OptEmptyof,
+    Ral_OptEqual,
+    Ral_OptEval,
+    Ral_OptExtend,
+    Ral_OptExtract,
+    Ral_OptForeach,
+    Ral_OptGet,
+    Ral_OptGroup,
+    Ral_OptHeading,
+    Ral_OptIdentifiers,
+    Ral_OptInsert,
+    Ral_OptIntersect,
+    Ral_OptIs,
+    Ral_OptIsempty,
+    Ral_OptIsnotempty,
+    Ral_OptJoin,
+    Ral_OptList,
+    Ral_OptMinus,
+    Ral_OptNames,
+    Ral_OptPartition,
+    Ral_OptProject,
+    Ral_OptRank,
+    Ral_OptRename,
+    Ral_OptRestrict,
+    Ral_OptRestrictwith,
+    Ral_OptSemijoin,
+    Ral_OptSemiminus,
+    Ral_OptSet,
+    Ral_OptSummarize,
+    Ral_OptTag,
+    Ral_OptTclose,
+    Ral_OptTimes,
+    Ral_OptTuple,
+    Ral_OptUngroup,
+    Ral_OptUnion,
+    Ral_OptUnwrap,
+    Ral_OptUpdate,
+    Ral_OptUpdateone,
+    Ral_OptWrap,
+} Ral_CmdOption ;
+
+typedef enum {
+    RAL_ERR_OK = 0,
+    RAL_ERR_UNKNOWN_ATTR,
+    RAL_ERR_DUPLICATE_ATTR,
+    RAL_ERR_HEADING_ERR,
+    RAL_ERR_FORMAT_ERR,
+    RAL_ERR_BAD_VALUE,
+    RAL_ERR_BAD_TYPE,
+    RAL_ERR_BAD_KEYWORD,
+    RAL_ERR_WRONG_NUM_ATTRS,
+    RAL_ERR_BAD_PAIRS_LIST,
+
+    RAL_ERR_NO_IDENTIFIER,
+    RAL_ERR_IDENTIFIER_FORMAT,
+    RAL_ERR_IDENTIFIER_SUBSET,
+    RAL_ERR_DUP_ATTR_IN_ID,
+    RAL_ERR_DUPLICATE_TUPLE,
+    RAL_ERR_HEADING_NOT_EQUAL,
+    RAL_ERR_DEGREE_ONE,
+    RAL_ERR_DEGREE_TWO,
+    RAL_ERR_CARDINALITY_ONE,
+    RAL_ERR_BAD_TRIPLE_LIST,
+    RAL_ERR_NOT_AN_IDENTIFIER,
+    RAL_ERR_NOT_A_RELATION,
+    RAL_ERR_NOT_A_TUPLE,
+    RAL_ERR_NOT_A_PROJECTION,
+    RAL_ERR_NOT_DISJOINT,
+    RAL_ERR_NOT_UNION,
+    RAL_ERR_TOO_MANY_ATTRS,
+    RAL_ERR_TYPE_MISMATCH,
+    RAL_ERR_SINGLE_IDENTIFIER,
+    RAL_ERR_SINGLE_ATTRIBUTE,
+    RAL_ERR_WITHIN_NOT_SUBSET,
+    RAL_ERR_BAD_RANK_TYPE,
+
+    RAL_ERR_DUP_NAME,
+    RAL_ERR_UNKNOWN_NAME,
+    RAL_ERR_REFATTR_MISMATCH,
+    RAL_ERR_DUP_CONSTRAINT,
+    RAL_ERR_UNKNOWN_CONSTRAINT,
+    RAL_ERR_CONSTRAINTS_PRESENT,
+    RAL_ERR_BAD_MULT,
+    RAL_ERR_BAD_TRANS_OP,
+} Ral_ErrorCode ;
+
+typedef struct Ral_ErrorInfo {
+    Ral_Command cmd ;
+    Ral_CmdOption opt ;
+    Ral_ErrorCode errorCode ;
+    Tcl_DString param ;
+} Ral_ErrorInfo ;
+
 /*
 FUNCTION DECLARATIONS
 */
 
 extern int Ral_ObjEqual(Tcl_Obj *, Tcl_Obj *) ;
-extern void Ral_ObjSetError(Tcl_Interp *, const char *, const char *,
-    const char *, const char *) ;
-
+extern void Ral_ErrorInfoSetCmd(Ral_ErrorInfo *, Ral_Command, Ral_CmdOption) ;
+extern void Ral_ErrorInfoSetError(Ral_ErrorInfo *info, Ral_ErrorCode,
+    const char *) ;
+extern void Ral_ErrorInfoSetErrorObj(Ral_ErrorInfo *, Ral_ErrorCode,
+    Tcl_Obj *) ;
+extern void Ral_InterpSetError(Tcl_Interp *, Ral_ErrorInfo *) ;
+extern void Ral_InterpErrorInfo(Tcl_Interp *, Ral_Command, Ral_CmdOption,
+    Ral_ErrorCode, const char *) ;
+extern void Ral_InterpErrorInfoObj(Tcl_Interp *, Ral_Command, Ral_CmdOption,
+    Ral_ErrorCode, Tcl_Obj *) ;
 
 #endif /* _ral_utils_h_ */

@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.19 $
-# $Date: 2006/06/04 17:03:22 $
+# $Revision: 1.20 $
+# $Date: 2006/06/24 18:07:39 $
 #  *--
 
 package require tcltest 2.2
@@ -232,21 +232,21 @@ namespace eval ::ral::test {
 
     test tuple-strrep-6.0 {bad format -- extra list element} -body {
 	tuple degree {Tuple {Name string} {Name Fred} {}}
-    } -result {bad tuple value format, "Tuple {Name string} {Name Fred} {}"}\
+    } -result {bad value format, "Tuple {Name string} {Name Fred} {}"}\
     -returnCodes error
 
     test tuple-strrep-6.1 {bad format -- missing list element} -body {
 	tuple degree {Tuple Name}
-    } -result {bad tuple value format, "Tuple Name"} -returnCodes error
+    } -result {bad value format, "Tuple Name"} -returnCodes error
 
     test tuple-strrep-6.2 {bad format -- bad keyword} -body {
 	tuple degree {Tupel {Name string} {Name Fred}}
-    } -result {bad tuple type keyword, "Tupel"}\
+    } -result {bad type keyword, "Tupel"}\
     -returnCodes error
 
     test tuple-strrep-6.3 {bad format -- bad heading} -body {
 	tuple degree {Tuple {Name string foo} {Name Fred}}
-    } -result {bad tuple heading format, "Name string foo"} -returnCodes error
+    } -result {bad list of pairs, "Name string foo"} -returnCodes error
 
     test tuple-strrep-6.4 {bad format -- duplicate attribute names} -body {
 	tuple degree {Tuple {Name string Name int} {Name Fred Name George}}
@@ -300,7 +300,7 @@ namespace eval ::ral::test {
     test tuple-create-3.0 {bad format} -body {
 	set h {Name string Age int}
 	tuple create $h {Name Andrew foo}
-    } -result {bad tuple value format, "Name Andrew foo"} -returnCodes error
+    } -result {bad list of pairs, "Name Andrew foo"} -returnCodes error
 
     test tuple-create-4.0 {unknown attribute} -body {
 	set h {Name string Age int}
@@ -427,7 +427,7 @@ namespace eval ::ral::test {
     test tuple-extend-4.0 {bad value} -body {
 	set t {Tuple {Name string} {Name Andrew}}
 	tuple extend $t {Age int foo}
-    } -result {expected integer but got "foo"} -returnCodes error
+    } -result {bad value type for value, "foo"} -returnCodes error
 
     test tuple-extend-5.0 {bad type} -body {
 	set t {Tuple {Name string} {Name Andrew}}
@@ -584,8 +584,7 @@ namespace eval ::ral::test {
 	    {Name Andrew Address {Number 599 Street Blackwood City Sunnyvale}}]
     } -body {
 	tuple unwrap $t Name
-    } -result {bad value type for value,\
-	"attribute to unwrap must be of Tuple type"} -returnCodes error
+    } -result {attribute must be of a Tuple type, "Name"} -returnCodes error
 
     # tuple update subcommand
     test tuple-update-1.0 {single attribute} -setup {
@@ -879,7 +878,7 @@ namespace eval ::ral::test {
 	    {Age 20 Name George City {San Jose}}\
 	    {City Saratoga Age 10 Name Fred}}}
 	relation choose $r City Sunnyvale
-    } -result {attributes do not constitute an identifier, "during find operation"}\
+    } -result {attributes do not constitute an identifier, "during identifier construction operation"}\
     -returnCodes 1
 
     test relation-choose-4.0 {multiple identifiers} -body {
@@ -1033,7 +1032,7 @@ namespace eval ::ral::test {
 	set med [relation project $SP P# S#]
     } -body {
 	relation divide $dend $dsor $med
-    } -result {divisor heading must be disjoint from the dividend heading, "during divide operation"}\
+    } -result {divisor heading must be disjoint from the dividend heading, "while computing quotient"}\
     -returnCodes error
 
     test relation-divide-5.0 {mediator not union dividend and divsor} -setup {
@@ -1042,7 +1041,7 @@ namespace eval ::ral::test {
 	set med [relation project $SP S#]
     } -body {
 	relation divide $dend $dsor $med
-    } -result {mediator heading must be a union of the dividend and divisor headings, "during divide operation"}\
+    } -result {mediator heading must be a union of the dividend and divisor headings, "while computing quotient"}\
     -returnCodes error
 
     # relation emptyof subcommand
@@ -2884,7 +2883,7 @@ namespace eval ::ral::test {
 	    }
 	}
 	relation ungroup $r Dog
-    } -result {duplicate attribute name, "during ungroup operation"}\
+    } -result {duplicate attribute name, "while ungrouping relation"}\
     -returnCodes error
 
     test relation-ungroup-2.1 {unknown attribute name} -body {
@@ -2904,7 +2903,7 @@ namespace eval ::ral::test {
 	    }
 	}
 	relation ungroup $r Weight
-    } -result {unknown attribute name, "during ungroup operation"}\
+    } -result {unknown attribute name, "Weight"}\
     -returnCodes error
 
     test relation-ungroup-2.2 {attribute not a relation} -body {
@@ -2924,9 +2923,7 @@ namespace eval ::ral::test {
 	    }
 	}
 	relation ungroup $r Name
-    } -result\
-	{attribute must be of a Relation type, "during ungroup operation"}\
-    -returnCodes error
+    } -result {attribute must be of a Relation type, "Name"} -returnCodes error
 
     test relation-ungroup-3.0 {common tuples in the relation attribute} -body {
 	set r {
@@ -3088,7 +3085,7 @@ namespace eval ::ral::test {
 	set r2 {Relation {Name string City string} Name\
 	    {{Name George City {San Jose}}}}
 	relation union $r1 $r2
-    } -result {headings not equal, "Relation {Name string City string} Name {{Name George City {San Jose}}}"}\
+    } -result {headings not equal, "while computing union"}\
     -returnCodes error
 
     test relation-union-8.0 {equal headings of different order} -body {
@@ -3479,7 +3476,7 @@ tuple {B1 c B2 foo} is not referenced by any tuple} -returnCodes error
 	relvar destroy X
     } -body {
 	relvar deleteone X Status 30
-    } -result {attributes do not constitute an identifier, "during find operation"}\
+    } -result {attributes do not constitute an identifier, "during identifier construction operation"}\
     -returnCodes error
 
     # relvar partition subcommand
@@ -3521,7 +3518,7 @@ tuple {B1 c B2 foo} is not referenced by any tuple} -returnCodes error
 	relvar destroy A B C
     } -body {
 	relvar partition R1 A A2 B B1 C C2
-    } -result {referred to attributes do not form an identifier, "A2"}\
+    } -result {attributes do not constitute an identifier, "A2"}\
     -returnCodes error
 
     test relvar-partition-2.1 {passes constraints} -setup {
@@ -3576,7 +3573,7 @@ tuple {A1 b} is referred to by multiple tuples}\
     -returnCodes error
 
     # relvar set subcommand
-    test relvar-set-1.0 {single attribute} -body {
+    test relvar-set-1.0 {simple assignment} -body {
 	relvar create SV {
 	    Relation
 	    {S# string SNAME string STATUS int CITY string}
@@ -3595,6 +3592,32 @@ tuple {A1 b} is referred to by multiple tuples}\
 	    {S# S3 SNAME Blake STATUS 30 CITY Paris}
 	    {S# S4 SNAME Clark STATUS 20 CITY London}
 	    {S# S5 SNAME Adams STATUS 30 CITY Athens}
+	}
+    } -match relation
+
+    test relvar-set-2.0 {name resolution} -setup {
+	relvar create ::R {
+	    Relation
+	    {R# string RNAME string}
+	    R#
+	}
+	relvar insert ::R {R# 1 RNAME First}
+	relvar create R {
+	    Relation
+	    {R# string RNAME string}
+	    R#
+	}
+	relvar insert R {R# 2 RNAME Second}
+    } -cleanup {
+	relvar destroy ::R R
+    } -body {
+	relvar set R
+    } -result {
+	Relation
+	{R# string RNAME string}
+	R#
+	{
+	    {R# 2 RNAME Second}
 	}
     } -match relation
 
@@ -3977,7 +4000,7 @@ tuple {A1 b} is referred to by multiple tuples}\
 	relvar destroy X
     } -body {
 	relvar updateone X {Status 20} {Name Jane}
-    } -result {attributes do not constitute an identifier, "during find operation"}\
+    } -result {attributes do not constitute an identifier, "during identifier construction operation"}\
     -returnCodes error
 
     test relvar-updateone-4.0 {update creates duplicate} -setup {

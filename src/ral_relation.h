@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.h,v $
-$Revision: 1.14 $
-$Date: 2006/05/29 21:07:42 $
+$Revision: 1.15 $
+$Date: 2006/06/24 18:07:38 $
  *--
  */
 #ifndef _ral_relation_h_
@@ -59,6 +59,7 @@ PRAGMAS
 /*
 INCLUDE FILES
 */
+#include "ral_utils.h"
 #include "ral_relationheading.h"
 #include "ral_tuple.h"
 #include "ral_attribute.h"
@@ -128,43 +129,8 @@ typedef struct Ral_Relation {
 } *Ral_Relation ;
 
 /*
- * Order here is important!
- * These enumerators are used as an array index in Ral_RelationObjSetError()
- */
-typedef enum Ral_RelationError {
-    REL_OK = 0,
-    REL_FORMAT_ERR,
-    REL_BAD_KEYWORD,
-    REL_NO_IDENTIFIER,
-    REL_IDENTIFIER_FORMAT,
-    REL_IDENTIFIER_SUBSET,
-    REL_DUP_ATTR_IN_ID,
-    REL_UNKNOWN_ATTR,
-    REL_DUPLICATE_TUPLE,
-    REL_HEADING_NOT_EQUAL,
-    REL_DUPLICATE_ATTR,
-    REL_DEGREE_ONE,
-    REL_DEGREE_TWO,
-    REL_CARDINALITY_ONE,
-    REL_BAD_PAIRS_LIST,
-    REL_BAD_TRIPLE_LIST,
-    REL_NOT_AN_IDENTIFIER,
-    REL_NOT_A_RELATION,
-    REL_NOT_A_PROJECTION,
-    REL_NOT_DISJOINT,
-    REL_NOT_UNION,
-    REL_TOO_MANY_ATTRS,
-    REL_TYPE_MISMATCH,
-    REL_SINGLE_IDENTIFIER,
-    REL_SINGLE_ATTRIBUTE,
-    REL_WITHIN_NOT_SUBSET,
-    REL_BAD_RANK_TYPE,
-} Ral_RelationError ;
-
-/*
 DATA DECLARATIONS
 */
-extern Ral_RelationError Ral_RelationLastError ;
 
 /*
 FUNCTION DECLARATIONS
@@ -204,24 +170,29 @@ extern int Ral_RelationProperSubsetOf(Ral_Relation, Ral_Relation) ;
 extern int Ral_RelationSupersetOf(Ral_Relation, Ral_Relation) ;
 extern int Ral_RelationProperSupersetOf(Ral_Relation, Ral_Relation) ;
 
-extern int Ral_RelationRenameAttribute(Ral_Relation, const char *,
-    const char *) ;
+extern int Ral_RelationRenameAttribute(Ral_Relation, const char *, const char *,
+    Ral_ErrorInfo *) ;
 
-extern Ral_Relation Ral_RelationUnion(Ral_Relation, Ral_Relation) ;
-extern Ral_Relation Ral_RelationIntersect(Ral_Relation, Ral_Relation) ;
-extern Ral_Relation Ral_RelationMinus(Ral_Relation, Ral_Relation) ;
+extern Ral_Relation Ral_RelationUnion(Ral_Relation, Ral_Relation,
+    Ral_ErrorInfo *) ;
+extern Ral_Relation Ral_RelationIntersect(Ral_Relation, Ral_Relation,
+    Ral_ErrorInfo *) ;
+extern Ral_Relation Ral_RelationMinus(Ral_Relation, Ral_Relation,
+    Ral_ErrorInfo *) ;
 extern Ral_Relation Ral_RelationTimes(Ral_Relation, Ral_Relation) ;
 extern Ral_Relation Ral_RelationProject(Ral_Relation, Ral_IntVector) ;
 extern Ral_Relation Ral_RelationGroup(Ral_Relation, const char *,
     Ral_IntVector) ;
-extern Ral_Relation Ral_RelationUngroup(Ral_Relation, const char *) ;
-extern Ral_Relation Ral_RelationJoin(Ral_Relation, Ral_Relation, Ral_JoinMap) ;
+extern Ral_Relation Ral_RelationUngroup(Ral_Relation, const char *,
+    Ral_ErrorInfo *) ;
+extern Ral_Relation Ral_RelationJoin(Ral_Relation, Ral_Relation, Ral_JoinMap,
+    Ral_ErrorInfo *) ;
 extern Ral_Relation Ral_RelationSemiJoin(Ral_Relation, Ral_Relation,
     Ral_JoinMap) ;
 extern Ral_Relation Ral_RelationSemiMinus(Ral_Relation, Ral_Relation,
     Ral_JoinMap) ;
-extern Ral_Relation Ral_RelationDivide(Ral_Relation, Ral_Relation,
-    Ral_Relation) ;
+extern Ral_Relation Ral_RelationDivide(Ral_Relation, Ral_Relation, Ral_Relation,
+    Ral_ErrorInfo *) ;
 extern Ral_Relation Ral_RelationTclose(Ral_Relation) ;
 
 extern Ral_IntVector Ral_RelationSortAscending(Ral_Relation, Ral_IntVector) ;

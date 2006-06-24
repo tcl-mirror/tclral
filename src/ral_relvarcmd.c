@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.6 $
-$Date: 2006/05/21 04:22:00 $
+$Revision: 1.7 $
+$Date: 2006/06/24 18:07:38 $
  *--
  */
 
@@ -111,7 +111,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.6 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.7 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -278,6 +278,7 @@ RelvarCreateCmd(
     int elemc ;
     Tcl_Obj **elemv ;
     Ral_RelationHeading heading ;
+    Ral_ErrorInfo errInfo ;
 
     /* relvar create relvarName heading */
     if (objc != 4) {
@@ -285,24 +286,28 @@ RelvarCreateCmd(
 	return TCL_ERROR ;
     }
 
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelvar, Ral_OptCreate) ;
+
     if (Tcl_ListObjGetElements(interp, objv[3], &elemc, &elemv) != TCL_OK) {
 	return TCL_ERROR ;
     }
     if (elemc != 3) {
-	Ral_RelationObjSetError(interp, REL_FORMAT_ERR,
-	    Tcl_GetString(objv[3])) ;
+	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_FORMAT_ERR, objv[3]) ;
+	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
     if (strcmp(Ral_RelationObjType.name, Tcl_GetString(*elemv)) != 0) {
-	Ral_RelationObjSetError(interp, REL_BAD_KEYWORD,
-	    Tcl_GetString(*elemv)) ;
+	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_BAD_KEYWORD, *elemv) ;
+	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
     /*
      * Create the heading from the external representation.
      */
-    heading = Ral_RelationHeadingNewFromObjs(interp, elemv[1], elemv[2]) ;
+    heading = Ral_RelationHeadingNewFromObjs(interp, elemv[1], elemv[2],
+	&errInfo) ;
     if (!heading) {
+	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
 
@@ -395,6 +400,7 @@ RelvarDeleteOneCmd(
     int idNum ;
     int deleted ;
     int result ;
+    Ral_ErrorInfo errInfo ;
 
     /* relvar deleteone relvarName ?attrName1 value1 attrName2 value2 ...? */
     if (objc < 3) {
@@ -417,7 +423,10 @@ RelvarDeleteOneCmd(
     objc -= 3 ;
     objv += 3 ;
 
-    key = Ral_RelationObjKeyTuple(interp, relation, objc, objv, &idNum) ;
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelvar, Ral_OptDeleteone) ;
+
+    key = Ral_RelationObjKeyTuple(interp, relation, objc, objv, &idNum,
+	&errInfo) ;
     if (key == NULL) {
 	return TCL_ERROR ;
     }
@@ -507,6 +516,7 @@ RelvarInsertCmd(
     Ral_Relation relation ;
     int inserted = 0 ;
     int result ;
+    Ral_ErrorInfo errInfo ;
 
     /* relvar insert relvarName ?name-value-list ...? */
     if (objc < 3) {
@@ -525,13 +535,15 @@ RelvarInsertCmd(
     }
     relation = relvar->relObj->internalRep.otherValuePtr ;
 
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelvar, Ral_OptInsert) ;
     objc -= 3 ;
     objv += 3 ;
 
     Ral_RelvarStartCommand(rInfo, relvar) ;
     Ral_RelationReserve(relation, objc) ;
     while (objc-- > 0) {
-	if (Ral_RelationInsertTupleObj(relation, interp, *objv++) != TCL_OK) {
+	if (Ral_RelationInsertTupleObj(relation, interp, *objv++, &errInfo)
+	    != TCL_OK) {
 	    return Ral_RelvarObjEndCmd(interp, rInfo, 1) ;
 	}
 	++inserted ;
@@ -655,7 +667,8 @@ RelvarSetCmd(
 
 	if (!Ral_RelationHeadingEqual(relvalue->heading, relation->heading)) {
 	    char *headingStr = Ral_RelationHeadingStringOf(relation->heading) ;
-	    Ral_RelvarObjSetError(interp, RELVAR_HEADING_MISMATCH, headingStr) ;
+	    Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptSet,
+		RAL_ERR_HEADING_NOT_EQUAL, headingStr) ;
 	    ckfree(headingStr) ;
 	    return TCL_ERROR ;
 	}
@@ -781,7 +794,8 @@ RelvarUpdateCmd(
 	tuple = tupleObj->internalRep.otherValuePtr ;
 	if (!Ral_RelationUpdate(relation, rIter, tuple, NULL)) {
 	    char *tupleStr = Ral_TupleValueStringOf(tuple) ;
-	    Ral_RelationObjSetError(interp, REL_DUPLICATE_TUPLE, tupleStr) ;
+	    Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptUpdate,
+		RAL_ERR_DUPLICATE_TUPLE, tupleStr) ;
 	    ckfree(tupleStr) ;
 	    result = TCL_ERROR ;
 	    break ;
@@ -822,6 +836,7 @@ RelvarUpdateOneCmd(
     Ral_RelationIter found ;
     int result = TCL_OK ;
     int updated = 0 ;
+    Ral_ErrorInfo errInfo ;
 
     /* relvar updateone relvarName idValueList nameValueList */
     if (objc != 5) {
@@ -840,12 +855,14 @@ RelvarUpdateOneCmd(
 	return TCL_ERROR ;
     }
     relation = relvar->relObj->internalRep.otherValuePtr ;
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelvar, Ral_OptUpdateone) ;
 
     if (Tcl_ListObjGetElements(interp, objv[3], &elemc, &elemv) != TCL_OK) {
 	return TCL_ERROR ;
     }
 
-    key = Ral_RelationObjKeyTuple(interp, relation, elemc, elemv, &idNum) ;
+    key = Ral_RelationObjKeyTuple(interp, relation, elemc, elemv, &idNum,
+	&errInfo) ;
     if (key == NULL) {
 	return TCL_ERROR ;
     }
@@ -856,8 +873,8 @@ RelvarUpdateOneCmd(
 	int failed = 0 ;
 	Ral_RelvarStartCommand(rInfo, relvar) ;
 
-	if (Ral_RelationObjUpdateTuple(interp, objv[4], relation, found)
-	    != TCL_OK) {
+	if (Ral_RelationObjUpdateTuple(interp, objv[4], relation, found,
+	    &errInfo) != TCL_OK) {
 	    failed = 1 ;
 	} else {
 	    Tcl_InvalidateStringRep(relvar->relObj) ;

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_utils.c,v $
-$Revision: 1.4 $
-$Date: 2006/03/19 19:48:31 $
+$Revision: 1.5 $
+$Date: 2006/06/24 18:07:39 $
  *--
  */
 
@@ -87,8 +87,163 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_utils.c,v $ $Revision: 1.4 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_utils.c,v $ $Revision: 1.5 $" ;
 
+static char const * const cmdStrings[] = {
+    "unknown command",
+    "tuple",
+    "relation",
+    "relvar",
+    "setfromany",
+    "updatefromobj",
+} ;
+
+static char const * const optStrings[] = {
+    "NONE",
+    "ARRAY",
+    "ASSIGN",
+    "ASSOCIATION",
+    "CARDINALITY",
+    "CHOOSE",
+    "CONSTRAINT",
+    "CREATE",
+    "DEGREE",
+    "DELETE",
+    "DELETEONE",
+    "DESTROY",
+    "DICT",
+    "DIVIDE",
+    "ELIMINATE",
+    "EMPTYOF",
+    "EQUAL",
+    "EVAL",
+    "EXTEND",
+    "EXTRACT",
+    "FOREACH",
+    "GET",
+    "GROUP",
+    "HEADING",
+    "IDENTIFIERS",
+    "INSERT",
+    "INTERSECT",
+    "IS",
+    "ISEMPTY",
+    "ISNOTEMPTY",
+    "JOIN",
+    "LIST",
+    "MINUS",
+    "NAMES",
+    "PARTITION",
+    "PROJECT",
+    "RANK",
+    "RENAME",
+    "RESTRICT",
+    "RESTRICTWITH",
+    "SEMIJOIN",
+    "SEMIMINUS",
+    "SET",
+    "SUMMARIZE",
+    "TAG",
+    "TCLOSE",
+    "TIMES",
+    "TUPLE",
+    "UNGROUP",
+    "UNION",
+    "UNWRAP",
+    "UPDATE",
+    "UPDATEONE",
+    "WRAP",
+} ;
+
+static char const * const resultStrings[] = {
+    "no error",
+    "unknown attribute name",
+    "duplicate attribute name",
+    "bad heading format",
+    "bad value format",
+    "bad value type for value",
+    "unknown data type",
+    "bad type keyword",
+    "wrong number of attributes specified",
+    "bad list of pairs",
+
+    "relations of non-zero degree must have at least one identifier",
+    "identifiers must have at least one attribute",
+    "identifiers must not be subsets of other identifiers",
+    "duplicate attribute name in identifier attribute set",
+    "duplicate tuple",
+    "headings not equal",
+    "relation must have degree of one",
+    "relation must have degree of two",
+    "relation must have cardinality of one",
+    "bad list of triples",
+    "attributes do not constitute an identifier",
+    "attribute must be of a Relation type",
+    "attribute must be of a Tuple type",
+    "relation is not a projection of the summarized relation",
+    "divisor heading must be disjoint from the dividend heading",
+    "mediator heading must be a union of the dividend and divisor headings",
+    "too many attributes specified",
+    "attributes must have the same type",
+    "only a single identifier may be specified",
+    "identifier must have only a single attribute",
+    "\"-within\" option attributes are not the subset of any identifier",
+    "attribute is not a valid type for rank operation",
+
+    "duplicate relvar name",
+    "unknown relvar name",
+    "mismatch between referential attributes",
+    "duplicate constraint name",
+    "unknown constraint name",
+    "relvar has constraints in place",
+    "referred to identifiers can not have non-singular multiplicities",
+    "operation is not allowed during \"eval\" command",
+} ;
+
+static char const * const errorStrings[] = {
+    "OK",
+    "UNKNOWN_ATTR",
+    "DUPLICATE_ATTR",
+    "HEADING_ERR",
+    "FORMAT_ERR",
+    "BAD_VALUE",
+    "BAD_TYPE",
+    "BAD_KEYWORD",
+    "WRONG_NUM_ATTRS",
+    "BAD_PAIRS_LIST",
+
+    "NO_IDENTIFIER",
+    "IDENTIFIER_FORMAT",
+    "IDENTIFIER_SUBSET",
+    "DUP_ATTR_IN_ID",
+    "DUPLICATE_TUPLE",
+    "HEADING_NOT_EQUAL",
+    "DEGREE_ONE",
+    "DEGREE_TWO",
+    "CARDINALITY_ONE",
+    "BAD_TRIPLE_LIST",
+    "NOT_AN_IDENTIFIER",
+    "NOT_A_RELATION",
+    "NOT_A_TUPLE",
+    "NOT_A_PROJECTION",
+    "NOT_DISJOINT",
+    "NOT_UNION",
+    "TOO_MANY_ATTRS",
+    "TYPE_MISMATCH",
+    "SINGLE_IDENTIFIER",
+    "SINGLE_ATTRIBUTE",
+    "WITHIN_NOT_SUBSET",
+    "BAD_RANK_TYPE",
+
+    "DUP_NAME",
+    "UNKNOWN_NAME",
+    "REFATTR_MISMATCH",
+    "DUP_CONSTRAINT",
+    "UNKNOWN_CONSTRAINT",
+    "CONSTRAINTS_PRESENT",
+    "BAD_MULT",
+    "BAD_TRANS_OP",
+} ;
 /*
 FUNCTION DEFINITIONS
 */
@@ -124,17 +279,88 @@ Ral_ObjEqual(
 }
 
 void
-Ral_ObjSetError(
-    Tcl_Interp *interp,
-    const char *cmdName,
-    const char *errorResult,
-    const char *errorCode,
+Ral_ErrorInfoSetCmd(
+    Ral_ErrorInfo *info,
+    Ral_Command cmd,
+    Ral_CmdOption opt)
+{
+    if (info) {
+	info->cmd = cmd ;
+	info->opt = opt ;
+    }
+}
+
+void
+Ral_ErrorInfoSetError(
+    Ral_ErrorInfo *info,
+    Ral_ErrorCode errorCode,
     const char *param)
 {
-    if (interp) {
-	Tcl_ResetResult(interp) ;
-	Tcl_AppendStringsToObj(Tcl_GetObjResult(interp), errorResult,
-	    ", \"", param, "\"", NULL) ;
-	Tcl_SetErrorCode(interp, "RAL", cmdName, errorCode, param, NULL) ;
+    if (info) {
+	info->errorCode = errorCode ;
+	Tcl_DStringInit(&info->param) ;
+	Tcl_DStringAppend(&info->param, param, -1) ;
     }
+}
+
+void
+Ral_ErrorInfoSetErrorObj(
+    Ral_ErrorInfo *info,
+    Ral_ErrorCode errorCode,
+    Tcl_Obj *objPtr)
+{
+    if (info) {
+	info->errorCode = errorCode ;
+	Tcl_DStringInit(&info->param) ;
+	Tcl_DStringAppend(&info->param, Tcl_GetString(objPtr), -1) ;
+    }
+}
+
+void
+Ral_InterpSetError(
+    Tcl_Interp *interp,
+    Ral_ErrorInfo *info)
+{
+    if (interp && info) {
+	const char *param = Tcl_DStringValue(&info->param) ;
+
+	Tcl_ResetResult(interp) ;
+	Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
+	    resultStrings[info->errorCode], ", \"", param, "\"", NULL) ;
+	Tcl_SetErrorCode(interp, "RAL", cmdStrings[info->cmd],
+	    optStrings[info->opt], errorStrings[info->errorCode], param, NULL) ;
+    }
+    if (info) {
+	Tcl_DStringFree(&info->param) ;
+    }
+}
+
+void
+Ral_InterpErrorInfo(
+    Tcl_Interp *interp,
+    Ral_Command cmd,
+    Ral_CmdOption opt,
+    Ral_ErrorCode errorCode,
+    const char *param)
+{
+    Ral_ErrorInfo errInfo ;
+
+    Ral_ErrorInfoSetCmd(&errInfo, cmd, opt) ;
+    Ral_ErrorInfoSetError(&errInfo, errorCode, param) ;
+    Ral_InterpSetError(interp, &errInfo) ;
+}
+
+void
+Ral_InterpErrorInfoObj(
+    Tcl_Interp *interp,
+    Ral_Command cmd,
+    Ral_CmdOption opt,
+    Ral_ErrorCode errorCode,
+    Tcl_Obj *objPtr)
+{
+    Ral_ErrorInfo errInfo ;
+
+    Ral_ErrorInfoSetCmd(&errInfo, cmd, opt) ;
+    Ral_ErrorInfoSetErrorObj(&errInfo, errorCode, objPtr) ;
+    Ral_InterpSetError(interp, &errInfo) ;
 }

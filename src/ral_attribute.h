@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.h,v $
-$Revision: 1.9 $
-$Date: 2006/05/19 04:54:32 $
+$Revision: 1.10 $
+$Date: 2006/06/24 18:07:38 $
  *--
  */
 #ifndef _ral_attribute_h_
@@ -60,6 +60,7 @@ PRAGMAS
 INCLUDE FILES
 */
 #include "tcl.h"
+#include "ral_utils.h"
 
 /*
 MACRO DEFINITIONS
@@ -147,9 +148,9 @@ extern Ral_Attribute Ral_AttributeNewTupleType(const char *,
 extern Ral_Attribute Ral_AttributeNewRelationType(const char *,
     struct Ral_RelationHeading *) ;
 extern Ral_Attribute Ral_AttributeNewFromObjs(Tcl_Interp *, Tcl_Obj *,
-    Tcl_Obj*) ;
+    Tcl_Obj*, Ral_ErrorInfo *) ;
 extern int Ral_AttributeConvertValueToType(Tcl_Interp *, Ral_Attribute,
-    Tcl_Obj *) ;
+    Tcl_Obj *, Ral_ErrorInfo *) ;
 extern void Ral_AttributeDelete(Ral_Attribute) ;
 extern Ral_Attribute Ral_AttributeDup(Ral_Attribute) ;
 extern Ral_Attribute Ral_AttributeRename(Ral_Attribute, const char *) ;

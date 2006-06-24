@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.14 $
-$Date: 2006/05/29 21:07:42 $
+$Revision: 1.15 $
+$Date: 2006/06/24 18:07:38 $
  *--
  */
 
@@ -139,7 +139,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.14 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.15 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -255,18 +255,19 @@ RelationArrayCmd(
     heading = relation->heading ;
 
     if (Ral_RelationDegree(relation) != 2) {
-	Ral_RelationObjSetError(interp, REL_DEGREE_TWO, Tcl_GetString(relObj)) ;
+	Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptArray,
+	    RAL_ERR_DEGREE_TWO, relObj) ;
 	return TCL_ERROR ;
     }
 
     if (heading->idCount != 1) {
-	Ral_RelationObjSetError(interp, REL_SINGLE_IDENTIFIER,
-	    Tcl_GetString(relObj)) ;
+	Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptArray,
+	    RAL_ERR_SINGLE_IDENTIFIER, relObj) ;
 	return TCL_ERROR ;
     }
     if (Ral_IntVectorSize(*heading->identifiers) != 1) {
-	Ral_RelationObjSetError(interp, REL_SINGLE_ATTRIBUTE,
-	    Tcl_GetString(relObj)) ;
+	Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptArray,
+	    RAL_ERR_SINGLE_ATTRIBUTE, relObj) ;
 	return TCL_ERROR ;
     }
     arrayNameObj = objv[3] ;
@@ -326,6 +327,7 @@ RelationChooseCmd(
     int idNum ;
     Ral_Relation newRelation ;
     Ral_RelationIter found ;
+    Ral_ErrorInfo errInfo ;
 
     /* relation choose relValue attr value ?attr2 value2 ...? */
     if (objc < 5) {
@@ -342,14 +344,17 @@ RelationChooseCmd(
     heading = relation->heading ;
     tupleHeading = heading->tupleHeading ;
 
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptChoose) ;
     objc -= 3 ;
     objv += 3 ;
     if (objc % 2 != 0) {
-	Ral_RelationObjSetError(interp, REL_BAD_PAIRS_LIST,
+	Ral_ErrorInfoSetError(&errInfo, RAL_ERR_BAD_PAIRS_LIST,
 	    "attribute / value arguments must be given in pairs") ;
+	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
-    key = Ral_RelationObjKeyTuple(interp, relation, objc, objv, &idNum) ;
+    key = Ral_RelationObjKeyTuple(interp, relation, objc, objv, &idNum,
+	&errInfo) ;
     if (key == NULL) {
 	return TCL_ERROR ;
     }
@@ -432,18 +437,19 @@ RelationDictCmd(
     heading = relation->heading ;
 
     if (Ral_RelationDegree(relation) != 2) {
-	Ral_RelationObjSetError(interp, REL_DEGREE_TWO, Tcl_GetString(relObj)) ;
+	Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptDict,
+	    RAL_ERR_DEGREE_TWO, relObj) ;
 	return TCL_ERROR ;
     }
 
     if (heading->idCount != 1) {
-	Ral_RelationObjSetError(interp, REL_SINGLE_IDENTIFIER,
-	    Tcl_GetString(relObj)) ;
+	Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptDict,
+	    RAL_ERR_SINGLE_IDENTIFIER, relObj) ;
 	return TCL_ERROR ;
     }
     if (Ral_IntVectorSize(*heading->identifiers) != 1) {
-	Ral_RelationObjSetError(interp, REL_SINGLE_ATTRIBUTE,
-	    Tcl_GetString(relObj)) ;
+	Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptDict,
+	    RAL_ERR_SINGLE_ATTRIBUTE, relObj) ;
 	return TCL_ERROR ;
     }
 
@@ -479,6 +485,7 @@ RelationDivideCmd(
     Tcl_Obj *medObj ;
     Ral_Relation med ;
     Ral_Relation quot ;
+    Ral_ErrorInfo errInfo ;
 
     /* relation divide dividend divisor mediator */
     if (objc != 5) {
@@ -507,10 +514,10 @@ RelationDivideCmd(
     /*
      * Create the quotient. It has the same heading as the dividend.
      */
-    quot = Ral_RelationDivide(dend, dsor, med) ;
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptDivide) ;
+    quot = Ral_RelationDivide(dend, dsor, med, &errInfo) ;
     if (quot == NULL) {
-	Ral_RelationObjSetError(interp, Ral_RelationLastError,
-	    "during divide operation") ;
+	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
 
@@ -612,6 +619,7 @@ RelationExtendCmd(
     Ral_RelationIter relEnd ;
     Ral_RelationIter relIter ;
     Ral_TupleHeadingIter extHeadingIter ;
+    Ral_ErrorInfo errInfo ;
 
     /*
      * relation extend relationValue tupleVarName
@@ -634,9 +642,12 @@ RelationExtendCmd(
     objc -= 4 ;
     objv += 4 ;
 
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptExtend) ;
     if (objc % 3 != 0) {
-	Ral_RelationObjSetError(interp, REL_BAD_TRIPLE_LIST,
-	"attribute / type / expression arguments must be given in triples") ;
+	Ral_ErrorInfoSetError(&errInfo, RAL_ERR_BAD_TRIPLE_LIST,
+	    "attribute / type / expression arguments "
+	    "must be given in triples") ;
+	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
 
@@ -646,17 +657,17 @@ RelationExtendCmd(
      */
     extTupleHeading = Ral_TupleHeadingExtend(tupleHeading, objc / 3) ;
     for (c = objc, v = objv ; c > 0 ; c -= 3, v += 3) {
-	Ral_Attribute attr = Ral_AttributeNewFromObjs(interp, *v, *(v + 1)) ;
+	Ral_Attribute attr = Ral_AttributeNewFromObjs(interp, *v, *(v + 1),
+	    &errInfo) ;
 	Ral_TupleHeadingIter inserted ;
 
 	if (attr == NULL) {
-	    goto errorOut ;
+	    goto errorOut2 ;
 	}
 	inserted = Ral_TupleHeadingPushBack(extTupleHeading, attr) ;
 	if (inserted == Ral_TupleHeadingEnd(extTupleHeading)) {
-	    Ral_RelationObjSetError(interp, REL_DUPLICATE_ATTR,
-		Tcl_GetString(*v)) ;
-	    goto errorOut ;
+	    Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_DUPLICATE_ATTR, *v) ;
+	    goto errorOut2 ;
 	}
     }
     extHeading = Ral_RelationHeadingExtend(heading, extTupleHeading, 0) ;
@@ -691,10 +702,10 @@ RelationExtendCmd(
 		goto errorOut ;
 	    }
 	    if (Ral_AttributeConvertValueToType(interp, *attrIter++,
-		exprResult) != TCL_OK) {
+		exprResult, &errInfo) != TCL_OK) {
 		Ral_TupleDelete(extTuple) ;
 		Tcl_DecrRefCount(exprResult) ;
-		goto errorOut ;
+		goto errorOut2 ;
 	    }
 	    Tcl_IncrRefCount(*extIter++ = exprResult) ;
 	    Tcl_DecrRefCount(exprResult) ;
@@ -711,6 +722,9 @@ RelationExtendCmd(
     Tcl_DecrRefCount(varNameObj) ;
     Tcl_SetObjResult(interp, Ral_RelationObjNew(extRelation)) ;
     return TCL_OK ;
+
+errorOut2:
+    Ral_InterpSetError(interp, &errInfo) ;
 
 errorOut:
     Tcl_UnsetVar(interp, Tcl_GetString(varNameObj), 0) ;
@@ -906,7 +920,8 @@ RelationGroupCmd(
 	const char *attrName = Tcl_GetString(*objv++) ;
 	int attrIndex = Ral_TupleHeadingIndexOf(tupleHeading, attrName) ;
 	if (attrIndex < 0) {
-	    Ral_RelationObjSetError(interp, REL_UNKNOWN_ATTR, attrName) ;
+	    Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptGroup,
+		RAL_ERR_UNKNOWN_ATTR, attrName) ;
 	    Ral_IntVectorDelete(grpAttrs) ;
 	    return TCL_ERROR ;
 	}
@@ -916,7 +931,8 @@ RelationGroupCmd(
      * You may not group away all of the attributes.
      */
     if (Ral_IntVectorSize(grpAttrs) >= Ral_TupleHeadingSize(tupleHeading)) {
-	Ral_RelationObjSetError(interp, REL_TOO_MANY_ATTRS,
+	Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptGroup,
+	    RAL_ERR_TOO_MANY_ATTRS,
 	    "attempt to group all attributes in the relation") ;
 	Ral_IntVectorDelete(grpAttrs) ;
 	return TCL_ERROR ;
@@ -930,15 +946,16 @@ RelationGroupCmd(
     index = Ral_TupleHeadingIndexOf(tupleHeading, relAttrName) ;
     if (index >= 0 &&
 	Ral_IntVectorFind(grpAttrs, index) == Ral_IntVectorEnd(grpAttrs)) {
-	Ral_RelationObjSetError(interp, REL_DUPLICATE_ATTR, relAttrName) ;
+	Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptGroup,
+	    RAL_ERR_DUPLICATE_ATTR, relAttrName) ;
 	Ral_IntVectorDelete(grpAttrs) ;
 	return TCL_ERROR ;
     }
 
     grpRel = Ral_RelationGroup(rel, relAttrName, grpAttrs) ;
     if (grpRel == NULL) {
-	Ral_RelationObjSetError(interp, Ral_RelationLastError,
-	    "during group operation") ;
+	Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptGroup,
+	    RAL_ERR_BAD_VALUE, "during group operation") ;
 	return TCL_ERROR ;
     }
 
@@ -1045,6 +1062,7 @@ RelationIntersectCmd(
     Ral_Relation r1 ;
     Ral_Relation r2 ;
     Ral_Relation intersectRel ;
+    Ral_ErrorInfo errInfo ;
 
     /* relation intersect relation1 relation2 ? ... ? */
     if (objc < 4) {
@@ -1065,10 +1083,10 @@ RelationIntersectCmd(
     }
     r2 = r2Obj->internalRep.otherValuePtr ;
 
-    intersectRel = Ral_RelationIntersect(r1, r2) ;
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptIntersect) ;
+    intersectRel = Ral_RelationIntersect(r1, r2, &errInfo) ;
     if (intersectRel == NULL) {
-	Ral_RelationObjSetError(interp, Ral_RelationLastError,
-	    Tcl_GetString(r2Obj)) ;
+	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
 
@@ -1088,11 +1106,10 @@ RelationIntersectCmd(
 	}
 	r2 = r2Obj->internalRep.otherValuePtr ;
 
-	intersectRel = Ral_RelationIntersect(r1, r2) ;
+	intersectRel = Ral_RelationIntersect(r1, r2, &errInfo) ;
 	Ral_RelationDelete(r1) ;
 	if (intersectRel == NULL) {
-	    Ral_RelationObjSetError(interp, Ral_RelationLastError,
-		Tcl_GetString(r2Obj)) ;
+	    Ral_InterpSetError(interp, &errInfo) ;
 	    return TCL_ERROR ;
 	}
     }
@@ -1158,8 +1175,8 @@ RelationIsCmd(
 
     result = cmdTable[index].cmdFunc(r1, r2) ;
     if (result < 0) {
-	Ral_RelationObjSetError(interp, REL_HEADING_NOT_EQUAL,
-	    Tcl_GetString(r2Obj)) ;
+	Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptIs,
+	    RAL_ERR_HEADING_NOT_EQUAL, r2Obj) ;
 	return TCL_ERROR ;
     }
 
@@ -1229,6 +1246,7 @@ RelationJoinCmd(
     Ral_Relation r2 ;
     Ral_Relation joinRel ;
     Ral_JoinMap joinMap ;
+    Ral_ErrorInfo errInfo ;
 
     /* relation join relation1 relation2 ?-using joinAttrs relation3 ... ? */
     if (objc < 4) {
@@ -1252,17 +1270,17 @@ RelationJoinCmd(
     objc -= 4 ;
     objv += 4 ;
 
-    if (Ral_RelationObjParseJoinArgs(interp, &objc, &objv, r1, r2, joinMap)
-	!= TCL_OK) {
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptJoin) ;
+    if (Ral_RelationObjParseJoinArgs(interp, &objc, &objv, r1, r2, joinMap,
+	&errInfo) != TCL_OK) {
 	Ral_JoinMapDelete(joinMap) ;
 	return TCL_ERROR ;
     }
 
-    joinRel = Ral_RelationJoin(r1, r2, joinMap) ;
+    joinRel = Ral_RelationJoin(r1, r2, joinMap, &errInfo) ;
     Ral_JoinMapDelete(joinMap) ;
     if (joinRel == NULL) {
-	Ral_RelationObjSetError(interp, Ral_RelationLastError,
-	    Tcl_GetString(r2Obj)) ;
+	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
 
@@ -1276,17 +1294,16 @@ RelationJoinCmd(
 	r2 = r2Obj->internalRep.otherValuePtr ;
 	joinMap = Ral_JoinMapNew(0, 0) ;
 
-	if (Ral_RelationObjParseJoinArgs(interp, &objc, &objv, r1, r2, joinMap)
-	    != TCL_OK) {
+	if (Ral_RelationObjParseJoinArgs(interp, &objc, &objv, r1, r2, joinMap,
+	    &errInfo) != TCL_OK) {
 	    Ral_JoinMapDelete(joinMap) ;
 	    return TCL_ERROR ;
 	}
-	joinRel = Ral_RelationJoin(r1, r2, joinMap) ;
+	joinRel = Ral_RelationJoin(r1, r2, joinMap, &errInfo) ;
 	Ral_RelationDelete(r1) ;
 	Ral_JoinMapDelete(joinMap) ;
 	if (joinRel == NULL) {
-	    Ral_RelationObjSetError(interp, Ral_RelationLastError,
-		Tcl_GetString(r2Obj)) ;
+	    Ral_InterpSetError(interp, &errInfo) ;
 	    return TCL_ERROR ;
 	}
     }
@@ -1319,7 +1336,8 @@ RelationListCmd(
     }
     relation = relObj->internalRep.otherValuePtr ;
     if (Ral_RelationDegree(relation) != 1) {
-	Ral_RelationObjSetError(interp, REL_DEGREE_ONE, Tcl_GetString(relObj)) ;
+	Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptList,
+	    RAL_ERR_DEGREE_ONE, relObj) ;
 	return TCL_ERROR ;
     }
 
@@ -1350,6 +1368,7 @@ RelationMinusCmd(
     Ral_Relation r1 ;
     Ral_Relation r2 ;
     Ral_Relation diffRel ;
+    Ral_ErrorInfo errInfo ;
 
     /* relation minus relation1 relation2 */
     if (objc != 4) {
@@ -1369,10 +1388,10 @@ RelationMinusCmd(
     }
     r2 = r2Obj->internalRep.otherValuePtr ;
 
-    diffRel = Ral_RelationMinus(r1, r2) ;
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptMinus) ;
+    diffRel = Ral_RelationMinus(r1, r2, &errInfo) ;
     if (diffRel == NULL) {
-	Ral_RelationObjSetError(interp, Ral_RelationLastError,
-	    Tcl_GetString(r2Obj)) ;
+	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
 
@@ -1477,12 +1496,14 @@ RelationRankCmd(
     rankAttrName = Tcl_GetString(objv[objc - 2]) ;
     rankAttrIter = Ral_TupleHeadingFind(tupleHeading, rankAttrName) ;
     if (rankAttrIter == Ral_TupleHeadingEnd(tupleHeading)) {
-	Ral_RelationObjSetError(interp, REL_UNKNOWN_ATTR, rankAttrName) ;
+	Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptRank,
+	    RAL_ERR_UNKNOWN_ATTR, rankAttrName) ;
 	return TCL_ERROR ;
     }
     rankAttr = *rankAttrIter ;
     if (rankAttr->attrType != Tcl_Type) {
-	Ral_RelationObjSetError(interp, REL_BAD_RANK_TYPE, rankAttrName) ;
+	Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptRank,
+	    RAL_ERR_BAD_RANK_TYPE, rankAttrName) ;
 	return TCL_ERROR ;
     } else if (strcmp(rankAttr->tclType->name, "int") == 0) {
 	rankType = RANK_INT ;
@@ -1491,7 +1512,8 @@ RelationRankCmd(
     } else if (strcmp(rankAttr->tclType->name, "string") == 0) {
 	rankType = RANK_STRING ;
     } else {
-	Ral_RelationObjSetError(interp, REL_BAD_RANK_TYPE, rankAttrName) ;
+	Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptRank,
+	    RAL_ERR_BAD_RANK_TYPE, rankAttrName) ;
 	return TCL_ERROR ;
     }
     rankAttrIndex = rankAttrIter - Ral_TupleHeadingBegin(tupleHeading) ;
@@ -1503,7 +1525,8 @@ RelationRankCmd(
     newTupleHeading = Ral_TupleHeadingExtend(tupleHeading, 1) ;
     inserted = Ral_TupleHeadingPushBack(newTupleHeading, newAttr) ;
     if (inserted == Ral_TupleHeadingEnd(newTupleHeading)) {
-	Ral_RelationObjSetError(interp, REL_DUPLICATE_ATTR, newAttrName) ;
+	Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptRank,
+	    RAL_ERR_DUPLICATE_ATTR, rankAttrName) ;
 	Ral_TupleHeadingDelete(newTupleHeading) ;
 	return TCL_ERROR ;
     }
@@ -1607,6 +1630,7 @@ RelationRenameCmd(
     Tcl_Obj *relObj ;
     Ral_Relation relation ;
     Ral_Relation newRelation ;
+    Ral_ErrorInfo errInfo ;
 
     /* relation rename relationValue ?oldname newname ... ? */
     if (objc < 3) {
@@ -1621,20 +1645,22 @@ RelationRenameCmd(
     }
     relation = relObj->internalRep.otherValuePtr ;
 
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptRename) ;
+
     objc -= 3 ;
     objv += 3 ;
     if (objc % 2 != 0) {
-	Ral_RelationObjSetError(interp, REL_BAD_PAIRS_LIST,
+	Ral_ErrorInfoSetError(&errInfo, RAL_ERR_BAD_PAIRS_LIST,
 	    "oldname / newname arguments must be given in pairs") ;
+	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
 
     newRelation = Ral_RelationDup(relation) ;
     for ( ; objc > 0 ; objc -= 2, objv += 2) {
 	if (!Ral_RelationRenameAttribute(newRelation, Tcl_GetString(objv[0]),
-	    Tcl_GetString(objv[1]))) {
-	    Ral_RelationObjSetError(interp, REL_DUPLICATE_ATTR,
-		Tcl_GetString(objv[1])) ;
+	    Tcl_GetString(objv[1]), &errInfo)) {
+	    Ral_InterpSetError(interp, &errInfo) ;
 	    Ral_RelationDelete(newRelation) ;
 	    return TCL_ERROR ;
 	}
@@ -1809,6 +1835,7 @@ RelationSemijoinCmd(
     Ral_Relation r2 ;
     Ral_Relation semiJoinRel ;
     Ral_JoinMap joinMap ;
+    Ral_ErrorInfo errInfo ;
 
     /*
      * relation semijoin relation1 relation2 ?-using joinAttrs relation3 ... ?
@@ -1830,12 +1857,13 @@ RelationSemijoinCmd(
     }
     r2 = r2Obj->internalRep.otherValuePtr ;
     joinMap = Ral_JoinMapNew(0, 0) ;
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptSemijoin) ;
 
     objc -= 4 ;
     objv += 4 ;
 
-    if (Ral_RelationObjParseJoinArgs(interp, &objc, &objv, r1, r2, joinMap)
-	!= TCL_OK) {
+    if (Ral_RelationObjParseJoinArgs(interp, &objc, &objv, r1, r2, joinMap,
+	&errInfo) != TCL_OK) {
 	Ral_JoinMapDelete(joinMap) ;
 	return TCL_ERROR ;
     }
@@ -1854,8 +1882,8 @@ RelationSemijoinCmd(
 	r2 = r2Obj->internalRep.otherValuePtr ;
 	joinMap = Ral_JoinMapNew(0, 0) ;
 
-	if (Ral_RelationObjParseJoinArgs(interp, &objc, &objv, r1, r2, joinMap)
-	    != TCL_OK) {
+	if (Ral_RelationObjParseJoinArgs(interp, &objc, &objv, r1, r2, joinMap,
+	    &errInfo) != TCL_OK) {
 	    Ral_JoinMapDelete(joinMap) ;
 	    return TCL_ERROR ;
 	}
@@ -1881,6 +1909,7 @@ RelationSemiminusCmd(
     Ral_Relation r2 ;
     Ral_Relation semiMinusRel ;
     Ral_JoinMap joinMap ;
+    Ral_ErrorInfo errInfo ;
 
     /*
      * relation semiminus relation1 relation2 ?-using joinAttrs relation3 ... ?
@@ -1902,12 +1931,13 @@ RelationSemiminusCmd(
     }
     r2 = r2Obj->internalRep.otherValuePtr ;
     joinMap = Ral_JoinMapNew(0, 0) ;
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptSemiminus) ;
 
     objc -= 4 ;
     objv += 4 ;
 
-    if (Ral_RelationObjParseJoinArgs(interp, &objc, &objv, r1, r2, joinMap)
-	!= TCL_OK) {
+    if (Ral_RelationObjParseJoinArgs(interp, &objc, &objv, r1, r2, joinMap,
+	&errInfo) != TCL_OK) {
 	Ral_JoinMapDelete(joinMap) ;
 	return TCL_ERROR ;
     }
@@ -1926,8 +1956,8 @@ RelationSemiminusCmd(
 	r2 = r2Obj->internalRep.otherValuePtr ;
 	joinMap = Ral_JoinMapNew(0, 0) ;
 
-	if (Ral_RelationObjParseJoinArgs(interp, &objc, &objv, r1, r2, joinMap)
-	    != TCL_OK) {
+	if (Ral_RelationObjParseJoinArgs(interp, &objc, &objv, r1, r2, joinMap,
+	    &errInfo) != TCL_OK) {
 	    Ral_JoinMapDelete(joinMap) ;
 	    return TCL_ERROR ;
 	}
@@ -1966,6 +1996,7 @@ RelationSummarizeCmd(
     Ral_RelationIter perIter ;
     Ral_RelationIter perEnd ;
     Ral_TupleHeadingIter sumHeadingIter ;
+    Ral_ErrorInfo errInfo ;
     /*
      * relation summarize relationValue perRelation relationVarName
      * ?attr1 type1 expr1 ... attrN typeN exprN?
@@ -1992,6 +2023,7 @@ RelationSummarizeCmd(
     perRelation = perObj->internalRep.otherValuePtr ;
     perHeading = perRelation->heading ;
     perTupleHeading = perHeading->tupleHeading ;
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptSummarize) ;
 
     /*
      * Create a join map so that we can find the tuples that match between the
@@ -2004,8 +2036,8 @@ RelationSummarizeCmd(
     c = Ral_TupleHeadingCommonAttributes(perTupleHeading, tupleHeading,
 	joinMap) ;
     if (c != Ral_TupleHeadingSize(perTupleHeading)) {
-	Ral_RelationObjSetError(interp, REL_NOT_A_PROJECTION,
-	    Tcl_GetString(perObj)) ;
+	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_NOT_A_PROJECTION, perObj) ;
+	Ral_InterpSetError(interp, &errInfo) ;
 	Ral_JoinMapDelete(joinMap) ;
 	return TCL_ERROR ;
     }
@@ -2015,8 +2047,10 @@ RelationSummarizeCmd(
     objc -= 5 ;
     objv += 5 ;
     if (objc % 3 != 0) {
-	Ral_RelationObjSetError(interp, REL_BAD_TRIPLE_LIST,
-	"attribute / type / expression arguments must be given in triples") ;
+	Ral_ErrorInfoSetError(&errInfo, RAL_ERR_BAD_TRIPLE_LIST,
+	    "attribute / type / expression arguments "
+	    "must be given in triples") ;
+	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
 
@@ -2030,16 +2064,18 @@ RelationSummarizeCmd(
      * Add in the summary attributes to tuple heading.
      */
     for (c = objc, v = objv ; c > 0 ; c -= 3, v += 3) {
-	Ral_Attribute attr = Ral_AttributeNewFromObjs(interp, *v, *(v + 1)) ;
+	Ral_Attribute attr = Ral_AttributeNewFromObjs(interp, *v, *(v + 1),
+	    &errInfo) ;
 	Ral_TupleHeadingIter inserted ;
 
 	if (attr == NULL) {
+	    Ral_InterpSetError(interp, &errInfo) ;
 	    goto errorOut ;
 	}
 	inserted = Ral_TupleHeadingPushBack(sumTupleHeading, attr) ;
 	if (inserted == Ral_TupleHeadingEnd(sumTupleHeading)) {
-	    Ral_RelationObjSetError(interp, REL_DUPLICATE_ATTR,
-		Tcl_GetString(*v)) ;
+	    Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_DUPLICATE_ATTR, *v) ;
+	    Ral_InterpSetError(interp, &errInfo) ;
 	    goto errorOut ;
 	}
     }
@@ -2091,7 +2127,7 @@ RelationSummarizeCmd(
 		goto errorOut ;
 	    }
 	    if (Ral_AttributeConvertValueToType(interp, *attrIter++,
-		exprResult) != TCL_OK) {
+		exprResult, &errInfo) != TCL_OK) {
 		Ral_TupleDelete(sumTuple) ;
 		Tcl_DecrRefCount(matchObj) ;
 		Tcl_DecrRefCount(exprResult) ;
@@ -2180,8 +2216,8 @@ RelationTagCmd(
     tagTupleHeading = Ral_TupleHeadingExtend(tupleHeading, 1) ;
     inserted = Ral_TupleHeadingPushBack(tagTupleHeading, tagAttr) ;
     if (inserted == Ral_TupleHeadingEnd(tagTupleHeading)) {
-	Ral_RelationObjSetError(interp, REL_DUPLICATE_ATTR,
-	    Tcl_GetString(attrNameObj)) ;
+	Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptTag,
+	    RAL_ERR_DUPLICATE_ATTR, attrNameObj) ;
 	Ral_TupleHeadingDelete(tagTupleHeading) ;
 	return TCL_ERROR ;
     } else {
@@ -2279,8 +2315,8 @@ RelationTagCmd(
 		}
 	    }
 	    if (subSetIdNum < 0) {
-		Ral_RelationObjSetError(interp, REL_WITHIN_NOT_SUBSET,
-		    Tcl_GetString(argv[1])) ;
+		Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptTag,
+		    RAL_ERR_WITHIN_NOT_SUBSET, argv[1]) ;
 		Ral_RelationDelete(tagRelation) ;
 		Ral_IntVectorDelete(withinAttrs) ;
 		return TCL_ERROR ;
@@ -2444,14 +2480,15 @@ RelationTcloseCmd(
     tupleHeading = heading->tupleHeading ;
 
     if (Ral_RelationDegree(relation) != 2) {
-	Ral_RelationObjSetError(interp, REL_DEGREE_TWO, Tcl_GetString(relObj)) ;
+	Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptTclose,
+	    RAL_ERR_DEGREE_TWO, relObj) ;
 	return TCL_ERROR ;
     }
 
     thIter = Ral_TupleHeadingBegin(tupleHeading) ;
     if (!Ral_AttributeTypeEqual(*thIter, *(thIter + 1))) {
-	Ral_RelationObjSetError(interp, REL_TYPE_MISMATCH,
-	    Tcl_GetString(relObj)) ;
+	Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptTag,
+	    RAL_ERR_TYPE_MISMATCH, relObj) ;
 	return TCL_ERROR ;
     }
 
@@ -2492,8 +2529,8 @@ RelationTimesCmd(
 
     prodRel = Ral_RelationTimes(r1, r2) ;
     if (prodRel == NULL) {
-	Ral_RelationObjSetError(interp, REL_DUPLICATE_ATTR,
-	    Tcl_GetString(r2Obj)) ;
+	Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptTimes,
+	    RAL_ERR_DUPLICATE_ATTR, r2Obj) ;
 	return TCL_ERROR ;
     }
 
@@ -2516,8 +2553,8 @@ RelationTimesCmd(
 	prodRel = Ral_RelationTimes(r1, r2) ;
 	Ral_RelationDelete(r1) ;
 	if (prodRel == NULL) {
-	    Ral_RelationObjSetError(interp, REL_DUPLICATE_ATTR,
-		Tcl_GetString(r2Obj)) ;
+	    Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptTimes,
+		RAL_ERR_DUPLICATE_ATTR, r2Obj) ;
 	    return TCL_ERROR ;
 	}
     }
@@ -2547,8 +2584,8 @@ RelationTupleCmd(
     }
     relation = relObj->internalRep.otherValuePtr ;
     if (Ral_RelationCardinality(relation) != 1) {
-	Ral_RelationObjSetError(interp, REL_CARDINALITY_ONE,
-	    Tcl_GetString(relObj)) ;
+	Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptTag,
+	    RAL_ERR_CARDINALITY_ONE, relObj) ;
 	return TCL_ERROR ;
     }
 
@@ -2567,6 +2604,7 @@ RelationUngroupCmd(
     Tcl_Obj *attrObj ;
     const char *attrName ;
     Ral_Relation ungrpRel ;
+    Ral_ErrorInfo errInfo ;
 
     /* relation ungroup relation attribute */
     if (objc != 4) {
@@ -2581,10 +2619,10 @@ RelationUngroupCmd(
     attrObj = objv[3] ;
     attrName = Tcl_GetString(attrObj) ;
 
-    ungrpRel = Ral_RelationUngroup(relation, attrName) ;
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptUngroup) ;
+    ungrpRel = Ral_RelationUngroup(relation, attrName, &errInfo) ;
     if (ungrpRel == NULL) {
-	Ral_RelationObjSetError(interp, Ral_RelationLastError,
-	    "during ungroup operation") ;
+	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
 
@@ -2603,6 +2641,7 @@ RelationUnionCmd(
     Ral_Relation r1 ;
     Ral_Relation r2 ;
     Ral_Relation unionRel ;
+    Ral_ErrorInfo errInfo ;
 
     /* relation union relation1 relation2 ? ... ? */
     if (objc < 4) {
@@ -2623,10 +2662,10 @@ RelationUnionCmd(
     }
     r2 = r2Obj->internalRep.otherValuePtr ;
 
-    unionRel = Ral_RelationUnion(r1, r2) ;
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptUnion) ;
+    unionRel = Ral_RelationUnion(r1, r2, &errInfo) ;
     if (unionRel == NULL) {
-	Ral_RelationObjSetError(interp, Ral_RelationLastError,
-	    Tcl_GetString(r2Obj)) ;
+	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
 
@@ -2646,11 +2685,10 @@ RelationUnionCmd(
 	}
 	r2 = r2Obj->internalRep.otherValuePtr ;
 
-	unionRel = Ral_RelationUnion(r1, r2) ;
+	unionRel = Ral_RelationUnion(r1, r2, &errInfo) ;
 	Ral_RelationDelete(r1) ;
 	if (unionRel == NULL) {
-	    Ral_RelationObjSetError(interp, Ral_RelationLastError,
-		Tcl_GetString(r2Obj)) ;
+	    Ral_InterpSetError(interp, &errInfo) ;
 	    return TCL_ERROR ;
 	}
     }

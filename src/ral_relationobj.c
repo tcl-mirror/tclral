@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationobj.c,v $
-$Revision: 1.14 $
-$Date: 2006/05/29 21:07:42 $
+$Revision: 1.15 $
+$Date: 2006/06/24 18:07:38 $
  *--
  */
 
@@ -81,6 +81,8 @@ EXTERNAL FUNCTION REFERENCES
 /*
 FORWARD FUNCTION REFERENCES
 */
+static int Ral_RelationFindJoinAttrs(Tcl_Interp *, Ral_Relation, Ral_Relation,
+    Tcl_Obj *, Ral_JoinMap, Ral_ErrorInfo *) ;
 static void FreeRelationInternalRep(Tcl_Obj *) ;
 static void DupRelationInternalRep(Tcl_Obj *, Tcl_Obj *) ;
 static void UpdateStringOfRelation(Tcl_Obj *) ;
@@ -105,7 +107,7 @@ Tcl_ObjType Ral_RelationObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.14 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.15 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -127,17 +129,34 @@ Ral_RelationObjConvert(
     Ral_RelationHeading heading,
     Tcl_Interp *interp,
     Tcl_Obj *value,
-    Tcl_Obj *objPtr)
+    Tcl_Obj *objPtr,
+    Ral_ErrorInfo *errInfo)
 {
+    int elemc ;
+    Tcl_Obj **elemv ;
     /*
      * Create the relation and set the values of the tuples from the object.
      * The object must be a list of tuple values.
      */
     Ral_Relation relation = Ral_RelationNew(heading) ;
-
-    if (Ral_RelationSetFromObj(relation, interp, value) != TCL_OK) {
-	Ral_RelationDelete(relation) ;
+    /*
+     * Split the value into tuples.
+     */
+    if (Tcl_ListObjGetElements(interp, value, &elemc, &elemv) != TCL_OK) {
 	return TCL_ERROR ;
+    }
+    /*
+     * Reserve the required storage so as not to reallocate during the
+     * insertions.
+     */
+    Ral_RelationReserve(relation, elemc) ;
+
+    while (elemc-- > 0) {
+	if (Ral_RelationInsertTupleObj(relation, interp, *elemv++, errInfo)
+	    != TCL_OK) {
+	    Ral_RelationDelete(relation) ;
+	    return TCL_ERROR ;
+	}
     }
     /*
      * Discard the old internal representation.
@@ -165,7 +184,8 @@ Ral_RelationHeading
 Ral_RelationHeadingNewFromObjs(
     Tcl_Interp *interp,
     Tcl_Obj *headingObj,
-    Tcl_Obj *identObj)
+    Tcl_Obj *identObj,
+    Ral_ErrorInfo *errInfo)
 {
     Ral_TupleHeading tupleHeading ;
     Ral_RelationHeading heading ;
@@ -176,7 +196,7 @@ Ral_RelationHeadingNewFromObjs(
     /*
      * Create the tuple heading.
      */
-    tupleHeading = Ral_TupleHeadingNewFromObj(interp, headingObj) ;
+    tupleHeading = Ral_TupleHeadingNewFromObj(interp, headingObj, errInfo) ;
     if (!tupleHeading) {
 	return NULL ;
     }
@@ -192,7 +212,8 @@ Ral_RelationHeadingNewFromObjs(
      * an identifier.
      */
     if (idc == 0) {
-	Ral_RelationObjSetError(interp, REL_NO_IDENTIFIER, NULL) ;
+	Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_NO_IDENTIFIER, identObj) ;
+	Ral_InterpSetError(interp, errInfo) ;
 	Ral_TupleHeadingDelete(tupleHeading) ;
 	return NULL ;
     }
@@ -206,7 +227,7 @@ Ral_RelationHeadingNewFromObjs(
      * Iterate over the identifier elements and insert them
      * into the heading.
      */
-    for (idNum = 0 ; idNum < idc ; ++idNum) {
+    for (idNum = 0 ; idNum < idc ; ++idNum, ++idv) {
 	/*
 	 * Iterate over the members of each identifier.
 	 */
@@ -214,7 +235,7 @@ Ral_RelationHeadingNewFromObjs(
 	Tcl_Obj **elemv ;
 	Ral_IntVector id ;
 
-	if (Tcl_ListObjGetElements(interp, *idv++, &elemc, &elemv) != TCL_OK) {
+	if (Tcl_ListObjGetElements(interp, *idv, &elemc, &elemv) != TCL_OK) {
 	    Ral_RelationHeadingDelete(heading) ;
 	    return NULL ;
 	}
@@ -232,7 +253,8 @@ Ral_RelationHeadingNewFromObjs(
 	    int index = Ral_TupleHeadingIndexOf(tupleHeading, attrName) ;
 
 	    if (index < 0) {
-		Ral_RelationObjSetError(interp, REL_UNKNOWN_ATTR, attrName) ;
+		Ral_ErrorInfoSetError(errInfo, RAL_ERR_UNKNOWN_ATTR, attrName) ;
+		Ral_InterpSetError(interp, errInfo) ;
 		Ral_RelationHeadingDelete(heading) ;
 		return NULL ;
 	    }
@@ -242,7 +264,9 @@ Ral_RelationHeadingNewFromObjs(
 	     * that is intended to be an identifier of a relation.
 	     */
 	    if (!Ral_IntVectorSetAdd(id, index)) {
-		Ral_RelationObjSetError(interp, REL_DUP_ATTR_IN_ID, attrName) ;
+		Ral_ErrorInfoSetError(errInfo, RAL_ERR_DUP_ATTR_IN_ID,
+		    attrName) ;
+		Ral_InterpSetError(interp, errInfo) ;
 		Ral_RelationHeadingDelete(heading) ;
 		return NULL ;
 	    }
@@ -252,7 +276,8 @@ Ral_RelationHeadingNewFromObjs(
 	 * the vector checks that we do not have a subset dependency.
 	 */
 	if (!Ral_RelationHeadingAddIdentifier(heading, idNum, id)) {
-	    Ral_RelationObjSetError(interp, REL_IDENTIFIER_SUBSET, NULL) ;
+	    Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_IDENTIFIER_SUBSET, *idv) ;
+	    Ral_InterpSetError(interp, errInfo) ;
 	    Ral_RelationHeadingDelete(heading) ;
 	    return NULL ;
 	}
@@ -262,38 +287,11 @@ Ral_RelationHeadingNewFromObjs(
 }
 
 int
-Ral_RelationSetFromObj(
-    Ral_Relation relation,
-    Tcl_Interp *interp,
-    Tcl_Obj *tupleList)
-{
-    int elemc ;
-    Tcl_Obj **elemv ;
-
-    if (Tcl_ListObjGetElements(interp, tupleList, &elemc, &elemv) != TCL_OK) {
-	return TCL_ERROR ;
-    }
-
-    /*
-     * Reserve the required storage so as not to reallocate during the
-     * insertions.
-     */
-    Ral_RelationReserve(relation, elemc) ;
-
-    while (elemc-- > 0) {
-	if (Ral_RelationInsertTupleObj(relation, interp, *elemv++) != TCL_OK) {
-	    return TCL_ERROR ;
-	}
-    }
-
-    return TCL_OK ;
-}
-
-int
 Ral_RelationInsertTupleObj(
     Ral_Relation relation,
     Tcl_Interp *interp,
-    Tcl_Obj *tupleObj)
+    Tcl_Obj *tupleObj,
+    Ral_ErrorInfo *errInfo)
 {
     Ral_Tuple tuple ;
 
@@ -305,7 +303,7 @@ Ral_RelationInsertTupleObj(
      * Set the values of the attributes from the list of attribute / value
      * pairs.
      */
-    if (Ral_TupleSetFromObj(tuple, interp, tupleObj) != TCL_OK) {
+    if (Ral_TupleSetFromObj(tuple, interp, tupleObj, errInfo) != TCL_OK) {
 	Ral_TupleDelete(tuple) ;
 	return TCL_ERROR ;
     }
@@ -313,21 +311,23 @@ Ral_RelationInsertTupleObj(
      * Insert the tuple into the relation.
      */
     if (!Ral_RelationPushBack(relation, tuple, NULL)) {
-	Ral_RelationObjSetError(interp, REL_DUPLICATE_TUPLE,
-	    Tcl_GetString(tupleObj)) ;
+	Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_DUPLICATE_TUPLE, tupleObj) ;
+	Ral_InterpSetError(interp, errInfo) ;
 	return TCL_ERROR ;
     }
 
     return TCL_OK ;
 }
 
-int Ral_RelationObjParseJoinArgs(
+int
+Ral_RelationObjParseJoinArgs(
     Tcl_Interp *interp,
     int *objcPtr,
     Tcl_Obj *const**objvPtr,
     Ral_Relation r1,
     Ral_Relation r2,
-    Ral_JoinMap joinMap)
+    Ral_JoinMap joinMap,
+    Ral_ErrorInfo *errInfo)
 {
     int findCommon = 1 ;
     int objc = *objcPtr ;
@@ -340,8 +340,8 @@ int Ral_RelationObjParseJoinArgs(
 	    /*
 	     * Join arguments specified.
 	     */
-	    if (Ral_RelationFindJoinAttrs(interp, r1, r2, *(objv + 1), joinMap)
-		!= TCL_OK) {
+	    if (Ral_RelationFindJoinAttrs(interp, r1, r2, *(objv + 1), joinMap,
+		errInfo) != TCL_OK) {
 		return TCL_ERROR ;
 	    }
 	    *objcPtr -= 2 ;
@@ -354,49 +354,6 @@ int Ral_RelationObjParseJoinArgs(
 	 */
 	Ral_TupleHeadingCommonAttributes(
 	    r1->heading->tupleHeading, r2->heading->tupleHeading, joinMap) ;
-    }
-
-    return TCL_OK ;
-}
-
-int
-Ral_RelationFindJoinAttrs(
-    Tcl_Interp *interp,
-    Ral_Relation r1,
-    Ral_Relation r2,
-    Tcl_Obj *attrList,
-    Ral_JoinMap joinMap)
-{
-    Ral_TupleHeading r1TupleHeading = r1->heading->tupleHeading ;
-    Ral_TupleHeading r2TupleHeading = r2->heading->tupleHeading ;
-    int objc ;
-    Tcl_Obj **objv ;
-
-    if (Tcl_ListObjGetElements(interp, attrList, &objc, &objv) != TCL_OK) {
-	return TCL_ERROR ;
-    }
-    if (objc % 2 != 0) {
-	Ral_RelationObjSetError(interp, REL_BAD_PAIRS_LIST,
-	    Tcl_GetString(attrList)) ;
-	return TCL_ERROR ;
-    }
-    Ral_JoinMapAttrReserve(joinMap, objc / 2) ;
-    for ( ; objc > 0 ; objc -= 2, objv += 2) {
-	int r1Index = Ral_TupleHeadingIndexOf(r1TupleHeading,
-	    Tcl_GetString(*objv)) ;
-	int r2Index = Ral_TupleHeadingIndexOf(r2TupleHeading,
-	    Tcl_GetString(*(objv + 1))) ;
-	if (r1Index < 0) {
-	    Ral_RelationObjSetError(interp, REL_DUPLICATE_ATTR,
-		Tcl_GetString(*objv)) ;
-	    return TCL_ERROR ;
-	}
-	if (r2Index < 0) {
-	    Ral_RelationObjSetError(interp, REL_DUPLICATE_ATTR,
-		Tcl_GetString(*(objv + 1))) ;
-	    return TCL_ERROR ;
-	}
-	Ral_JoinMapAddAttrMapping(joinMap, r1Index, r2Index) ;
     }
 
     return TCL_OK ;
@@ -415,7 +372,8 @@ Ral_RelationObjKeyTuple(
     Ral_Relation relation,
     int objc,
     Tcl_Obj *const*objv,
-    int *idRef)
+    int *idRef,
+    Ral_ErrorInfo *errInfo)
 {
     Ral_RelationHeading heading = relation->heading ;
     Ral_TupleHeading tupleHeading = heading->tupleHeading ;
@@ -424,7 +382,8 @@ Ral_RelationObjKeyTuple(
     int idNum ;
 
     if (objc % 2 != 0) {
-	Ral_RelationObjSetError(interp, REL_BAD_PAIRS_LIST, "key tuple") ;
+	Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_BAD_PAIRS_LIST, *objv) ;
+	Ral_InterpSetError(interp, errInfo) ;
 	return NULL ;
     }
     /*
@@ -437,18 +396,14 @@ Ral_RelationObjKeyTuple(
     for ( ; objc > 0 ; objc -= 2, objv += 2) {
 	const char *attrName = Tcl_GetString(*objv) ;
 	int attrIndex = Ral_TupleHeadingIndexOf(tupleHeading, attrName) ;
-	int updated ;
 
 	if (attrIndex < 0) {
-	    Ral_RelationObjSetError(interp, REL_UNKNOWN_ATTR, attrName) ;
+	    Ral_ErrorInfoSetError(errInfo, RAL_ERR_UNKNOWN_ATTR, attrName) ;
 	    goto error_out ;
 	}
 	Ral_IntVectorPushBack(id, attrIndex) ;
 
-	updated = Ral_TupleUpdateAttrValue(key, attrName, *(objv + 1)) ;
-	if (!updated) {
-	    Ral_TupleObjSetError(interp, Ral_TupleLastError,
-		Tcl_GetString(*(objv + 1))) ;
+	if (!Ral_TupleUpdateAttrValue(key, attrName, *(objv + 1), errInfo)) {
 	    goto error_out ;
 	}
     }
@@ -458,8 +413,8 @@ Ral_RelationObjKeyTuple(
      */
     idNum = Ral_RelationHeadingFindIdentifier(heading, id) ;
     if (idNum < 0) {
-	Ral_RelationObjSetError(interp, REL_NOT_AN_IDENTIFIER,
-	    "during find operation") ;
+	Ral_ErrorInfoSetError(errInfo, RAL_ERR_NOT_AN_IDENTIFIER,
+	    "during identifier construction operation") ;
 	goto error_out ;
     } else if (idRef) {
 	*idRef = idNum ;
@@ -469,6 +424,7 @@ Ral_RelationObjKeyTuple(
     return key ;
 
 error_out:
+    Ral_InterpSetError(interp, errInfo) ;
     Ral_IntVectorDelete(id) ;
     Ral_TupleDelete(key) ;
     return NULL ;
@@ -479,20 +435,19 @@ Ral_RelationObjUpdateTuple(
     Tcl_Interp *interp,
     Tcl_Obj *updateList,
     Ral_Relation relation,
-    Ral_RelationIter tupleIter)
+    Ral_RelationIter tupleIter,
+    Ral_ErrorInfo *errInfo)
 {
     int objc ;
     Tcl_Obj **objv ;
     Ral_Tuple tuple ;
-    int updated ;
 
     if (Tcl_ListObjGetElements(interp, updateList, &objc, &objv) != TCL_OK) {
 	return TCL_ERROR ;
     }
     if (objc % 2 != 0) {
-	Ral_RelationObjSetError(interp, REL_BAD_PAIRS_LIST,
-	    Tcl_GetString(updateList)) ;
-	return TCL_ERROR ;
+	Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_BAD_PAIRS_LIST, updateList) ;
+	goto errorOut ;
     }
     /*
      * Clone the tuple. This is the only way that we can handle the potential
@@ -501,23 +456,23 @@ Ral_RelationObjUpdateTuple(
     tuple = Ral_TupleDup(*tupleIter) ;
     for ( ; objc > 0 ; objc -= 2, objv += 2) {
 	const char *attrName = Tcl_GetString(objv[0]) ;
-	updated = Ral_TupleUpdateAttrValue(tuple, attrName, objv[1]) ;
-
-	if (!updated) {
-	    Ral_TupleObjSetError(interp, Ral_TupleLastError, attrName) ;
-	    Ral_TupleDelete(tuple) ;
-	    return TCL_ERROR ;
+	if (!Ral_TupleUpdateAttrValue(tuple, attrName, objv[1], errInfo)) {
+	    goto errorOut ;
 	}
     }
     if (!Ral_RelationUpdate(relation, tupleIter, tuple, NULL)) {
 	char *tupleStr = Ral_TupleValueStringOf(tuple) ;
-	Ral_RelationObjSetError(interp, REL_DUPLICATE_TUPLE, tupleStr) ;
+	Ral_ErrorInfoSetError(errInfo, RAL_ERR_DUPLICATE_TUPLE, tupleStr) ;
 	ckfree(tupleStr) ;
 	Ral_TupleDelete(tuple) ;
-	return TCL_ERROR ;
+	goto errorOut ;
     }
 
     return TCL_OK ;
+
+errorOut:
+    Ral_InterpSetError(interp, errInfo) ;
+    return TCL_ERROR ;
 }
 
 const char *
@@ -525,78 +480,56 @@ Ral_RelationObjVersion(void)
 {
     return rcsid ;
 }
+/*
+ * ======================================================================
+ * PRIVATE FUNCTIONS
+ * ======================================================================
+ */
 
-void
-Ral_RelationObjSetError(
+static int
+Ral_RelationFindJoinAttrs(
     Tcl_Interp *interp,
-    Ral_RelationError error,
-    const char *param)
+    Ral_Relation r1,
+    Ral_Relation r2,
+    Tcl_Obj *attrList,
+    Ral_JoinMap joinMap,
+    Ral_ErrorInfo *errInfo)
 {
-    /*
-     * These must be in the same order as the encoding of the Ral_RelationError
-     * enumeration.
-     */
-    static const char *resultStrings[] = {
-	"no error",
-	"bad relation value format",
-	"bad relation type keyword",
-	"relations of non-zero degree must have at least one identifier",
-	"identifiers must have at least one attribute",
-	"identifiers must not be subsets of other identifiers",
-	"duplicate attribute name in identifier attribute set",
-	"unknown attribute name",
-	"duplicate tuple",
-	"headings not equal",
-	"duplicate attribute name",
-	"relation must have degree of one",
-	"relation must have degree of two",
-	"relation must have cardinality of one",
-	"bad list of pairs",
-	"bad list of triples",
-	"attributes do not constitute an identifier",
-	"attribute must be of a Relation type",
-	"relation is not a projection of the summarized relation",
-	"divisor heading must be disjoint from the dividend heading",
-	"mediator heading must be a union of the dividend and divisor headings",
-	"too many attributes specified",
-	"attributes must have the same type",
-	"only a single identifier may be specified",
-	"identifier must have only a single attribute",
-	"\"-within\" option attributes are not the subset of any identifier",
-	"attribute is not a valid type for rank operation",
-    } ;
-    static const char *errorStrings[] = {
-	"OK",
-	"FORMAT_ERR",
-	"BAD_KEYWORD",
-	"NO_IDENTIFIER",
-	"IDENTIFIER_FORMAT",
-	"IDENTIFIER_SUBSET",
-	"DUP_ATTR_IN_ID",
-	"UNKNOWN_ATTR",
-	"DUPLICATE_TUPLE",
-	"HEADING_NOT_EQUAL",
-	"DUPLICATE_ATTR",
-	"DEGREE_ONE",
-	"DEGREE_TWO",
-	"CARDINALITY_ONE",
-	"BAD_PAIRS_LIST",
-	"BAD_TRIPLE_LIST",
-	"NOT_AN_IDENTIFIER",
-	"NOT_A_RELATION",
-	"NOT_A_PROJECTION",
-	"NOT_DISJOINT",
-	"NOT_UNION",
-	"TOO_MANY_ATTRS",
-	"TYPE_MISMATCH",
-	"SINGLE_IDENTIFIER",
-	"SINGLE_ATTRIBUTE",
-	"WITHIN_NOT_SUBSET",
-	"BAD_RANK_TYPE",
-    } ;
+    Ral_TupleHeading r1TupleHeading = r1->heading->tupleHeading ;
+    Ral_TupleHeading r2TupleHeading = r2->heading->tupleHeading ;
+    int objc ;
+    Tcl_Obj **objv ;
 
-    Ral_ObjSetError(interp, "RELATION", resultStrings[error],
-	errorStrings[error], param) ;
+    if (Tcl_ListObjGetElements(interp, attrList, &objc, &objv) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    if (objc % 2 != 0) {
+	Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_BAD_PAIRS_LIST, attrList) ;
+	goto errorOut ;
+    }
+    Ral_JoinMapAttrReserve(joinMap, objc / 2) ;
+    for ( ; objc > 0 ; objc -= 2, objv += 2) {
+	int r1Index = Ral_TupleHeadingIndexOf(r1TupleHeading,
+	    Tcl_GetString(*objv)) ;
+	int r2Index = Ral_TupleHeadingIndexOf(r2TupleHeading,
+	    Tcl_GetString(*(objv + 1))) ;
+	if (r1Index < 0) {
+	    Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_DUPLICATE_ATTR, *objv) ;
+	    goto errorOut ;
+	}
+	if (r2Index < 0) {
+	    Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_DUPLICATE_ATTR,
+		*(objv + 1)) ;
+	    goto errorOut ;
+	}
+	Ral_JoinMapAddAttrMapping(joinMap, r1Index, r2Index) ;
+    }
+
+    return TCL_OK ;
+
+errorOut:
+    Ral_InterpSetError(interp, errInfo) ;
+    return TCL_ERROR ;
 }
 
 /*
@@ -648,25 +581,30 @@ SetRelationFromAny(
     int objc ;
     Tcl_Obj **objv ;
     Ral_RelationHeading heading ;
+    Ral_ErrorInfo errInfo ;
 
     if (Tcl_ListObjGetElements(interp, objPtr, &objc, &objv) != TCL_OK) {
 	return TCL_ERROR ;
     }
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdSetFromAny, Ral_OptNone) ;
     if (objc != 4) {
-	Ral_RelationObjSetError(interp, REL_FORMAT_ERR, Tcl_GetString(objPtr)) ;
+	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_FORMAT_ERR, objPtr) ;
+	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
     if (strcmp(Ral_RelationObjType.name, Tcl_GetString(*objv)) != 0) {
-	Ral_RelationObjSetError(interp, REL_BAD_KEYWORD, Tcl_GetString(*objv)) ;
+	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_BAD_KEYWORD, *objv) ;
+	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
     /*
      * Create the heading from the external representation.
      */
-    heading = Ral_RelationHeadingNewFromObjs(interp, objv[1], objv[2]) ;
+    heading = Ral_RelationHeadingNewFromObjs(interp, objv[1], objv[2],
+	&errInfo) ;
     if (!heading) {
 	return TCL_ERROR ;
     }
 
-    return Ral_RelationObjConvert(heading, interp, objv[3], objPtr) ;
+    return Ral_RelationObjConvert(heading, interp, objv[3], objPtr, &errInfo) ;
 }

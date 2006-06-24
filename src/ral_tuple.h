@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuple.h,v $
-$Revision: 1.9 $
-$Date: 2006/05/19 04:54:32 $
+$Revision: 1.10 $
+$Date: 2006/06/24 18:07:39 $
  *--
  */
 #ifndef _ral_tuple_h_
@@ -60,6 +60,7 @@ PRAGMAS
 INCLUDE FILES
 */
 #include "tcl.h"
+#include "ral_utils.h"
 #include "ral_attribute.h"
 #include "ral_tupleheading.h"
 #include <stdio.h>
@@ -110,22 +111,9 @@ typedef struct Ral_Tuple {
 				 * degree of the heading */
 } *Ral_Tuple ;
 
-typedef enum Ral_TupleError {
-    TUP_OK = 0,
-    TUP_UNKNOWN_ATTR,
-    TUP_HEADING_ERR,
-    TUP_FORMAT_ERR,
-    TUP_DUPLICATE_ATTR,
-    TUP_BAD_VALUE,
-    TUP_BAD_KEYWORD,
-    TUP_WRONG_NUM_ATTRS,
-    TUP_BAD_PAIRS_LIST,
-} Ral_TupleError ;
-
 /*
 DATA DECLARATIONS
 */ 
-extern Ral_TupleError Ral_TupleLastError ;
 
 /*
 FUNCTION DECLARATIONS
@@ -145,7 +133,7 @@ extern Ral_TupleIter Ral_TupleEnd(Ral_Tuple) ;
 extern int Ral_TupleEqual(Ral_Tuple, Ral_Tuple) ;
 extern int Ral_TupleEqualValues(Ral_Tuple, Ral_Tuple) ;
 extern int Ral_TupleUpdateAttrValue(Ral_Tuple,
-    const char *, Tcl_Obj *) ;
+    const char *, Tcl_Obj *, Ral_ErrorInfo *) ;
 extern Tcl_Obj *Ral_TupleGetAttrValue(Ral_Tuple, const char *) ;
 extern int Ral_TupleCopy(Ral_Tuple, Ral_TupleHeadingIter,
     Ral_TupleHeadingIter, Ral_Tuple) ;

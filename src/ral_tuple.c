@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuple.c,v $
-$Revision: 1.10 $
-$Date: 2006/05/07 03:53:28 $
+$Revision: 1.11 $
+$Date: 2006/06/24 18:07:38 $
  *--
  */
 
@@ -85,14 +85,13 @@ EXTERNAL DATA REFERENCES
 /*
 EXTERNAL DATA DEFINITIONS
 */
-Ral_TupleError Ral_TupleLastError = TUP_OK ;
 
 /*
 STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_tuple.c,v $ $Revision: 1.10 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tuple.c,v $ $Revision: 1.11 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -275,7 +274,8 @@ int
 Ral_TupleUpdateAttrValue(
     Ral_Tuple tuple,
     const char *attrName,
-    Tcl_Obj *value)
+    Tcl_Obj *value,
+    Ral_ErrorInfo *errInfo)
 {
     Ral_TupleHeading heading ;
     Ral_TupleHeadingIter i_attr ;
@@ -295,15 +295,16 @@ Ral_TupleUpdateAttrValue(
     heading = tuple->heading ;
     i_attr = Ral_TupleHeadingFind(heading, attrName) ;
     if (i_attr == Ral_TupleHeadingEnd(heading)) {
-	Ral_TupleLastError = TUP_UNKNOWN_ATTR ;
+	Ral_ErrorInfoSetError(errInfo, RAL_ERR_UNKNOWN_ATTR, attrName) ;
 	return 0 ;
     }
     attribute = *i_attr ;
     /*
      * Convert the value to the type of the attribute.
      */
-    if (Ral_AttributeConvertValueToType(NULL, attribute, value) != TCL_OK) {
-	Ral_TupleLastError = TUP_BAD_VALUE ;
+    if (Ral_AttributeConvertValueToType(NULL, attribute, value, errInfo)
+	!= TCL_OK) {
+	Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_BAD_VALUE, value) ;
 	return 0 ;
     }
     /*

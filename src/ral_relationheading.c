@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationheading.c,v $
-$Revision: 1.13 $
-$Date: 2006/05/29 21:07:42 $
+$Revision: 1.14 $
+$Date: 2006/06/24 18:07:38 $
  *--
  */
 
@@ -89,7 +89,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.13 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.14 $" ;
 
 static const char relationKeyword[] = "Relation" ;
 static const char openList = '{' ;
@@ -628,7 +628,8 @@ Ral_RelationHeadingJoin(
     Ral_RelationHeading h1,
     Ral_RelationHeading h2,
     Ral_JoinMap map,
-    Ral_IntVector *attrMap)
+    Ral_IntVector *attrMap,
+    Ral_ErrorInfo *errInfo)
 {
     int status ;
     Ral_TupleHeading joinTupleHeading ;
@@ -678,7 +679,8 @@ Ral_RelationHeadingJoin(
 	    status = Ral_TupleHeadingAppend(h2TupleHeading,
 		h2TupleHeadingIter, h2TupleHeadingIter + 1, joinTupleHeading) ;
 	    if (status == 0) {
-		Ral_RelationLastError = REL_DUPLICATE_ATTR ;
+		Ral_ErrorInfoSetError(errInfo, RAL_ERR_DUPLICATE_ATTR,
+		    "while joining tuple headings") ;
 		Ral_TupleHeadingDelete(joinTupleHeading) ;
 		Ral_IntVectorDelete(h2JoinAttrs) ;
 		*attrMap = NULL ;

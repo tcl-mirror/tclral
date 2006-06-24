@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleobj.c,v $
-$Revision: 1.7 $
-$Date: 2006/03/19 19:48:31 $
+$Revision: 1.8 $
+$Date: 2006/06/24 18:07:39 $
  *--
  */
 
@@ -108,7 +108,7 @@ Tcl_ObjType Ral_TupleObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tupleobj.c,v $ $Revision: 1.7 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tupleobj.c,v $ $Revision: 1.8 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -130,11 +130,12 @@ Ral_TupleObjConvert(
     Ral_TupleHeading heading,
     Tcl_Interp *interp,
     Tcl_Obj *value,
-    Tcl_Obj *objPtr)
+    Tcl_Obj *objPtr,
+    Ral_ErrorInfo *errInfo)
 {
     Ral_Tuple tuple = Ral_TupleNew(heading) ;
 
-    if (Ral_TupleSetFromObj(tuple, interp, value) != TCL_OK) {
+    if (Ral_TupleSetFromObj(tuple, interp, value, errInfo) != TCL_OK) {
 	Ral_TupleDelete(tuple) ;
 	return TCL_ERROR ;
     }
@@ -162,7 +163,8 @@ Ral_TupleObjConvert(
 Ral_TupleHeading
 Ral_TupleHeadingNewFromObj(
     Tcl_Interp *interp,
-    Tcl_Obj *objPtr)
+    Tcl_Obj *objPtr,
+    Ral_ErrorInfo *errInfo)
 {
     int objc ;
     Tcl_Obj **objv ;
@@ -176,7 +178,8 @@ Ral_TupleHeadingNewFromObj(
 	return NULL ;
     }
     if (objc % 2 != 0) {
-	Ral_TupleObjSetError(interp, TUP_HEADING_ERR, Tcl_GetString(objPtr)) ;
+	Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_BAD_PAIRS_LIST, objPtr) ;
+	Ral_InterpSetError(interp, errInfo) ;
 	return NULL ;
     }
     heading = Ral_TupleHeadingNew(objc / 2) ;
@@ -188,14 +191,16 @@ Ral_TupleHeadingNewFromObj(
 	Ral_Attribute attr ;
 	Ral_TupleHeadingIter iter ;
 
-	attr = Ral_AttributeNewFromObjs(interp, *objv, *(objv + 1)) ;
+	attr = Ral_AttributeNewFromObjs(interp, *objv, *(objv + 1), errInfo) ;
 	if (attr == NULL) {
 	    Ral_TupleHeadingDelete(heading) ;
 	    return NULL ;
 	}
 	iter = Ral_TupleHeadingPushBack(heading, attr) ;
 	if (iter == Ral_TupleHeadingEnd(heading)) {
-	    Ral_TupleObjSetError(interp, TUP_DUPLICATE_ATTR, attr->name) ;
+	    Ral_ErrorInfoSetError(errInfo, RAL_ERR_DUPLICATE_ATTR, attr->name) ;
+	    Ral_InterpSetError(interp, errInfo) ;
+
 	    Ral_AttributeDelete(attr) ;
 	    Ral_TupleHeadingDelete(heading) ;
 	    return NULL ;
@@ -251,7 +256,8 @@ Ral_TupleHeadingAttrsFromVect(
 	     */
 	    Ral_IntVectorSetAdd(attrVector, attrIndex) ;
 	} else {
-	    Ral_TupleObjSetError(interp, TUP_UNKNOWN_ATTR, attrName) ;
+	    Ral_InterpErrorInfo(interp, Ral_CmdUnknown, Ral_OptNone,
+		RAL_ERR_UNKNOWN_ATTR, attrName) ;
 	    Ral_IntVectorDelete(attrVector) ;
 	    return NULL ;
 	}
@@ -268,7 +274,8 @@ int
 Ral_TupleSetFromObj(
     Ral_Tuple tuple,
     Tcl_Interp *interp,
-    Tcl_Obj *objPtr)
+    Tcl_Obj *objPtr,
+    Ral_ErrorInfo *errInfo)
 {
     int elemc ;
     Tcl_Obj **elemv ;
@@ -278,12 +285,13 @@ Ral_TupleSetFromObj(
 	return TCL_ERROR ;
     }
     if (elemc % 2 != 0) {
-	Ral_TupleObjSetError(interp, TUP_FORMAT_ERR, Tcl_GetString(objPtr)) ;
+	Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_BAD_PAIRS_LIST, objPtr) ;
+	Ral_InterpSetError(interp, errInfo) ;
 	return TCL_ERROR ;
     }
     if (elemc / 2 != Ral_TupleDegree(tuple)) {
-	Ral_TupleObjSetError(interp, TUP_WRONG_NUM_ATTRS,
-	    Tcl_GetString(objPtr)) ;
+	Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_WRONG_NUM_ATTRS, objPtr) ;
+	Ral_InterpSetError(interp, errInfo) ;
 	return TCL_ERROR ;
     }
     /*
@@ -297,10 +305,10 @@ Ral_TupleSetFromObj(
 	int hindex = Ral_TupleHeadingIndexOf(tuple->heading, attrName) ;
 
 	if (hindex < 0) {
-	    Ral_TupleObjSetError(interp, TUP_UNKNOWN_ATTR, attrName) ;
+	    Ral_ErrorInfoSetError(errInfo, RAL_ERR_UNKNOWN_ATTR, attrName) ;
 	    goto errorOut ;
 	} else if (Ral_IntVectorFetch(attrStatus, hindex)) {
-	    Ral_TupleObjSetError(interp, TUP_DUPLICATE_ATTR, attrName) ;
+	    Ral_ErrorInfoSetError(errInfo, RAL_ERR_DUPLICATE_ATTR, attrName) ;
 	    goto errorOut ;
 	}
 	Ral_IntVectorStore(attrStatus, hindex, 1) ;
@@ -311,10 +319,11 @@ Ral_TupleSetFromObj(
      * Once we've established that all the attributes are in the list,
      * then the normal update function assigns the values to the attributes.
      */
-    return Ral_TupleUpdateFromObj(tuple, interp, objPtr) ;
+    return Ral_TupleUpdateFromObj(tuple, interp, objPtr, errInfo) ;
 
 errorOut:
     Ral_IntVectorDelete(attrStatus) ;
+    Ral_InterpSetError(interp, errInfo) ;
     return TCL_ERROR ;
 }
 
@@ -325,7 +334,8 @@ int
 Ral_TupleUpdateFromObj(
     Ral_Tuple tuple,
     Tcl_Interp *interp,
-    Tcl_Obj *objPtr)
+    Tcl_Obj *objPtr,
+    Ral_ErrorInfo *errInfo)
 {
     int elemc ;
     Tcl_Obj **elemv ;
@@ -334,7 +344,8 @@ Ral_TupleUpdateFromObj(
 	return TCL_ERROR ;
     }
     if (elemc % 2 != 0) {
-	Ral_TupleObjSetError(interp, TUP_FORMAT_ERR, Tcl_GetString(objPtr)) ;
+	Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_BAD_PAIRS_LIST, objPtr) ;
+	Ral_InterpSetError(interp, errInfo) ;
 	return TCL_ERROR ;
     }
     /*
@@ -342,13 +353,9 @@ Ral_TupleUpdateFromObj(
      */
     for ( ; elemc > 0 ; elemc -= 2, elemv += 2) {
 	const char *attrName = Tcl_GetString(*elemv) ;
-	if (!Ral_TupleUpdateAttrValue(tuple, attrName, elemv[1])) {
-	    if (Ral_TupleLastError == TUP_BAD_VALUE) {
-		Ral_TupleObjSetError(interp, Ral_TupleLastError,
-		    Tcl_GetString(elemv[1])) ;
-	    } else {
-		Ral_TupleObjSetError(interp, Ral_TupleLastError, attrName) ;
-	    }
+
+	if (!Ral_TupleUpdateAttrValue(tuple, attrName, elemv[1], errInfo)) {
+	    Ral_InterpSetError(interp, errInfo) ;
 	    return TCL_ERROR ;
 	}
     }
@@ -360,43 +367,6 @@ const char *
 Ral_TupleObjVersion(void)
 {
     return rcsid ;
-}
-
-void
-Ral_TupleObjSetError(
-    Tcl_Interp *interp,
-    Ral_TupleError error,
-    const char *param)
-{
-    /*
-     * These must be in the same order as the encoding of the Ral_TupleError
-     * enumeration.
-     */
-    static const char *resultStrings[] = {
-	"no error",
-	"unknown attribute name",
-	"bad tuple heading format",
-	"bad tuple value format",
-	"duplicate attribute name",
-	"bad value type for value",
-	"bad tuple type keyword",
-	"wrong number of attributes specified",
-	"bad list of pairs",
-    } ;
-    static const char *errorStrings[] = {
-	"OK",
-	"UNKNOWN_ATTR",
-	"HEADING_ERR",
-	"FORMAT_ERR",
-	"DUPLICATE_ATTR",
-	"BAD_VALUE",
-	"BAD_KEYWORD",
-	"WRONG_NUM_ATTRS",
-	"BAD_PAIRS_LIST",
-    } ;
-
-    Ral_ObjSetError(interp, "TUPLE", resultStrings[error], errorStrings[error],
-	param) ;
 }
 
 /*
@@ -434,6 +404,10 @@ static void
 UpdateStringOfTuple(
     Tcl_Obj *objPtr)
 {
+    /*
+     * N.B. that "Ral_TupleStringOf" allocates the string and that
+     * pointer is simply transferred to the object.
+     */
     objPtr->bytes = Ral_TupleStringOf(objPtr->internalRep.otherValuePtr) ;
     objPtr->length = strlen(objPtr->bytes) ;
 }
@@ -446,22 +420,26 @@ SetTupleFromAny(
     int objc ;
     Tcl_Obj **objv ;
     Ral_TupleHeading heading ;
+    Ral_ErrorInfo errInfo ;
 
     if (Tcl_ListObjGetElements(interp, objPtr, &objc, &objv) != TCL_OK) {
 	return TCL_ERROR ;
     }
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdSetFromAny, Ral_OptNone) ;
     if (objc != 3) {
-	Ral_TupleObjSetError(interp, TUP_FORMAT_ERR, Tcl_GetString(objPtr)) ;
+	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_FORMAT_ERR, objPtr) ;
+	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
-    if (strcmp(Ral_TupleObjType.name, Tcl_GetString(*objv)) != 0) {
-	Ral_TupleObjSetError(interp, TUP_BAD_KEYWORD, Tcl_GetString(*objv)) ;
+    if (strcmp(Ral_TupleObjType.name, Tcl_GetString(objv[0])) != 0) {
+	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_BAD_KEYWORD, objv[0]) ;
+	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
 
-    heading = Ral_TupleHeadingNewFromObj(interp, objv[1]) ;
+    heading = Ral_TupleHeadingNewFromObj(interp, objv[1], &errInfo) ;
     if (!heading) {
 	return TCL_ERROR ;
     }
-    return Ral_TupleObjConvert(heading, interp, objv[2], objPtr) ;
+    return Ral_TupleObjConvert(heading, interp, objv[2], objPtr, &errInfo) ;
 }

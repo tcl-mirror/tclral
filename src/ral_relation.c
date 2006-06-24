@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.16 $
-$Date: 2006/05/29 21:07:42 $
+$Revision: 1.17 $
+$Date: 2006/06/24 18:07:38 $
  *--
  */
 
@@ -105,7 +105,6 @@ EXTERNAL DATA REFERENCES
 /*
 EXTERNAL DATA DEFINITIONS
 */
-Ral_RelationError Ral_RelationLastError = REL_OK ;
 
 /*
 STATIC DATA ALLOCATION
@@ -114,7 +113,7 @@ static Ral_RelationIter sortBegin ;
 static Ral_IntVector sortAttrs ;
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.16 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.17 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -384,7 +383,8 @@ Ral_RelationUpdate(
 Ral_Relation
 Ral_RelationUnion(
     Ral_Relation r1,
-    Ral_Relation r2)
+    Ral_Relation r2,
+    Ral_ErrorInfo *errInfo)
 {
     Ral_Relation unionRel ;
     int copyStatus ;
@@ -393,7 +393,8 @@ Ral_RelationUnion(
      * Headings must be equal to perform a union.
      */
     if (!Ral_RelationHeadingEqual(r1->heading, r2->heading)) {
-	Ral_RelationLastError = REL_HEADING_NOT_EQUAL ;
+	Ral_ErrorInfoSetError(errInfo, RAL_ERR_HEADING_NOT_EQUAL,
+	    "while computing union") ;
 	return NULL ;
     }
     unionRel = Ral_RelationNew(r1->heading) ;
@@ -424,7 +425,8 @@ Ral_RelationUnion(
 Ral_Relation
 Ral_RelationIntersect(
     Ral_Relation r1,
-    Ral_Relation r2)
+    Ral_Relation r2,
+    Ral_ErrorInfo *errInfo)
 {
     Ral_Relation intersectRel ;
     Ral_IntVector orderMap ;
@@ -435,7 +437,8 @@ Ral_RelationIntersect(
      * Headings must be equal to perform a union.
      */
     if (!Ral_RelationHeadingEqual(r1->heading, r2->heading)) {
-	Ral_RelationLastError = REL_HEADING_NOT_EQUAL ;
+	Ral_ErrorInfoSetError(errInfo, RAL_ERR_HEADING_NOT_EQUAL,
+	    "while computing intersection") ;
 	return NULL ;
     }
     /*
@@ -470,7 +473,8 @@ Ral_RelationIntersect(
 Ral_Relation
 Ral_RelationMinus(
     Ral_Relation r1,
-    Ral_Relation r2)
+    Ral_Relation r2,
+    Ral_ErrorInfo *errInfo)
 {
     Ral_Relation diffRel ;
     Ral_IntVector orderMap ;
@@ -481,7 +485,8 @@ Ral_RelationMinus(
      * Headings must be equal to perform a union.
      */
     if (!Ral_RelationHeadingEqual(r1->heading, r2->heading)) {
-	Ral_RelationLastError = REL_HEADING_NOT_EQUAL ;
+	Ral_ErrorInfoSetError(errInfo, RAL_ERR_HEADING_NOT_EQUAL,
+	    "while computing difference") ;
 	return NULL ;
     }
     /*
@@ -855,7 +860,8 @@ Ral_RelationGroup(
 Ral_Relation
 Ral_RelationUngroup(
     Ral_Relation relation,
-    const char *attrName)
+    const char *attrName,
+    Ral_ErrorInfo *errInfo)
 {
     Ral_RelationHeading heading = relation->heading ;
     Ral_TupleHeading tupleHeading = heading->tupleHeading ;
@@ -882,12 +888,12 @@ Ral_RelationUngroup(
      */
     ungrpAttrIter = Ral_TupleHeadingFind(tupleHeading, attrName) ;
     if (ungrpAttrIter == Ral_TupleHeadingEnd(tupleHeading)) {
-	Ral_RelationLastError = REL_UNKNOWN_ATTR ;
+	Ral_ErrorInfoSetError(errInfo, RAL_ERR_UNKNOWN_ATTR, attrName) ;
 	return NULL ;
     }
     ungrpAttr = *ungrpAttrIter ;
     if (ungrpAttr->attrType != Relation_Type) {
-	Ral_RelationLastError = REL_NOT_A_RELATION ;
+	Ral_ErrorInfoSetError(errInfo, RAL_ERR_NOT_A_RELATION, attrName) ;
 	return NULL ;
     }
     attrHeading = ungrpAttr->relationHeading ;
@@ -922,7 +928,8 @@ Ral_RelationUngroup(
 	Ral_TupleHeadingBegin(attrTupleHeading),
 	Ral_TupleHeadingEnd(attrTupleHeading), resultTupleHeading) ;
     if (status == 0) {
-	Ral_RelationLastError = REL_DUPLICATE_ATTR ;
+	Ral_ErrorInfoSetError(errInfo, RAL_ERR_DUPLICATE_ATTR,
+	    "while ungrouping relation") ;
 	Ral_TupleHeadingDelete(resultTupleHeading) ;
 	return NULL ;
     }
@@ -1030,7 +1037,7 @@ Ral_RelationUngroup(
 	Ral_RelationIter ungrpEnd ;
 
 	if (Tcl_ConvertToType(NULL, ungrpObj, &Ral_RelationObjType) != TCL_OK) {
-	    Ral_RelationLastError = REL_FORMAT_ERR ;
+	    Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_FORMAT_ERR, ungrpObj) ;
 	    Ral_RelationDelete(resultRel) ;
 	    return NULL ;
 	}
@@ -1070,7 +1077,8 @@ Ral_Relation
 Ral_RelationJoin(
     Ral_Relation r1,
     Ral_Relation r2,
-    Ral_JoinMap map)
+    Ral_JoinMap map,
+    Ral_ErrorInfo *errInfo)
 {
     Ral_RelationHeading r1Heading = r1->heading ;
     Ral_RelationHeading r2Heading = r2->heading ;
@@ -1092,7 +1100,7 @@ Ral_RelationJoin(
      * Construct the heading for the joined relation.
      */
     joinHeading = Ral_RelationHeadingJoin(r1Heading, r2Heading, map,
-	&r2JoinAttrs) ;
+	&r2JoinAttrs, errInfo) ;
     if (joinHeading == NULL) {
 	return NULL ;
     }
@@ -1256,7 +1264,8 @@ Ral_Relation
 Ral_RelationDivide(
     Ral_Relation dend,
     Ral_Relation dsor,
-    Ral_Relation med)
+    Ral_Relation med,
+    Ral_ErrorInfo *errInfo)
 {
     Ral_RelationHeading dendHeading = dend->heading ;
     Ral_TupleHeading dendTupleHeading = dendHeading->tupleHeading ;
@@ -1289,14 +1298,16 @@ Ral_RelationDivide(
      */
     if (Ral_TupleHeadingCommonAttributes(dendTupleHeading, dsorTupleHeading,
 	NULL) != 0) {
-	Ral_RelationLastError = REL_NOT_DISJOINT ;
+	Ral_ErrorInfoSetError(errInfo, RAL_ERR_NOT_DISJOINT,
+	    "while computing quotient") ;
 	return NULL ;
     }
     if (Ral_TupleHeadingCommonAttributes(dendTupleHeading, medTupleHeading,
 	NULL) != Ral_TupleHeadingSize(dendTupleHeading) ||
 	Ral_TupleHeadingCommonAttributes(dsorTupleHeading, medTupleHeading,
 	NULL) != Ral_TupleHeadingSize(dsorTupleHeading)) {
-	Ral_RelationLastError = REL_NOT_UNION ;
+	Ral_ErrorInfoSetError(errInfo, RAL_ERR_NOT_UNION,
+	    "while computing quotient") ;
 	return NULL ;
     }
     /*
@@ -2019,7 +2030,8 @@ int
 Ral_RelationRenameAttribute(
     Ral_Relation relation,
     const char *oldName,
-    const char *newName)
+    const char *newName,
+    Ral_ErrorInfo *errInfo)
 {
     Ral_TupleHeading tupleHeading = relation->heading->tupleHeading ;
     Ral_TupleHeadingIter end = Ral_TupleHeadingEnd(tupleHeading) ;
@@ -2031,7 +2043,7 @@ Ral_RelationRenameAttribute(
      */
     found = Ral_TupleHeadingFind(tupleHeading, oldName) ;
     if (found == end) {
-	Ral_RelationLastError = REL_UNKNOWN_ATTR ;
+	Ral_ErrorInfoSetError(errInfo, RAL_ERR_UNKNOWN_ATTR, oldName) ;
 	return 0 ;
     }
     /*
@@ -2043,7 +2055,7 @@ Ral_RelationRenameAttribute(
      */
     found = Ral_TupleHeadingStore(tupleHeading, found, newAttr) ;
     if (found == end) {
-	Ral_RelationLastError = REL_DUPLICATE_ATTR ;
+	Ral_ErrorInfoSetError(errInfo, RAL_ERR_DUPLICATE_ATTR, newName) ;
 	return 0 ;
     }
 
@@ -2435,15 +2447,13 @@ Ral_RelationIndexIdentifier(
     entry = Tcl_CreateHashEntry(index, id, &newPtr) ;
     Tcl_DStringFree(&idKey) ;
     /*
-     * Check that there are no duplicate tuples.
+     * Check that an entry was actually created and if so, set its value.
      */
-    if (newPtr == 0) {
-	Ral_RelationLastError = REL_DUPLICATE_TUPLE ;
-	return 0 ;
+    if (newPtr) {
+	Tcl_SetHashValue(entry, where - relation->start) ;
     }
 
-    Tcl_SetHashValue(entry, where - relation->start) ;
-    return 1 ;
+    return newPtr ;
 }
 
 static int

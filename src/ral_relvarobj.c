@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.7 $
-$Date: 2006/06/04 17:03:22 $
+$Revision: 1.8 $
+$Date: 2006/06/24 18:07:38 $
  *--
  */
 
@@ -101,7 +101,7 @@ EXTERNAL DATA DEFINITIONS
 STATIC DATA ALLOCATION
 */
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.7 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.8 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -124,7 +124,8 @@ Ral_RelvarObjNew(
      * Creating a relvar is not allowed during an "eval" script.
      */
     if (Ral_RelvarIsTransOnGoing(info)) {
-	Ral_RelvarObjSetError(interp, RELVAR_BAD_TRANS_OP, "create") ;
+	Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptCreate,
+	    RAL_ERR_BAD_TRANS_OP, "create") ;
 	return TCL_ERROR ;
     }
     /*
@@ -136,7 +137,8 @@ Ral_RelvarObjNew(
 	/*
 	 * Duplicate name.
 	 */
-	Ral_RelvarObjSetError(interp, RELVAR_DUP_NAME, resolvedName) ;
+	Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptCreate,
+	    RAL_ERR_DUP_NAME, resolvedName) ;
 	Tcl_DStringFree(&resolve) ;
 	return TCL_ERROR ;
     }
@@ -174,7 +176,8 @@ Ral_RelvarObjDelete(
      * Deleting a relvar is not allowed during an "eval" script.
      */
     if (Ral_RelvarIsTransOnGoing(info)) {
-	Ral_RelvarObjSetError(interp, RELVAR_BAD_TRANS_OP, "delete") ;
+	Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptDelete,
+	    RAL_ERR_BAD_TRANS_OP, "delete") ;
 	return TCL_ERROR ;
     }
 
@@ -194,7 +197,8 @@ Ral_RelvarObjDelete(
      * via a constraint.
      */
     if (Ral_PtrVectorSize(relvar->constraints) != 0) {
-	Ral_RelvarObjSetError(interp, RELVAR_CONSTRAINTS_PRESENT, fullName) ;
+	Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptDelete,
+	    RAL_ERR_CONSTRAINTS_PRESENT, fullName) ;
 	ckfree(fullName) ;
 	return TCL_ERROR ;
     }
@@ -277,7 +281,8 @@ Ral_RelvarObjFindRelvar(
     }
 
     if (relvar == NULL) {
-        Ral_RelvarObjSetError(interp, RELVAR_UNKNOWN_NAME, name) ;
+	Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptNone,
+	    RAL_ERR_UNKNOWN_NAME, name) ;
     }
     return relvar ;
 }
@@ -326,7 +331,8 @@ Ral_RelvarObjCreateAssoc(
      * Creating an association is not allowed during an "eval" script.
      */
     if (Ral_RelvarIsTransOnGoing(info)) {
-	Ral_RelvarObjSetError(interp, RELVAR_BAD_TRANS_OP, "association") ;
+	Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptAssociation,
+	    RAL_ERR_BAD_TRANS_OP, "association") ;
 	return TCL_ERROR ;
     }
     /*
@@ -378,7 +384,8 @@ Ral_RelvarObjCreateAssoc(
      * The referred to multiplicity is cannot be many.
      */
     if (specTable[specIndex2].multiplicity) {
-	Ral_RelvarObjSetError(interp, RELVAR_BAD_MULT, Tcl_GetString(objv[6])) ;
+	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptAssociation,
+	    RAL_ERR_BAD_MULT, objv[6]) ;
 	return TCL_ERROR ;
     }
 
@@ -387,8 +394,8 @@ Ral_RelvarObjCreateAssoc(
      * association.
      */
     if (elemc1 != elemc2) {
-	Ral_RelvarObjSetError(interp, RELVAR_REFATTR_MISMATCH,
-	    Tcl_GetString(objv[5])) ;
+	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptAssociation,
+	    RELVAR_REFATTR_MISMATCH, objv[5]) ;
 	return TCL_ERROR ;
     }
 
@@ -404,14 +411,14 @@ Ral_RelvarObjCreateAssoc(
 	int attrIndex2 = Ral_TupleHeadingIndexOf(th2, Tcl_GetString(*elemv2)) ;
 
 	if (attrIndex1 < 0) {
-	    Ral_RelationObjSetError(interp, REL_UNKNOWN_ATTR,
-		Tcl_GetString(*elemv1)) ;
+	    Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptAssociation,
+		RAL_ERR_UNKNOWN_ATTR, *elemv1) ;
 	    Ral_JoinMapDelete(refMap) ;
 	    return TCL_ERROR ;
 	}
 	if (attrIndex2 < 0) {
-	    Ral_RelationObjSetError(interp, REL_UNKNOWN_ATTR,
-		Tcl_GetString(*elemv2)) ;
+	    Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptAssociation,
+		RAL_ERR_UNKNOWN_ATTR, *elemv2) ;
 	    Ral_JoinMapDelete(refMap) ;
 	    return TCL_ERROR ;
 	}
@@ -427,14 +434,16 @@ Ral_RelvarObjCreateAssoc(
     isNotId = Ral_RelationHeadingFindIdentifier(r2->heading, refAttrs) < 0 ;
     Ral_IntVectorDelete(refAttrs) ;
     if (isNotId) {
-	Ral_RelvarObjSetError(interp, RELVAR_NOT_ID, Tcl_GetString(objv[5])) ;
+	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptAssociation,
+	    RAL_ERR_NOT_AN_IDENTIFIER, objv[5]) ;
 	Ral_JoinMapDelete(refMap) ;
 	return TCL_ERROR ;
     }
 
     constraint = Ral_ConstraintAssocCreate(name, info) ;
     if (constraint == NULL) {
-	Ral_RelvarObjSetError(interp, RELVAR_DUP_CONSTRAINT, name) ;
+	Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptAssociation,
+	    RAL_ERR_DUP_CONSTRAINT, name) ;
 	Ral_JoinMapDelete(refMap) ;
 	return TCL_ERROR ;
     }
@@ -491,7 +500,8 @@ Ral_RelvarObjCreatePartition(
      * Creating a partition is not allowed during an "eval" script.
      */
     if (Ral_RelvarIsTransOnGoing(info)) {
-	Ral_RelvarObjSetError(interp, RELVAR_BAD_TRANS_OP, "partition") ;
+	Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptPartition,
+	    RAL_ERR_BAD_TRANS_OP, "partition") ;
 	return TCL_ERROR ;
     }
     /*
@@ -527,20 +537,23 @@ Ral_RelvarObjCreatePartition(
 	int status ;
 
 	if (attrIndex < 0) {
-	    Ral_RelationObjSetError(interp, REL_UNKNOWN_ATTR, attrName) ;
+	    Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptPartition,
+		RAL_ERR_UNKNOWN_ATTR, attrName) ;
 	    Ral_IntVectorDelete(superAttrs) ;
 	    return TCL_ERROR ;
 	}
 	status = Ral_IntVectorSetAdd(superAttrs, attrIndex) ;
 	if (!status) {
-	    Ral_RelationObjSetError(interp, REL_DUP_ATTR_IN_ID, attrName) ;
+	    Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptPartition,
+		RAL_ERR_DUP_ATTR_IN_ID, attrName) ;
 	    Ral_IntVectorDelete(superAttrs) ;
 	    return TCL_ERROR ;
 	}
 	++supElemv ;
     }
     if (Ral_RelationHeadingFindIdentifier(superRel->heading, superAttrs) < 0) {
-	Ral_RelvarObjSetError(interp, RELVAR_NOT_ID, Tcl_GetString(objv[2])) ;
+	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptPartition,
+	    RAL_ERR_NOT_AN_IDENTIFIER, objv[2]) ;
 	Ral_IntVectorDelete(superAttrs) ;
 	return TCL_ERROR ;
     }
@@ -551,7 +564,8 @@ Ral_RelvarObjCreatePartition(
     partName = Tcl_GetString(objv[0]) ;
     constraint = Ral_ConstraintPartitionCreate(partName, info) ;
     if (constraint == NULL) {
-	Ral_RelvarObjSetError(interp, RELVAR_DUP_CONSTRAINT, partName) ;
+	Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptPartition,
+	    RAL_ERR_DUP_CONSTRAINT, partName) ;
 	Ral_IntVectorDelete(superAttrs) ;
 	return TCL_ERROR ;
     }
@@ -580,7 +594,8 @@ Ral_RelvarObjCreatePartition(
 	 * Get the subtype relvar and the attributes.
 	 */
 	if (!Ral_PtrVectorSetAdd(subList, subName)) {
-	    Ral_RelvarObjSetError(interp, RELVAR_DUP_NAME, subName) ;
+	    Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptPartition,
+		RAL_ERR_DUP_NAME, subName) ;
 	    goto errorOut ;
 	}
 	sub = Ral_RelvarObjFindRelvar(interp, info, subName, NULL) ;
@@ -600,8 +615,8 @@ Ral_RelvarObjCreatePartition(
 	    goto errorOut ;
 	}
 	if (nSupAttrs != subElemc) {
-	    Ral_RelvarObjSetError(interp, RELVAR_REFATTR_MISMATCH,
-		Tcl_GetString(objv[1])) ;
+	    Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptPartition,
+		RAL_ERR_REFATTR_MISMATCH, objv[1]) ;
 	    goto errorOut ;
 	}
 	/*
@@ -621,8 +636,8 @@ Ral_RelvarObjCreatePartition(
 		Ral_TupleHeadingIndexOf(subth, Tcl_GetString(*subElemv)) ;
 
 	    if (attrIndex < 0) {
-		Ral_RelationObjSetError(interp, REL_UNKNOWN_ATTR,
-		    Tcl_GetString(*subElemv)) ;
+		Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptPartition,
+		    RAL_ERR_UNKNOWN_ATTR, *subElemv) ;
 		goto errorOut ;
 	    }
 	    Ral_JoinMapAddAttrMapping(refMap, attrIndex, *supAttrIter++) ;
@@ -650,7 +665,8 @@ Ral_RelvarObjConstraintDelete(
     Ral_RelvarInfo info)
 {
     if (!Ral_ConstraintDeleteByName(name, info)) {
-	Ral_RelvarObjSetError(interp, RELVAR_UNKNOWN_CONSTRAINT, name) ;
+	Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptConstraint,
+	    RAL_ERR_UNKNOWN_CONSTRAINT, name) ;
 	return TCL_ERROR ;
     }
     return TCL_OK ;
@@ -672,7 +688,8 @@ Ral_RelvarObjConstraintInfo(
      */
     constraint = Ral_ConstraintFindByName(name, info) ;
     if (constraint == NULL) {
-	Ral_RelvarObjSetError(interp, RELVAR_UNKNOWN_CONSTRAINT, name) ;
+	Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptConstraint,
+	    RAL_ERR_UNKNOWN_CONSTRAINT, name) ;
 	return TCL_ERROR ;
     }
 
@@ -880,49 +897,6 @@ Ral_RelvarObjEndCmd(
     return success ? TCL_OK : TCL_ERROR ;
 }
 
-void
-Ral_RelvarObjSetError(
-    Tcl_Interp *interp,
-    Ral_RelvarError error,
-    const char *param)
-{
-    /*
-     * These must be in the same order as the encoding of the Ral_RelationError
-     * enumeration.
-     */
-    static const char *resultStrings[] = {
-	"no error",
-	"duplicate relvar name",
-	"unknown relvar name",
-	"relation heading mismatch",
-	"mismatch between referential attributes",
-	"duplicate constraint name",
-	"referred to attributes do not form an identifier",
-	"unknown constraint name",
-	"relvar has constraints in place",
-	"referred to identifiers can not have non-singular multiplicities",
-	"operation is not allowed during \"eval\" command",
-	"bad list of pairs",
-    } ;
-    static const char *errorStrings[] = {
-	"OK",
-	"DUP_NAME",
-	"UNKNOWN_NAME",
-	"HEADING_MISMATCH",
-	"REFATTR_MISMATCH",
-	"DUP_CONSTRAINT",
-	"NOT_ID",
-	"UNKNOWN_CONSTRAINT",
-	"CONSTRAINTS_PRESENT",
-	"BAD_MULT",
-	"BAD_TRANS_OP",
-	"BAD_PAIRS_LIST",
-    } ;
-
-    Ral_ObjSetError(interp, "RELVAR", resultStrings[error],
-	errorStrings[error], param) ;
-}
-
 /*
  * PRIVATE FUNCTIONS
  */
@@ -975,6 +949,7 @@ relvarResolveName(
 	/*
 	 * absolute reference.
 	 */
+	Tcl_DStringInit(resolvedName) ;
 	Tcl_DStringAppend(resolvedName, name, -1) ;
     } else if(interp) {
 	relvarGetNamespaceName(interp, name, resolvedName) ;

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.c,v $
-$Revision: 1.10 $
-$Date: 2006/05/19 04:54:32 $
+$Revision: 1.11 $
+$Date: 2006/06/24 18:07:38 $
  *--
  */
 
@@ -96,7 +96,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.10 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.11 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -349,13 +349,14 @@ Ral_AttributeValueObj(
 }
 
 /*
- * Construct an attribute from a Tcl objects.
+ * Construct an attribute from Tcl objects.
  */
 Ral_Attribute
 Ral_AttributeNewFromObjs(
     Tcl_Interp *interp,
     Tcl_Obj *nameObj,
-    Tcl_Obj *typeObj)
+    Tcl_Obj *typeObj,
+    Ral_ErrorInfo *errInfo)
 {
     Ral_Attribute attribute = NULL ;
     int typec ;
@@ -375,14 +376,14 @@ Ral_AttributeNewFromObjs(
     typeName = Tcl_GetString(*typev) ;
     if (strcmp("Tuple", typeName) == 0 && typec == 2) {
 	Ral_TupleHeading heading =
-	    Ral_TupleHeadingNewFromObj(interp, *(typev + 1)) ;
+	    Ral_TupleHeadingNewFromObj(interp, *(typev + 1), errInfo) ;
 
 	if (heading) {
 	    attribute = Ral_AttributeNewTupleType(attrName, heading) ;
 	}
     } else if (strcmp("Relation", typeName) == 0 && typec == 3) {
-	Ral_RelationHeading heading =
-	    Ral_RelationHeadingNewFromObjs(interp, typev[1], typev[2]) ;
+	Ral_RelationHeading heading = Ral_RelationHeadingNewFromObjs(interp,
+	    typev[1], typev[2], errInfo) ;
 
 	if (heading) {
 	    attribute = Ral_AttributeNewRelationType(attrName, heading) ;
@@ -393,16 +394,12 @@ Ral_AttributeNewFromObjs(
 	if (tclType != NULL) {
 	    attribute = Ral_AttributeNewTclType(attrName, tclType) ;
 	} else {
-	    Tcl_ResetResult(interp) ;
-	    Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-		"unknown data type, \"", typeName, "\"",
-		NULL) ;
+	    Ral_ErrorInfoSetError(errInfo, RAL_ERR_BAD_TYPE, typeName) ;
+	    Ral_InterpSetError(interp, errInfo) ;
 	}
     } else {
-	Tcl_ResetResult(interp) ;
-	Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-	    "bad type specification, \"", Tcl_GetString(typeObj),
-	    "\"", NULL) ;
+	Ral_ErrorInfoSetError(errInfo, RAL_ERR_BAD_KEYWORD, typeName) ;
+	Ral_InterpSetError(interp, errInfo) ;
     }
 
     return attribute ;
@@ -419,7 +416,8 @@ int
 Ral_AttributeConvertValueToType(
     Tcl_Interp *interp,
     Ral_Attribute attr,
-    Tcl_Obj *objPtr)
+    Tcl_Obj *objPtr,
+    Ral_ErrorInfo *errInfo)
 {
     int result = TCL_OK ;
 
@@ -427,10 +425,15 @@ Ral_AttributeConvertValueToType(
 	return TCL_OK ;
     }
 
+    /*
+     */
     switch (attr->attrType) {
     case Tcl_Type:
 	result = Tcl_ConvertToType(interp, objPtr, attr->tclType) ;
-	if (result == TCL_OK && strcmp(attr->tclType->name, "string") != 0) {
+	if (result != TCL_OK) {
+	    Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_BAD_VALUE, objPtr) ;
+	    Ral_InterpSetError(interp, errInfo) ;
+	} else if (strcmp(attr->tclType->name, "string") != 0) {
 	    Tcl_InvalidateStringRep(objPtr) ;
 	}
 	break ;
@@ -438,14 +441,14 @@ Ral_AttributeConvertValueToType(
     case Tuple_Type:
 	if (objPtr->typePtr != &Ral_TupleObjType) {
 	    result = Ral_TupleObjConvert(attr->tupleHeading, interp, objPtr,
-		objPtr) ;
+		objPtr, errInfo) ;
 	}
 	break ;
 
     case Relation_Type:
 	if (objPtr->typePtr != &Ral_RelationObjType) {
 	    result = Ral_RelationObjConvert(attr->relationHeading, interp,
-		objPtr, objPtr) ;
+		objPtr, objPtr, errInfo) ;
 	}
 	break ;
 

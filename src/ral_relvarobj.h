@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.h,v $
-$Revision: 1.5 $
-$Date: 2006/06/04 17:03:22 $
+$Revision: 1.6 $
+$Date: 2006/06/24 18:07:38 $
  *--
  */
 #ifndef _ral_relvarobj_h_
@@ -99,6 +99,5 @@ extern int Ral_RelvarObjConstraintNames(Tcl_Interp *, const char *,
     Ral_RelvarInfo) ;
 extern int Ral_RelvarObjEndTrans(Tcl_Interp *, Ral_RelvarInfo, int) ;
 extern int Ral_RelvarObjEndCmd(Tcl_Interp *, Ral_RelvarInfo, int) ;
-extern void Ral_RelvarObjSetError(Tcl_Interp *, Ral_RelvarError, const char *) ;
 
 #endif /* _ral_relvarobj_h_ */

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuplecmd.c,v $
-$Revision: 1.9 $
-$Date: 2006/05/19 04:54:32 $
+$Revision: 1.10 $
+$Date: 2006/06/24 18:07:39 $
  *--
  */
 
@@ -104,7 +104,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tuplecmd.c,v $ $Revision: 1.9 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tuplecmd.c,v $ $Revision: 1.10 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -234,19 +234,21 @@ TupleCreateCmd(
 {
     Ral_TupleHeading heading ;
     Ral_Tuple tuple ;
+    Ral_ErrorInfo errInfo ;
 
     if (objc != 4) {
 	Tcl_WrongNumArgs(interp, 2, objv, "heading name-value-list") ;
 	return TCL_ERROR ;
     }
 
-    heading = Ral_TupleHeadingNewFromObj(interp, *(objv + 2)) ;
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdTuple, Ral_OptCreate) ;
+    heading = Ral_TupleHeadingNewFromObj(interp, *(objv + 2), &errInfo) ;
     if (!heading) {
 	return TCL_ERROR ;
     }
 
     tuple = Ral_TupleNew(heading) ;
-    if (Ral_TupleSetFromObj(tuple, interp, *(objv + 3)) != TCL_OK) {
+    if (Ral_TupleSetFromObj(tuple, interp, *(objv + 3), &errInfo) != TCL_OK) {
 	Ral_TupleDelete(tuple) ;
 	return TCL_ERROR ;
     }
@@ -331,14 +333,15 @@ TupleEliminateCmd(
 	int attrIndex = Ral_TupleHeadingIndexOf(heading, attrName) ;
 
 	if (attrIndex < 0) {
-	    Ral_TupleObjSetError(interp, TUP_UNKNOWN_ATTR, attrName) ;
+	    Ral_InterpErrorInfo(interp, Ral_CmdTuple, Ral_OptEliminate,
+		RAL_ERR_UNKNOWN_ATTR, attrName) ;
 	    Ral_IntVectorDelete(elimList) ;
 	    return TCL_ERROR ;
 	}
 	Ral_IntVectorSetAdd(elimList, attrIndex) ;
     }
     /*
-     * Create the complement map which contains the attribute to retain.
+     * Create the complement map which contains the attributes to retain.
      */
     attrList = Ral_IntVectorSetComplement(elimList,
 	Ral_TupleHeadingSize(heading)) ;
@@ -390,6 +393,7 @@ TupleExtendCmd(
     Ral_Tuple newTuple ;
     Ral_TupleHeading newHeading ;
     Ral_TupleIter newValues ;
+    Ral_ErrorInfo errInfo ;
 
     if (objc < 3) {
 	Tcl_WrongNumArgs(interp, 2, objv, "tupleValue ?name-type-value ... ?") ;
@@ -418,6 +422,7 @@ TupleExtendCmd(
      */
     newHeading = Ral_TupleHeadingExtend(tuple->heading, objc) ;
     newTuple = Ral_TupleExtend(tuple, newHeading) ;
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdTuple, Ral_OptExtend) ;
     /*
      * Add the new attributes to the new tuple.  The new attributes are tacked
      * on at the end of the attributes that came from the original tuple.
@@ -432,21 +437,24 @@ TupleExtendCmd(
 	    goto errorOut ;
 	}
 	if (elemc != 3) {
-	    Ral_TupleObjSetError(interp, TUP_FORMAT_ERR, Tcl_GetString(*objv)) ;
+	    Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_BAD_TRIPLE_LIST, *objv) ;
+	    Ral_InterpSetError(interp, &errInfo) ;
 	    goto errorOut ;
 	}
-	attr = Ral_AttributeNewFromObjs(interp, elemv[0], elemv[1]) ;
+	attr = Ral_AttributeNewFromObjs(interp, elemv[0], elemv[1], &errInfo) ;
 	if (attr == NULL) {
 	    goto errorOut ;
 	}
 	hiter = Ral_TupleHeadingPushBack(newHeading, attr) ;
 	if (hiter == Ral_TupleHeadingEnd(newHeading)) {
-	    char *attrName = Tcl_GetString(elemv[0]) ;
-	    Ral_TupleObjSetError(interp, TUP_DUPLICATE_ATTR, attrName) ;
+	    Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_DUPLICATE_ATTR,
+		elemv[0]) ;
+	    Ral_InterpSetError(interp, &errInfo) ;
 	    goto errorOut ;
 	}
 
-	if (Ral_AttributeConvertValueToType(interp, attr, elemv[2]) != TCL_OK) {
+	if (Ral_AttributeConvertValueToType(interp, attr, elemv[2], &errInfo)
+	    != TCL_OK) {
 	    goto errorOut ;
 	}
 	Tcl_IncrRefCount(*newValues++ = elemv[2]) ;
@@ -492,7 +500,8 @@ TupleExtractCmd(
 	attrName = Tcl_GetString(*objv) ;
 	attrIndex = Ral_TupleHeadingIndexOf(heading, attrName) ;
 	if (attrIndex < 0) {
-	    Ral_TupleObjSetError(interp, TUP_UNKNOWN_ATTR, attrName) ;
+	    Ral_InterpErrorInfo(interp, Ral_CmdTuple, Ral_OptExtract,
+		RAL_ERR_UNKNOWN_ATTR, attrName) ;
 	    return TCL_ERROR ;
 	}
 	resultObj = tuple->values[attrIndex] ;
@@ -502,7 +511,8 @@ TupleExtractCmd(
 	    attrName = Tcl_GetString(*objv++) ;
 	    attrIndex = Ral_TupleHeadingIndexOf(heading, attrName) ;
 	    if (attrIndex < 0) {
-		Ral_TupleObjSetError(interp, TUP_UNKNOWN_ATTR, attrName) ;
+		Ral_InterpErrorInfo(interp, Ral_CmdTuple, Ral_OptExtract,
+		    RAL_ERR_UNKNOWN_ATTR, attrName) ;
 		goto errorOut ;
 	    }
 	    if (Tcl_ListObjAppendElement(interp, resultObj,
@@ -632,7 +642,8 @@ TupleProjectCmd(
 	int attrIndex = Ral_TupleHeadingIndexOf(heading, attrName) ;
 
 	if (attrIndex < 0) {
-	    Ral_TupleObjSetError(interp, TUP_UNKNOWN_ATTR, attrName) ;
+	    Ral_InterpErrorInfo(interp, Ral_CmdTuple, Ral_OptProject,
+		RAL_ERR_UNKNOWN_ATTR, attrName) ;
 	    Ral_IntVectorDelete(attrList) ;
 	    return TCL_ERROR ;
 	}
@@ -675,8 +686,8 @@ TupleRenameCmd(
     objc -= 3 ;
     objv += 3 ;
     if (objc % 2 != 0) {
-	Ral_TupleObjSetError(interp, TUP_BAD_PAIRS_LIST,
-	    "for oldname / newname arguments") ;
+	Ral_InterpErrorInfo(interp, Ral_CmdTuple, Ral_OptRename,
+	    RAL_ERR_BAD_PAIRS_LIST, "for oldname / newname arguments") ;
 	return TCL_ERROR ;
     }
 
@@ -690,14 +701,16 @@ TupleRenameCmd(
 
 	hiter =Ral_TupleHeadingFind(newHeading, oldAttrName) ;
 	if (hiter == hend) {
-	    Ral_TupleObjSetError(interp, TUP_UNKNOWN_ATTR, oldAttrName) ;
+	    Ral_InterpErrorInfo(interp, Ral_CmdTuple, Ral_OptRename,
+		RAL_ERR_UNKNOWN_ATTR, oldAttrName) ;
 	    goto errorOut ;
 	}
 
 	hiter = Ral_TupleHeadingStore(newHeading, hiter,
 	    Ral_AttributeRename(*hiter, newAttrName)) ;
 	if (hiter == hend) {
-	    Ral_TupleObjSetError(interp, TUP_DUPLICATE_ATTR, newAttrName) ;
+	    Ral_InterpErrorInfo(interp, Ral_CmdTuple, Ral_OptRename,
+		RAL_ERR_DUPLICATE_ATTR, newAttrName) ;
 	    goto errorOut ;
 	}
     }
@@ -753,7 +766,8 @@ TupleUnwrapCmd(
     tupleAttrName = Tcl_GetString(objv[3]) ;
     tupleAttrIter = Ral_TupleHeadingFind(heading, tupleAttrName) ;
     if (tupleAttrIter == Ral_TupleHeadingEnd(heading)) {
-	Ral_TupleObjSetError(interp, TUP_UNKNOWN_ATTR, tupleAttrName) ;
+	Ral_InterpErrorInfo(interp, Ral_CmdTuple, Ral_OptUnwrap,
+	    RAL_ERR_UNKNOWN_ATTR, tupleAttrName) ;
 	return TCL_ERROR ;
     }
     /*
@@ -761,8 +775,8 @@ TupleUnwrapCmd(
      */
     tupleAttr = *tupleAttrIter ;
     if (tupleAttr->attrType != Tuple_Type) {
-	Ral_TupleObjSetError(interp, TUP_BAD_VALUE,
-	    "attribute to unwrap must be of Tuple type") ;
+	Ral_InterpErrorInfo(interp, Ral_CmdTuple, Ral_OptUnwrap,
+	    RAL_ERR_NOT_A_TUPLE, tupleAttrName) ;
 	return TCL_ERROR ;
     }
     /*
@@ -801,8 +815,8 @@ TupleUnwrapCmd(
 	    Ral_TupleHeadingEnd(unTuple->heading), newTuple) &&
 	Ral_TupleCopy(tuple, tupleAttrIter + 1, Ral_TupleHeadingEnd(heading),
 	    newTuple))) {
-	Ral_TupleObjSetError(interp, TUP_DUPLICATE_ATTR,
-	    "while unwrapping tuple") ;
+	Ral_InterpErrorInfo(interp, Ral_CmdTuple, Ral_OptUnwrap,
+	    RAL_ERR_DUPLICATE_ATTR, "while unwrapping tuple") ;
 	Ral_TupleDelete(newTuple) ;
 	return TCL_ERROR ;
     }
@@ -819,6 +833,7 @@ TupleUpdateCmd(
 {
     Tcl_Obj *tupleObj ;
     Ral_Tuple tuple ;
+    Ral_ErrorInfo errInfo ;
 
     /* tuple update tupleVar name-value-list */
     if (objc != 4) {
@@ -847,7 +862,8 @@ TupleUpdateCmd(
     tuple = tupleObj->internalRep.otherValuePtr ;
     assert(tuple->refCount == 1) ;
 
-    if (Ral_TupleUpdateFromObj(tuple, interp, objv[3]) != TCL_OK) {
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdTuple, Ral_OptUpdate) ;
+    if (Ral_TupleUpdateFromObj(tuple, interp, objv[3], &errInfo) != TCL_OK) {
 	return TCL_ERROR ;
     }
 
@@ -880,6 +896,7 @@ TupleWrapCmd(
     const char *newAttrName ;
     Ral_Attribute newAttr ;
     Ral_TupleHeadingIter newAttrIter ;
+    Ral_ErrorInfo errInfo ;
 
     /* tuple wrap tupleValue newAttr oldAttrList */
     if (objc != 5) {
@@ -902,7 +919,8 @@ TupleWrapCmd(
     heading = tuple->heading ;
     degree = Ral_TupleDegree(tuple) ;
     if (elemc > degree) {
-	Ral_TupleObjSetError(interp, TUP_WRONG_NUM_ATTRS,
+	Ral_InterpErrorInfo(interp, Ral_CmdTuple, Ral_OptWrap,
+	    RAL_ERR_WRONG_NUM_ATTRS,
 	    "attempt to wrap more attributes than exist in the tuple") ;
 	return TCL_ERROR ;
     }
@@ -920,11 +938,13 @@ TupleWrapCmd(
 	attrIter = Ral_TupleHeadingFind(heading, attrName) ;
 	if (attrIter == hend) {
 	    Ral_TupleDelete(wrapTuple) ;
-	    Ral_TupleObjSetError(interp, TUP_UNKNOWN_ATTR, attrName) ;
+	    Ral_InterpErrorInfo(interp, Ral_CmdTuple, Ral_OptUnwrap,
+		RAL_ERR_UNKNOWN_ATTR, attrName) ;
 	    return TCL_ERROR ;
 	}
 	if (!Ral_TupleCopy(tuple, attrIter, attrIter + 1, wrapTuple)) {
-	    Ral_TupleObjSetError(interp, TUP_DUPLICATE_ATTR, attrName) ;
+	    Ral_InterpErrorInfo(interp, Ral_CmdTuple, Ral_OptUnwrap,
+		RAL_ERR_DUPLICATE_ATTR, attrName) ;
 	    return TCL_ERROR ;
 	}
     }
@@ -961,16 +981,17 @@ TupleWrapCmd(
      * Now add the wrapped tuple. First add a new attribute and then store the
      * value.
      */
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdTuple, Ral_OptWrap) ;
     newAttrName = Tcl_GetString(newAttrNameObj) ;
     newAttr = Ral_AttributeNewTupleType(newAttrName, wrapHeading) ;
     newAttrIter = Ral_TupleHeadingPushBack(newHeading, newAttr) ;
     if (newAttrIter == Ral_TupleHeadingEnd(newHeading)) {
-	Ral_TupleObjSetError(interp, TUP_DUPLICATE_ATTR, newAttrName) ;
+	Ral_ErrorInfoSetError(&errInfo, RAL_ERR_DUPLICATE_ATTR, newAttrName) ;
 	goto errorOut ;
     }
 
-    if (!Ral_TupleUpdateAttrValue(newTuple, newAttrName, wrapTupleObj)) {
-	Ral_TupleObjSetError(interp, Ral_TupleLastError, newAttrName) ;
+    if (!Ral_TupleUpdateAttrValue(newTuple, newAttrName, wrapTupleObj,
+	&errInfo)) {
 	goto errorOut ;
     }
 	
@@ -980,5 +1001,6 @@ TupleWrapCmd(
 errorOut:
     Ral_TupleDelete(newTuple) ;
     Tcl_DecrRefCount(wrapTupleObj) ;
+    Ral_InterpSetError(interp, &errInfo) ;
     return TCL_ERROR ;
 }
