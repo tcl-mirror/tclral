@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleobj.c,v $
-$Revision: 1.8 $
-$Date: 2006/06/24 18:07:39 $
+$Revision: 1.9 $
+$Date: 2006/07/01 23:56:31 $
  *--
  */
 
@@ -108,7 +108,7 @@ Tcl_ObjType Ral_TupleObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tupleobj.c,v $ $Revision: 1.8 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tupleobj.c,v $ $Revision: 1.9 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -122,6 +122,7 @@ Ral_TupleObjNew(
     objPtr->typePtr = &Ral_TupleObjType ;
     Ral_TupleReference(objPtr->internalRep.otherValuePtr = tuple) ;
     Tcl_InvalidateStringRep(objPtr) ;
+    objPtr->length = 0 ;
     return objPtr ;
 }
 
@@ -151,6 +152,7 @@ Ral_TupleObjConvert(
      * be generated in order to obtain the canonical string form.
      */
     Tcl_InvalidateStringRep(objPtr) ;
+    objPtr->length = 0 ;
     /*
      * Install the new internal representation.
      */

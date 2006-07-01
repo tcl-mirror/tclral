@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationobj.c,v $
-$Revision: 1.15 $
-$Date: 2006/06/24 18:07:38 $
+$Revision: 1.16 $
+$Date: 2006/07/01 23:56:31 $
  *--
  */
 
@@ -107,7 +107,7 @@ Tcl_ObjType Ral_RelationObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.15 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.16 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -121,6 +121,7 @@ Ral_RelationObjNew(
     objPtr->typePtr = &Ral_RelationObjType ;
     objPtr->internalRep.otherValuePtr = relation ;
     Tcl_InvalidateStringRep(objPtr) ;
+    objPtr->length = 0 ;
     return objPtr ;
 }
 
@@ -170,6 +171,7 @@ Ral_RelationObjConvert(
      * to be generated in order to obtain the canonical string form.
      */
     Tcl_InvalidateStringRep(objPtr) ;
+    objPtr->length = 0 ;
     /*
      * Install the new internal representation.
      */

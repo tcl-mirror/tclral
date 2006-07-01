@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.c,v $
-$Revision: 1.12 $
-$Date: 2006/06/24 18:26:22 $
+$Revision: 1.13 $
+$Date: 2006/07/01 23:56:31 $
  *--
  */
 
@@ -96,7 +96,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.12 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.13 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -436,6 +436,7 @@ Ral_AttributeConvertValueToType(
 	    Ral_InterpSetError(interp, errInfo) ;
 	} else if (strcmp(attr->tclType->name, "string") != 0) {
 	    Tcl_InvalidateStringRep(objPtr) ;
+	    objPtr->length = 0 ;
 	}
 	break ;
 

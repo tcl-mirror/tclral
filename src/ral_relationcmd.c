@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.16 $
-$Date: 2006/06/24 18:26:22 $
+$Revision: 1.17 $
+$Date: 2006/07/01 23:56:31 $
  *--
  */
 
@@ -139,7 +139,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.16 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.17 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -2590,7 +2590,8 @@ RelationTupleCmd(
 	return TCL_ERROR ;
     }
 
-    Tcl_SetObjResult(interp, Ral_TupleObjNew(*Ral_RelationBegin(relation))) ;
+    Tcl_SetObjResult(interp, Ral_TupleObjNew(
+	Ral_TupleDup(*Ral_RelationBegin(relation)))) ;
     return TCL_OK ;
 }
 

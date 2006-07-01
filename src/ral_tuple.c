@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuple.c,v $
-$Revision: 1.11 $
-$Date: 2006/06/24 18:07:38 $
+$Revision: 1.12 $
+$Date: 2006/07/01 23:56:31 $
  *--
  */
 
@@ -91,7 +91,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_tuple.c,v $ $Revision: 1.11 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tuple.c,v $ $Revision: 1.12 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -617,6 +617,7 @@ Ral_TupleStringOf(
     Ral_AttributeTypeScanFlags typeFlags ;
     Ral_AttributeValueScanFlags valueFlags ;
     char *str ;
+    int scanLen ;
     int length ;
 
     memset(&typeFlags, 0, sizeof(typeFlags)) ;
@@ -625,8 +626,10 @@ Ral_TupleStringOf(
     valueFlags.attrType = Tuple_Type ;
 
     /* +1 for NUL terminator */
-    str = ckalloc(Ral_TupleScan(tuple, &typeFlags, &valueFlags) + 1) ;
+    scanLen = Ral_TupleScan(tuple, &typeFlags, &valueFlags) + 1 ;
+    str = ckalloc(scanLen) ;
     length = Ral_TupleConvert(tuple, str, &typeFlags, &valueFlags) ;
+    assert(length <= scanLen) ;
     str[length] = '\0' ;
 
     return str ;

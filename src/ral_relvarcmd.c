@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.8 $
-$Date: 2006/06/24 18:26:22 $
+$Revision: 1.9 $
+$Date: 2006/07/01 23:56:31 $
  *--
  */
 
@@ -111,7 +111,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.8 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.9 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -378,6 +378,7 @@ RelvarDeleteCmd(
     Tcl_DecrRefCount(exprObj) ;
     if (deleted) {
 	Tcl_InvalidateStringRep(relvar->relObj) ;
+	relvar->relObj->length = 0 ;
     }
 
     result = Ral_RelvarObjEndCmd(interp, rInfo, 0) ;
@@ -436,6 +437,7 @@ RelvarDeleteOneCmd(
 
     if (deleted) {
 	Tcl_InvalidateStringRep(relvar->relObj) ;
+	relvar->relObj->length = 0 ;
     }
 
     result = Ral_RelvarObjEndCmd(interp, rInfo, 0) ;
@@ -551,6 +553,7 @@ RelvarInsertCmd(
 
     if (inserted) {
 	Tcl_InvalidateStringRep(relvar->relObj) ;
+	relvar->relObj->length = 0 ;
     }
 
     result = Ral_RelvarObjEndCmd(interp, rInfo, 0) ;
@@ -676,6 +679,7 @@ RelvarSetCmd(
 	Ral_RelvarStartCommand(rInfo, relvar) ;
 	Ral_RelvarSetRelation(relvar, relation) ;
 	Tcl_InvalidateStringRep(relvar->relObj) ;
+	relvar->relObj->length = 0 ;
 	result = Ral_RelvarObjEndCmd(interp, rInfo, 0) ;
     }
 
@@ -804,6 +808,7 @@ RelvarUpdateCmd(
 
     if (updated) {
 	Tcl_InvalidateStringRep(relvar->relObj) ;
+	relvar->relObj->length = 0 ;
     }
 
     result = Ral_RelvarObjEndCmd(interp, rInfo, result != TCL_OK) ;
@@ -878,6 +883,7 @@ RelvarUpdateOneCmd(
 	    failed = 1 ;
 	} else {
 	    Tcl_InvalidateStringRep(relvar->relObj) ;
+	    relvar->relObj->length = 0 ;
 	}
 	result = Ral_RelvarObjEndCmd(interp, rInfo, failed) ;
 	updated = 1 ;

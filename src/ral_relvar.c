@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.c,v $
-$Revision: 1.5 $
-$Date: 2006/05/21 04:22:00 $
+$Revision: 1.6 $
+$Date: 2006/07/01 23:56:31 $
  *--
  */
 
@@ -109,7 +109,7 @@ Ral_RelvarError Ral_RelvarLastError = RELVAR_OK ;
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.5 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.6 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -695,6 +695,7 @@ relvarSetIntRep(
     relvar->relObj->internalRep.otherValuePtr = relation ;
     relvar->relObj->typePtr = &Ral_RelationObjType ;
     Tcl_InvalidateStringRep(relvar->relObj) ;
+    relvar->relObj->length = 0 ;
 }
 
 /*
