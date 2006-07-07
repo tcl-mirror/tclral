@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuplecmd.c,v $
-$Revision: 1.10 $
-$Date: 2006/06/24 18:07:39 $
+$Revision: 1.11 $
+$Date: 2006/07/07 01:57:57 $
  *--
  */
 
@@ -104,7 +104,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tuplecmd.c,v $ $Revision: 1.10 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tuplecmd.c,v $ $Revision: 1.11 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -835,9 +835,10 @@ TupleUpdateCmd(
     Ral_Tuple tuple ;
     Ral_ErrorInfo errInfo ;
 
-    /* tuple update tupleVar name-value-list */
-    if (objc != 4) {
-	Tcl_WrongNumArgs(interp, 2, objv, "tupleValue name-value-list") ;
+    /* tuple update tupleVar ?attr1 value1 attr2 value2 ...? */
+    if (objc < 3) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+	    "tupleValue ?attr1 value1 attr2 value2?") ;
 	return TCL_ERROR ;
     }
 
@@ -862,9 +863,26 @@ TupleUpdateCmd(
     tuple = tupleObj->internalRep.otherValuePtr ;
     assert(tuple->refCount == 1) ;
 
-    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdTuple, Ral_OptUpdate) ;
-    if (Ral_TupleUpdateFromObj(tuple, interp, objv[3], &errInfo) != TCL_OK) {
+    objc -= 3 ;
+    objv += 3 ;
+    if (objc % 2 != 0) {
+	Ral_InterpErrorInfo(interp, Ral_CmdTuple, Ral_OptUpdate,
+	    RAL_ERR_BAD_PAIRS_LIST,
+	    "for attribute name / attribute value arguments") ;
 	return TCL_ERROR ;
+    }
+
+    /*
+     * Go through the attribute / value pairs updating the attribute values.
+     */
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdTuple, Ral_OptUpdate) ;
+    for ( ; objc > 0 ; objc -= 2, objv += 2) {
+	const char *attrName = Tcl_GetString(objv[0]) ;
+
+	if (!Ral_TupleUpdateAttrValue(tuple, attrName, objv[1], &errInfo)) {
+	    Ral_InterpSetError(interp, &errInfo) ;
+	    return TCL_ERROR ;
+	}
     }
 
     Tcl_SetObjResult(interp, tupleObj) ;

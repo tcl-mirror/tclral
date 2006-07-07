@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.20 $
-# $Date: 2006/06/24 18:07:39 $
+# $Revision: 1.21 $
+# $Date: 2006/07/07 01:57:57 $
 #  *--
 
 package require tcltest 2.2
@@ -591,7 +591,7 @@ namespace eval ::ral::test {
 	set t [tuple create {Name string Age int Size double}\
 	    {Name Andrew Age 20 Size 3.0}]
     } -body {
-	tuple update t {Age 40}
+	tuple update t Age 40
     } -result {Tuple {Name string Age int Size double}\
 	    {Name Andrew Age 40 Size 3.0}} -match tuple
 
@@ -599,7 +599,7 @@ namespace eval ::ral::test {
 	set t [tuple create {Name string Age int Size double}\
 	    {Name Andrew Age 20 Size 3.0}]
     } -body {
-	tuple update t {Age 40 Size 33.0}
+	tuple update t Age 40 Size 33.0
     } -result {Tuple {Name string Age int Size double}\
 	    {Name Andrew Age 40 Size 33.0}} -match tuple
 
@@ -607,14 +607,14 @@ namespace eval ::ral::test {
 	set t [tuple create {Name string Age int Size double}\
 	    {Name Andrew Age 20 Size 3.0}]
     } -body {
-	tuple update t {foo 40}
+	tuple update t foo 40
     } -result {unknown attribute name, "foo"} -returnCodes error
 
     test tuple-update-4.0 {bad type} -setup {
 	set t [tuple create {Name string Age int Size double}\
 	    {Name Andrew Age 20 Size 3.0}]
     } -body {
-	tuple update t {Age foo}
+	tuple update t Age foo
     } -result {bad value type for value, "foo"} -returnCodes error
 
     # tuple wrap subcommand
@@ -1135,7 +1135,7 @@ namespace eval ::ral::test {
     test relation-foreach-5.1 {update tuple variable} -body {
 	set nameList [list]
 	relation foreach sup $S {
-	    tuple update sup {CITY Sunnyvale}
+	    tuple update sup CITY Sunnyvale
 	}
 	set S
     } -result {
@@ -3841,7 +3841,7 @@ tuple {A1 b} is referred to by multiple tuples}\
 	relvar destroy X
     } -body {
 	relvar update X t {0} {
-	    tuple update t {Status -1}
+	    tuple update t Status -1
 	}
     } -result {0}
 
@@ -3859,7 +3859,7 @@ tuple {A1 b} is referred to by multiple tuples}\
 	relvar destroy X
     } -body {
 	relvar update X t {1} {
-	    tuple update t {Status -1}
+	    tuple update t Status -1
 	}
     } -result {3}
 
@@ -3877,7 +3877,7 @@ tuple {A1 b} is referred to by multiple tuples}\
 	relvar destroy X
     } -body {
 	relvar update X t {1} {
-	    tuple update t {Status -1}
+	    tuple update t Status -1
 	}
 	relvar set X
     } -result {
@@ -3905,7 +3905,7 @@ tuple {A1 b} is referred to by multiple tuples}\
 	relvar destroy X
     } -body {
 	relvar update X t {[tuple extract $t Name] eq "George"} {
-	    tuple update t {Status -1}
+	    tuple update t Status -1
 	}
     } -result {1}
 
@@ -3923,7 +3923,7 @@ tuple {A1 b} is referred to by multiple tuples}\
 	relvar destroy X
     } -body {
 	relvar update X t {[tuple extract $t Name] eq "George"} {
-	    tuple update t {Name Fred}
+	    tuple update t Name Fred
 	}
     } -result {duplicate tuple, "{Name Fred Status 20}"} -returnCodes error
 
@@ -4219,43 +4219,43 @@ Suppliers
 
     test relformat-4.0 {relation valued attribute} -body {
 	relformat [relation group $SP PQ P# QTY]
-    } -result {+======+-------------------------------+
-|S#    |PQ                             |
-|string|Relation {P# string QTY int} P#|
-+======+-------------------------------+
-|S1    |+======+---+                   |
-|      ||P#    |QTY|                   |
-|      ||string|int|                   |
-|      |+======+---+                   |
-|      ||P1    |300|                   |
-|      ||P2    |200|                   |
-|      ||P3    |400|                   |
-|      ||P4    |200|                   |
-|      ||P5    |100|                   |
-|      ||P6    |100|                   |
-|      |+======+---+                   |
-|S2    |+======+---+                   |
-|      ||P#    |QTY|                   |
-|      ||string|int|                   |
-|      |+======+---+                   |
-|      ||P1    |300|                   |
-|      ||P2    |400|                   |
-|      |+======+---+                   |
-|S3    |+======+---+                   |
-|      ||P#    |QTY|                   |
-|      ||string|int|                   |
-|      |+======+---+                   |
-|      ||P2    |200|                   |
-|      |+======+---+                   |
-|S4    |+======+---+                   |
-|      ||P#    |QTY|                   |
-|      ||string|int|                   |
-|      |+======+---+                   |
-|      ||P2    |200|                   |
-|      ||P4    |300|                   |
-|      ||P5    |400|                   |
-|      |+======+---+                   |
-+======+-------------------------------+}
+    } -result {+======+------------+
+|S#    |PQ          |
+|string|Relation    |
++======+------------+
+|S1    |+======+---+|
+|      ||P#    |QTY||
+|      ||string|int||
+|      |+======+---+|
+|      ||P1    |300||
+|      ||P2    |200||
+|      ||P3    |400||
+|      ||P4    |200||
+|      ||P5    |100||
+|      ||P6    |100||
+|      |+======+---+|
+|S2    |+======+---+|
+|      ||P#    |QTY||
+|      ||string|int||
+|      |+======+---+|
+|      ||P1    |300||
+|      ||P2    |400||
+|      |+======+---+|
+|S3    |+======+---+|
+|      ||P#    |QTY||
+|      ||string|int||
+|      |+======+---+|
+|      ||P2    |200||
+|      |+======+---+|
+|S4    |+======+---+|
+|      ||P#    |QTY||
+|      ||string|int||
+|      |+======+---+|
+|      ||P2    |200||
+|      ||P4    |300||
+|      ||P5    |400||
+|      |+======+---+|
++======+------------+}
 
     cleanupTests
 }

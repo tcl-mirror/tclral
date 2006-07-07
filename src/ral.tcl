@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.9 $
-# $Date: 2006/06/04 17:03:22 $
+# $Revision: 1.10 $
+# $Date: 2006/07/07 01:57:57 $
 #  *--
 
 namespace eval ::ral {
@@ -500,7 +500,11 @@ proc ::ral::addHeading {matrix heading} {
     set attrTypes [list]
     foreach {name type} [lindex $heading 1] {
 	lappend attrNames $name
-	lappend attrTypes $type
+	# For Relation and Tuple types, just use the keyword.
+	# The components of the types will be apparent from the headings
+	# of the relation or tuple valued attributes. This saves quite
+	# a bit of column space for these types of nested attributes.
+	lappend attrTypes [lindex $type 0]
     }
     $matrix add row $attrNames
     $matrix add row $attrTypes

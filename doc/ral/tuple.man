@@ -41,12 +41,12 @@
 # 
 #  *++
 # MODULE:
-# 
+#	tuple.man -- Manual page for the TclRal "tuple" command.
 # ABSTRACT:
 # 
 # $RCSfile: tuple.man,v $
-# $Revision: 1.1 $
-# $Date: 2006/04/09 01:35:47 $
+# $Revision: 1.2 $
+# $Date: 2006/07/07 01:57:57 $
 #  *--
 }]
 [moddesc "Tuple Operators"]
@@ -73,7 +73,7 @@ The attribute name may be any Tcl string, although attribute names that
 contain embedded blanks are particularly inconvenient.
 The attribute data type may be any valid Tcl internal data type.
 Tcl uses many different internal types for many different purposes.
-The ones most useful are:
+Some common ones are:
 
 [list_begin bullet]
 [bullet]
@@ -90,14 +90,7 @@ boolean
 list
 [bullet]
 bytearray
-[bullet]
-Tuple
 [list_end]
-
-Any attribute value assigned to a particular attribute is coerced into the
-attribute data type for that attribute and it is an error if the value
-string assigned to an attribute does not represent a valid value of the
-attribute data type.
 
 [para]
 
@@ -112,6 +105,13 @@ Tuples are sets of components and as such have the following rules.
 [list_begin bullet]
 [bullet]
 All attribute names must be unique.
+
+[bullet]
+Any attribute value assigned to a particular attribute is coerced into the
+attribute data type for that attribute and it is an error if the value
+string assigned to an attribute does not represent a valid value of the
+attribute data type.
+
 [bullet]
 The is no inherent left to right ordering in tuples.
 Clearly, the implementation may store components in a particular order
@@ -151,9 +151,9 @@ give the corresponding attribute value.
 [para]
 The following is a literal string representation of a tuple with
 three attributes.
-[example_begin]
+[example {
 {Tuple {Name string Breed string Age int} {Name Fido Breed Terrier Age 2}}
-[example_end]
+}]
 
 [section COMMANDS]
 [list_begin definitions]
@@ -168,7 +168,18 @@ Any existing variable that has the same name as an attribute is assigned a
 new value.
 Variables are created as necessary.
 All variables are created in the local scope.
-The [cmd assign] subcommand returns the empty string.
+The [cmd assign] subcommand returns the number of variables assigned to which
+necessarily is equal to the degree of the tuple.
+
+[example {
+% tuple assign {Tuple {Name string Age int} {Name John Age 25}}
+2
+% set Name
+John
+% set Age
+25
+}]
+
 
 [call [cmd "::ral::tuple create"] [arg heading] [arg name-value-list]]
 
@@ -190,10 +201,54 @@ It is an error if the conversion fails.
 It is also an error not to supply a value for every attribute or to attempt
 to supply the value of any attribute more than once.
 
+
+[example {
+% tuple create {Number int Street string Zip string}\
+	{Number 100 Zip 90214 Street Elm}
+Tuple {Number int Street string Zip string} {Number 100 Street Elm Zip 90214}
+% tuple create {Number int Street string Zip string}\
+	{Number hundred Zip 90214 Street Elm}
+bad value type for value, "hundred"
+% tuple create {Number int Street string Zip string} {Number 100 Zip 90214}
+wrong number of attributes specified, "Number 100 Zip 90214"
+% tuple create {Number int Street string Zip string}\
+	{Number 100 Zip 90214 Number 100}
+duplicate attribute name, "Number"
+% tuple create {Number int Street string Zip string}\
+	{Number 100 Zip 90214 Street Elm Email john@net.net}
+wrong number of attributes specified, "Number 100 Zip 90214 Street Elm Email john@net.net"
+}]
+
 [call [cmd "::ral::tuple degree"] [arg tupleValue]]
 
 The [cmd degree] subcommand returns the degree of the tuple which is
 the number of attributes the tuple has.
+
+[example {
+% tuple degree {Tuple {Name string Age int} {Name John Age 25}}
+2
+% tuple degree {Tuple {} {}}
+0
+}]
+
+[call [cmd "::ral::tuple eliminate"] [arg tupleValue] [opt [arg "attr ..."]]]
+
+The [cmd eliminate] subcommand returns a new tuple with the same
+heading and values as [arg tupleValue] except that those attributes given
+in the argument list are not present.
+It is an error to attempt to eliminate attributes that are not part of
+[arg tupleValue].
+
+[example {
+% set t1 [tuple create {Name string Age int} {Name John Age 25}]
+Tuple {Name string Age int} {Name John Age 25}
+% tuple eliminate $t1
+Tuple {Name string Age int} {Name John Age 25}
+% tuple eliminate $t1 Name
+Tuple {Age int} {Age 25}
+% tuple eliminate $t1 Street
+unknown attribute name, "Street"
+}]
 
 [call [cmd "::ral::tuple equal"] [arg tuple1] [arg tuple2]]
 
@@ -205,40 +260,45 @@ the corresponding attribute values are equal.
 Because there is no inherent order to the attributes of a tuple,
 there are many ways to specify the same tuple.
 For example, the following tuples are equal.
-[example_begin]
-set t1 [lb]::ral::tuple create {{Name string} {Status int}} {Name Fred Status 20}[rb]
-set t2 [lb]::ral::tuple create {{Status int} {Name string}} {Name Fred Status 20}[rb]
-[example_end]
+
+[example {
+% set t1 [tuple create {Name string Status int} {Name Fred Status 20}]
+Tuple {Name string Status int} {Name Fred Status 20}
+% set t2 [tuple create {Status int Name string} {Name Fred Status 20}]
+Tuple {Status int Name string} {Status 20 Name Fred}
+% tuple equal $t1 $t2
+1
+}]
+
 This implies that only [cmd "tuple equal"] can reliably determine
 tuple equality.
-Using [cmd "string equal"] to determine tuple equality is not reliable and
-should be avoided.
-
-[call [cmd "::ral::tuple eliminate"] [arg tupleValue] [opt [arg "attr ..."]]]
-
-The [cmd eliminate] subcommand returns a new tuple with the same
-heading and values as [arg tupleValue] except that those attributes given
-in the argument list are not present.
-It is an error to attempt to eliminate attributes that are not part of
-[arg tupleValue].
+Using [cmd "string equal"] (or any other string based comparison operations)
+to determine tuple equality is not reliable and should not be used
 
 [call [cmd "::ral::tuple extend"] [arg tupleValue] [opt [arg "name-type-value ..."]]]
 
 The [cmd extend] subcommand returns a new tuple with the same heading and
 values as the [arg tupleValue] argument except that the new attributes given by
 the [arg name-type-value] arguments are included.
-Each [arg name-type-value] argument is a list consisting of two or
-three elements.
-If [arg name-type-value] list contains three elements then
-they are taken as a new attribute name, attribute data type and attribute
+Each [arg name-type-value] argument is a list consisting of three elements.
+The three elements
+are a new attribute name, attribute data type and attribute
 value in that order.
-If only two elements are given, then they are
-taken as the attribute name and attribute value and the attribute data
-type is taken as "string".
 It is an error to attempt to [cmd extend] a tuple with an attribute name
 that is already contained in [arg tupleValue].
 Each new attribute value is converted to the appropriate type and it is
 an error if that conversion fails.
+
+[example {
+% set t1 [tuple create {Name string} {Name Fred}]
+Tuple {Name string} {Name Fred}
+% tuple extend $t1 {Age int 30} {Sex string Male}
+Tuple {Name string Age int Sex string} {Name Fred Age 30 Sex Male}
+% tuple extend $t1 {Name string Jane}
+duplicate attribute name, "Name"
+% tuple extend $t1 {Age int Thirty}
+bad value type for value, "Thirty"
+}]
 
 [call [cmd "::ral::tuple extract"] [arg tupleValue] [arg attr] [opt [arg "attr2 ..."]]]
 
@@ -250,6 +310,17 @@ is returned.
 The order of the returned list is the same as the order of the [arg attr]
 arguments.
 
+[example {
+% set t1 [tuple create {Name string Age int} {Name {Fred Jones} Age 27}]
+Tuple {Name string Age int} {Name {Fred Jones} Age 27}
+% tuple extract $t1 Name
+Fred Jones
+% tuple extract $t1 Age Name
+27 {Fred Jones}
+% tuple extract $t1 Status
+unknown attribute name, "Status"
+}]
+
 [call [cmd "::ral::tuple get"] [arg tupleValue]]
 
 The [cmd get] subcommand returns a list consisting of pairs of elements.
@@ -260,11 +331,36 @@ command and accepted by the [cmd "array set"] command.
 The [cmd get] subcommand provides a convenient means to move tuple
 values into an array.
 
+[example {
+% set t1 {Tuple {Name string Age int} {Name {Fred Jones} Age 27}}
+Tuple {Name string Age int} {Name {Fred Jones} Age 27}
+% set tinfo [tuple get $t1]
+Name {Fred Jones} Age 27
+% array set ainfo $tinfo
+
+% parray ainfo
+ainfo(Age)  = 27
+ainfo(Name) = Fred Jones
+
+% dict keys $tinfo
+Age Name
+}]
+
+
 [call [cmd "::ral::tuple heading"] [arg tupleValue]]
 
 The [cmd heading] subcommand returns the heading of the given [arg tupleValue].
-The heading of a tuple is an even numbered list consisting alternately of
+The heading of a tuple is a list consisting of two elements.
+The first element is the keyword [emph Tuple] and the second is list with
+an even number of elements consisting of alternating
 attribute names and attribute data types.
+
+[example {
+% set t {Tuple {Name string Age int} {Name {Fred Jones} Age 27}}
+Tuple {Name string Age int} {Name {Fred Jones} Age 27}
+% tuple heading $t
+Tuple {Name string Age int}
+}]
 
 [call [cmd "::ral::tuple project"] [arg tupleValue] [opt [arg "attr ..."]]]
 
@@ -274,15 +370,40 @@ with the corresponding values taken from [arg tupleValue].
 It is not an error to project zero attributes (the nullary tuple projection),
 the result being the tuple with no attributes.
 
+[example {
+% set t {Tuple {Name string Age int} {Name {Fred Jones} Age 27}}
+Tuple {Name string Age int} {Name {Fred Jones} Age 27}
+% tuple project $t Age
+Tuple {Age int} {Age 27}
+% tuple project $t
+Tuple {} {}
+}]
+
 [call [cmd "::ral::tuple rename"] [arg tupleValue] [opt [arg "oldname newname ..."]]]
 
 The [cmd rename] subcommand returns a new tuple where [arg oldname] is
 replaced by [arg newname].
 The [arg tupleValue] argument is not modified.
 Many pairs of [arg oldname]/[arg newname] arguments may be given.
-It is an error to attempt to given an [arg oldname] that is not an attribute
+It is an error to attempt to give an [arg oldname] that is not an attribute
 name in the tuple or to attempt to change the name of an attribute to be
 one that already exists in the tuple.
+
+[example {
+% set t {Tuple {Name string Age int} {Name {Fred Jones} Age 27}}
+Tuple {Name string Age int} {Name {Fred Jones} Age 27}
+% tuple rename $t Name Person Age Status
+Tuple {Person string Status int} {Person {Fred Jones} Status 27}
+% tuple rename $t Name Person Person Name
+Tuple {Name string Age int} {Name {Fred Jones} Age 27}
+% tuple rename $t Name Person Name Nomen
+unknown attribute name, "Name"
+% tuple rename $t Name Age
+duplicate attribute name, "Age"
+% tuple rename $t
+Tuple {Name string Age int} {Name {Fred Jones} Age 27}
+}]
+
 
 [call [cmd "::ral::tuple unwrap"] [arg tupleValue] [arg attr]]
 
@@ -297,26 +418,44 @@ The [cmd unwrap] subcommand is useful for [emph un-nesting] tuples that
 have tuple valued attributes.
 For example, the tuple:
 
-[example_begin]
-tuple unwrap\
-    {Tuple {{Name string} {Address {Tuple {{Num string} {Street string}}}}}\
-    {Name Fred Address {Num 100 Street Main}}} Address
 
-returns:
+[example {
+% set t {Tuple {Name string Address {Tuple {Number int Street string}}} {Name Fred Address {Number 100 Street Elm}}}
+Tuple {Name string Address {Tuple {Number int Street string}}} {Name Fred Address {Number 100 Street Elm}}
+% tuple unwrap $t Address
+Tuple {Name string Number int Street string} {Name Fred Number 100 Street Elm}
+% tuple unwrap $t Name
+attribute must be of a Tuple type, "Name"
+% set u {Tuple {Name string Address {Tuple {Number int Name string}}} {Name Fred Address {Number 100 Name Elm}}}
+Tuple {Name string Address {Tuple {Number int Name string}}} {Name Fred Address {Number 100 Name Elm}}
+% tuple unwrap $u Address
+duplicate attribute name, "while unwrapping tuple"
+}]
 
-{Tuple {{Name string} {Num string} {Street string}}\
-    {Name Fred Num 100 Street Main}}
-[example_end]
 
-[call [cmd "::ral::tuple update"] [arg tupleVarName] [arg name-value-list]]
+[call [cmd "::ral::tuple update"] [arg tupleVarName]\
+    [opt "attr1 value1 attr2 value2 ..."]]
 
-The [cmd update] subcommand modifies the values of a tuple in place.
+The [cmd update] subcommand modifies the attribute values of a tuple in place.
 The [arg tupleVarName] argument is the name of a variable that contains a
 tuple value.
-The [arg name-value-list] is a list of pairs giving the attribute name and the
+The remaining arguments are treated as 
+pairs giving the attribute name and the
 new value to which that attribute is to be set.
 The command modifies the attributes in place
 and returns the updated tuple.
+It is an error to attempt to update an attribute that does exist,
+[emph i.e.] the structure of the tuple may not be changed by this command.
+
+[example {
+% set t {Tuple {Name string Age int} {Name {Fred Jones} Age 27}}
+Tuple {Name string Age int} {Name {Fred Jones} Age 27}
+% tuple update t Name {Jane Jones}
+Tuple {Name string Age int} {Name {Jane Jones} Age 27}
+% tuple update t Status 20
+unknown attribute name, "Status"
+}]
+
 
 [call [cmd "::ral::tuple wrap"] [arg tupleValue] [arg newAttr] [arg oldAttrList]]
 
@@ -330,16 +469,12 @@ The [arg oldAttrList] argument is a list of attribute names that will be placed
 in the new tuple valued attribute.
 Referring to the example from the [cmd "tuple unwrap"] command above:
 
-[example_begin]
-tuple wrap\
-    {Tuple {{Name string} {Num string} {Street string}}\
-	{Name Fred Num 100 Street Main}} Address {Num Street}
-
-returns:
-    {Tuple {{Name string} {Address {Tuple {{Num string} {Street string}}}}}\
-    {Name Fred Address {Num 100 Street Main}}} Address
-
-[example_end]
+[example {
+% set t {Tuple {Name string Number int Street string} {Name Fred Number 100 Street Elm}}
+Tuple {Name string Number int Street string} {Name Fred Number 100 Street Elm}
+% tuple wrap $t Address {Number Street}
+Tuple {Name string Address {Tuple {Number int Street string}}} {Name Fred Address {Number 100 Street Elm}}
+}]
 
 [list_end]
 
