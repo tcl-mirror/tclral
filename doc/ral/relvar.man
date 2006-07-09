@@ -45,8 +45,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: relvar.man,v $
-# $Revision: 1.1 $
-# $Date: 2006/04/09 01:35:47 $
+# $Revision: 1.2 $
+# $Date: 2006/07/09 03:48:13 $
 #  *--
 }]
 [moddesc "Relvar Operators"]
@@ -79,59 +79,104 @@ allows optimizers to find the most efficient manner of computing the result.
 [para]
 In the TclRAL implementation,
 relation variables serve a similar role although there
-is no persistence supplied by the library.
+is no implicit persistence supplied by the library.
 Relation values may be stored in Tcl variables like any other Tcl object.
 This does abandon the non-procedural nature of relational expressions
 as usually accomplished in the relational model, but is a better fit
 to the Tcl way of doing things.
 
 [para]
-Since it is possible to store a relation value in an ordinary Tcl variable,
-the user should be aware of some of the consequences of this.
-Because internally Tcl objects are reference counted,
-storing a relation value in a variable in effect creates another reference
-to the underlying object.
-Since the [cmd relvar] commands operate directly on the underlying value,
-any changes to the value affected by the [cmd relvar] subcommands will
-also be reflected in the value seen by any references to the value stored
-in ordinary Tcl variables.
-So, for example, if the value of a relation variable, say [emph RV],
-is stored in a Tcl variable, say [emph V], then any insert or delete
-operations on [emph RV] will also be seen when the value is accessed
-via [emph V].
-This could be surprising to some, since most other Tcl commands will
-create a new copy of a shared value before performing any update
-operation on it.
-The behavior described here works well when it is remembered that the
-[cmd relvar] commands can modify the underlying value directly and that
-the [cmd relation] commands only operate on values in a read only fashion
-and never modify their arguments directly.
+Since it is possible to store a relation value in an ordinary Tcl variable
+and since Tcl variables are convenient to use,
+all relvars have corresponding Tcl variables.
+
+[section "RELVAR NAMES"]
+
+[section CONSTRAINTS]
+
+[para]
+Constraints may be defined to exist between relvars.
+The type of constraints supported by TclRAL are declarative in nature
+and are used to implement referential integrity.
+
 
 [section COMMANDS]
 [list_begin definitions]
-[call [cmd "::ral::relvar create"] [arg relationVariable]\
-    [arg heading] [arg identifiers] [opt "name-value-list ..."]]
+[call [cmd "::ral::relvar association"] [arg name]\
+    [arg refrngRelvar] [arg refrngAttrList] [arg refrngSpec]\
+    [arg refToRelvar] [arg refToAttrList] [arg refToSpec]\
+]
+
+The [cmd association] subcommand creates a referential association
+between two relvars called [arg name].
+The return value of [cmd association] is the empty string.
+Associations declare that one relvar has attributes that refer to
+an identifier of another relvar.
+The referring relvar name is given by the [arg refrngRelvar] argument
+and the referring attributes are given by [arg refrngAttrList] argument.
+The referred to relvar name is given by [arg refToRelvar] and the
+attributes that are referred to by [arg refToAttrList]. The referring
+and referred to attribute lists are ordered and referring attributes
+refer to the corresponding referred to attribute.
+The set of attributes given by [arg refToAttrList] must constitute
+and identifier for [arg refToRelvar].
+The [arg refrngSpec] argument defines the multiplicity and conditionality
+of the reference.
+It can be one of:
+
+[list_begin definitions]
+
+[lst_item *]
+Zero or more references.
+[lst_item +]
+One or more references.
+[lst_item 1]
+Exactly one reference.
+[lst_item ?]
+Zero or one reference.
+
+[list_end]
+
+Similarly [arg refToSpec] defines the multiplicity and conditionality
+associated with the references to [arg refToRelvar].
+Necessarily, [arg refToSpec] may only be "1" or "?" implying that
+all the tuples of [arg refToRelvar] are referred to by [arg refrngRelvar]
+or at least one tuple of [arg refToRelvar] is not referred to.
+
+The symbols for [arg refrngSpec] and [arg refToSpec] were chosen to
+by analogy to the use of those symbols in regular expression syntax.
+
+[example {
+% relvar association R1-Owner OWNERSHIP OwnerName + OWNER OwnerName 1
+% relvar association R1-Dog OWNERSHIP DogName * DOG DogName ?
+}]
+
+
+[call [cmd "::ral::relvar constraint delete"]\
+	[opt "[arg name1] [arg name2] ..."]]
+[call [cmd "::ral::relvar constraint info"] [arg name]]
+[call [cmd "::ral::relvar constraint names"] [opt [arg pattern]]]
+
+[call [cmd "::ral::relvar create"] [arg relationVariable] [arg heading]]
 
 The [cmd create] subcommand creates a new relation variable whose name is given
-by [arg relationVariable].
-The subcommand has no return value.
-The [arg heading] is specified by an even numbered list consisting alternately
-of an attribute name and attribute data type.
-The [arg identifiers] argument is a list of identifying attribute sets.
-Each element of the [arg identifiers] list is in turn a list containing
-a set of attribute names that constititute an identifier.
-Relations must have at least one identifier.
-Relations may have an arbitrary number of identifiers however,
-no identifier may be a subset of another identifier.
-Optionally, an arbitrary number of tuples may be specified.
-Tuples consists of a list of alternating attribute name / attribute value
-pairs.
-Optional tuples are inserted into the relation variable as if
-[cmd "relvar insert"] had been called.
+by [arg relationVariable] and that has the relation value heading given
+by the [arg heading] argument.
+The subcommand returns the relation value of the newly created relvar,
+which necessarily will have cardinality of 0.
+The [arg heading] argument is a valid relation value heading
+as described for the [cmd ::ral::relation] commands or
+as returned from [cmd "::ral::relation heading"].
 
-[example_begin]
-relvar create OWNER {OwnerName string Age int City string} OwnerName
-[example_end]
+[example {
+% relvar create OWNER {Relation {OwnerName string Age int City string} OwnerName}
+Relation {OwnerName string Age int City string} OwnerName {}
+% relvar create DOG {Relation {DogName string Breed string} DogName}
+Relation {DogName string Breed string} DogName {}
+% relvar create OWNERSHIP {Relation {OwnerName string DogName string Acquired string} {{OwnerName DogName}}}
+Relation {OwnerName string DogName string Acquired string} {{OwnerName DogName}} {}
+}]
+
 
 [call [cmd "::ral::relvar delete"] [arg relationVariable]\
     [arg tupleVariable] [arg expression]]
@@ -145,62 +190,100 @@ modifying the value contained in [arg relationVariable].
 The return value of the subcommand is the number of tuples deleted.
 
 [example {
-relvar delete OWNER o {[tuple extract $o OwnerName] eq "Sue"}
+% puts [relformat $::OWNER "Before deleting Sue"]
++=========+---+-------------+
+|OwnerName|Age|City         |
+|string   |int|string       |
++=========+---+-------------+
+|Sue      |24 |Cupertino    |
+|George   |35 |Sunnyvale    |
+|Alice    |30 |San Jose     |
+|Mike     |50 |San Jose     |
+|Jim      |42 |San Francisco|
++=========+---+-------------+
+Before deleting Sue
+-------------------
+% relvar delete OWNER o {[tuple extract $o OwnerName] eq "Sue"}
+1
+% puts [relformat $::OWNER "After deleting Sue"]
++=========+---+-------------+
+|OwnerName|Age|City         |
+|string   |int|string       |
++=========+---+-------------+
+|George   |35 |Sunnyvale    |
+|Alice    |30 |San Jose     |
+|Mike     |50 |San Jose     |
+|Jim      |42 |San Francisco|
++=========+---+-------------+
+After deleting Sue
+------------------
 }]
 
+
 [call [cmd "::ral::relvar deleteone"] [arg relationVariable]\
-    [arg name-value-list]]
+    [opt "attr1 value1 attr2 value2 ..."]]
 
 The [cmd deleteone] subcommand deletes at most one tuple from the
 relation variable given by the [arg relationVariable] argument.
-The [arg name-value-list] must be list containing an even number of elements
-which are attribute names alternating with attribute values.
-The set of attribute names in [arg name-value-list] must form one of the
-identifiers of [arg relationVariable].
+The [arg "attrN valueN"] arguments must be given and pairs
+and are the attribute names and values that determine which tuple
+is deleted from the relation value held in [arg relationVariable].
+The set of attribute names in the [arg "attrN valueN"] arguments
+must form one of the identifiers of [arg relationVariable].
 If [arg relationVariable] contains a tuple whose attribute values match those
-in [arg name-value-list] then that tuple is deleted and [arg relationVariable]
+in given then that tuple is deleted and [arg relationVariable]
 is modified in place.
 Otherwise [arg relationVariable] is unchanged.
 This subcommand is useful in those contexts where the attribute values of an
 identifier are known and evaluating an expression over all the tuples
 in [arg relationVariable] is superfluous.
 The return value of the subcommand is the number of tuples deleted which will
-be either 1 or 0.
+necessarily be either 1 or 0.
 
 [example {
-% relvar deleteone OWNER {OwnerName Sue}
+% puts [relformat $::OWNER "Before deleting Mike"]
++=========+---+-------------+
+|OwnerName|Age|City         |
+|string   |int|string       |
++=========+---+-------------+
+|Sue      |24 |Cupertino    |
+|George   |35 |Sunnyvale    |
+|Alice    |30 |San Jose     |
+|Mike     |50 |San Jose     |
+|Jim      |42 |San Francisco|
++=========+---+-------------+
+Before deleting Mike
+--------------------
+% relvar deleteone OWNER OwnerName Mike
 1
+% puts [relformat $::OWNER "After deleting Mike"]
++=========+---+-------------+
+|OwnerName|Age|City         |
+|string   |int|string       |
++=========+---+-------------+
+|Sue      |24 |Cupertino    |
+|George   |35 |Sunnyvale    |
+|Alice    |30 |San Jose     |
+|Jim      |42 |San Francisco|
++=========+---+-------------+
+After deleting Mike
+-------------------
+% relvar deleteone OWNER OwnerName Alfonse
+0
+% puts [relformat $::OWNER]
++=========+---+-------------+
+|OwnerName|Age|City         |
+|string   |int|string       |
++=========+---+-------------+
+|Sue      |24 |Cupertino    |
+|George   |35 |Sunnyvale    |
+|Alice    |30 |San Jose     |
+|Jim      |42 |San Francisco|
++=========+---+-------------+
 }]
 
-[call [cmd "::ral::relvar destroy"] [opt "relationVariable ..."]]
 
-The [cmd destroy] deletes all the relation variables whose names are given
-as the subcommand arguments.
-
-[call [cmd "::ral::relvar dump"] [opt {-schema | -body}] [opt pattern]]
-
-The [cmd dump] subcommand returns a Tcl script that when evaluated will
-reconstruct the relation variables in the state that existed at the time
-the [cmd dump] subcommand is issued.
-This command provides a primative means of persistence for the relation
-variables since the value returned from [cmd dump] may be stored in a file
-to be [cmd source]'ed in later.
-If the [arg -schema] argument is present then only [cmd "relvar create"]
-commands are included in the dump, in effect dumping only the schema.
-If the [arg -body] argument is present then only [cmd "relvar insert"]
-commands are included in the dump, in effect dumping only the data.
-If neither [arg -schema] or [arg -body] are present then both the necessary
-[cmd "relvar create"] and [cmd "relvar insert"] commands are returned.
-If the [arg pattern] is present then only those relation variables names
-matching [arg pattern] are dumped.
-Matching of relation variable names against [arg pattern] happens in the
-same manner as for the [cmd "string match"] command.
-
-[example {
-set c [::open vars.tcl w]
-puts -nonewline [relvar dump]
-::close $c
-}]
+[call [cmd "::ral::relvar eval"]]
 
 [call [cmd "::ral::relvar insert"] [arg relationVariable]\
     [opt "name-value-list ..."]]
@@ -228,33 +311,34 @@ If the [arg pattern] argument is specified then only those names matching
 [arg pattern] are returned.
 Name matching is performed as for the [cmd "string match"] command.
 
+[call [cmd "::ral::relvar partition"] [arg name] [arg super]\
+	[arg superAttrList] [arg sub1] [arg sub1AttrList]\
+	[opt "sub2 sub2AttrList sub3 sub3AttrList ..."]]
+
 [call [cmd "::ral::relvar set"] [arg relationVariable] [opt relationValue]]
 
 The [cmd set] subcommand replaces the current value held by the relation
 variable named [arg relationVariable] with the value given by
 [arg relationValue].
-The [cmd set] subcommands operates differently depending upon whether
-[arg relationVariable] is a base relvar or a virtual relvar.
-If [arg relationVariable] is a base relvar, then [cmd set] attempts to
-assign [arg relationValue], if present, to the relvar.
 It is an error to attempt to assign a relation value to a relation variable
 that is of a different type than the type of the value
 that the variable currently holds.
-If [arg relationVariable] is a virtual relvar,
-then [arg relationValue] is interpreted as a relational expression string
-and is associated in a macro-like fashion to [arg relationVariable].
+In other words, it is not possible to change the type of a relvar
+by assignment.
 The return value of the subcommand the current value
 held by [arg relationVariable].
-If [arg relationVariable] is virtual,
-then its associated relation expression is evaluated and returned as
-the value of the [cmd set] subcommand.
 If the [arg relationValue] argument is missing, then no attempt is made to
 change the value of [arg relationVariable].
 This command operates in a manner analogous to the [cmd set] command for
 ordinary Tcl variables.
 
-[call [cmd "::ral::relvar update"] [arg relationVariable] [arg tupleVariable]\
-    [arg expression] [arg name-value-list]]
+[call [cmd "::ral::relvar unset"] [opt "relationVariable ..."]]
+
+The [cmd unset] deletes all the relation variables whose names are given
+as the subcommand arguments.
+
+[call [cmd "::ral::relvar update"] [arg relvarName] [arg tupleVarName]\
+    [arg expression] [arg script]]
 
 The [cmd update] subcommand modifies the values of tuples in the relation
 value contained in the relation variable given by [arg relationVariable].
@@ -290,21 +374,6 @@ This subcommand is useful in those contexts where the attribute values of an
 identifier are known and evaluating an expression over all the tuples
 in [arg relationVariable] is superfluous.
 The return value of the subcommand is the number of tuples updated.
-
-[call [cmd "::ral::relvar virtual"] [arg relationVariable]\
-    [arg relationExpression]]
-
-The [cmd virtual] subcommand creates a virtual relvar whose name is given
-by [arg relationVariable] and whose value is given by [arg relationExpression].
-The [arg relationExpression] is a script that is evaluated each time
-that the value stored in [arg relationVariable] is fetched (via the
-[cmd "relvar set"] command).
-Thus a virtual relvar behaves as a kind of macro.
-It is an error to attempt to perform any updates on a virtual relvar except
-to use [cmd "relvar set"] to change the script associated with the relvar.
-It is also an error if the result of evaluating the script associated
-with a virtual relvar is not an object that can be converted into a Relation
-type.
 
 [list_end]
 

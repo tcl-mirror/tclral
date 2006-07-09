@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.21 $
-# $Date: 2006/07/07 01:57:57 $
+# $Revision: 1.22 $
+# $Date: 2006/07/09 03:48:13 $
 #  *--
 
 package require tcltest 2.2
@@ -1314,6 +1314,50 @@ namespace eval ::ral::test {
     test relation-identifiers-4.0 {multiple compound identifiers} -body {
 	relation identifiers {Relation {a1 string a2 string a3 string} {{a1 a2} {a2 a3}} {}}
     } -result {{a1 a2} {a2 a3}}
+
+    # relation intersect subcommand
+    test relation-include-1.0 {single tuple} -body {
+	relation include [relation emptyof $S]\
+	    {S# S1 SNAME Jones STATUS 20 CITY Madrid}
+    } -result {
+	Relation
+	{S# string SNAME string STATUS int CITY string}
+	S#
+	{
+	    {S# S1 SNAME Jones STATUS 20 CITY Madrid}
+	}
+    } -match relation
+
+    test relation-include-2.0 {multiple tuple} -body {
+	relation include [relation emptyof $S]\
+	    {S# S1 SNAME Jones STATUS 20 CITY Madrid}\
+	    {S# S2 SNAME Smith STATUS 10 CITY London}\
+	    {S# S3 SNAME Elm STATUS 30 CITY Athens}
+    } -result {
+	Relation
+	{S# string SNAME string STATUS int CITY string}
+	S#
+	{
+	    {S# S1 SNAME Jones STATUS 20 CITY Madrid}
+	    {S# S2 SNAME Smith STATUS 10 CITY London}
+	    {S# S3 SNAME Elm STATUS 30 CITY Athens}
+	}
+    } -match relation
+
+    test relation-include-3.0 {duplicate tuple} -body {
+	relation include [relation emptyof $S]\
+	    {S# S1 SNAME Jones STATUS 20 CITY Madrid}\
+	    {S# S3 SNAME Elm STATUS 30 CITY Athens}\
+	    {S# S1 SNAME Jones STATUS 20 CITY Madrid}
+    } -result {
+	Relation
+	{S# string SNAME string STATUS int CITY string}
+	S#
+	{
+	    {S# S1 SNAME Jones STATUS 20 CITY Madrid}
+	    {S# S3 SNAME Elm STATUS 30 CITY Athens}
+	}
+    } -match relation
 
     # relation intersect subcommand
     test relation-intersect-1.0 {dum relation} -body {
@@ -3113,7 +3157,7 @@ namespace eval ::ral::test {
 	relvar association R1 A A1 1 B B1 1
     } -cleanup {
 	relvar constraint delete R1
-	relvar destroy A B
+	relvar unset A B
     } -body {
 	relvar eval {
 	    relvar insert A {A1 a A2 42}
@@ -3127,7 +3171,7 @@ namespace eval ::ral::test {
 	relvar association R1 A A1 1 B B1 1
     } -cleanup {
 	relvar constraint delete R1
-	relvar destroy A B
+	relvar unset A B
     } -body {
 	relvar insert A {A1 b A2 42}
     } -result {for association R1(::ral::test::A [1] ==> [1] ::ral::test::B), in relvar ::ral::test::A
@@ -3139,7 +3183,7 @@ tuple {A1 b A2 42} references no tuple} -returnCodes error
 	relvar association R1 A A1 1 B B1 1
     } -cleanup {
 	relvar constraint delete R1
-	relvar destroy A B
+	relvar unset A B
     } -body {
 	relvar insert B {B1 b B2 bar}
     } -result {for association R1(::ral::test::A [1] ==> [1] ::ral::test::B), in relvar ::ral::test::B
@@ -3151,7 +3195,7 @@ tuple {B1 b B2 bar} is not referenced by any tuple} -returnCodes error
 	relvar association R2 C C1 ? D D1 1
     } -cleanup {
 	relvar constraint delete R2
-	relvar destroy C D
+	relvar unset C D
     } -body {
 	relvar eval {
 	    relvar insert C {C1 a C2 42}
@@ -3166,7 +3210,7 @@ tuple {B1 b B2 bar} is not referenced by any tuple} -returnCodes error
 	relvar association R2 C C1 ? D D1 1
     } -cleanup {
 	relvar constraint delete R2
-	relvar destroy C D
+	relvar unset C D
     } -body {
 	relvar eval {
 	    relvar insert C {C1 a C2 42}
@@ -3183,7 +3227,7 @@ tuple {C1 c C2 42} references no tuple} -returnCodes error
 	relvar association R2 C C1 ? D D1 ?
     } -cleanup {
 	relvar constraint delete R2
-	relvar destroy C D
+	relvar unset C D
     } -body {
 	relvar eval {
 	    relvar insert C {C1 a C2 42}
@@ -3199,7 +3243,7 @@ tuple {C1 c C2 42} references no tuple} -returnCodes error
 	relvar association R1 A BID + B B1 1
     } -cleanup {
 	relvar constraint delete R1
-	relvar destroy A B
+	relvar unset A B
     } -body {
 	relvar eval {
 	    relvar insert A {A1 a BID a}
@@ -3217,7 +3261,7 @@ tuple {C1 c C2 42} references no tuple} -returnCodes error
 	relvar association R1 A BID + B B1 1
     } -cleanup {
 	relvar constraint delete R1
-	relvar destroy A B
+	relvar unset A B
     } -body {
 	relvar eval {
 	    relvar insert A {A1 a BID a}
@@ -3236,7 +3280,7 @@ tuple {A1 d BID c} references no tuple} -returnCodes error
 	relvar association R1 A BID + B B1 1
     } -cleanup {
 	relvar constraint delete R1
-	relvar destroy A B
+	relvar unset A B
     } -body {
 	relvar eval {
 	    relvar insert A {A1 a BID a}
@@ -3256,7 +3300,7 @@ tuple {B1 c B2 foo} is not referenced by any tuple} -returnCodes error
 	relvar association R1 A BID * B B1 1
     } -cleanup {
 	relvar constraint delete R1
-	relvar destroy A B
+	relvar unset A B
     } -body {
 	relvar eval {
 	    relvar insert A {A1 a BID a}
@@ -3275,7 +3319,7 @@ tuple {B1 c B2 foo} is not referenced by any tuple} -returnCodes error
 	relvar association R1 A BID + B B1 ?
     } -cleanup {
 	relvar constraint delete R1
-	relvar destroy A B
+	relvar unset A B
     } -body {
 	relvar eval {
 	    relvar insert A {A1 a BID a}
@@ -3294,7 +3338,7 @@ tuple {B1 c B2 foo} is not referenced by any tuple} -returnCodes error
 	relvar association R1 A BID * B B1 ?
     } -cleanup {
 	relvar constraint delete R1
-	relvar destroy A B
+	relvar unset A B
     } -body {
 	relvar eval {
 	    relvar insert A {A1 a BID a}
@@ -3316,7 +3360,7 @@ tuple {B1 c B2 foo} is not referenced by any tuple} -returnCodes error
 	relvar association R1 A BID * B B1 ?
     } -cleanup {
 	relvar constraint delete R1
-	relvar destroy A B
+	relvar unset A B
     } -result {duplicate constraint name, "R1"} -returnCodes error
 
     test relvar-association-6.2 {bad cond / mult spec} -setup {
@@ -3325,7 +3369,7 @@ tuple {B1 c B2 foo} is not referenced by any tuple} -returnCodes error
     } -body {
 	relvar association R1 A BID X B B1 ?
     } -cleanup {
-	relvar destroy A B
+	relvar unset A B
     } -result {bad multiplicity specification "X": must be 1, +, ?, or *} -returnCodes error
 
     test relvar-association-6.3 {bad multiplicity} -setup {
@@ -3334,7 +3378,7 @@ tuple {B1 c B2 foo} is not referenced by any tuple} -returnCodes error
     } -body {
 	relvar association R1 A BID * B B1 *
     } -cleanup {
-	relvar destroy A B
+	relvar unset A B
     } -result {referred to identifiers can not have non-singular multiplicities, "*"} -returnCodes error
 
     # relvar constraint subcommand
@@ -3345,7 +3389,7 @@ tuple {B1 c B2 foo} is not referenced by any tuple} -returnCodes error
 	relvar association R4 A BID2 * B B2 ?
     } -cleanup {
 	relvar constraint delete R3 R4
-	relvar destroy A B
+	relvar unset A B
     } -body {
 	lsort [relvar constraint names]
     } -result {R3 R4}
@@ -3356,7 +3400,7 @@ tuple {B1 c B2 foo} is not referenced by any tuple} -returnCodes error
 	relvar association R3 A BID1 * B B1 ?
     } -cleanup {
 	relvar constraint delete R3
-	relvar destroy A B
+	relvar unset A B
     } -body {
 	relvar constraint info R3
     } -result {association R3 ::ral::test::A BID1 * ::ral::test::B B1 ?}
@@ -3368,7 +3412,7 @@ tuple {B1 c B2 foo} is not referenced by any tuple} -returnCodes error
 	relvar partition R1 A A1 B B1 C C1
     } -cleanup {
 	relvar constraint delete R1
-	relvar destroy A B C
+	relvar unset A B C
     } -body {
 	relvar constraint info R1
     } -result {partition R1 ::ral::test::A A1 ::ral::test::B B1 ::ral::test::C C1}
@@ -3377,7 +3421,7 @@ tuple {B1 c B2 foo} is not referenced by any tuple} -returnCodes error
     test relvar-create-1.0 {single attribute} -body {
 	relvar create N {Relation {Name string} Name}
     } -cleanup {
-	relvar destroy N
+	relvar unset N
     } -result {Relation {Name string} Name {}} -match relation
 
     # relvar delete subcommand
@@ -3392,7 +3436,7 @@ tuple {B1 c B2 foo} is not referenced by any tuple} -returnCodes error
 	    {Name Fred Status 30}\
 	    {Status 40 Name Alice}
     } -cleanup {
-	relvar destroy X
+	relvar unset X
     } -body {
 	relvar delete X t {0}
     } -result {0}
@@ -3408,7 +3452,7 @@ tuple {B1 c B2 foo} is not referenced by any tuple} -returnCodes error
 	    {Name Fred Status 30}\
 	    {Status 40 Name Alice}
     } -cleanup {
-	relvar destroy X
+	relvar unset X
     } -body {
 	relvar delete X t {1}
     } -result {3}
@@ -3424,7 +3468,7 @@ tuple {B1 c B2 foo} is not referenced by any tuple} -returnCodes error
 	    {Name Fred Status 30}\
 	    {Status 40 Name Alice}
     } -cleanup {
-	relvar destroy X
+	relvar unset X
     } -body {
 	relvar delete X t {[tuple extract $t Name] eq "George"}
     } -result {1}
@@ -3441,7 +3485,7 @@ tuple {B1 c B2 foo} is not referenced by any tuple} -returnCodes error
 	    {Name Fred Status 30}\
 	    {Status 40 Name Alice}
     } -cleanup {
-	relvar destroy X
+	relvar unset X
     } -body {
 	relvar deleteone X Name Jane
     } -result {0}
@@ -3457,7 +3501,7 @@ tuple {B1 c B2 foo} is not referenced by any tuple} -returnCodes error
 	    {Name Fred Status 30}\
 	    {Status 40 Name Alice}
     } -cleanup {
-	relvar destroy X
+	relvar unset X
     } -body {
 	relvar deleteone X Name Fred
     } -result {1}
@@ -3473,7 +3517,7 @@ tuple {B1 c B2 foo} is not referenced by any tuple} -returnCodes error
 	    {Name Fred Status 30}\
 	    {Status 40 Name Alice}
     } -cleanup {
-	relvar destroy X
+	relvar unset X
     } -body {
 	relvar deleteone X Status 30
     } -result {attributes do not constitute an identifier, "during identifier construction operation"}\
@@ -3486,7 +3530,7 @@ tuple {B1 c B2 foo} is not referenced by any tuple} -returnCodes error
 	relvar create C {Relation {C1 string} C1}
     } -cleanup {
 	relvar constraint delete R1
-	relvar destroy A B C
+	relvar unset A B C
     } -body {
 	relvar partition R1 A A1 B B1 C C1
     } -result {}
@@ -3495,7 +3539,7 @@ tuple {B1 c B2 foo} is not referenced by any tuple} -returnCodes error
 	relvar create A {Relation {A1 string} A1}
 	relvar create B {Relation {B1 string} B1}
     } -cleanup {
-	relvar destroy A B
+	relvar unset A B
     } -body {
 	relvar partition R1 A A1 B B1 C C1
     } -result {unknown relvar name, "C"} -returnCodes error
@@ -3505,7 +3549,7 @@ tuple {B1 c B2 foo} is not referenced by any tuple} -returnCodes error
 	relvar create B {Relation {B1 string} B1}
 	relvar create C {Relation {C1 string} C1}
     } -cleanup {
-	relvar destroy A B C
+	relvar unset A B C
     } -body {
 	relvar partition R1 A A1 B B1 C C2
     } -result {unknown attribute name, "C2"} -returnCodes error
@@ -3515,7 +3559,7 @@ tuple {B1 c B2 foo} is not referenced by any tuple} -returnCodes error
 	relvar create B {Relation {B1 string} B1}
 	relvar create C {Relation {C1 string} C1}
     } -cleanup {
-	relvar destroy A B C
+	relvar unset A B C
     } -body {
 	relvar partition R1 A A2 B B1 C C2
     } -result {attributes do not constitute an identifier, "A2"}\
@@ -3528,7 +3572,7 @@ tuple {B1 c B2 foo} is not referenced by any tuple} -returnCodes error
 	relvar partition R1 A A1 B B1 C C1
     } -cleanup {
 	relvar constraint delete R1
-	relvar destroy A B C
+	relvar unset A B C
     } -body {
 	relvar eval {
 	    relvar insert A {A1 b} {A1 c}
@@ -3544,7 +3588,7 @@ tuple {B1 c B2 foo} is not referenced by any tuple} -returnCodes error
 	relvar partition R1 A A1 B B1 C C1
     } -cleanup {
 	relvar constraint delete R1
-	relvar destroy A B C
+	relvar unset A B C
     } -body {
 	relvar eval {
 	    relvar insert A {A1 b} {A1 c}
@@ -3561,7 +3605,7 @@ tuple {A1 c} is not referred to by any tuple}\
 	relvar partition R1 A A1 B B1 C C1
     } -cleanup {
 	relvar constraint delete R1
-	relvar destroy A B C
+	relvar unset A B C
     } -body {
 	relvar eval {
 	    relvar insert A {A1 b}
@@ -3581,7 +3625,7 @@ tuple {A1 b} is referred to by multiple tuples}\
 	}
 	relvar set SV $S
     } -cleanup {
-	relvar destroy SV
+	relvar unset SV
     } -result {
 	Relation
 	{S# string SNAME string STATUS int CITY string}
@@ -3609,7 +3653,7 @@ tuple {A1 b} is referred to by multiple tuples}\
 	}
 	relvar insert R {R# 2 RNAME Second}
     } -cleanup {
-	relvar destroy ::R R
+	relvar unset ::R R
     } -body {
 	relvar set R
     } -result {
@@ -3633,7 +3677,7 @@ tuple {A1 b} is referred to by multiple tuples}\
 	    relvar set SV $S
 	}
     } -cleanup {
-	relvar destroy SV
+	relvar unset SV
     } -result {
 	Relation
 	{S# string SNAME string STATUS int CITY string}
@@ -3665,7 +3709,7 @@ tuple {A1 b} is referred to by multiple tuples}\
 	}
 	set SV
     } -cleanup {
-	relvar destroy SV
+	relvar unset SV
     } -result {
 	Relation
 	{S# string SNAME string STATUS int CITY string}
@@ -3695,7 +3739,7 @@ tuple {A1 b} is referred to by multiple tuples}\
 	}
 	set SV
     } -cleanup {
-	relvar destroy SV
+	relvar unset SV
     } -result {
 	Relation
 	{S# string SNAME string STATUS int CITY string}
@@ -3723,7 +3767,7 @@ tuple {A1 b} is referred to by multiple tuples}\
 	    }
 	}
     } -cleanup {
-	relvar destroy SV
+	relvar unset SV
     } -result {
 	Relation
 	{S# string SNAME string STATUS int CITY string}
@@ -3737,7 +3781,7 @@ tuple {A1 b} is referred to by multiple tuples}\
     test relvar-insert-1.0 {insert single tuple} -setup {
 	relvar create N {Relation {Name string Age int City string} Name}
     } -cleanup {
-	relvar destroy N
+	relvar unset N
     } -body {
 	relvar insert N {Name Andrew Age 20 City Sunnyvale}
     } -result {
@@ -3752,7 +3796,7 @@ tuple {A1 b} is referred to by multiple tuples}\
     test relvar-insert-2.0 {insert multiple tuples} -setup {
 	relvar create N {Relation {Name string Age int City string} Name}
     } -cleanup {
-	relvar destroy N
+	relvar unset N
     } -body {
 	relvar insert N\
 	    {Name Andrew Age 20 City Sunnyvale}\
@@ -3772,7 +3816,7 @@ tuple {A1 b} is referred to by multiple tuples}\
     test relvar-insert-3.0 {duplicate tuple} -setup {
 	relvar create N {Relation {Name string Age int City string} Name}
     } -cleanup {
-	relvar destroy N
+	relvar unset N
     } -body {
 	relvar insert N\
 	    {Name Andrew Age 20 City Sunnyvale}\
@@ -3788,7 +3832,7 @@ tuple {A1 b} is referred to by multiple tuples}\
 	    {Age 20 Name George City {San Jose}}\
 	    {Name Fred City Saratoga Age 20}
     } -cleanup {
-	relvar destroy N
+	relvar unset N
     } -body {
 	catch {relvar insert N {Name Andrew Age 20 City Sunnyvale}}
 	relvar set N
@@ -3823,7 +3867,7 @@ tuple {A1 b} is referred to by multiple tuples}\
     } -body {
 	lsort [relvar names]
     } -cleanup {
-	relvar destroy SV PV SPV
+	relvar unset SV PV SPV
     } -result {::ral::test::PV ::ral::test::SPV ::ral::test::SV}
 
     # relvar update subcommand
@@ -3838,7 +3882,7 @@ tuple {A1 b} is referred to by multiple tuples}\
 	    {Name Fred Status 30}\
 	    {Status 40 Name Alice}
     } -cleanup {
-	relvar destroy X
+	relvar unset X
     } -body {
 	relvar update X t {0} {
 	    tuple update t Status -1
@@ -3856,7 +3900,7 @@ tuple {A1 b} is referred to by multiple tuples}\
 	    {Name Fred Status 30}\
 	    {Status 40 Name Alice}
     } -cleanup {
-	relvar destroy X
+	relvar unset X
     } -body {
 	relvar update X t {1} {
 	    tuple update t Status -1
@@ -3874,7 +3918,7 @@ tuple {A1 b} is referred to by multiple tuples}\
 	    {Name Fred Status 30}\
 	    {Status 40 Name Alice}
     } -cleanup {
-	relvar destroy X
+	relvar unset X
     } -body {
 	relvar update X t {1} {
 	    tuple update t Status -1
@@ -3902,7 +3946,7 @@ tuple {A1 b} is referred to by multiple tuples}\
 	    {Name Fred Status 30}\
 	    {Status 40 Name Alice}
     } -cleanup {
-	relvar destroy X
+	relvar unset X
     } -body {
 	relvar update X t {[tuple extract $t Name] eq "George"} {
 	    tuple update t Status -1
@@ -3920,7 +3964,7 @@ tuple {A1 b} is referred to by multiple tuples}\
 	    {Name Fred Status 30}\
 	    {Status 40 Name Alice}
     } -cleanup {
-	relvar destroy X
+	relvar unset X
     } -body {
 	relvar update X t {[tuple extract $t Name] eq "George"} {
 	    tuple update t Name Fred
@@ -3939,7 +3983,7 @@ tuple {A1 b} is referred to by multiple tuples}\
 	    {Name Fred Status 30}\
 	    {Status 40 Name Alice}
     } -cleanup {
-	relvar destroy X
+	relvar unset X
     } -body {
 	relvar updateone X {Name Jane} {Status -1}
     } -result {0}
@@ -3955,7 +3999,7 @@ tuple {A1 b} is referred to by multiple tuples}\
 	    {Name Fred Status 30}\
 	    {Status 40 Name Alice}
     } -cleanup {
-	relvar destroy X
+	relvar unset X
     } -body {
 	relvar updateone X {Name Fred} {Status -1}
     } -result {1}
@@ -3971,7 +4015,7 @@ tuple {A1 b} is referred to by multiple tuples}\
 	    {Name Fred Status 30}\
 	    {Status 40 Name Alice}
     } -cleanup {
-	relvar destroy X
+	relvar unset X
     } -body {
 	relvar updateone X {Name Fred} {Status -1}
 	relvar set X
@@ -3997,7 +4041,7 @@ tuple {A1 b} is referred to by multiple tuples}\
 	    {Name Fred Status 30}\
 	    {Status 40 Name Alice}
     } -cleanup {
-	relvar destroy X
+	relvar unset X
     } -body {
 	relvar updateone X {Status 20} {Name Jane}
     } -result {attributes do not constitute an identifier, "during identifier construction operation"}\
@@ -4014,7 +4058,7 @@ tuple {A1 b} is referred to by multiple tuples}\
 	    {Name Fred Status 30}\
 	    {Status 40 Name Alice}
     } -cleanup {
-	relvar destroy X
+	relvar unset X
     } -body {
 	relvar updateone X {Name George} {Name Fred}
     } -result {duplicate tuple, "{Name Fred Status 20}"} -returnCodes error

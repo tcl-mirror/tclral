@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.17 $
-$Date: 2006/07/01 23:56:31 $
+$Revision: 1.18 $
+$Date: 2006/07/09 03:48:13 $
  *--
  */
 
@@ -106,6 +106,7 @@ static int RelationForeachCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationGroupCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationHeadingCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationIdentifiersCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
+static int RelationIncludeCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationIntersectCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationIsCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationIsemptyCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
@@ -139,7 +140,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.17 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.18 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -177,6 +178,7 @@ relationCmd(
 	{"group", RelationGroupCmd},
 	{"heading", RelationHeadingCmd},
 	{"identifiers", RelationIdentifiersCmd},
+	{"include", RelationIncludeCmd},
 	{"intersect", RelationIntersectCmd},
 	{"is", RelationIsCmd},
 	{"isempty", RelationIsemptyCmd},
@@ -1049,6 +1051,45 @@ RelationIdentifiersCmd(
     }
 
     Tcl_SetObjResult(interp, idListObj) ;
+    return TCL_OK ;
+}
+
+static int
+RelationIncludeCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_Obj *relObj ;
+    Ral_Relation relation ;
+    Ral_Relation newRel ;
+
+    /* relation include relationValue ?name-value-list ...? */
+    if (objc < 3) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+	    "relationValue ?name-value-list ...?") ;
+	return TCL_ERROR ;
+    }
+
+    relObj = objv[2] ;
+    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relObj->internalRep.otherValuePtr ;
+
+    objc -= 3 ;
+    objv += 3 ;
+
+    newRel = Ral_RelationDup(relation) ;
+    Ral_RelationReserve(newRel, objc) ;
+    while (objc-- > 0) {
+	/*
+	 * Ignore any duplicate tuples.
+	 */
+	Ral_RelationInsertTupleObj(newRel, interp, *objv++, NULL) ;
+    }
+
+    Tcl_SetObjResult(interp, Ral_RelationObjNew(newRel)) ;
     return TCL_OK ;
 }
 

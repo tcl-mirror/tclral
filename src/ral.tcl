@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.10 $
-# $Date: 2006/07/07 01:57:57 $
+# $Revision: 1.11 $
+# $Date: 2006/07/09 03:48:13 $
 #  *--
 
 namespace eval ::ral {
@@ -61,6 +61,8 @@ namespace eval ::ral {
     namespace export loadFromMk
     namespace export dump
     namespace export dumpToFile
+    namespace export csv
+    namespace export csvToFile
 
     if {![catch {package require report}]} {
 	# Default report style for Tuple types
@@ -412,9 +414,9 @@ proc ::ral::loadFromMk {fileName {ns ::}} {
     }
     # determine the relvar names and types by reading the catalog
     ::mk::loop rvCursor db.__ral_relvar {
-	set relvarInfo [::mk::get $rvCursor]
+	array set relvarInfo [::mk::get $rvCursor]
 	namespace eval $ns [list ::ral::relvar create\
-	    [dict get $relvarInfo Name] [dict get $relvarInfo Heading]]
+	    $relvarInfo(Name) $relvarInfo(Heading)]
     }
     # create the association constraints
     ::mk::loop assocCursor db.__ral_association {
@@ -432,10 +434,10 @@ proc ::ral::loadFromMk {fileName {ns ::}} {
 		lappend subtypes $value
 	    }
 	}
-	set partValues [::mk::get $partCursor]
+	array set partValues [::mk::get $partCursor]
 	namespace eval $ns [list ::ral::relvar partition\
-	    [dict get $partValues Name] [dict get $partValues SupRelvar]\
-	    [dict get $partValues SupAttr] {expand}$subtypes]
+	    $partValues(Name) $partValues(SupRelvar)\
+	    $partValues(SupAttr) {expand}$subtypes]
     }
     # fetch the relation values from the views
     relvar eval {
@@ -492,6 +494,32 @@ proc ::ral::dumpToFile {fileName {ns {}}} {
     return
 }
 
+proc ::ral::csv {relValue {sortAttr {}} {noheading 0}} {
+    package require csv
+
+    set m [relation2matrix $relValue $sortAttr $noheading]
+    set gotErr [catch {::csv::report printmatrix $m} result]
+    $m destroy
+    if {$gotErr} {
+	error $result
+    }
+    return $result
+}
+
+proc ::ral::csvToFile {relValue fileName {sortAttr {}} {noheading 0}} {
+    package require csv
+
+    set m [relation2matrix $relValue $sortAttr $noheading]
+    set chan [::open $fileName w]
+    set gotErr [catch {::csv::report printmatrix2channel $m $chan} result]
+    $m destroy
+    ::close $chan
+    if {$gotErr} {
+	error $result
+    }
+    return
+}
+
 # PRIVATE PROCS
 
 # Add heading rows to the matrix.
@@ -512,18 +540,20 @@ proc ::ral::addHeading {matrix heading} {
     return
 }
 
-# Returns a dictionary mapping attribute names to a formatting function.
+# Returns a relation mapping attribute names to a formatting function.
 # Ordinary scalar values attributes are not contained in the mapping. Relation
-# and tuple valued attributes will be in the dictionary keyed by the attribute
+# and tuple valued attributes will be in the relation keyed by the attribute
 # name with values corresponding to the "relformat" or "tupleformat" command.
 proc ::ral::getFormatMap {heading} {
-    set attrReportMap [dict create]
+    set attrReportMap {Relation {AttrName string AttrFunc string} AttrName {}}
     foreach {name type} [lindex $heading 1] {
 	set typeKey [lindex $type 0]
 	if {$typeKey eq "Tuple"} {
-	    dict set attrReportMap $name ::ral::tupleformat
+	    set attrReportMap [relation include $attrReportMap\
+		    [list AttrName $name AttrFunc ::ral::tupleformat]]
 	} elseif {$typeKey eq "Relation"} {
-	    dict set attrReportMap $name ::ral::relformat
+	    set attrReportMap [relation include $attrReportMap\
+		    [list AttrName $name AttrFunc ::ral::relformat]]
 	}
     }
     return $attrReportMap
@@ -533,8 +563,10 @@ proc ::ral::getFormatMap {heading} {
 proc ::ral::addTuple {matrix tupleValue attrMap} {
     set values [list]
     foreach {attr value} [tuple get $tupleValue] {
-	if {[dict exists $attrMap $attr]} {
-	    set value [[dict get $attrMap $attr] $value]
+	set mapping [relation choose $attrMap AttrName $attr]
+	if {[relation isnotempty $mapping]} {
+	    set attrfunc [tuple extract [relation tuple $mapping] AttrFunc]
+	    set value [$attrfunc $value]
 	}
 	lappend values $value
     }
@@ -554,8 +586,7 @@ proc ::ral::getConstraint {cname} {
 	}
 	partition {
 	    lset cinfo 2 [namespace tail [lindex $cinfo 2]]
-	    set endIndex [expr {[llength $cinfo] - 4}]
-	    for {set index 4} {$index < $endIndex} {incr index 2} {
+	    for {set index 4} {$index < [llength $cinfo]} {incr index 2} {
 		lset cinfo $index [namespace tail [lindex $cinfo $index]]
 	    }
 	}

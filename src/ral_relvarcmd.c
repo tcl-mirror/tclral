@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.9 $
-$Date: 2006/07/01 23:56:31 $
+$Revision: 1.10 $
+$Date: 2006/07/09 03:48:13 $
  *--
  */
 
@@ -88,14 +88,14 @@ static int RelvarCreateCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarDeleteCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarDeleteOneCmd(Tcl_Interp *, int, Tcl_Obj *const*,
     Ral_RelvarInfo) ;
-static int RelvarDestroyCmd(Tcl_Interp *, int, Tcl_Obj *const*,
-    Ral_RelvarInfo) ;
 static int RelvarEvalCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarInsertCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarNamesCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarPartitionCmd(Tcl_Interp *, int, Tcl_Obj *const*,
     Ral_RelvarInfo) ;
 static int RelvarSetCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
+static int RelvarUnsetCmd(Tcl_Interp *, int, Tcl_Obj *const*,
+    Ral_RelvarInfo) ;
 static int RelvarUpdateCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarUpdateOneCmd(Tcl_Interp *, int, Tcl_Obj *const*,
     Ral_RelvarInfo) ;
@@ -111,7 +111,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.9 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.10 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -133,12 +133,12 @@ relvarCmd(
 	{"create", RelvarCreateCmd},
 	{"delete", RelvarDeleteCmd},
 	{"deleteone", RelvarDeleteOneCmd},
-	{"destroy", RelvarDestroyCmd},
 	{"eval", RelvarEvalCmd},
 	{"insert", RelvarInsertCmd},
 	{"names", RelvarNamesCmd},
 	{"partition", RelvarPartitionCmd},
 	{"set", RelvarSetCmd},
+	{"unset", RelvarUnsetCmd},
 	{"update", RelvarUpdateCmd},
 	{"updateone", RelvarUpdateOneCmd},
 	{NULL, NULL},
@@ -215,7 +215,7 @@ RelvarConstraintCmd(
 
     if (objc < 3) {
 	Tcl_WrongNumArgs(interp, 2, objv,
-	    "create | delete | info | names ?args?") ;
+	    "delete | info | names ?args?") ;
 	return TCL_ERROR ;
     }
 
@@ -233,15 +233,15 @@ RelvarConstraintCmd(
 	    result = Ral_RelvarObjConstraintDelete(interp,
 		Tcl_GetString(*objv++), rInfo) ;
 	    if (result != TCL_OK) {
-		break ;
+		return result ;
 	    }
 	}
-	return result ;
+	break ;
 
     /* relvar constraint info name */
     case ConstraintInfo:
 	if (objc != 4) {
-	    Tcl_WrongNumArgs(interp, 2, objv, "names") ;
+	    Tcl_WrongNumArgs(interp, 3, objv, "name") ;
 	    return TCL_ERROR ;
 	}
 	result = Ral_RelvarObjConstraintInfo(interp, objv[3], rInfo) ;
@@ -253,7 +253,7 @@ RelvarConstraintCmd(
 	const char *pattern ;
 
 	if (objc > 4) {
-	    Tcl_WrongNumArgs(interp, 2, objv, "names ?pattern?") ;
+	    Tcl_WrongNumArgs(interp, 3, objv, "?pattern?") ;
 	    return TCL_ERROR ;
 	}
 	pattern = objc == 3 ? "*" : Tcl_GetString(objv[3]) ;
@@ -444,34 +444,6 @@ RelvarDeleteOneCmd(
     if (result == TCL_OK) {
 	Tcl_SetObjResult(interp, Tcl_NewBooleanObj(deleted)) ;
     }
-    return result ;
-}
-
-static int
-RelvarDestroyCmd(
-    Tcl_Interp *interp,
-    int objc,
-    Tcl_Obj *const*objv,
-    Ral_RelvarInfo rInfo)
-{
-    int result = TCL_OK ;
-
-    /* relvar destroy ?relvar1 relvar2 ...? */
-    if (objc < 2) {
-	Tcl_WrongNumArgs(interp, 2, objv, "?relvar1 relvar2 ...?") ;
-	return TCL_ERROR ;
-    }
-
-    objc -= 2 ;
-    objv += 2 ;
-
-    while (objc-- > 0) {
-	result = Ral_RelvarObjDelete(interp, rInfo, *objv++) ;
-	if (result != TCL_OK) {
-	    break ;
-	}
-    }
-
     return result ;
 }
 
@@ -686,6 +658,34 @@ RelvarSetCmd(
     if (result == TCL_OK) {
 	Tcl_SetObjResult(interp, relvar->relObj) ;
     }
+    return result ;
+}
+
+static int
+RelvarUnsetCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv,
+    Ral_RelvarInfo rInfo)
+{
+    int result = TCL_OK ;
+
+    /* relvar unset ?relvar1 relvar2 ...? */
+    if (objc < 2) {
+	Tcl_WrongNumArgs(interp, 2, objv, "?relvar1 relvar2 ...?") ;
+	return TCL_ERROR ;
+    }
+
+    objc -= 2 ;
+    objv += 2 ;
+
+    while (objc-- > 0) {
+	result = Ral_RelvarObjDelete(interp, rInfo, *objv++) ;
+	if (result != TCL_OK) {
+	    break ;
+	}
+    }
+
     return result ;
 }
 
