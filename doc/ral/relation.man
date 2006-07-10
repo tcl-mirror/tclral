@@ -45,8 +45,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.2 $
-# $Date: 2006/04/27 14:48:56 $
+# $Revision: 1.3 $
+# $Date: 2006/07/10 01:17:43 $
 #  *--
 }]
 [moddesc "Relation Operators"]
@@ -531,6 +531,21 @@ The [cmd identifiers] subcommand returns the set of identifiers for the
 relation.
 The identifiers are returned as a list each element of which is in turn
 a list of attribute names that constitute the identifer.
+
+[call [cmd "::ral::relation include"] [arg relationValue]\
+    [opt "name-value-list1 name-value-list2 ..."]]
+
+The [cmd include] subcommand returns a new relation that has the same
+heading as [arg relationValue] and a body consisting of the body of
+[arg relationValue] with additional tuples formed by inserting the
+values given in the [arg name-value-listN] arguments.
+Each [arg name-value-list] argument consists of a list of alternating
+attribute names and attribute values.
+All attributes in the heading of [arg relationValue] must appear in
+each [arg name-value-list] argument.
+It is an error to attempt to include duplicate tuples in the relation.
+This is a convenience command that is useful when building relation values
+for other program data.
 
 [call [cmd "::ral::relation intersect"] [arg relationValue1]\
     [arg relationValue2] [opt "relationValue3 ..."]]

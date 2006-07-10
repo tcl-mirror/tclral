@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleobj.c,v $
-$Revision: 1.9 $
-$Date: 2006/07/01 23:56:31 $
+$Revision: 1.10 $
+$Date: 2006/07/10 01:17:44 $
  *--
  */
 
@@ -108,7 +108,7 @@ Tcl_ObjType Ral_TupleObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tupleobj.c,v $ $Revision: 1.9 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tupleobj.c,v $ $Revision: 1.10 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -286,11 +286,17 @@ Ral_TupleSetFromObj(
     if (Tcl_ListObjGetElements(interp, objPtr, &elemc, &elemv) != TCL_OK) {
 	return TCL_ERROR ;
     }
+    /*
+     * We must have attribute name / value pairs.
+     */
     if (elemc % 2 != 0) {
 	Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_BAD_PAIRS_LIST, objPtr) ;
 	Ral_InterpSetError(interp, errInfo) ;
 	return TCL_ERROR ;
     }
+    /*
+     * Make sure we get the correct number of attributes.
+     */
     if (elemc / 2 != Ral_TupleDegree(tuple)) {
 	Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_WRONG_NUM_ATTRS, objPtr) ;
 	Ral_InterpSetError(interp, errInfo) ;
@@ -298,8 +304,8 @@ Ral_TupleSetFromObj(
     }
     /*
      * Go through the attribute / value pairs making sure that that each
-     * attribute is mentioned exactly once.  We use a vector to keep track of
-     * this.
+     * attribute is known and mentioned no more than once.  We use a vector to
+     * keep track of this.
      */
     attrStatus = Ral_IntVectorNew(Ral_TupleDegree(tuple), 0) ;
     for ( ; elemc > 0 ; elemc -= 2, elemv += 2) {
@@ -315,6 +321,12 @@ Ral_TupleSetFromObj(
 	}
 	Ral_IntVectorStore(attrStatus, hindex, 1) ;
     }
+    /*
+     * At this point we know that all the attributes are accounted for because
+     * we insisted that the number of attributes match the number in the tuple
+     * heading, that all of them are found in the tuple heading and that no
+     * duplicates were among them.
+     */
     Ral_IntVectorDelete(attrStatus) ;
 
     /*

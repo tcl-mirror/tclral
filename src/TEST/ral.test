@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.22 $
-# $Date: 2006/07/09 03:48:13 $
+# $Revision: 1.23 $
+# $Date: 2006/07/10 01:17:44 $
 #  *--
 
 package require tcltest 2.2
@@ -1349,15 +1349,14 @@ namespace eval ::ral::test {
 	    {S# S1 SNAME Jones STATUS 20 CITY Madrid}\
 	    {S# S3 SNAME Elm STATUS 30 CITY Athens}\
 	    {S# S1 SNAME Jones STATUS 20 CITY Madrid}
-    } -result {
-	Relation
-	{S# string SNAME string STATUS int CITY string}
-	S#
-	{
-	    {S# S1 SNAME Jones STATUS 20 CITY Madrid}
-	    {S# S3 SNAME Elm STATUS 30 CITY Athens}
-	}
-    } -match relation
+    } -result {duplicate tuple, "S# S1 SNAME Jones STATUS 20 CITY Madrid"}\
+    -returnCodes error
+
+    test relation-include-4.0 {bad tuple} -body {
+	relation include [relation emptyof $S]\
+	    {S# S1 SNAME Jones STATUS 20}
+    } -result {wrong number of attributes specified, "S# S1 SNAME Jones STATUS 20"}\
+    -returnCodes error
 
     # relation intersect subcommand
     test relation-intersect-1.0 {dum relation} -body {

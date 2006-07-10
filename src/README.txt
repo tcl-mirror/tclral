@@ -1,3 +1,11 @@
+========= ral 0.8 =========
+Version 0.8 is a complete refactoring and rewrite of the extension.
+The source has been split among many files and there was a concerted
+attempt to have an internal "C" API separated from the Tcl portions.
+The biggest new feature is support for referential integrity constraints.
+Support for virtual relvars (i.e. views) has been removed, but may come
+back later when whole area is better understood.
+
 ========= ral 0.7 =========
 Organization of the source code did not change in this version. It is still a
 single (albeit rather large) "C" file. The "relformat" utility is also still

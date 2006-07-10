@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.18 $
-$Date: 2006/07/09 03:48:13 $
+$Revision: 1.19 $
+$Date: 2006/07/10 01:17:44 $
  *--
  */
 
@@ -140,7 +140,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.18 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.19 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -1063,6 +1063,7 @@ RelationIncludeCmd(
     Tcl_Obj *relObj ;
     Ral_Relation relation ;
     Ral_Relation newRel ;
+    Ral_ErrorInfo errInfo ;
 
     /* relation include relationValue ?name-value-list ...? */
     if (objc < 3) {
@@ -1082,11 +1083,17 @@ RelationIncludeCmd(
 
     newRel = Ral_RelationDup(relation) ;
     Ral_RelationReserve(newRel, objc) ;
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptInclude) ;
     while (objc-- > 0) {
 	/*
-	 * Ignore any duplicate tuples.
+	 * Enforce insert style semantics, i.e. we error out on duplicates
+	 * and other inconsistencies.
 	 */
-	Ral_RelationInsertTupleObj(newRel, interp, *objv++, NULL) ;
+	if (Ral_RelationInsertTupleObj(newRel, interp, *objv++, &errInfo)
+	    != TCL_OK) {
+	    Ral_RelationDelete(newRel) ;
+	    return TCL_ERROR ;
+	}
     }
 
     Tcl_SetObjResult(interp, Ral_RelationObjNew(newRel)) ;

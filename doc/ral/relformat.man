@@ -1,8 +1,8 @@
 [manpage_begin relformat n 0.8]
 [comment {
-# This software is copyrighted 2004 by G. Andrew Mangogna.  The following
-# terms apply to all files associated with the software unless explicitly
-# disclaimed in individual files.
+# This software is copyrighted 2004, 2005, 2006 by G. Andrew Mangogna.
+# The following terms apply to all files associated with the software unless
+# explicitly disclaimed in individual files.
 # 
 # The authors hereby grant permission to use, copy, modify, distribute,
 # and license this software and its documentation for any purpose, provided
@@ -47,25 +47,30 @@
 #   Relformat is part of the TCLRAL package.
 # 
 # $RCSfile: relformat.man,v $
-# $Revision: 1.1 $
-# $Date: 2006/04/09 01:35:47 $
+# $Revision: 1.2 $
+# $Date: 2006/07/10 01:17:44 $
 #  *--
 }]
 [moddesc "Relation formatting"]
 [titledesc "Text formatting for relations"]
-[copyright "2004 by G. Andrew Mangogna"]
+[copyright "2004, 2005, 2006 by G. Andrew Mangogna"]
 [require ral 0.8]
 [description]
-This manpage describes the
-[cmd relformat]
-command.
-The
-[cmd relformat]
-command is part of the Tcl Relational Algebra Library (ral) package.
+This manpage describes a set of commands that are used for
+generating text output of relation and tuple values.
+These commands are part of the Tcl Relational Algebra Library (ral) package.
+
+[section DEPENDENCIES]
+The commands described here depend upon access to the [package matrix]
+and [package csv] packages of the Tcl standard library.
+If your installation does not include [emph tcllib] then these commands
+will not be available to you.
 
 [section COMMANDS]
 [list_begin definitions]
-[call [cmd "::ral::relformat"] [arg relationValue] [opt title]]
+[call [cmd "::ral::relformat"] [arg relationValue] [opt title] [opt sortAttrs]\
+    [opt noheading]]
+
 The [cmd relformat] command returns a string that contains a human
 readable form of the relation given by [arg relationValue].
 [cmd Relformat] is intended to be to relations what the [cmd parray]
@@ -75,28 +80,136 @@ Rather than writing the output directly to a channel,
 [cmd relformat] returns it as a string.
 The returned string does not have a trailing newline character and so
 is suitable for handing directly to [cmd puts].
-If the optional [arg title] argument is present, then it becomes
-the first line of the output effectively giving a title to the relation.
+If the optional [arg title] argument is present, then it is used
+as a caption at the bottom of the relation printout.
+If the options [arg sortAttrs] argument is given then the relation is
+sorted by the list of attributes in [arg sortAttrs] before being displayed.
+If the [arg noheading] argument is set to 1, then two rows of attribute
+name and attribute type that by default are placed as a heading of the output
+are omitted.
+As a visual convenience, any attribute that is part of an identifier
+has its column delimited by an equal sign (=).
 
 [example {
-% puts [relformat [relvar set DOG] DOG]
-DOG
+% puts [relformat $::DOG Dog]
++=======+---------+
+|DogName|Breed    |
+|string |string   |
++=======+---------+
+|Fido   |Poodle   |
+|Sam    |Collie   |
+|Spot   |Terrier  |
+|Rover  |Retriever|
+|Fred   |Spaniel  |
+|Jumper |Mutt     |
++=======+---------+
+Dog
 ---
-DogName      Breed
- string     string
-==================
-   Fido     Poodle
-    Sam     Collie
-   Spot    Terrier
-  Rover  Retriever
-   Fred    Spaniel
- Jumper       Mutt
+% puts [relformat $::OWNERSHIP Ownership {DogName Acquired}]
++=========+=======+--------+
+|OwnerName|DogName|Acquired|
+|string   |string |string  |
++=========+=======+--------+
+|Sue      |Fido   |2001    |
+|George   |Fido   |2001    |
+|Jim      |Fred   |2003    |
+|Mike     |Rover  |2002    |
+|Sue      |Sam    |2000    |
+|George   |Sam    |2000    |
+|Alice    |Spot   |2001    |
++=========+=======+--------+
+Ownership
+---------
+% puts [relformat $::OWNER Owner "" 1]
++======+--+-------------+
+|Sue   |24|Cupertino    |
+|George|35|Sunnyvale    |
+|Alice |30|San Jose     |
+|Mike  |50|San Jose     |
+|Jim   |42|San Francisco|
++======+--+-------------+
+Owner
+-----
+% puts [relformat [relation group $::OWNERSHIP Owners OwnerName] "" DogName]
++=======+--------+-----------+
+|DogName|Acquired|Owners     |
+|string |string  |Relation   |
++=======+--------+-----------+
+|Fido   |2001    |+=========+|
+|       |        ||OwnerName||
+|       |        ||string   ||
+|       |        |+=========+|
+|       |        ||Sue      ||
+|       |        ||George   ||
+|       |        |+=========+|
+|Fred   |2003    |+=========+|
+|       |        ||OwnerName||
+|       |        ||string   ||
+|       |        |+=========+|
+|       |        ||Jim      ||
+|       |        |+=========+|
+|Rover  |2002    |+=========+|
+|       |        ||OwnerName||
+|       |        ||string   ||
+|       |        |+=========+|
+|       |        ||Mike     ||
+|       |        |+=========+|
+|Sam    |2000    |+=========+|
+|       |        ||OwnerName||
+|       |        ||string   ||
+|       |        |+=========+|
+|       |        ||Sue      ||
+|       |        ||George   ||
+|       |        |+=========+|
+|Spot   |2001    |+=========+|
+|       |        ||OwnerName||
+|       |        ||string   ||
+|       |        |+=========+|
+|       |        ||Alice    ||
+|       |        |+=========+|
++=======+--------+-----------+
 }]
 
 
+[call [cmd "::ral::tuple2matrix"] [arg tupleValue] [opt noheading]]
+
+The [cmd tuple2matrix] command returns a matrix containing the values
+in [arg tupleValue].
+The matrix is created using the [package struct] from the standard
+Tcl library.
+By default, the first two rows of the matrix contain the attribute
+names and types.
+Setting the [arg noheading] argument to 1,
+removes those rows from the returned matrix.
+It is the responsibility of the caller to [cmd destroy] the matrix
+when done with it.
+
+[call [cmd "::ral::relation2matrix"] [arg relationValue] [opt sortAttr]\
+	[opt noheading]]
+
+The [cmd relation2matrix] command returns a matrix containing the values
+in [arg relationValue].
+The matrix is created using the [package struct] from the standard
+Tcl library.
+If present, the [arg sortAttr] argument is a list of attributes
+that are used to sort the values before placing in the matrix.
+By default, the first two rows of the matrix contain the attribute
+names and types.
+Setting the [arg noheading] argument to 1,
+removes those rows from the returned matrix.
+It is the responsibility of the caller to [cmd destroy] the matrix
+when done with it.
+
+[call [cmd "::ral::csv"] [arg relationValue] [opt sortAttr] [opt noheading]]
+[call [cmd "::ral::csvToFile"] [arg relationValue] [arg fileName]\
+	[opt sortAttr] [opt noheading]]
+
+[call [cmd "::ral::tupleAsTable"] [opt capRows]]
+[call [cmd "::ral::relationAsTable"] [opt idCols] [opt capRows]]
+
 [list_end]
 
-[see_also relvar relation]
+[see_also relvar relation tuple]
 
 [keywords tuple relation relvar]
 

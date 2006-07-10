@@ -1,8 +1,9 @@
 DOCS =\
-    relation\
     relvar\
+    relation\
     tuple\
     relformat\
+    serialize\
     $(NULL)
 
 SRCS = $(patsubst %,ral/%.man,$(DOCS))

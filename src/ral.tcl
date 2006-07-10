@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.11 $
-# $Date: 2006/07/09 03:48:13 $
+# $Revision: 1.12 $
+# $Date: 2006/07/10 01:17:44 $
 #  *--
 
 namespace eval ::ral {
@@ -304,7 +304,7 @@ proc ::ral::deserialize {value {ns ::}} {
 
 proc ::ral::deserializeFromFile {fileName {ns {}}} {
     set chan [::open $fileName r]
-    set gotErr [catch {deserialize [read $chan]} result]
+    set gotErr [catch {deserialize [read $chan] $ns} result]
     ::close $chan
     if {$gotErr} {
 	error $result
@@ -407,6 +407,9 @@ proc ::ral::loadFromMk {fileName {ns ::}} {
 	error "Cannot find TclRAL catalogs in \"$fileName\":\
 	    file may not contain relvar information"
     }
+    set result [tuple create\
+	{Version string Date string Comment string}\
+	[::mk::get db.__ral_version!0]]
     set verNum [::mk::get db.__ral_version!0 Version]
     if {![package vsatisfies [package require ral] $verNum]} {
 	error "incompatible version number, \"$verNum\",\
@@ -452,6 +455,7 @@ proc ::ral::loadFromMk {fileName {ns ::}} {
     }
 
     ::mk::file close db
+    return $result
 }
 
 proc ::ral::dump {{ns {}}} {
