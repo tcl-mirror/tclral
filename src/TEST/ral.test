@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.23 $
-# $Date: 2006/07/10 01:17:44 $
+# $Revision: 1.24 $
+# $Date: 2006/07/11 02:04:31 $
 #  *--
 
 package require tcltest 2.2
@@ -3174,7 +3174,8 @@ namespace eval ::ral::test {
     } -body {
 	relvar insert A {A1 b A2 42}
     } -result {for association R1(::ral::test::A [1] ==> [1] ::ral::test::B), in relvar ::ral::test::A
-tuple {A1 b A2 42} references no tuple} -returnCodes error
+tuple {A1 b A2 42} references no tuple
+} -returnCodes error
 
     test relvar-association-1.3 {one to one -- fail referred to} -setup {
 	relvar create A {Relation {A1 string A2 int} A1}
@@ -3186,7 +3187,8 @@ tuple {A1 b A2 42} references no tuple} -returnCodes error
     } -body {
 	relvar insert B {B1 b B2 bar}
     } -result {for association R1(::ral::test::A [1] ==> [1] ::ral::test::B), in relvar ::ral::test::B
-tuple {B1 b B2 bar} is not referenced by any tuple} -returnCodes error
+tuple {B1 b B2 bar} is not referenced by any tuple
+} -returnCodes error
 
     test relvar-association-2.1 {one conditional to one} -setup {
 	relvar create C {Relation {C1 string C2 int} C1}
@@ -3218,7 +3220,8 @@ tuple {B1 b B2 bar} is not referenced by any tuple} -returnCodes error
 	    relvar insert C {C1 c C2 42}
 	}
     } -result {for association R2(::ral::test::C [?] ==> [1] ::ral::test::D), in relvar ::ral::test::C
-tuple {C1 c C2 42} references no tuple} -returnCodes error
+tuple {C1 c C2 42} references no tuple
+} -returnCodes error
 
     test relvar-association-3.1 {one conditional to one conditional} -setup {
 	relvar create C {Relation {C1 string C2 int} C1}
@@ -3271,7 +3274,8 @@ tuple {C1 c C2 42} references no tuple} -returnCodes error
 	    relvar insert B {B1 b B2 foo}
 	}
     } -result {for association R1(::ral::test::A [+] ==> [1] ::ral::test::B), in relvar ::ral::test::A
-tuple {A1 d BID c} references no tuple} -returnCodes error
+tuple {A1 d BID c} references no tuple
+} -returnCodes error
 
     test relvar-association-4.3 {many to one -- fail referred to} -setup {
 	relvar create A {Relation {A1 string BID string} A1}
@@ -3291,7 +3295,8 @@ tuple {A1 d BID c} references no tuple} -returnCodes error
 	    relvar insert B {B1 c B2 foo}
 	}
     } -result {for association R1(::ral::test::A [+] ==> [1] ::ral::test::B), in relvar ::ral::test::B
-tuple {B1 c B2 foo} is not referenced by any tuple} -returnCodes error
+tuple {B1 c B2 foo} is not referenced by any tuple
+} -returnCodes error
 
     test relvar-association-5.1 {many conditional to one} -setup {
 	relvar create A {Relation {A1 string BID string} A1}
@@ -3379,6 +3384,20 @@ tuple {B1 c B2 foo} is not referenced by any tuple} -returnCodes error
     } -cleanup {
 	relvar unset A B
     } -result {referred to identifiers can not have non-singular multiplicities, "*"} -returnCodes error
+
+    test relvar-association-7.1 {ordering in compound identifiers} -setup {
+	relvar create A {Relation {A1 string B1ID string B2ID string} A1}
+	relvar create B {Relation {B1 string B2 string} {{B1 B2}}}
+	relvar association R1 A {B2ID B1ID} + B {B2 B1} 1
+    } -body {
+	relvar eval {
+	    relvar insert A {A1 a1 B1ID b1 B2ID b2}
+	    relvar insert B {B1 b1 B2 b2}
+	}
+    } -cleanup {
+	relvar constraint delete R1
+	relvar unset A B
+    } -result {Relation {B1 string B2 string} {{B1 B2}} {{B1 b1 B2 b2}}}
 
     # relvar constraint subcommand
     test relvar-constraint-1.1 {constraint names} -setup {
@@ -3564,6 +3583,17 @@ tuple {B1 c B2 foo} is not referenced by any tuple} -returnCodes error
     } -result {attributes do not constitute an identifier, "A2"}\
     -returnCodes error
 
+    test relvar-partition-1.5 {compound reference} -setup {
+	relvar create A {Relation {A1 string A2 string A3 int} {{A1 A2}}}
+	relvar create B {Relation {A1 string A2 string B1 string} {{A1 A2}}}
+	relvar create C {Relation {A1 string A2 string C1 string} {{A1 A2}}}
+    } -cleanup {
+	relvar constraint delete R1
+	relvar unset A B C
+    } -body {
+	relvar partition R1 A {A1 A2} B {A1 A2} C {A1 A2}
+    } -result {}
+
     test relvar-partition-2.1 {passes constraints} -setup {
 	relvar create A {Relation {A1 string} A1}
 	relvar create B {Relation {B1 string} B1}
@@ -3594,8 +3624,8 @@ tuple {B1 c B2 foo} is not referenced by any tuple} -returnCodes error
 	    relvar insert B {B1 b}
 	}
     } -result {for partition R1(::ral::test::A is partitioned [::ral::test::B | ::ral::test::C]), in relvar ::ral::test::A
-tuple {A1 c} is not referred to by any tuple}\
-    -returnCodes error
+tuple {A1 c} is not referred to by any tuple
+} -returnCodes error
 
     test relvar-partition-2.3 {extra super type reference} -setup {
 	relvar create A {Relation {A1 string} A1}
@@ -3612,8 +3642,8 @@ tuple {A1 c} is not referred to by any tuple}\
 	    relvar insert C {C1 b}
 	}
     } -result {for partition R1(::ral::test::A is partitioned [::ral::test::B | ::ral::test::C]), in relvar ::ral::test::A
-tuple {A1 b} is referred to by multiple tuples}\
-    -returnCodes error
+tuple {A1 b} is referred to by multiple tuples
+} -returnCodes error
 
     # relvar set subcommand
     test relvar-set-1.0 {simple assignment} -body {

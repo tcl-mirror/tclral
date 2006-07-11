@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.c,v $
-$Revision: 1.6 $
-$Date: 2006/07/01 23:56:31 $
+$Revision: 1.7 $
+$Date: 2006/07/11 02:04:31 $
  *--
  */
 
@@ -109,7 +109,7 @@ Ral_RelvarError Ral_RelvarLastError = RELVAR_OK ;
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.6 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.7 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -781,13 +781,6 @@ relvarAssocConstraintEval(
      * Clean out the tuple matches from the join map.
      */
     Ral_JoinMapTupleEmpty(association->referenceMap) ;
-    /*
-     * Get rid of the trailing newline.
-     */
-    if (errMsg &&
-	*(Tcl_DStringValue(errMsg) + Tcl_DStringLength(errMsg) - 1) == '\n') {
-	Tcl_DStringSetLength(errMsg, Tcl_DStringLength(errMsg) - 1) ;
-    }
 
     return ref_result && refTo_result ;
 }
@@ -906,13 +899,6 @@ relvarPartitionConstraintEval(
     Ral_IntVectorDelete(multViolations) ;
     Ral_IntVectorDelete(condViolations) ;
     Ral_IntVectorDelete(superMatches) ;
-    /*
-     * Get rid of the trailing newline.
-     */
-    if (errMsg &&
-	*(Tcl_DStringValue(errMsg) + Tcl_DStringLength(errMsg) - 1) == '\n') {
-	Tcl_DStringSetLength(errMsg, Tcl_DStringLength(errMsg) - 1) ;
-    }
     return result ;
 }
 

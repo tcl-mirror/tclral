@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_joinmap.c,v $
-$Revision: 1.4 $
-$Date: 2006/05/13 01:10:13 $
+$Revision: 1.5 $
+$Date: 2006/07/11 02:04:31 $
  *--
  */
 
@@ -89,7 +89,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_joinmap.c,v $ $Revision: 1.4 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_joinmap.c,v $ $Revision: 1.5 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -325,6 +325,43 @@ Ral_JoinMapFindAttr(
     }
 
     return -1 ;
+}
+
+static int
+attr_0_cmp(
+    void const *m1,
+    void const *m2)
+{
+    const Ral_JoinMapValueType *a1 = m1 ;
+    const Ral_JoinMapValueType *a2 = m2 ;
+
+    return a1->m[0] - a2->m[0] ;
+}
+
+static int
+attr_1_cmp(
+    void const *m1,
+    void const *m2)
+{
+    Ral_JoinMapValueType const *a1 = m1 ;
+    Ral_JoinMapValueType const *a2 = m2 ;
+
+    return a1->m[1] - a2->m[1] ;
+}
+
+void
+Ral_JoinMapSortAttr(
+    Ral_JoinMap map,
+    int offset)
+{
+    static int (* const cmpFuncs[])(void const *, void const *) =
+    {
+	attr_0_cmp,
+	attr_1_cmp,
+    } ;
+    assert(offset < MAP_ELEMENT_COUNT) ;
+    qsort(map->attrStart, map->attrFinish - map->attrStart,
+	sizeof(Ral_JoinMapValueType), cmpFuncs[offset]) ;
 }
 
 /*

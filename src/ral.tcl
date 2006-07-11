@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.12 $
-# $Date: 2006/07/10 01:17:44 $
+# $Revision: 1.13 $
+# $Date: 2006/07/11 02:04:31 $
 #  *--
 
 namespace eval ::ral {
@@ -394,6 +394,7 @@ proc ::ral::storeToMk {fileName {ns {}}} {
     }
 
     ::mk::file close db
+    return
 }
 
 proc ::ral::loadFromMk {fileName {ns ::}} {

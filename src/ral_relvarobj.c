@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.8 $
-$Date: 2006/06/24 18:07:38 $
+$Revision: 1.9 $
+$Date: 2006/07/11 02:04:31 $
  *--
  */
 
@@ -101,7 +101,7 @@ EXTERNAL DATA DEFINITIONS
 STATIC DATA ALLOCATION
 */
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.8 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.9 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -439,6 +439,10 @@ Ral_RelvarObjCreateAssoc(
 	Ral_JoinMapDelete(refMap) ;
 	return TCL_ERROR ;
     }
+    /*
+     * Sort the join map attributes to match the identifier order.
+     */
+    Ral_JoinMapSortAttr(refMap, 1) ;
 
     constraint = Ral_ConstraintAssocCreate(name, info) ;
     if (constraint == NULL) {
@@ -549,7 +553,6 @@ Ral_RelvarObjCreatePartition(
 	    Ral_IntVectorDelete(superAttrs) ;
 	    return TCL_ERROR ;
 	}
-	++supElemv ;
     }
     if (Ral_RelationHeadingFindIdentifier(superRel->heading, superAttrs) < 0) {
 	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptPartition,
@@ -632,17 +635,20 @@ Ral_RelvarObjCreatePartition(
 	subth = subRel->heading->tupleHeading ;
 	supAttrIter = Ral_IntVectorBegin(superAttrs) ;
 	while (subElemc-- > 0) {
-	    int attrIndex =
-		Ral_TupleHeadingIndexOf(subth, Tcl_GetString(*subElemv)) ;
+	    const char *attrName = Tcl_GetString(*subElemv++) ;
+	    int attrIndex = Ral_TupleHeadingIndexOf(subth, attrName) ;
 
 	    if (attrIndex < 0) {
-		Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptPartition,
-		    RAL_ERR_UNKNOWN_ATTR, *subElemv) ;
+		Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptPartition,
+		    RAL_ERR_UNKNOWN_ATTR, attrName) ;
 		goto errorOut ;
 	    }
 	    Ral_JoinMapAddAttrMapping(refMap, attrIndex, *supAttrIter++) ;
-	    ++subElemv ;
 	}
+	/*
+	 * Sort the join map based on the super type identifier.
+	 */
+	Ral_JoinMapSortAttr(refMap, 1) ;
 	Ral_RelvarStartCommand(info, sub) ;
 	Ral_PtrVectorPushBack(sub->constraints, constraint) ;
     }
