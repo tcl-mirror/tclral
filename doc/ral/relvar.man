@@ -45,8 +45,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: relvar.man,v $
-# $Revision: 1.2 $
-# $Date: 2006/07/09 03:48:13 $
+# $Revision: 1.3 $
+# $Date: 2006/07/11 04:18:18 $
 #  *--
 }]
 [moddesc "Relvar Operators"]
@@ -283,7 +283,15 @@ After deleting Mike
 }]
 
 
-[call [cmd "::ral::relvar eval"]]
+[call [cmd "::ral::relvar eval"] [arg arg] [opt "arg ..."]]
+
+The [cmd eval] subcommand concatenates it arguments together and evaluates
+the resulting script as a relvar transaction.
+Enforcement of relvar constraints takes place at the end of the script.
+If either the script creates an error or if the constraint test on the
+modified relvars fail,
+then the relvar values are restored to their state before the script
+was executed.
 
 [call [cmd "::ral::relvar insert"] [arg relationVariable]\
     [opt "name-value-list ..."]]

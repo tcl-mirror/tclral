@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.10 $
-$Date: 2006/07/09 03:48:13 $
+$Revision: 1.11 $
+$Date: 2006/07/11 04:18:18 $
  *--
  */
 
@@ -111,7 +111,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.10 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.11 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -454,22 +454,26 @@ RelvarEvalCmd(
     Tcl_Obj *const*objv,
     Ral_RelvarInfo rInfo)
 {
-    Tcl_Obj *scriptObj ;
+    Tcl_Obj *objPtr ;
     int result ;
 
-    /* relvar eval script */
-    if (objc != 3) {
-	Tcl_WrongNumArgs(interp, 2, objv, "script") ;
+    /* relvar eval arg ?arg ...? */
+    if (objc < 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "arg ?arg ...?") ;
 	return TCL_ERROR ;
     }
-    scriptObj = objv[2] ;
 
     Ral_RelvarStartTransaction(rInfo, 0) ;
 
-    result = Tcl_EvalObjEx(interp, scriptObj, 0) ;
+    /*
+     * Do not need to worry about deleting the return from Tcl_ConcatObj().
+     * Tcl_EvalObjEx will do that after evaluating it.
+     */
+    objPtr = objc == 3 ? objv[2] : Tcl_ConcatObj(objc - 2, objv + 2) ;
+    result = Tcl_EvalObjEx(interp, objPtr, 0) ;
     if (result == TCL_ERROR) {
 	static const char msgfmt[] =
-	    "\n    (\"relvar eval\" body line %d)" ;
+	    "\n    (\"in ::ral::relvar eval\" body line %d)" ;
 	char msg[sizeof(msgfmt) + TCL_INTEGER_SPACE] ;
 	sprintf(msg, msgfmt, interp->errorLine) ;
 	Tcl_AddObjErrorInfo(interp, msg, -1) ;
