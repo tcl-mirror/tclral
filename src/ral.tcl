@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.13 $
-# $Date: 2006/07/11 02:04:31 $
+# $Revision: 1.14 $
+# $Date: 2006/07/12 01:41:49 $
 #  *--
 
 namespace eval ::ral {
@@ -94,7 +94,10 @@ namespace eval ::ral {
 	namespace export relationAsTable
     }
 
-    variable reportCounter 0
+    variable reportCounter 0 ; # used to make unique names
+    # Maximum width of a column that holds a scalar value.
+    # Relation and Tuple values are always shown in their "normal" width.
+    variable maxColLen 30
 }
 
 # Convert a tuple into a matrix.
@@ -123,8 +126,8 @@ proc ::ral::relation2matrix {relValue {sortAttr {}} {noheading 0}} {
     if {!$noheading} {
 	addHeading $m $heading
     }
-    relation foreach t $relValue -ascending $sortAttr {
-	addTuple $m $t $attrReportMap
+    relation foreach r $relValue -ascending $sortAttr {
+	addTuple $m [relation tuple $r] $attrReportMap
     }
 
     return $m
@@ -232,8 +235,8 @@ proc ::ral::serialize {{ns {}}} {
     set bodies [list]
     foreach name $names {
 	set body [list]
-	relation foreach t [relvar set $name] {
-	    lappend body [tupleValue $t]
+	relation foreach r [relvar set $name] {
+	    lappend body [tupleValue [relation tuple $r]]
 	}
 	lappend bodies [list [namespace tail $name] $body]
     }
@@ -386,9 +389,9 @@ proc ::ral::storeToMk {fileName {ns {}}} {
     foreach name $names {
 	set simpleName [namespace tail $name]
 	::mk::cursor create cursor db.$simpleName 0
-	relation foreach t [relvar set $name] {
+	relation foreach r [relvar set $name] {
 	    ::mk::row insert $cursor
-	    mkStoreTuple $cursor $t
+	    mkStoreTuple $cursor [relation tuple $r]
 	    ::mk::cursor incr cursor
 	}
     }
@@ -479,9 +482,9 @@ proc ::ral::dump {{ns {}}} {
     # perform the inserts inside of a transaction.
     append result "::ral::relvar eval \{\n"
     foreach name $names {
-	relation foreach t [relvar set $name] {
+	relation foreach r [relvar set $name] {
 	    append result "::ral::relvar insert [namespace tail $name]\
-		[list [tupleValue $t]]\n"
+		[list [tupleValue [relation tuple $r]]]\n"
 	}
     }
     append result "\}"
@@ -572,6 +575,15 @@ proc ::ral::addTuple {matrix tupleValue attrMap} {
 	if {[relation isnotempty $mapping]} {
 	    set attrfunc [tuple extract [relation tuple $mapping] AttrFunc]
 	    set value [$attrfunc $value]
+	} else {
+	    # Limit the width of scalar values. We use the "textutil"
+	    # package to wrap the text to "maxColLen" characters.
+	    variable maxColLen
+	    if {[string length $value] > $maxColLen} {
+		package require textutil
+		set value [::textutil::adjust $value -justify left\
+		    -length $maxColLen -strictlength true]
+	    }
 	}
 	lappend values $value
     }
@@ -622,8 +634,8 @@ proc ::ral::tupleValue {tuple} {
 
 proc ::ral::relationValue {relation} {
     set result [list]
-    relation foreach t $relation {
-	lappend result [tupleValue $t]
+    relation foreach r $relation {
+	lappend result [tupleValue [relation tuple $r]]
     }
 
     return $result
@@ -669,8 +681,8 @@ proc ::ral::mkStoreTuple {cursor tuple} {
 proc ::ral::mkStoreRelation {cursor relation} {
     ::mk::cursor create relCursor $cursor 0
     ::mk::row insert $relCursor [relation cardinality $relation]
-    relation foreach t $relation {
-	mkStoreTuple $relCursor $t
+    relation foreach r $relation {
+	mkStoreTuple $relCursor [relation tuple $r]
 	::mk::cursor incr relCursor
     }
     return

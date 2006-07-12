@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.17 $
-$Date: 2006/06/24 18:07:38 $
+$Revision: 1.18 $
+$Date: 2006/07/12 01:41:49 $
  *--
  */
 
@@ -113,7 +113,7 @@ static Ral_RelationIter sortBegin ;
 static Ral_IntVector sortAttrs ;
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.17 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.18 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -1432,12 +1432,18 @@ Ral_RelationFindJoinTuples(
 	 * For this case, the identifier given by "idNum" matches the 1st
 	 * attribute vector in the join map and is an identifier of "r1".  Find
 	 * the tuples in "r2" that match the attributes in the second attribute
-	 * vector of the join map. The resulting map is place back into "map".
+	 * vector of the join map. The resulting map is placed back into "map".
 	 */
 	Ral_RelationIter r2Iter ;
 	Ral_RelationIter r2Begin = Ral_RelationBegin(r2) ;
 	Ral_RelationIter r2End = Ral_RelationEnd(r2) ;
-	Ral_IntVector refAttrs = Ral_JoinMapGetAttr(map, 1) ;
+	Ral_IntVector refAttrs ;
+	/*
+	 * Sort the attributes in the 1st attribute vector to match
+	 * the same order as the identifer.
+	 */
+	Ral_JoinMapSortAttr(map, 0) ;
+	refAttrs = Ral_JoinMapGetAttr(map, 1) ;
 	/*
 	 * Iterate through the tuples in r2, and find and find any corresponding
 	 * match in r1, based on the ID given by idNum.
@@ -1463,7 +1469,13 @@ Ral_RelationFindJoinTuples(
 	    Ral_RelationIter r1Iter ;
 	    Ral_RelationIter r1Begin = Ral_RelationBegin(r1) ;
 	    Ral_RelationIter r1End = Ral_RelationEnd(r1) ;
-	    Ral_IntVector refAttrs = Ral_JoinMapGetAttr(map, 0) ;
+	    Ral_IntVector refAttrs ;
+	    /*
+	     * Sort the attributes in the 2nd attribute vector to match
+	     * the same order as the identifer.
+	     */
+	    Ral_JoinMapSortAttr(map, 1) ;
+	    refAttrs = Ral_JoinMapGetAttr(map, 0) ;
 	    /*
 	     * Iterate through the tuples in r1, and find any corresponding
 	     * match in r2, based on the ID given by idNum.

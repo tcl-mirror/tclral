@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.24 $
-# $Date: 2006/07/11 02:04:31 $
+# $Revision: 1.25 $
+# $Date: 2006/07/12 01:41:49 $
 #  *--
 
 package require tcltest 2.2
@@ -88,7 +88,8 @@ proc ::tcl::mathfunc::rcount {relation} {
 
 proc ::tcl::mathfunc::rsum {relation attr} {
     set result 0
-    ::ral::relation foreach t $relation {
+    ::ral::relation foreach r $relation {
+	set t [::ral::relation tuple $r]
 	set result [expr {$result + [::ral::tuple extract $t $attr]}]
     }
     return $result
@@ -1084,7 +1085,7 @@ namespace eval ::ral::test {
     test relation-foreach-1.0 {simple visit of suppliers} -body {
 	set nameList [list]
 	relation foreach sup $S {
-	    lappend nameList [tuple extract $sup SNAME]
+	    lappend nameList [tuple extract [relation tuple $sup] SNAME]
 	}
 	lsort $nameList
     } -result {Adams Blake Clark Jones Smith}
@@ -1092,7 +1093,7 @@ namespace eval ::ral::test {
     test relation-foreach-2.0 {visit of suppliers ascending order} -body {
 	set nameList [list]
 	relation foreach sup $S -ascending SNAME {
-	    lappend nameList [tuple extract $sup SNAME]
+	    lappend nameList [tuple extract [relation tuple $sup] SNAME]
 	}
 	set nameList
     } -result {Adams Blake Clark Jones Smith}
@@ -1100,7 +1101,7 @@ namespace eval ::ral::test {
     test relation-foreach-3.0 {visit of suppliers descending order} -body {
 	set nameList [list]
 	relation foreach sup $S -descending SNAME {
-	    lappend nameList [tuple extract $sup SNAME]
+	    lappend nameList [tuple extract [relation tuple $sup] SNAME]
 	}
 	set nameList
     } -result {Smith Jones Clark Blake Adams}
@@ -1108,7 +1109,7 @@ namespace eval ::ral::test {
     test relation-foreach-4.0 {visit of suppliers ordered by multiple} -body {
 	set nameList [list]
 	relation foreach sup $S -ascending {STATUS CITY} {
-	    lappend nameList [tuple extract $sup SNAME]
+	    lappend nameList [tuple extract [relation tuple $sup] SNAME]
 	}
 	set nameList
     } -result {Jones Smith Clark Adams Blake}
@@ -1135,7 +1136,8 @@ namespace eval ::ral::test {
     test relation-foreach-5.1 {update tuple variable} -body {
 	set nameList [list]
 	relation foreach sup $S {
-	    tuple update sup CITY Sunnyvale
+	    set t [relation tuple $sup]
+	    tuple update t CITY Sunnyvale
 	}
 	set S
     } -result {
@@ -2382,6 +2384,30 @@ namespace eval ::ral::test {
 	{
 	    {A1 a PrevA1 {}}
 	    {A1 b PrevA1 a}
+	}
+    } -match relation
+
+    test relation-semijoin-5.0 {compound identifiers, attr order} -setup {
+	set Container {
+	    Relation
+	    {A1 string A2 string PrevA1 string}
+	    {{A1 A2}}
+	    {
+		{A1 a1 A2 a2 PrevA1 {}}
+		{A1 b1 A2 a2 PrevA1 a1}
+		{A1 c1 A2 a2 PrevA1 b1}
+	    }
+	}
+    } -cleanup {
+    } -body {
+	set s [relation restrictwith $Container {$PrevA1 eq ""}]
+	relation semijoin $s $Container -using {A2 A2 A1 PrevA1}
+    } -result {
+	Relation
+	{A1 string A2 string PrevA1 string}
+	{{A1 A2}}
+	{
+	    {A1 b1 A2 a2 PrevA1 a1}
 	}
     } -match relation
     # HERE -- add tests

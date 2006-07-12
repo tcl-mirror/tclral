@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.19 $
-$Date: 2006/07/10 01:17:44 $
+$Revision: 1.20 $
+$Date: 2006/07/12 01:41:49 $
  *--
  */
 
@@ -140,7 +140,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.19 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.20 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -753,7 +753,7 @@ RelationForeachCmd(
     int result = TCL_OK ;
 
     /*
-     * relation foreach tupleVarName relationValue ?-ascending | -descending?
+     * relation foreach varName relationValue ?-ascending | -descending?
      * ?attr-list? script
      */
     if (objc < 5 || objc > 7) {
@@ -827,27 +827,33 @@ RelationForeachCmd(
     mapEnd = Ral_IntVectorEnd(sortMap) ;
     for (mapIter = Ral_IntVectorBegin(sortMap) ;
 	mapIter != mapEnd ; ++mapIter) {
-	Tcl_Obj *tupleObj = Ral_TupleObjNew(*(relBegin + *mapIter)) ;
+	int appended ;
+	Tcl_Obj *iterObj ;
+	Ral_Relation iterRel = Ral_RelationNew(relation->heading) ;
+
+	Ral_RelationReserve(iterRel, 1) ;
+	appended = Ral_RelationPushBack(iterRel, *(relBegin + *mapIter),
+	    NULL) ;
+	assert(appended != 0) ;
+
+	iterObj = Ral_RelationObjNew(iterRel) ;
 
 	/*
-	 * Count the tuple object so that if there is any attempt
-	 * to update or unset the tuple variable we don't loose
-	 * the tuple.
-	 * Mainly we want the tuple object to appear to be "shared"
-	 * so any calls to "tuple update" don't modify the underlying
-	 * tuple in the relation.
+	 * Count the relation object so that if there is any attempt
+	 * to update or unset the relation variable we don't loose
+	 * the relation.
 	 */
-	Tcl_IncrRefCount(tupleObj) ;
+	Tcl_IncrRefCount(iterObj) ;
 
-	if (Tcl_ObjSetVar2(interp, varNameObj, NULL, tupleObj,
+	if (Tcl_ObjSetVar2(interp, varNameObj, NULL, iterObj,
 	    TCL_LEAVE_ERR_MSG) == NULL) {
-	    Tcl_DecrRefCount(tupleObj) ;
+	    Tcl_DecrRefCount(iterObj) ;
 	    result = TCL_ERROR ;
 	    break; 
 	}
 
 	result = Tcl_EvalObjEx(interp, scriptObj, 0) ;
-	Tcl_DecrRefCount(tupleObj) ;
+	Tcl_DecrRefCount(iterObj) ;
 
 	if (result != TCL_OK) {
 	    if (result == TCL_CONTINUE) {
