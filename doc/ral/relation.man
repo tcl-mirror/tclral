@@ -45,8 +45,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.3 $
-# $Date: 2006/07/10 01:17:43 $
+# $Revision: 1.4 $
+# $Date: 2006/07/12 01:49:06 $
 #  *--
 }]
 [moddesc "Relation Operators"]
@@ -452,25 +452,28 @@ OwnerName  Age           City  AgeInMonths
       Jim   42  San Francisco          504
 }]
 
-[call [cmd "::ral::relation foreach"] [arg tupleVariable] [arg relationValue]\
-    [opt "-ascending | -descending"] [opt attr-list] [arg script]]
+[call [cmd "::ral::relation foreach"] [arg relationVariable]\
+    [arg relationValue] [opt "-ascending | -descending"] [opt attr-list]\
+    [arg script]]
 
 The [cmd foreach] subcommand provides a means to iterate through the
 body of a relation.
 For each tuple in the body of [arg relationValue],
-the [arg tupleVariable] variable is assigned a value of a tuple and
+the [arg relationVariable] variable is successively set to a relation
+value that contains a single tuple from [arg relationValue] and then
 [arg script] is executed.
 The order in which the tuples are considered is unspecified unless
-the list of sorting attributes is specified.
-In this case the tuples are visited in the [arg -ascending] order of
+a list of sorting attributes is specified by the [arg attr-list] argument.
+In this case,
+the tuples are visited in the [arg -ascending] order of
 the values of the sorting attibutes if the direction option
 of [arg -ascending] is supplied or if no direction option is given.
 Tuples can be visited in descending order of the sorting attributes if
 the [arg -descending] option is given.
 
 [example {
-% relation foreach d $DOG descending DogName {
-    puts [tuple extract $d DogName]
+% relation foreach d $DOG -descending DogName {
+    puts [tuple extract [relation tuple $d] DogName]
 }
 Spot
 Sam
