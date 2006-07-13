@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.25 $
-# $Date: 2006/07/12 01:41:49 $
+# $Revision: 1.26 $
+# $Date: 2006/07/13 02:52:16 $
 #  *--
 
 package require tcltest 2.2
@@ -3199,7 +3199,7 @@ namespace eval ::ral::test {
 	relvar unset A B
     } -body {
 	relvar insert A {A1 b A2 42}
-    } -result {for association R1(::ral::test::A [1] ==> [1] ::ral::test::B), in relvar ::ral::test::A
+    } -result {for association ::ral::test::R1(::ral::test::A [1] ==> [1] ::ral::test::B), in relvar ::ral::test::A
 tuple {A1 b A2 42} references no tuple
 } -returnCodes error
 
@@ -3212,7 +3212,7 @@ tuple {A1 b A2 42} references no tuple
 	relvar unset A B
     } -body {
 	relvar insert B {B1 b B2 bar}
-    } -result {for association R1(::ral::test::A [1] ==> [1] ::ral::test::B), in relvar ::ral::test::B
+    } -result {for association ::ral::test::R1(::ral::test::A [1] ==> [1] ::ral::test::B), in relvar ::ral::test::B
 tuple {B1 b B2 bar} is not referenced by any tuple
 } -returnCodes error
 
@@ -3245,7 +3245,7 @@ tuple {B1 b B2 bar} is not referenced by any tuple
 	    relvar insert D {D1 b D2 foo}
 	    relvar insert C {C1 c C2 42}
 	}
-    } -result {for association R2(::ral::test::C [?] ==> [1] ::ral::test::D), in relvar ::ral::test::C
+    } -result {for association ::ral::test::R2(::ral::test::C [?] ==> [1] ::ral::test::D), in relvar ::ral::test::C
 tuple {C1 c C2 42} references no tuple
 } -returnCodes error
 
@@ -3299,7 +3299,7 @@ tuple {C1 c C2 42} references no tuple
 	    relvar insert B {B1 a B2 foo}
 	    relvar insert B {B1 b B2 foo}
 	}
-    } -result {for association R1(::ral::test::A [+] ==> [1] ::ral::test::B), in relvar ::ral::test::A
+    } -result {for association ::ral::test::R1(::ral::test::A [+] ==> [1] ::ral::test::B), in relvar ::ral::test::A
 tuple {A1 d BID c} references no tuple
 } -returnCodes error
 
@@ -3320,7 +3320,7 @@ tuple {A1 d BID c} references no tuple
 	    relvar insert B {B1 b B2 foo}
 	    relvar insert B {B1 c B2 foo}
 	}
-    } -result {for association R1(::ral::test::A [+] ==> [1] ::ral::test::B), in relvar ::ral::test::B
+    } -result {for association ::ral::test::R1(::ral::test::A [+] ==> [1] ::ral::test::B), in relvar ::ral::test::B
 tuple {B1 c B2 foo} is not referenced by any tuple
 } -returnCodes error
 
@@ -3391,7 +3391,7 @@ tuple {B1 c B2 foo} is not referenced by any tuple
     } -cleanup {
 	relvar constraint delete R1
 	relvar unset A B
-    } -result {duplicate constraint name, "R1"} -returnCodes error
+    } -result {duplicate constraint name, "::ral::test::R1"} -returnCodes error
 
     test relvar-association-6.2 {bad cond / mult spec} -setup {
 	relvar create A {Relation {A1 string BID string} A1}
@@ -3436,7 +3436,7 @@ tuple {B1 c B2 foo} is not referenced by any tuple
 	relvar unset A B
     } -body {
 	lsort [relvar constraint names]
-    } -result {R3 R4}
+    } -result {::ral::test::R3 ::ral::test::R4}
 
     test relvar-constraint-2.1 {constraint info -- association} -setup {
 	relvar create A {Relation {A1 string BID1 string BID2 int} A1}
@@ -3447,7 +3447,7 @@ tuple {B1 c B2 foo} is not referenced by any tuple
 	relvar unset A B
     } -body {
 	relvar constraint info R3
-    } -result {association R3 ::ral::test::A BID1 * ::ral::test::B B1 ?}
+    } -result {association ::ral::test::R3 ::ral::test::A BID1 * ::ral::test::B B1 ?}
 
     test relvar-constraint-2.2 {constraint info -- partition} -setup {
 	relvar create A {Relation {A1 string} A1}
@@ -3459,7 +3459,7 @@ tuple {B1 c B2 foo} is not referenced by any tuple
 	relvar unset A B C
     } -body {
 	relvar constraint info R1
-    } -result {partition R1 ::ral::test::A A1 ::ral::test::B B1 ::ral::test::C C1}
+    } -result {partition ::ral::test::R1 ::ral::test::A A1 ::ral::test::B B1 ::ral::test::C C1}
 
     # relvar create subcommand
     test relvar-create-1.0 {single attribute} -body {
@@ -3649,7 +3649,7 @@ tuple {B1 c B2 foo} is not referenced by any tuple
 	    relvar insert A {A1 b} {A1 c}
 	    relvar insert B {B1 b}
 	}
-    } -result {for partition R1(::ral::test::A is partitioned [::ral::test::B | ::ral::test::C]), in relvar ::ral::test::A
+    } -result {for partition ::ral::test::R1(::ral::test::A is partitioned [::ral::test::B | ::ral::test::C]), in relvar ::ral::test::A
 tuple {A1 c} is not referred to by any tuple
 } -returnCodes error
 
@@ -3667,7 +3667,7 @@ tuple {A1 c} is not referred to by any tuple
 	    relvar insert B {B1 b}
 	    relvar insert C {C1 b}
 	}
-    } -result {for partition R1(::ral::test::A is partitioned [::ral::test::B | ::ral::test::C]), in relvar ::ral::test::A
+    } -result {for partition ::ral::test::R1(::ral::test::A is partitioned [::ral::test::B | ::ral::test::C]), in relvar ::ral::test::A
 tuple {A1 b} is referred to by multiple tuples
 } -returnCodes error
 

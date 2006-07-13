@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.14 $
-# $Date: 2006/07/12 01:41:49 $
+# $Revision: 1.15 $
+# $Date: 2006/07/13 02:52:16 $
 #  *--
 
 namespace eval ::ral {
@@ -212,6 +212,7 @@ proc ::ral::tupleformat {tupleValue {title {}} {noheading 0}} {
 #	{<relvar name> {<tuple value>}}
 
 # Generate a string that encodes all the relvars.
+
 proc ::ral::serialize {{ns {}}} {
     set result [list]
 
@@ -227,8 +228,8 @@ proc ::ral::serialize {{ns {}}} {
     lappend result [list Relvars $relNameList]
 
     set constraints [list]
-    foreach cname [lsort [relvar constraint names]] {
-	lappend constaints [getConstraint $cname]
+    foreach cname [lsort [relvar constraint names ${ns}*]] {
+	lappend constraints [getConstraint $cname]
     }
     lappend result [list Constraints $constraints]
 
@@ -285,7 +286,7 @@ proc ::ral::deserialize {value {ns ::}} {
 	error "expected keyword \"Constraints\", got \"$cnstrKeyWord\""
     }
     foreach constraint $cnstrDef {
-	namspace eval $ns ::ral::relvar $constraint
+	namespace eval $ns ::ral::relvar $constraint
     }
 
     lassign $bodies bodyKeyWord bodyDefs
@@ -305,7 +306,7 @@ proc ::ral::deserialize {value {ns ::}} {
     return
 }
 
-proc ::ral::deserializeFromFile {fileName {ns {}}} {
+proc ::ral::deserializeFromFile {fileName {ns ::}} {
     set chan [::open $fileName r]
     set gotErr [catch {deserialize [read $chan] $ns} result]
     ::close $chan
@@ -358,7 +359,7 @@ proc ::ral::storeToMk {fileName {ns {}}} {
     # Get the constraints and put them into the appropriate catalog
     # depending upon the type of the constraint.
     set partIndex 0
-    foreach cname [relvar constraint names] {
+    foreach cname [relvar constraint names ${ns}*] {
 	set cinfo [getConstraint $cname]
 	switch -exact [lindex $cinfo 0] {
 	    association {
@@ -475,7 +476,7 @@ proc ::ral::dump {{ns {}}} {
 	    [list [relation heading [relvar set $name]]]\n"
     }
 
-    foreach cname [lsort [relvar constraint names]] {
+    foreach cname [lsort [relvar constraint names ${ns}*]] {
 	append result "::ral::relvar [getConstraint $cname]\n"
     }
 
@@ -598,10 +599,12 @@ proc ::ral::getConstraint {cname} {
     set cinfo [relvar constraint info $cname]
     switch -exact [lindex $cinfo 0] {
 	association {
+	    lset cinfo 1 [namespace tail [lindex $cinfo 1]]
 	    lset cinfo 2 [namespace tail [lindex $cinfo 2]]
 	    lset cinfo 5 [namespace tail [lindex $cinfo 5]]
 	}
 	partition {
+	    lset cinfo 1 [namespace tail [lindex $cinfo 1]]
 	    lset cinfo 2 [namespace tail [lindex $cinfo 2]]
 	    for {set index 4} {$index < [llength $cinfo]} {incr index 2} {
 		lset cinfo $index [namespace tail [lindex $cinfo $index]]
