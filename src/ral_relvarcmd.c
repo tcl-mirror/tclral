@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.11 $
-$Date: 2006/07/11 04:18:18 $
+$Revision: 1.12 $
+$Date: 2006/07/14 04:13:30 $
  *--
  */
 
@@ -111,7 +111,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.11 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.12 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -210,7 +210,7 @@ RelvarConstraintCmd(
 	"names",
 	NULL
     } ;
-    int result = TCL_ERROR ;
+    int result = TCL_OK ;
     int index ;
 
     if (objc < 3) {

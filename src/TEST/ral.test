@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.26 $
-# $Date: 2006/07/13 02:52:16 $
+# $Revision: 1.27 $
+# $Date: 2006/07/14 04:13:30 $
 #  *--
 
 package require tcltest 2.2
@@ -3186,9 +3186,12 @@ namespace eval ::ral::test {
     } -body {
 	relvar eval {
 	    relvar insert A {A1 a A2 42}
+	    relvar insert A {A1 b A2 42}
 	    relvar insert B {B1 a B2 foo}
+	    relvar insert B {B1 b B2 foo}
 	}
-    } -result {Relation {B1 string B2 string} B1 {{B1 a B2 foo}}}
+	return
+    } -result {}
 
     test relvar-association-1.2 {one to one -- fail referring} -setup {
 	relvar create A {Relation {A1 string A2 int} A1}
@@ -3198,7 +3201,12 @@ namespace eval ::ral::test {
 	relvar constraint delete R1
 	relvar unset A B
     } -body {
-	relvar insert A {A1 b A2 42}
+	relvar eval {
+	    relvar insert A {A1 a A2 42}
+	    relvar insert A {A1 b A2 42}
+	    relvar insert B {B1 a B2 foo}
+	}
+	return
     } -result {for association ::ral::test::R1(::ral::test::A [1] ==> [1] ::ral::test::B), in relvar ::ral::test::A
 tuple {A1 b A2 42} references no tuple
 } -returnCodes error
@@ -3211,7 +3219,12 @@ tuple {A1 b A2 42} references no tuple
 	relvar constraint delete R1
 	relvar unset A B
     } -body {
-	relvar insert B {B1 b B2 bar}
+	relvar eval {
+	    relvar insert A {A1 a A2 42}
+	    relvar insert B {B1 a B2 foo}
+	    relvar insert B {B1 b B2 bar}
+	}
+	return
     } -result {for association ::ral::test::R1(::ral::test::A [1] ==> [1] ::ral::test::B), in relvar ::ral::test::B
 tuple {B1 b B2 bar} is not referenced by any tuple
 } -returnCodes error
@@ -3226,10 +3239,13 @@ tuple {B1 b B2 bar} is not referenced by any tuple
     } -body {
 	relvar eval {
 	    relvar insert C {C1 a C2 42}
+	    relvar insert C {C1 b C2 42}
 	    relvar insert D {D1 a D2 foo}
 	    relvar insert D {D1 b D2 foo}
+	    relvar insert D {D1 c D2 foo}
 	}
-    } -result {Relation {D1 string D2 string} D1 {{D1 a D2 foo} {D1 b D2 foo}}}
+	return
+    } -result {}
 
     test relvar-association-2.2 {one conditional to one -- fail} -setup {
 	relvar create C {Relation {C1 string C2 int} C1}
@@ -3241,9 +3257,9 @@ tuple {B1 b B2 bar} is not referenced by any tuple
     } -body {
 	relvar eval {
 	    relvar insert C {C1 a C2 42}
+	    relvar insert C {C1 c C2 42}
 	    relvar insert D {D1 a D2 foo}
 	    relvar insert D {D1 b D2 foo}
-	    relvar insert C {C1 c C2 42}
 	}
     } -result {for association ::ral::test::R2(::ral::test::C [?] ==> [1] ::ral::test::D), in relvar ::ral::test::C
 tuple {C1 c C2 42} references no tuple
@@ -3263,7 +3279,8 @@ tuple {C1 c C2 42} references no tuple
 	    relvar insert D {D1 a D2 foo}
 	    relvar insert D {D1 b D2 bar}
 	}
-    } -result {Relation {D1 string D2 string} D1 {{D1 a D2 foo} {D1 b D2 bar}}}
+	return
+    } -result {}
 
     test relvar-association-4.1 {many to one} -setup {
 	relvar create A {Relation {A1 string BID string} A1}
@@ -3341,7 +3358,8 @@ tuple {B1 c B2 foo} is not referenced by any tuple
 	    relvar insert B {B1 b B2 foo}
 	    relvar insert B {B1 c B2 foo}
 	}
-    } -result {Relation {B1 string B2 string} B1 {{B1 a B2 foo} {B1 b B2 foo} {B1 c B2 foo}}}
+	return
+    } -result {}
 
     test relvar-association-5.2 {many to one conditional} -setup {
 	relvar create A {Relation {A1 string BID string} A1}
@@ -3360,7 +3378,8 @@ tuple {B1 c B2 foo} is not referenced by any tuple
 	    relvar insert B {B1 a B2 foo}
 	    relvar insert B {B1 b B2 foo}
 	}
-    } -result {Relation {B1 string B2 string} B1 {{B1 a B2 foo} {B1 b B2 foo}}}
+	return
+    } -result {}
 
     test relvar-association-5.3 {many conditional to one conditional} -setup {
 	relvar create A {Relation {A1 string BID string} A1}
@@ -3381,6 +3400,37 @@ tuple {B1 c B2 foo} is not referenced by any tuple
 	    relvar insert B {B1 c B2 foo}
 	}
     } -result {Relation {B1 string B2 string} B1 {{B1 a B2 foo} {B1 b B2 foo} {B1 c B2 foo}}}
+
+    test relvar-association-5.4 {many to one conditional, empty one} -setup {
+	relvar create A {Relation {A1 string BID string} A1}
+	relvar create B {Relation {B1 string B2 string} B1}
+	relvar association R1 A BID + B B1 ?
+    } -cleanup {
+	relvar constraint delete R1
+	relvar unset A B
+    } -body {
+	relvar eval {
+	    relvar insert A {A1 a BID a}
+	    relvar insert A {A1 b BID b}
+	}
+	return
+    } -result {}
+
+    test relvar-association-5.5 {many conditional to one , empty many} -setup {
+	relvar create A {Relation {A1 string BID string} A1}
+	relvar create B {Relation {B1 string B2 string} B1}
+	relvar association R1 A BID * B B1 1
+    } -cleanup {
+	relvar constraint delete R1
+	relvar unset A B
+    } -body {
+	relvar eval {
+	    relvar insert B {B1 a B2 foo}
+	    relvar insert B {B1 b B2 foo}
+	    relvar insert B {B1 c B2 foo}
+	}
+	return
+    } -result {}
 
     test relvar-association-6.1 {duplicate names} -setup {
 	relvar create A {Relation {A1 string BID string} A1}

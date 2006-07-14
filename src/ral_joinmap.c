@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_joinmap.c,v $
-$Revision: 1.5 $
-$Date: 2006/07/11 02:04:31 $
+$Revision: 1.6 $
+$Date: 2006/07/14 04:13:30 $
  *--
  */
 
@@ -89,7 +89,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_joinmap.c,v $ $Revision: 1.5 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_joinmap.c,v $ $Revision: 1.6 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -391,10 +391,9 @@ Ral_JoinMapTupleMap(
 }
 
 /*
- * Return a vector of "size" length where each entry contains the count of the
- * number of times the corresponding tuple index appears in the "map" at the
- * "offset".  The maximum value contained in "map" must be less than "size".
- * Caller must delete the returned vector.
+ * Fill in a vector with the number of times that tuple index appears in the
+ * "map" at "offset". The vector is assumed to be the same size as the join
+ * map.  The maximum value contained in "map" will be less than that size.
  */
 int
 Ral_JoinMapTupleCounts(
