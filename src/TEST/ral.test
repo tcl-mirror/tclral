@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.27 $
-# $Date: 2006/07/14 04:13:30 $
+# $Revision: 1.28 $
+# $Date: 2006/07/17 03:55:46 $
 #  *--
 
 package require tcltest 2.2
@@ -3475,6 +3475,21 @@ tuple {B1 c B2 foo} is not referenced by any tuple
 	relvar unset A B
     } -result {Relation {B1 string B2 string} {{B1 B2}} {{B1 b1 B2 b2}}}
 
+    test relvar-association-8.1 {failure at creation time} -setup {
+	relvar create C {Relation {C1 string C2 int} C1}
+	relvar create D {Relation {D1 string D2 string} D1}
+	relvar insert C {C1 a C2 42}
+	relvar insert C {C1 c C2 42}
+	relvar insert D {D1 a D2 foo}
+	relvar insert D {D1 b D2 foo}
+    } -cleanup {
+	relvar unset C D
+    } -body {
+	relvar association R2 C C1 ? D D1 1
+    } -result {for association ::ral::test::R2(::ral::test::C [?] ==> [1] ::ral::test::D), in relvar ::ral::test::C
+tuple {C1 c C2 42} references no tuple
+} -returnCodes error
+
     # relvar constraint subcommand
     test relvar-constraint-1.1 {constraint names} -setup {
 	relvar create A {Relation {A1 string BID1 string BID2 int} A1}
@@ -3719,6 +3734,20 @@ tuple {A1 c} is not referred to by any tuple
 	}
     } -result {for partition ::ral::test::R1(::ral::test::A is partitioned [::ral::test::B | ::ral::test::C]), in relvar ::ral::test::A
 tuple {A1 b} is referred to by multiple tuples
+} -returnCodes error
+
+    test relvar-partition-3.1 {fail at create time} -setup {
+	relvar create A {Relation {A1 string} A1}
+	relvar create B {Relation {B1 string} B1}
+	relvar create C {Relation {C1 string} C1}
+	relvar insert A {A1 b} {A1 c}
+	relvar insert B {B1 b}
+    } -cleanup {
+	relvar unset A B C
+    } -body {
+	relvar partition R1 A A1 B B1 C C1
+    } -result {for partition ::ral::test::R1(::ral::test::A is partitioned [::ral::test::B | ::ral::test::C]), in relvar ::ral::test::A
+tuple {A1 c} is not referred to by any tuple
 } -returnCodes error
 
     # relvar set subcommand

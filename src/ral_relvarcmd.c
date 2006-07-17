@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.12 $
-$Date: 2006/07/14 04:13:30 $
+$Revision: 1.13 $
+$Date: 2006/07/17 03:55:46 $
  *--
  */
 
@@ -111,7 +111,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.12 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.13 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -181,7 +181,8 @@ RelvarAssociationCmd(
      * relvar2 attr-list2 spec2 */
     if (objc != 9) {
 	Tcl_WrongNumArgs(interp, 2, objv,
-	    "name relvar1 attr-list1 spec1 relvar2 attr-list2 spec2") ;
+	    "name refrngRelvar refrngAttrList refToSpec "
+	    "refToRelvar refToAttrList refrngSpec") ;
 	return TCL_ERROR ;
     }
     Tcl_ResetResult(interp) ;
@@ -204,7 +205,7 @@ RelvarConstraintCmd(
 	ConstraintInfo,
 	ConstraintNames,
     } ;
-    static const char *constraintCmds[] = {
+    static char const *constraintCmds[] = {
 	"delete",
 	"info",
 	"names",

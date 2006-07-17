@@ -1,8 +1,8 @@
 [manpage_begin relvar n 0.8]
 [comment {
-# This software is copyrighted 2004 by G. Andrew Mangogna.  The following
-# terms apply to all files associated with the software unless explicitly
-# disclaimed in individual files.
+# This software is copyrighted 2004, 2005, 2006 by G. Andrew Mangogna.
+# The following terms apply to all files associated with the software unless
+# explicitly disclaimed in individual files.
 # 
 # The authors hereby grant permission to use, copy, modify, distribute,
 # and license this software and its documentation for any purpose, provided
@@ -41,18 +41,20 @@
 # 
 #  *++
 # MODULE:
-# 
+#   relvar.man -- documentation for the ::ral::relvar command
 # ABSTRACT:
-# 
+#   This file contains the documentation for the ::ral::relvar command.
+#   This command is part of TclRAL. This file is in Tcl Markup Language
+#   format.
 # $RCSfile: relvar.man,v $
-# $Revision: 1.3 $
-# $Date: 2006/07/11 04:18:18 $
+# $Revision: 1.4 $
+# $Date: 2006/07/17 03:55:46 $
 #  *--
 }]
 [moddesc "Relvar Operators"]
 [titledesc "Operators for Relation Variables"]
 [copyright "2004 by G. Andrew Mangogna"]
-[require ral 0.8]
+[require ral [opt 0.8]]
 [description]
 This manpage describes the [cmd relvar] command.
 The [cmd relvar] command is part of the Tcl Relational Algebra Library
@@ -67,17 +69,18 @@ For this reason, most of the [cmd relvar] subcommands
 take the name of a relation variable as an argument.
 
 [para]
-In the relational model, relation variables play the important role of
+In the relational model as it applies to database management systems,
+relation variables play the important role of
 representing the persistent data base values.
 Relation variables are the leaves of the
-expression tree that performs the desired computation and represent
+expression tree that perform the desired query and represent
 the core data from which results may be computed.
-That computation is expressed as a single, sometimes complex expression.
+That computation is usually expressed as a single, sometimes complex expression.
 This allows for a non-procedural way of specifying the computation and
 allows optimizers to find the most efficient manner of computing the result.
 
 [para]
-In the TclRAL implementation,
+In the TclRAL implementation of the relational model,
 relation variables serve a similar role although there
 is no implicit persistence supplied by the library.
 Relation values may be stored in Tcl variables like any other Tcl object.
@@ -87,24 +90,74 @@ to the Tcl way of doing things.
 
 [para]
 Since it is possible to store a relation value in an ordinary Tcl variable
-and since Tcl variables are convenient to use,
-all relvars have corresponding Tcl variables.
+and since Tcl variables are convenient to use when formulating expressions,
+creating a relvar also creates a corresponding Tcl variable by the same name.
 
 [section "RELVAR NAMES"]
 
+The namespace of relvar names follows the familiar Tcl method of naming
+ordinary Tcl variables.
+Thus relvars have Tcl namespace-like names.
+For example, a relvar named [var Dog] created at the global level
+will be named [var ::Dog].
+Thus it is possible and indeed encouraged to group related relvars
+together in a namespace.
+If an application uses only one set of relvars,
+then the global namespace of relvars is most convenient.
+Using several distinct sets of relvars is best accomplished if each
+set is placed in their own relvar namespace.
+
 [section CONSTRAINTS]
 
-[para]
-Constraints may be defined to exist between relvars.
-The type of constraints supported by TclRAL are declarative in nature
-and are used to implement referential integrity.
+TclRAL supports the notion of [emph constraints] as a means of
+insuring integrity among a set of relvars.
+There are many types of constraints that might be used to insure integrity,
+but TclRAL supports two types of declarative constraints.
+[list_begin definitions]
 
+[lst_item Association]
+Association constraints define a referential association between two relvars.
+In this context,
+an association declares that a set of attributes in one relvar refers to
+an identifier of another relvar.
+Thus for all the tuples in a given relvar,
+the given attribute values must match the corresponding attribute values
+of the identifier of the associated relvar.
+The association also declares the number of times that such matches may
+occur and if it is allowed not to match at all.
+
+[lst_item Partition]
+Partition constraints define a complete and disjoint
+referential partitioning between one relvar,
+known as the super set,
+and a given set of relvars,
+known as the sub sets.
+This constraint declares that every tuple of the super set relvar is
+referred to by exactly one tuple from among all the tuples in the
+sub set relvars.
+
+[list_end]
+
+At the end of each [cmd ::ral::eval] command (see below) or,
+if outside of an [cmd eval] command,
+at the end of any command that modifies a relvar
+that participates in a constraint,
+all of the constraints defined for the modified relvars are evaluated.
+If any of the constraints fail, the relvar modifications are discarded
+and the relvar values are returned to the values they had before
+the modifications.
+
+Like relvars, constraints have names.
+Constraints names follow the same pattern as relvar names, i.e.
+unresolved names are created in the current namespace.
+Thus you are able to keep the relvars and their constraints organized
+together in namespace like groups.
 
 [section COMMANDS]
 [list_begin definitions]
 [call [cmd "::ral::relvar association"] [arg name]\
-    [arg refrngRelvar] [arg refrngAttrList] [arg refrngSpec]\
-    [arg refToRelvar] [arg refToAttrList] [arg refToSpec]\
+    [arg refrngRelvar] [arg refrngAttrList] [arg refToSpec]\
+    [arg refToRelvar] [arg refToAttrList] [arg refrngSpec]\
 ]
 
 The [cmd association] subcommand creates a referential association
@@ -120,73 +173,167 @@ and referred to attribute lists are ordered and referring attributes
 refer to the corresponding referred to attribute.
 The set of attributes given by [arg refToAttrList] must constitute
 and identifier for [arg refToRelvar].
-The [arg refrngSpec] argument defines the multiplicity and conditionality
-of the reference.
+The [arg refToSpec] argument defines
+the multiplicity and conditionality of the reference.
 It can be one of:
 
 [list_begin definitions]
 
 [lst_item *]
-Zero or more references.
+Each tuple in [arg refToRelvar] is referred to zero or more times by
+the tuples in [arg refrngRelvar].
+
 [lst_item +]
-One or more references.
+Each tuple in [arg refToRelvar] is referred to one or more times by
+the tuples in [arg refrngRelvar].
+
 [lst_item 1]
-Exactly one reference.
+Each tuple in [arg refToRelvar] is referred to exactly once by
+the tuples in [arg refrngRelvar].
+
 [lst_item ?]
-Zero or one reference.
+Each tuple in [arg refToRelvar] is referred to zero or one times by
+the tuples in [arg refrngRelvar].
 
 [list_end]
 
-Similarly [arg refToSpec] defines the multiplicity and conditionality
+Similarly [arg refrngSpec] defines the multiplicity and conditionality
 associated with the references to [arg refToRelvar].
-Necessarily, [arg refToSpec] may only be "1" or "?" implying that
-all the tuples of [arg refToRelvar] are referred to by [arg refrngRelvar]
-or at least one tuple of [arg refToRelvar] is not referred to.
+Necessarily, [arg refrngSpec] may only be "1" or "?" implying:
+[list_begin definitions]
 
-The symbols for [arg refrngSpec] and [arg refToSpec] were chosen to
+[lst_item 1]
+Each tuple in [arg refrngRelvar] refers to exactly one tuple in
+[arg refToRelvar].
+
+[lst_item ?]
+Each tuple in [arg refrngRelvar] refers to at most one tuple
+(and possibly none at all) in [arg refToRelvar].
+
+[list_end]
+
+The symbols for [arg refrngSpec] and [arg refToSpec] were chosen
 by analogy to the use of those symbols in regular expression syntax.
 
 [example {
-% relvar association R1-Owner OWNERSHIP OwnerName + OWNER OwnerName 1
-% relvar association R1-Dog OWNERSHIP DogName * DOG DogName ?
+% relvar association A1 OWNERSHIP OwnerName + OWNER OwnerName 1
+% relvar association A2 OWNERSHIP DogName * DOG DogName 1
 }]
 
+In this example,
+A1 declares that for every tuple in OWNERSHIP,
+the value of OWNERSHIP.OwnerName matches the value of OWNER.OwnerName
+in exactly one tuple of OWNER and that for every tuple in OWNER the
+value of OWNER.OwnerName matches the value of OWNERSHIP.OwnerName in
+at least one tuple of OWNERSHIP and possibly more.
+In the semantics of this example, the concepts of being an OWNER
+and that of OWNERSHIP of a DOG are unconditionally associated since
+no tuple of OWNER may exist without there being at least one associated
+tuple of OWNERSHIP.
+Also this constraint allows for OWNERS that may own more than one DOG.
+
+Compare this to the case of A2.
+A2 states that every tuple in OWNERSHIP must have a corresponding tuple
+in DOG, but that tuples in DOG may not be reference by any tuple in OWNERSHIP.
+OWNERSHIP and DOG are conditionally associated
+and in the semantics of this problem, it is possible to have dogs that 
+are not owned at all and to have dogs that are owned multiple times.
 
 [call [cmd "::ral::relvar constraint delete"]\
 	[opt "[arg name1] [arg name2] ..."]]
+The [cmd "constraint delete"] subcommand deletes all the
+constraints given by the [arg nameN] arguments.
+The return value is the empty string.
+
 [call [cmd "::ral::relvar constraint info"] [arg name]]
+The [cmd "constraint info"] subcommand returns the detailed information
+about the constraint named [arg name].
+The information returned is of the same format as the command used
+to create the partition minus the superfluous leading [cmd relvar].
+Also the relvar names and constraint names are returned in fully qualified
+form.
+
+[example {
+% relvar constraint info A1
+association ::A1 ::OWNERSHIP OwnerName + ::OWNER OwnerName 1
+% relvar constraint info ::P1
+partition ::P1 ::Lamp SerialNo ::TableLamp SerialNo ::FloorLamp SerialNo
+% relvar constraint info G
+unknown constraint name, "G"
+}]
+
 [call [cmd "::ral::relvar constraint names"] [opt [arg pattern]]]
 
-[call [cmd "::ral::relvar create"] [arg relationVariable] [arg heading]]
+The [cmd "constraint names"] subcommand returns a list of constraint names.
+If the optional [arg pattern] is present,
+then only those constraint names that match [arg pattern] are returned.
+Name matching happens in the same manner as for the [cmd "string match"].
+The returned names are fully qualified.
+
+[example {
+% relvar constraint names
+::A1 ::A2
+% relvar constraint names *2
+::A2
+}]
+
+[call [cmd "::ral::relvar create"] [arg relvarName] [arg heading]]
 
 The [cmd create] subcommand creates a new relation variable whose name is given
-by [arg relationVariable] and that has the relation value heading given
+by [arg relvarName] and that has the relation value heading given
 by the [arg heading] argument.
 The subcommand returns the relation value of the newly created relvar,
 which necessarily will have cardinality of 0.
 The [arg heading] argument is a valid relation value heading
 as described for the [cmd ::ral::relation] commands or
 as returned from [cmd "::ral::relation heading"].
+If [arg relvarName] name begins with "::", then it is interpreted
+as a fully resolved name and will be created in the given namespace.
+Othersize [arg relvarName] is interpreted relative the to current
+namespace and will be created in the current namespace.
+In either case,
+an ordinary Tcl variable is also created by the same fully resolved
+name as the relvar.
+This implies that any namespaces referenced in [arg relvarName]
+must already exist.
 
 [example {
-% relvar create OWNER {Relation {OwnerName string Age int City string} OwnerName}
+% relvar create OWNER {
+>       Relation
+>       {OwnerName string Age int City string}
+>       OwnerName
+>     }
 Relation {OwnerName string Age int City string} OwnerName {}
-% relvar create DOG {Relation {DogName string Breed string} DogName}
+% puts [relformat $::OWNER]
++=========+---+------+
+|OwnerName|Age|City  |
+|string   |int|string|
++=========+---+------+
++=========+---+------+
+% relvar create DOG {
+>       Relation
+>       {DogName string Breed string}
+>       DogName
+>     }
 Relation {DogName string Breed string} DogName {}
-% relvar create OWNERSHIP {Relation {OwnerName string DogName string Acquired string} {{OwnerName DogName}}}
+% relvar create OWNERSHIP {
+>       Relation
+>       {OwnerName string DogName string Acquired string}
+>       {{OwnerName DogName}}
+>     }
 Relation {OwnerName string DogName string Acquired string} {{OwnerName DogName}} {}
 }]
 
-
-[call [cmd "::ral::relvar delete"] [arg relationVariable]\
-    [arg tupleVariable] [arg expression]]
+[call [cmd "::ral::relvar delete"] [arg relvarName]\
+    [arg tupleVarName] [arg expression]]
 
 The [cmd delete] subcommands deletes tuples from the relation variable
-given by the [arg relationVariable] argument.
-Each tuple in the body of [arg relationVariable] is assigned to the
-tuple variable named [arg tupleVariable] and [arg expression] is evaluated.
+given by the [arg relvarName] argument.
+Each tuple in the body of [arg relvarName] is successively
+assigned to the tuple variable named [arg tupleVarName] and
+[arg expression] is evaluated.
 If [arg expression] returns true, then that tuple is deleted, directly
-modifying the value contained in [arg relationVariable].
+modifying the value contained in [arg relvarName].
 The return value of the subcommand is the number of tuples deleted.
 
 [example {
@@ -219,24 +366,23 @@ After deleting Sue
 ------------------
 }]
 
-
-[call [cmd "::ral::relvar deleteone"] [arg relationVariable]\
+[call [cmd "::ral::relvar deleteone"] [arg relvarName]\
     [opt "attr1 value1 attr2 value2 ..."]]
 
 The [cmd deleteone] subcommand deletes at most one tuple from the
-relation variable given by the [arg relationVariable] argument.
-The [arg "attrN valueN"] arguments must be given and pairs
+relation variable given by the [arg relvarName] argument.
+The [arg "attrN valueN"] arguments must be given in pairs
 and are the attribute names and values that determine which tuple
-is deleted from the relation value held in [arg relationVariable].
+is deleted from the relation value held in [arg relvarName].
 The set of attribute names in the [arg "attrN valueN"] arguments
-must form one of the identifiers of [arg relationVariable].
-If [arg relationVariable] contains a tuple whose attribute values match those
-in given then that tuple is deleted and [arg relationVariable]
+must form one of the identifiers of [arg relvarName].
+If [arg relvarName] contains a tuple whose attribute values match those
+in given then that tuple is deleted and [arg relvarName]
 is modified in place.
-Otherwise [arg relationVariable] is unchanged.
+Otherwise [arg relvarName] is unchanged.
 This subcommand is useful in those contexts where the attribute values of an
 identifier are known and evaluating an expression over all the tuples
-in [arg relationVariable] is superfluous.
+in [arg relvarName] is superfluous.
 The return value of the subcommand is the number of tuples deleted which will
 necessarily be either 1 or 0.
 
@@ -282,23 +428,93 @@ After deleting Mike
 +=========+---+-------------+
 }]
 
-
 [call [cmd "::ral::relvar eval"] [arg arg] [opt "arg ..."]]
 
 The [cmd eval] subcommand concatenates it arguments together and evaluates
 the resulting script as a relvar transaction.
-Enforcement of relvar constraints takes place at the end of the script.
-If either the script creates an error or if the constraint test on the
-modified relvars fail,
-then the relvar values are restored to their state before the script
-was executed.
+The return value of [cmd eval] is the return value of the last
+command executed in the script.
+At the end of the script,
+the constraints associated with any relvar that was modified
+by the script are evaluated.
+If either the script generates an error or any of the constraints fail,
+then the values of the modified relvars are returned to the values
+they held before the [cmd eval] command.
+It is an error to attempt to create relvars or constraints in the
+script executed by [cmd eval].
 
-[call [cmd "::ral::relvar insert"] [arg relationVariable]\
+[example {
+% puts [relformat $::OWNER]
++=========+---+-------------+
+|OwnerName|Age|City         |
+|string   |int|string       |
++=========+---+-------------+
+|Sue      |24 |Cupertino    |
+|George   |35 |Sunnyvale    |
+|Alice    |30 |San Jose     |
+|Mike     |50 |San Jose     |
+|Jim      |42 |San Francisco|
++=========+---+-------------+
+% relvar eval {
+>       relvar insert OWNER {OwnerName Tom Age 22 City Tulsa}
+> }
+for association ::A1(::OWNERSHIP [+] ==> [1] ::OWNER), in relvar ::OWNER
+tuple {OwnerName Tom Age 22 City Tulsa} is not referenced by any tuple
+
+% puts [relformat $::OWNER]
++=========+---+-------------+
+|OwnerName|Age|City         |
+|string   |int|string       |
++=========+---+-------------+
+|Sue      |24 |Cupertino    |
+|George   |35 |Sunnyvale    |
+|Alice    |30 |San Jose     |
+|Mike     |50 |San Jose     |
+|Jim      |42 |San Francisco|
++=========+---+-------------+
+% relvar eval {
+>       relvar insert OWNER {OwnerName Tom Age 22 City Tulsa}
+>       relvar insert OWNERSHIP {OwnerName Tom DogName Skippy Acquired 2006}
+> }
+for association ::A2(::OWNERSHIP [*] ==> [1] ::DOG), in relvar ::OWNERSHIP
+tuple {OwnerName Tom DogName Skippy Acquired 2006} references no tuple
+
+% puts [relformat $::OWNER]
++=========+---+-------------+
+|OwnerName|Age|City         |
+|string   |int|string       |
++=========+---+-------------+
+|Sue      |24 |Cupertino    |
+|George   |35 |Sunnyvale    |
+|Alice    |30 |San Jose     |
+|Mike     |50 |San Jose     |
+|Jim      |42 |San Francisco|
++=========+---+-------------+
+% relvar eval {
+>       relvar insert OWNER {OwnerName Tom Age 22 City Tulsa}
+>       relvar insert OWNERSHIP {OwnerName Tom DogName Jumper Acquired 2006}
+>       return
+> }
+% puts [relformat $::OWNER]
++=========+---+-------------+
+|OwnerName|Age|City         |
+|string   |int|string       |
++=========+---+-------------+
+|Sue      |24 |Cupertino    |
+|George   |35 |Sunnyvale    |
+|Alice    |30 |San Jose     |
+|Mike     |50 |San Jose     |
+|Jim      |42 |San Francisco|
+|Tom      |22 |Tulsa        |
++=========+---+-------------+
+}]
+
+[call [cmd "::ral::relvar insert"] [arg relvarName]\
     [opt "name-value-list ..."]]
 
 The [cmd insert] subcommand inserts the tuples given by [arg name-value-list]
-arguments into the value of the relation stored in [arg relationVariable].
-The value is modified in place.
+arguments into the value of the relation stored in [arg relvarName].
+The value of [arg relvarName] is modified in place.
 The subcommand has no return value.
 It is an error to attempt to insert a duplicate tuple or a tuple whose
 heading does not match the relation heading.
@@ -306,10 +522,14 @@ All values of the tuple must be specfied with a valid value representation of
 the type associated with the attribute.
 
 [example {
-relvar insert OWNER\
-    {OwnerName Sue Age 20 City {New York}}\
-    {City {San Francisco} Age 32 OwnerName Frank}
+% relvar insert DOG {DogName Skippy Breed Dalmation}
+Relation {DogName string Breed string} DogName {{DogName Fido Breed Poodle} {DogName Sam Breed Collie} {DogName Spot Breed Terrier} {DogName Rover Breed Retriever} {DogName Fred Breed Spaniel} {DogName Jumper Breed Mutt} {DogName Skippy Breed Dalmation}}
+% relvar insert OWNER {OwnerName Tom Age 22 City Tulsa}
+for association ::A1(::OWNERSHIP [+] ==> [1] ::OWNER), in relvar ::OWNER
+tuple {OwnerName Tom Age 22 City Tulsa} is not referenced by any tuple
+
 }]
+
 
 [call [cmd "::ral::relvar names"] [opt pattern]]
 
@@ -318,15 +538,78 @@ relation variables.
 If the [arg pattern] argument is specified then only those names matching
 [arg pattern] are returned.
 Name matching is performed as for the [cmd "string match"] command.
+The returned names are fully qualified.
+
+[example {
+% relvar names
+::DOG ::OWNERSHIP ::OWNER
+% relvar names ::D*
+::DOG
+}]
 
 [call [cmd "::ral::relvar partition"] [arg name] [arg super]\
 	[arg superAttrList] [arg sub1] [arg sub1AttrList]\
 	[opt "sub2 sub2AttrList sub3 sub3AttrList ..."]]
 
-[call [cmd "::ral::relvar set"] [arg relationVariable] [opt relationValue]]
+The [cmd partition] subcommand defines a partition constraint named
+[arg name].
+The relvar named [arg super] must have as one of its identifiers the
+attributes named in the [arg superAttrList] argument.
+The remaining arguments define the sub set relvars named [arg subN]
+and the attributes in those relvars that reference the super set relvar
+are given by the [arg subNAttrList] arguments.
+A partition constraint declares that every tuple in the [arg subN]
+relvars references exactly one tuple in the [arg super] relvar and that
+every tuple in the [arg super] relvar is referred to by exactly one
+tuple contained in one of the [arg subN] relvars.
+This constraint implies that the tuples in the [arg super] relvar are
+completely partitioned into the disjoint sub sets given by the the
+[arg subN] relvars.
+
+[example {
+% relvar create Lamp {
+>       Relation
+>       {SerialNo string ModelNo string Make string}
+>       SerialNo
+>     }
+Relation {SerialNo string ModelNo string Make string} SerialNo {}
+% relvar create TableLamp {
+>       Relation
+>       {SerialNo string Shade string}
+>       SerialNo
+>     }
+Relation {SerialNo string Shade string} SerialNo {}
+% relvar create FloorLamp {
+>       Relation
+>       {SerialNo string Height int Sockets int}
+>       SerialNo
+>     }
+Relation {SerialNo string Height int Sockets int} SerialNo {}
+% relvar partition P1 Lamp SerialNo TableLamp SerialNo FloorLamp SerialNo
+% relvar insert Lamp {SerialNo NF100 ModelNo FCN-22  Make Falcon}
+for partition ::P1(::Lamp is partitioned [::TableLamp | ::FloorLamp]), in relvar ::Lamp
+tuple {SerialNo NF100 ModelNo FCN-22 Make Falcon} is not referred to by any tuple
+
+% relvar eval {
+>       relvar insert Lamp {SerialNo NF100 ModelNo FCN-22  Make Falcon}
+>       relvar insert TableLamp {SerialNo NF100  Shade Blue}
+>       return
+>     }
+% relvar insert FloorLamp {SerialNo NF100 Height 72 Sockets 3}
+for partition ::P1(::Lamp is partitioned [::TableLamp | ::FloorLamp]), in relvar ::Lamp
+tuple {SerialNo NF100 ModelNo FCN-22 Make Falcon} is referred to by multiple tuples
+
+% relvar insert FloorLamp {SerialNo NF101 Height 72 Sockets 3}
+for partition ::P1(::Lamp is partitioned [::TableLamp | ::FloorLamp]), in relvar ::FloorLamp
+tuple {SerialNo NF101 Height 72 Sockets 3} references no tuple
+
+}]
+
+
+[call [cmd "::ral::relvar set"] [arg relvarName] [opt relationValue]]
 
 The [cmd set] subcommand replaces the current value held by the relation
-variable named [arg relationVariable] with the value given by
+variable named [arg relvarName] with the value given by
 [arg relationValue].
 It is an error to attempt to assign a relation value to a relation variable
 that is of a different type than the type of the value
@@ -334,54 +617,154 @@ that the variable currently holds.
 In other words, it is not possible to change the type of a relvar
 by assignment.
 The return value of the subcommand the current value
-held by [arg relationVariable].
+held by [arg relvarName].
 If the [arg relationValue] argument is missing, then no attempt is made to
-change the value of [arg relationVariable].
+change the value of [arg relvarName].
 This command operates in a manner analogous to the [cmd set] command for
 ordinary Tcl variables.
 
-[call [cmd "::ral::relvar unset"] [opt "relationVariable ..."]]
+[example {
+% relvar create PUPPY {
+>       Relation
+>       {PuppyName string Dame string Sire string}
+>       PuppyName
+>     }
+Relation {PuppyName string Dame string Sire string} PuppyName {}
+% relvar set PUPPY {
+>       Relation
+>       {PuppyName string Dame string Sire string}
+>       PuppyName
+>       {
+>           {PuppyName Bitsy Dame Spot Sire Jumper}
+>       }
+>     }
+Relation {PuppyName string Dame string Sire string} PuppyName {{PuppyName Bitsy Dame Spot Sire Jumper}}
+% relvar set PUPPY $::DOG
+headings not equal, "Relation {DogName string Breed string} DogName"
+}]
+
+[call [cmd "::ral::relvar unset"] [opt "relvarName ..."]]
 
 The [cmd unset] deletes all the relation variables whose names are given
 as the subcommand arguments.
+The corresponding Tcl variables that were created when the relvar
+was created are also [cmd unset].
+This command operates in a manner analogous to the [cmd unset] command for
+ordinary Tcl variables.
+It is an error to attempt to [cmd unset] a relvar that is associated
+with any constraints.
 
 [call [cmd "::ral::relvar update"] [arg relvarName] [arg tupleVarName]\
     [arg expression] [arg script]]
 
 The [cmd update] subcommand modifies the values of tuples in the relation
-value contained in the relation variable given by [arg relationVariable].
-Each tuple in [arg relationVariable] is successively assigned to the tuple
-variable given by [arg tupleVariable] and [arg expression] is evaluated.
+value contained in the relation variable given by [arg relvarName].
+Each tuple in [arg relvarName] is successively assigned to the tuple
+variable given by [arg tupleVarName] and [arg expression] is evaluated.
 If the result of the evaluation is true,
-then the attributes whose names are mentioned in the [arg name-value-list]
-are set to the corresponding values.
-The [arg name-value-list] argument consists of alternating attribute names
-and attribute values.
+then [arg script] is evaluated.
+The value of [arg tupleVarName] at the end of executing
+[arg script] is then updated into [arg relvarName].
+Typically, [arg script] will invoke [cmd "::ral::tuple update"]
+to modify the value of [arg tupleVarName].
 The return value of the subcommand is the number of tuples updated.
-The example below updates Sue's Age to be 20.
+
 [example {
-relvar update OWNER o {[tuple extract $o OwnerName] eq "Sue"} {Age 20}
+% puts [relformat $::OWNER]
++=========+---+-------------+
+|OwnerName|Age|City         |
+|string   |int|string       |
++=========+---+-------------+
+|Sue      |24 |Cupertino    |
+|George   |35 |Sunnyvale    |
+|Alice    |30 |San Jose     |
+|Mike     |50 |San Jose     |
+|Jim      |42 |San Francisco|
++=========+---+-------------+
+% relvar update OWNER o {[tuple extract $o OwnerName] eq "Sue"} {
+>       tuple update o Age [expr {[tuple extract $o Age] + 1}]
+>     }
+1
+% puts [relformat $::OWNER]
++=========+---+-------------+
+|OwnerName|Age|City         |
+|string   |int|string       |
++=========+---+-------------+
+|Sue      |25 |Cupertino    |
+|George   |35 |Sunnyvale    |
+|Alice    |30 |San Jose     |
+|Mike     |50 |San Jose     |
+|Jim      |42 |San Francisco|
++=========+---+-------------+
+% relvar update OWNER o {[tuple extract $o OwnerName] eq "George"} {
+>       tuple update o OwnerName Alfonse
+>     }
+for association ::A1(::OWNERSHIP [+] ==> [1] ::OWNER), in relvar ::OWNER
+tuple {OwnerName Alfonse Age 35 City Sunnyvale} is not referenced by any tuple
+for association ::A1(::OWNERSHIP [+] ==> [1] ::OWNER), in relvar ::OWNERSHIP
+tuple {OwnerName George DogName Fido Acquired 2001} references no tuple
+tuple {OwnerName George DogName Sam Acquired 2000} references no tuple
+
+% puts [relformat $::OWNER]
++=========+---+-------------+
+|OwnerName|Age|City         |
+|string   |int|string       |
++=========+---+-------------+
+|Sue      |25 |Cupertino    |
+|George   |35 |Sunnyvale    |
+|Alice    |30 |San Jose     |
+|Mike     |50 |San Jose     |
+|Jim      |42 |San Francisco|
++=========+---+-------------+
 }]
 
-[call [cmd "::ral::relvar updateone"] [arg relationVariable]\
+[call [cmd "::ral::relvar updateone"] [arg relvarName]\
     [arg id-name-value-list] [arg name-value-list]]
 
 The [cmd updateone] subcommand modifies at most one tuple from the
-relation variable given by the [arg relationVariable] argument.
+relation variable given by the [arg relvarName] argument.
 The [arg id-name-value-list] must be list containing an even number of elements
 which are attribute names alternating with attribute values.
 The set of attribute names in [arg id-name-value-list] must form one of the
-identifiers of [arg relationVariable].
-If [arg relationVariable] contains a tuple whose attribute values match those
+identifiers of [arg relvarName].
+If [arg relvarName] contains a tuple whose attribute values match those
 in [arg name-value-list] then
 then the attributes whose names are mentioned in the [arg name-value-list]
-are set to the corresponding values and [arg relationVariable]
+are set to the corresponding values and [arg relvarName]
 is modified in place.
-Otherwise [arg relationVariable] is unchanged.
+Otherwise [arg relvarName] is unchanged.
 This subcommand is useful in those contexts where the attribute values of an
 identifier are known and evaluating an expression over all the tuples
-in [arg relationVariable] is superfluous.
-The return value of the subcommand is the number of tuples updated.
+in [arg relvarName] is superfluous.
+The return value of the subcommand is the number of tuples updated
+which will necessarily be either 0 or 1.
+
+[example {
+% puts [relformat $::OWNER]
++=========+---+-------------+
+|OwnerName|Age|City         |
+|string   |int|string       |
++=========+---+-------------+
+|Sue      |24 |Cupertino    |
+|George   |35 |Sunnyvale    |
+|Alice    |30 |San Jose     |
+|Mike     |50 |San Jose     |
+|Jim      |42 |San Francisco|
++=========+---+-------------+
+% relvar updateone OWNER {OwnerName George} {Age 37 City {New York}}
+1
+% puts [relformat $::OWNER]
++=========+---+-------------+
+|OwnerName|Age|City         |
+|string   |int|string       |
++=========+---+-------------+
+|Sue      |24 |Cupertino    |
+|George   |37 |New York     |
+|Alice    |30 |San Jose     |
+|Mike     |50 |San Jose     |
+|Jim      |42 |San Francisco|
++=========+---+-------------+
+}]
 
 [list_end]
 

@@ -45,8 +45,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.4 $
-# $Date: 2006/07/12 01:49:06 $
+# $Revision: 1.5 $
+# $Date: 2006/07/17 03:55:46 $
 #  *--
 }]
 [moddesc "Relation Operators"]
@@ -113,11 +113,12 @@ The identifiers of the relation.
 [enum]
 The relation body.
 [list_end]
-The relation heading is a even numbered list consisting of alternating
+The relation heading is a list containing an even number of elements
+consisting of alternating
 attribute names and attribute data types.
 It is the same form as a tuple heading.
 [para]
-The identifiers (candidate keys) of a relation are specified as a list.
+The identifiers (a.k.a. candidate keys) of a relation are specified as a list.
 Each identifer list element is in turn a list containing the attribute
 names that constitute the identifier.
 Every relation must have at least one identifier.
@@ -141,80 +142,128 @@ same name as the tables given below.
 For brevity we assume that the necessary commands have been imported into
 the namespace of the example.
 
-[example_begin]
+[example {
 % set DOG {
-    Relation
-    {DogName string Breed string}
-    DogName
-    {
-	{Fido Poodle}
-	{Sam Collie}
-	{Spot Terrier}
-	{Rover Retriever}
-	{Fred Spaniel}
-	{Jumper Mutt}
-    }
+> Relation
+> {DogName string Breed string}
+> DogName
+> {
+> {DogName Fido Breed Poodle}
+> {DogName Sam Breed Collie}
+> {DogName Spot Breed Terrier}
+> {DogName Rover Breed Retriever}
+> {DogName Fred Breed Spaniel}
+> {DogName Jumper Breed Mutt}
+> }
+> }
+
+Relation
+{DogName string Breed string}
+DogName
+{
+{DogName Fido Breed Poodle}
+{DogName Sam Breed Collie}
+{DogName Spot Breed Terrier}
+{DogName Rover Breed Retriever}
+{DogName Fred Breed Spaniel}
+{DogName Jumper Breed Mutt}
 }
+
 % relformat $DOG DOG
++=======+---------+
+|DogName|Breed    |
+|string |string   |
++=======+---------+
+|Fido   |Poodle   |
+|Sam    |Collie   |
+|Spot   |Terrier  |
+|Rover  |Retriever|
+|Fred   |Spaniel  |
+|Jumper |Mutt     |
++=======+---------+
 DOG
-DogName      Breed
- string     string
-==================
-   Fido     Poodle
-    Sam     Collie
-   Spot    Terrier
-  Rover  Retriever
-   Fred    Spaniel
- Jumper       Mutt
+---
 % set OWNER {
-    Relation
-    {OwnerName string Age int City string}
-    OwnerName
-    {
-	{OwnerName Sue Age 24 City Cupertino}
-	{OwnerName George Age 35 City Sunnyvale}
-	{OwnerName Alice Age 30 City {San Jose}}
-	{OwnerName Mike Age 50 City {San Jose}}
-	{OwnerName Jim Age 42 City {San Francisco}}
-    }
+> Relation
+> {OwnerName string Age int City string}
+> OwnerName
+> {
+> {OwnerName Sue Age 24 City Cupertino}
+> {OwnerName George Age 35 City Sunnyvale}
+> {OwnerName Alice Age 30 City {San Jose}}
+> {OwnerName Mike Age 50 City {San Jose}}
+> {OwnerName Jim Age 42 City {San Francisco}}
+> }
+> }
+
+Relation
+{OwnerName string Age int City string}
+OwnerName
+{
+{OwnerName Sue Age 24 City Cupertino}
+{OwnerName George Age 35 City Sunnyvale}
+{OwnerName Alice Age 30 City {San Jose}}
+{OwnerName Mike Age 50 City {San Jose}}
+{OwnerName Jim Age 42 City {San Francisco}}
 }
+
 % relformat $OWNER OWNER
++=========+---+-------------+
+|OwnerName|Age|City         |
+|string   |int|string       |
++=========+---+-------------+
+|Sue      |24 |Cupertino    |
+|George   |35 |Sunnyvale    |
+|Alice    |30 |San Jose     |
+|Mike     |50 |San Jose     |
+|Jim      |42 |San Francisco|
++=========+---+-------------+
 OWNER
-OwnerName  Age           City
-   string  int         string
-=============================
-      Sue   24      Cupertino
-   George   35      Sunnyvale
-    Alice   30       San Jose
-     Mike   50       San Jose
-      Jim   42  San Francisco
+-----
 % set OWNERSHIP {
-    Relation
-    {OwnerName string DogName string Acquired string}
-    {{OwnerName DogName}}
-    {
-	{OwnerName Sue DogName Fido Acquired 2001}
-	{OwnerName Sue DogName Sam Acquired 2000}
-	{OwnerName George DogName Fido Acquired 2001}
-	{OwnerName George DogName Sam Acquired 2000}
-	{OwnerName Alice DogName Spot Acquired 2001}
-	{OwnerName Mike DogName Rover Acquired 2002}
-	{OwnerName Jim DogName Fred Acquired 2003}
-    }
+> Relation
+> {OwnerName string DogName string Acquired string}
+> {{OwnerName DogName}}
+> {
+> {OwnerName Sue DogName Fido Acquired 2001}
+> {OwnerName Sue DogName Sam Acquired 2000}
+> {OwnerName George DogName Fido Acquired 2001}
+> {OwnerName George DogName Sam Acquired 2000}
+> {OwnerName Alice DogName Spot Acquired 2001}
+> {OwnerName Mike DogName Rover Acquired 2002}
+> {OwnerName Jim DogName Fred Acquired 2003}
+> }
+> }
+
+Relation
+{OwnerName string DogName string Acquired string}
+{{OwnerName DogName}}
+{
+{OwnerName Sue DogName Fido Acquired 2001}
+{OwnerName Sue DogName Sam Acquired 2000}
+{OwnerName George DogName Fido Acquired 2001}
+{OwnerName George DogName Sam Acquired 2000}
+{OwnerName Alice DogName Spot Acquired 2001}
+{OwnerName Mike DogName Rover Acquired 2002}
+{OwnerName Jim DogName Fred Acquired 2003}
 }
+
 % relformat $OWNERSHIP OWNERSHIP
++=========+=======+--------+
+|OwnerName|DogName|Acquired|
+|string   |string |string  |
++=========+=======+--------+
+|Sue      |Fido   |2001    |
+|Sue      |Sam    |2000    |
+|George   |Fido   |2001    |
+|George   |Sam    |2000    |
+|Alice    |Spot   |2001    |
+|Mike     |Rover  |2002    |
+|Jim      |Fred   |2003    |
++=========+=======+--------+
 OWNERSHIP
-OwnerName  DogName  Acquired
-   string   string    string
-============================
-      Sue     Fido      2001
-      Sue      Sam      2000
-   George     Fido      2001
-   George      Sam      2000
-    Alice     Spot      2001
-     Mike    Rover      2002
-      Jim     Fred      2003
-[example_end]
+---------
+}]
 
 [section COMMANDS]
 [list_begin definitions]
@@ -273,16 +322,19 @@ identifier are known and evaluating an expression over all the tuples
 in [arg relationValue] is superfluous.
 
 [example {
-% relformat [relation choose DOG DogName Fred]
-DogName    Breed
- string   string
-================
-   Fred  Spaniel
-
-% relformat [relation choose $DOG DogName Jane]
-DogName    Breed
- string   string
-================
+% relformat [relation choose $::DOG DogName Fred]
++=======+-------+
+|DogName|Breed  |
+|string |string |
++=======+-------+
+|Fred   |Spaniel|
++=======+-------+
+% relformat [relation choose $::DOG DogName Jane]
++=======+------+
+|DogName|Breed |
+|string |string|
++=======+------+
++=======+------+
 }]
 
 [call [cmd "::ral::relation degree"] [arg relationValue]]
@@ -306,15 +358,16 @@ as the dictionary keys and the other attribute values
 as the corresponding dictionary values.
 
 [example {
-% dict for {name breed} [relation dict $DOG] {
-     puts "$name ==> $breed"
-}
+% dict for {name breed} [relation dict $::DOG] {
+> puts "$name ==> $breed"
+> }
 Fred ==> Spaniel
 Sam ==> Collie
 Rover ==> Retriever
 Spot ==> Terrier
 Fido ==> Poodle
-Jumper ==> Mutt}]
+Jumper ==> Mutt
+}]
 
 [call [cmd "::ral::relation divide"] [arg dividend] [arg divisor]\
     [arg mediator]]
@@ -330,60 +383,68 @@ corresponding tuples in [arg mediator] include all the tuples in
 Using the data from our ongoing example, then the following example shows
 how division can be used to find all the Dogs owned by both Sue and George.
 
-
 [example {
-set dividend [relation project $DOG DogName]
-puts [relformat $dividend Dividend:]
+% set dividend [relation project $::DOG DogName]
+Relation {DogName string} DogName {{DogName Fido} {DogName Sam} {DogName Spot} {DogName Rover} {DogName Fred} {DogName Jumper}}
+% puts [relformat $dividend Dividend:]
++=======+
+|DogName|
+|string |
++=======+
+|Fido   |
+|Sam    |
+|Spot   |
+|Rover  |
+|Fred   |
+|Jumper |
++=======+
 Dividend:
 ---------
-DogName
- string
-=======
-   Fido
-    Sam
-   Spot
-  Rover
-   Fred
- Jumper
-
-set divisor [relation project [relation restrict $OWNER t\ 
-    {[tuple extract $t OwnerName] eq "Sue" ||\ 
-    [tuple extract $t OwnerName] eq "George"}] OwnerName]
-puts [relformat $divisor Divisor:]
+% set divisor [relation project [relation restrict $::OWNER t\
+> {[tuple extract $t OwnerName] eq "Sue" ||\
+> [tuple extract $t OwnerName] eq "George"}] OwnerName]
+Relation {OwnerName string} OwnerName {{OwnerName Sue} {OwnerName George}}
+% puts [relformat $divisor Divisor:]
++=========+
+|OwnerName|
+|string   |
++=========+
+|Sue      |
+|George   |
++=========+
 Divisor:
 --------
-OwnerName
-   string
-=========
-      Sue
-   George
-
-set mediator [relation eliminate $OWNERSHIP Acquired]
-puts [relformat $mediator Mediator:]
+% set mediator [relation eliminate $::OWNERSHIP Acquired]
+Relation {OwnerName string DogName string} {{OwnerName DogName}} {{OwnerName Sue DogName Fido} {OwnerName Sue DogName Sam} {OwnerName George DogName Fido} {OwnerName George DogName Sam} {OwnerName Alice DogName Spot} {OwnerName Mike DogName Rover} {OwnerName Jim DogName Fred}}
+% puts [relformat $mediator Mediator:]
++=========+=======+
+|OwnerName|DogName|
+|string   |string |
++=========+=======+
+|Sue      |Fido   |
+|Sue      |Sam    |
+|George   |Fido   |
+|George   |Sam    |
+|Alice    |Spot   |
+|Mike     |Rover  |
+|Jim      |Fred   |
++=========+=======+
 Mediator:
 ---------
-OwnerName  DogName
-   string   string
-==================
-      Sue     Fido
-      Sue      Sam
-   George     Fido
-   George      Sam
-    Alice     Spot
-     Mike    Rover
-      Jim     Fred
-
-set quotient [relation divide $dividend $divisor $mediator]
-puts [relformat $quotient "All dogs owned by both Sue and George"]
+% set quotient [relation divide $dividend $divisor $mediator]
+Relation {DogName string} DogName {{DogName Fido} {DogName Sam}}
+% puts [relformat $quotient "All dogs owned by both Sue and George"]
++=======+
+|DogName|
+|string |
++=======+
+|Fido   |
+|Sam    |
++=======+
 All dogs owned by both Sue and George
 -------------------------------------
-DogName
- string
-=======
-   Fido
-    Sam
-
 }]
+
 
 [call [cmd "::ral::relation eliminate"] [arg relationValue]\
     [opt "attribute ..."]]
@@ -501,19 +562,44 @@ corresponding part of the tuple placed in the new relation valued attribute.
 See also the [cmd ungroup] subcommand for the complementary operation.
 
 [example {
-relation group $OWNERSHIP DogAcquisition Dogname Acquired
-OwnerName     DogAcquisition
-   string           Relation
-           DogName  Acquired
-            string    string
-============================
-      Sue     Fido      2001
-               Sam      2000
-   George     Fido      2001
-               Sam      2000
-    Alice     Spot      2001
-     Mike    Rover      2002
-      Jim     Fred      2003
+% relformat [relation group $::OWNERSHIP DogAcquisition DogName Acquired]
++=========+------------------+
+|OwnerName|DogAcquisition    |
+|string   |Relation          |
++=========+------------------+
+|Sue      |+=======+--------+|
+|         ||DogName|Acquired||
+|         ||string |string  ||
+|         |+=======+--------+|
+|         ||Fido   |2001    ||
+|         ||Sam    |2000    ||
+|         |+=======+--------+|
+|George   |+=======+--------+|
+|         ||DogName|Acquired||
+|         ||string |string  ||
+|         |+=======+--------+|
+|         ||Fido   |2001    ||
+|         ||Sam    |2000    ||
+|         |+=======+--------+|
+|Alice    |+=======+--------+|
+|         ||DogName|Acquired||
+|         ||string |string  ||
+|         |+=======+--------+|
+|         ||Spot   |2001    ||
+|         |+=======+--------+|
+|Mike     |+=======+--------+|
+|         ||DogName|Acquired||
+|         ||string |string  ||
+|         |+=======+--------+|
+|         ||Rover  |2002    ||
+|         |+=======+--------+|
+|Jim      |+=======+--------+|
+|         ||DogName|Acquired||
+|         ||string |string  ||
+|         |+=======+--------+|
+|         ||Fred   |2003    ||
+|         |+=======+--------+|
++=========+------------------+
 }]
 
 [call [cmd "::ral::relation heading"] [arg relationValue]]

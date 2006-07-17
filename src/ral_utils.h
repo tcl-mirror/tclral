@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_utils.h,v $
-$Revision: 1.4 $
-$Date: 2006/07/09 03:48:13 $
+$Revision: 1.5 $
+$Date: 2006/07/17 03:55:46 $
  *--
  */
 #ifndef _ral_utils_h_
@@ -182,6 +182,7 @@ typedef enum {
     RAL_ERR_CONSTRAINTS_PRESENT,
     RAL_ERR_BAD_MULT,
     RAL_ERR_BAD_TRANS_OP,
+    RAL_ERR_SUPER_NAME,
 } Ral_ErrorCode ;
 
 typedef struct Ral_ErrorInfo {

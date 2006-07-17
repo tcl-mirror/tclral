@@ -4,26 +4,7 @@ exec tclsh "$0" "$@"
 
 package require ral
 
-proc displayExample {script} {
-    puts "\[example \{"
-
-    set cmd ""
-    foreach line [split $script "\n"] {
-	if {[string length $line] == 0} continue
-	if {[string length $cmd] == 0} {
-	    puts "% [string trim $line]"
-	} else {
-	    puts "> $line"
-	}
-	append cmd " " [string trim $line]
-	if {[info complete $cmd]} {
-	    catch $line result
-	    puts $result
-	    set cmd ""
-	}
-    }
-    puts "\}\]\n"
-}
+source displayExample.tcl
 
 # Example for the tuple manual page.
 
@@ -125,13 +106,18 @@ displayExample {
 
 # tuple unwrap
 displayExample {
-    set t {Tuple {Name string Address {Tuple {Number int Street string}}}\
-	{Name Fred Address {Number 100 Street Elm}}}
+    set t {
+	Tuple
+	{Name string Address {Tuple {Number int Street string}}}
+	{Name Fred Address {Number 100 Street Elm}}
+    }
     tuple unwrap $t Address
     tuple unwrap $t Name
 
-    set u {Tuple {Name string Address {Tuple {Number int Name string}}}\
-	{Name Fred Address {Number 100 Name Elm}}}
+    set u {
+	Tuple {Name string Address {Tuple {Number int Name string}}}
+	{Name Fred Address {Number 100 Name Elm}}
+    }
     tuple unwrap $u Address
 }
 

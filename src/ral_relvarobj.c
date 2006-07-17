@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.10 $
-$Date: 2006/07/13 02:52:16 $
+$Revision: 1.11 $
+$Date: 2006/07/17 03:55:46 $
  *--
  */
 
@@ -103,7 +103,7 @@ EXTERNAL DATA DEFINITIONS
 STATIC DATA ALLOCATION
 */
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.10 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.11 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -329,6 +329,8 @@ Ral_RelvarObjCreateAssoc(
     int isNotId ;
     Ral_Constraint constraint ;
     Ral_AssociationConstraint assoc ;
+    int result = TCL_OK ;
+    Tcl_DString errMsg ;
 
     /*
      * Creating an association is not allowed during an "eval" script.
@@ -456,7 +458,6 @@ Ral_RelvarObjCreateAssoc(
 	Tcl_DStringFree(&resolve) ;
 	return TCL_ERROR ;
     }
-    Tcl_DStringFree(&resolve) ;
     assoc = constraint->association ;
     assoc->referringRelvar = relvar1 ;
     assoc->referringCond = specTable[specIndex1].conditionality ;
@@ -474,13 +475,25 @@ Ral_RelvarObjCreateAssoc(
     Ral_PtrVectorPushBack(relvar1->constraints, constraint) ;
     Ral_PtrVectorPushBack(relvar2->constraints, constraint) ;
     /*
-     * Mark the relvars involved in the constraint as modified so that
-     * the constraint will be checked.
+     * Evaluate the newly created constraint to make sure that the
+     * current values of the relvar pass the constraint evaluation.
+     * If not, we delete the constraint because the state of the
+     * relvar values is not correct.
      */
-    Ral_RelvarStartTransaction(info, 0) ;
-    Ral_RelvarStartCommand(info, relvar1) ;
-    Ral_RelvarStartCommand(info, relvar2) ;
-    return Ral_RelvarObjEndTrans(interp, info, 0) ;
+    Tcl_DStringInit(&errMsg) ;
+    if (!Ral_RelvarConstraintEval(constraint, &errMsg)) {
+	int status ;
+
+	Tcl_DStringResult(interp, &errMsg) ;
+	status = Ral_ConstraintDeleteByName(name, info) ;
+	assert(status != 0) ;
+
+	result = TCL_ERROR ;
+    }
+
+    Tcl_DStringFree(&resolve) ;
+    Tcl_DStringFree(&errMsg) ;
+    return result ;
 }
 
 int
@@ -494,6 +507,7 @@ Ral_RelvarObjCreatePartition(
      * name super super-attrs sub1 sub1-attrs
      * ?sub2 sub2-attrs sub3 sub3-attrs ...?
      */
+    char const *superName ;
     Ral_Relvar super ;
     Ral_Relation superRel ;
     int supElemc ;
@@ -503,9 +517,11 @@ Ral_RelvarObjCreatePartition(
     Ral_TupleHeading supth ;
     const char *partName ;
     Tcl_DString resolve ;
+    Tcl_DString errMsg ;
     Ral_Constraint constraint ;
     Ral_PartitionConstraint partition ;
     Ral_PtrVector subList ;	/* set of sub type names */
+    int result = TCL_OK ;
 
     /*
      * Creating a partition is not allowed during an "eval" script.
@@ -518,8 +534,8 @@ Ral_RelvarObjCreatePartition(
     /*
      * Look up the supertype and make sure that the value is truly a relation.
      */
-    super = Ral_RelvarObjFindRelvar(interp, info, Tcl_GetString(objv[1]),
-	NULL) ;
+    superName = Tcl_GetString(objv[1]) ;
+    super = Ral_RelvarObjFindRelvar(interp, info, superName, NULL) ;
     if (super == NULL) {
 	return TCL_ERROR ;
     }
@@ -583,8 +599,6 @@ Ral_RelvarObjCreatePartition(
     partition = constraint->partition ;
     partition->referredToRelvar = super ;
 
-    Ral_RelvarStartTransaction(info, 0) ;
-    Ral_RelvarStartCommand(info, super) ;
     Ral_PtrVectorPushBack(super->constraints, constraint) ;
     /*
      * Loop over the subtype relations and attributes.
@@ -601,6 +615,14 @@ Ral_RelvarObjCreatePartition(
 	Ral_SubsetReference subRef ;
 	Ral_JoinMap refMap ;
 	Ral_IntVectorIter supAttrIter ;
+	/*
+	 * Make sure the sub type is not the super type.
+	 */
+	if (strcmp(superName, subName) == 0) {
+	    Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptPartition,
+		RAL_ERR_SUPER_NAME, superName) ;
+	    goto errorOut ;
+	}
 	/*
 	 * Get the subtype relvar and the attributes.
 	 */
@@ -657,21 +679,32 @@ Ral_RelvarObjCreatePartition(
 	 * Sort the join map based on the super type identifier.
 	 */
 	Ral_JoinMapSortAttr(refMap, 1) ;
-	Ral_RelvarStartCommand(info, sub) ;
 	Ral_PtrVectorPushBack(sub->constraints, constraint) ;
+    }
+
+    Tcl_DStringInit(&errMsg) ;
+    if (!Ral_RelvarConstraintEval(constraint, &errMsg)) {
+	int status ;
+
+	Tcl_DStringResult(interp, &errMsg) ;
+	status = Ral_ConstraintDeleteByName(partName, info) ;
+	assert(status != 0) ;
+
+	result = TCL_ERROR ;
     }
 
     Ral_IntVectorDelete(superAttrs) ;
     Ral_PtrVectorDelete(subList) ;
+    Tcl_DStringFree(&errMsg) ;
     Tcl_DStringFree(&resolve) ;
-    return Ral_RelvarObjEndTrans(interp, info, 0) ;
+    return result ;
 
 errorOut:
     Ral_IntVectorDelete(superAttrs) ;
     Ral_PtrVectorDelete(subList) ;
     Ral_ConstraintDeleteByName(partName, info) ;
     Tcl_DStringFree(&resolve) ;
-    return Ral_RelvarObjEndTrans(interp, info, 1) ;
+    return TCL_ERROR ;
 }
 
 int

@@ -4,28 +4,7 @@ exec tclsh "$0" "$@"
 
 package require ral
 
-proc displayExample {script} {
-    puts "\[example \{"
-
-    set cmd ""
-    foreach line [split $script "\n"] {
-	if {[string length $line] == 0} continue
-	if {[string length $cmd] == 0} {
-	    puts "% [string trim $line]"
-	} else {
-	    puts "> $line"
-	}
-	append cmd " " [string trim $line]
-	if {[info complete $cmd]} {
-	    catch $line result
-	    if {[string length $result]} {
-		puts $result
-	    }
-	    set cmd ""
-	}
-    }
-    puts "\}\]\n"
-}
+source displayExample.tcl
 
 proc setOwner {} {
     relvar set OWNER {

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_utils.c,v $
-$Revision: 1.6 $
-$Date: 2006/07/09 03:48:13 $
+$Revision: 1.7 $
+$Date: 2006/07/17 03:55:46 $
  *--
  */
 
@@ -87,7 +87,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_utils.c,v $ $Revision: 1.6 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_utils.c,v $ $Revision: 1.7 $" ;
 
 static char const * const cmdStrings[] = {
     "unknown command",
@@ -199,6 +199,7 @@ static char const * const resultStrings[] = {
     "relvar has constraints in place",
     "referred to identifiers can not have non-singular multiplicities",
     "operation is not allowed during \"eval\" command",
+    "a super set relvar may not be named as one of its own sub sets",
 } ;
 
 static char const * const errorStrings[] = {
@@ -244,6 +245,7 @@ static char const * const errorStrings[] = {
     "CONSTRAINTS_PRESENT",
     "BAD_MULT",
     "BAD_TRANS_OP",
+    "SUPER_NAME",
 } ;
 /*
 FUNCTION DEFINITIONS
