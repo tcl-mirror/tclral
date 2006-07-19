@@ -47,8 +47,8 @@
 #   This command is part of TclRAL. This file is in Tcl Markup Language
 #   format.
 # $RCSfile: relvar.man,v $
-# $Revision: 1.4 $
-# $Date: 2006/07/17 03:55:46 $
+# $Revision: 1.5 $
+# $Date: 2006/07/19 04:06:24 $
 #  *--
 }]
 [moddesc "Relvar Operators"]
@@ -146,6 +146,11 @@ all of the constraints defined for the modified relvars are evaluated.
 If any of the constraints fail, the relvar modifications are discarded
 and the relvar values are returned to the values they had before
 the modifications.
+Similarly,
+after the creation of a constraint, the constraint is evaluated
+on all the relvars associated with the constraint.
+If the evaluation fails,
+the constraint is deleted.
 
 Like relvars, constraints have names.
 Constraints names follow the same pattern as relvar names, i.e.
@@ -234,7 +239,7 @@ Also this constraint allows for OWNERS that may own more than one DOG.
 
 Compare this to the case of A2.
 A2 states that every tuple in OWNERSHIP must have a corresponding tuple
-in DOG, but that tuples in DOG may not be reference by any tuple in OWNERSHIP.
+in DOG, but that tuples in DOG may not be referenced by any tuple in OWNERSHIP.
 OWNERSHIP and DOG are conditionally associated
 and in the semantics of this problem, it is possible to have dogs that 
 are not owned at all and to have dogs that are owned multiple times.
@@ -249,8 +254,9 @@ The return value is the empty string.
 The [cmd "constraint info"] subcommand returns the detailed information
 about the constraint named [arg name].
 The information returned is of the same format as the command used
-to create the partition minus the superfluous leading [cmd relvar].
-Also the relvar names and constraint names are returned in fully qualified
+to create the partition minus the superfluous leading [cmd relvar] command
+word.
+Also, the relvar names and constraint names are returned in fully qualified
 form.
 
 [example {
@@ -515,7 +521,7 @@ tuple {OwnerName Tom DogName Skippy Acquired 2006} references no tuple
 The [cmd insert] subcommand inserts the tuples given by [arg name-value-list]
 arguments into the value of the relation stored in [arg relvarName].
 The value of [arg relvarName] is modified in place.
-The subcommand has no return value.
+The return value is the current relation value held in [arg relvarName].
 It is an error to attempt to insert a duplicate tuple or a tuple whose
 heading does not match the relation heading.
 All values of the tuple must be specfied with a valid value representation of

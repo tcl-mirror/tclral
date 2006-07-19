@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.20 $
-$Date: 2006/07/12 01:41:49 $
+$Revision: 1.21 $
+$Date: 2006/07/19 04:06:24 $
  *--
  */
 
@@ -92,6 +92,7 @@ EXTERNAL FUNCTION REFERENCES
 FORWARD FUNCTION REFERENCES
 */
 static int RelationArrayCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
+static int RelationAttributesCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationCardinalityCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationChooseCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationDegreeCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
@@ -140,7 +141,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.20 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.21 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -164,6 +165,7 @@ relationCmd(
 	int (*const cmdFunc)(Tcl_Interp *, int, Tcl_Obj *const*) ;
     } cmdTable[] = {
 	{"array", RelationArrayCmd},
+	{"attributes", RelationAttributesCmd},
 	{"cardinality", RelationCardinalityCmd},
 	{"choose", RelationChooseCmd},
 	{"degree", RelationDegreeCmd},
@@ -289,6 +291,51 @@ RelationArrayCmd(
     Tcl_ResetResult(interp) ;
     return TCL_OK ;
 }
+
+static int
+RelationAttributesCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_Obj *relObj ;
+    Ral_Relation relation ;
+    Ral_TupleHeading tupleHeading ;
+    Tcl_Obj *attrListObj ;
+    Ral_TupleHeadingIter tIter ;
+    Ral_TupleHeadingIter tEnd ;
+
+    /* relation attributes relationValue */
+    if (objc != 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relationValue") ;
+	return TCL_ERROR ;
+    }
+
+    relObj = *(objv + 2) ;
+    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relObj->internalRep.otherValuePtr ;
+    tupleHeading = relation->heading->tupleHeading ;
+
+    attrListObj = Tcl_NewListObj(0, NULL) ;
+    tEnd = Ral_TupleHeadingEnd(tupleHeading) ;
+    for (tIter = Ral_TupleHeadingBegin(tupleHeading) ;
+	tIter != tEnd ; ++tIter) {
+	Ral_Attribute attr = *tIter ;
+	Tcl_Obj *attrObj = Tcl_NewStringObj(attr->name, -1) ;
+
+	if (Tcl_ListObjAppendElement(interp, attrListObj, attrObj) != TCL_OK) {
+	    Tcl_DecrRefCount(attrObj) ;
+	    Tcl_DecrRefCount(attrListObj) ;
+	    return TCL_ERROR ;
+	}
+    }
+
+    Tcl_SetObjResult(interp, attrListObj) ;
+    return TCL_OK ;
+}
+
 static int
 RelationCardinalityCmd(
     Tcl_Interp *interp,

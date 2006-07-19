@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.28 $
-# $Date: 2006/07/17 03:55:46 $
+# $Revision: 1.29 $
+# $Date: 2006/07/19 04:06:24 $
 #  *--
 
 package require tcltest 2.2
@@ -836,6 +836,11 @@ namespace eval ::ral::test {
 	    S4 London
 	    S5 Athens
     } -match dict
+
+    # relation attributes subcommand
+    test relation-attributes-1.0 {DOG relation} -body {
+	lsort [relation attributes $P]
+    } -result {CITY COLOR P# PNAME WEIGHT}
 
     # relation cardinality subcommand
     test relation-cardinality-1.0 {dum relation} -body {
