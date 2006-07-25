@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.29 $
-# $Date: 2006/07/19 04:06:24 $
+# $Revision: 1.30 $
+# $Date: 2006/07/25 04:13:51 $
 #  *--
 
 package require tcltest 2.2
@@ -3530,6 +3530,72 @@ tuple {C1 c C2 42} references no tuple
     } -body {
 	relvar constraint info R1
     } -result {partition ::ral::test::R1 ::ral::test::A A1 ::ral::test::B B1 ::ral::test::C C1}
+
+    # relvar correlation subcommand
+    test relvar-correlation-1.1 {many to many} -setup {
+	relvar create A {
+	    Relation
+	    {A1 int X_ID string Y_ID string}
+	    {{X_ID Y_ID}}
+	}
+	relvar create X {
+	    Relation
+	    {X_ID string X2 string}
+	    X_ID
+	}
+	relvar create Y {
+	    Relation
+	    {Y_ID string Y2 string}
+	    Y_ID
+	}
+	relvar correlation R1 A X_ID + X X_ID Y_ID + Y Y_ID
+    } -cleanup {
+	relvar constraint delete R1
+	relvar unset A X Y
+    } -body {
+	relvar eval {
+	    relvar insert X {X_ID x1 X2 one}
+	    relvar insert X {X_ID x2 X2 two}
+	    relvar insert Y {Y_ID y1 Y2 one}
+	    relvar insert Y {Y_ID y2 Y2 two}
+	    relvar insert A {A1 1 X_ID x1 Y_ID y1}
+	    relvar insert A {A1 1 X_ID x1 Y_ID y2}
+	    relvar insert A {A1 2 X_ID x2 Y_ID y1}
+	}
+	return
+    } -result {}
+
+    test relvar-correlation-2.1 {1 to 1} -setup {
+	relvar create A {
+	    Relation
+	    {A1 int X_ID string Y_ID string}
+	    {{X_ID Y_ID}}
+	}
+	relvar create X {
+	    Relation
+	    {X_ID string X2 string}
+	    X_ID
+	}
+	relvar create Y {
+	    Relation
+	    {Y_ID string Y2 string}
+	    Y_ID
+	}
+	relvar correlation R1 A X_ID 1 X X_ID Y_ID 1 Y Y_ID
+    } -cleanup {
+	relvar constraint delete R1
+	relvar unset A X Y
+    } -body {
+	relvar eval {
+	    relvar insert X {X_ID x1 X2 one}
+	    relvar insert X {X_ID x2 X2 two}
+	    relvar insert Y {Y_ID y1 Y2 one}
+	    relvar insert Y {Y_ID y2 Y2 two}
+	    relvar insert A {A1 1 X_ID x1 Y_ID y2}
+	    relvar insert A {A1 2 X_ID x2 Y_ID y1}
+	}
+	return
+    } -result {}
 
     # relvar create subcommand
     test relvar-create-1.0 {single attribute} -body {

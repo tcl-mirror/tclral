@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.c,v $
-$Revision: 1.7 $
-$Date: 2006/07/11 02:04:31 $
+$Revision: 1.8 $
+$Date: 2006/07/25 04:13:51 $
  *--
  */
 
@@ -84,18 +84,24 @@ static int relvarAssocConstraintEval(const char *, Ral_AssociationConstraint,
     Tcl_DString *) ;
 static int relvarPartitionConstraintEval(const char *,
     Ral_PartitionConstraint, Tcl_DString *) ;
+static int relvarCorrelationConstraintEval(const char *,
+    Ral_CorrelationConstraint, Tcl_DString *) ;
 static int relvarEvalAssocTupleCounts(Ral_IntVector, int, int, Ral_IntVector,
     Ral_IntVector) ;
 static void relvarAssocConstraintErrorMsg(Tcl_DString *, const char *,
     Ral_AssociationConstraint, Ral_Relvar, Ral_IntVector, const char *) ;
 static void relvarPartitionConstraintErrorMsg(Tcl_DString *, const char *,
     Ral_PartitionConstraint, Ral_Relvar, Ral_IntVector, const char *) ;
+static void relvarCorrelationConstraintErrorMsg(Tcl_DString *, const char *,
+    Ral_CorrelationConstraint, Ral_Relvar, Ral_IntVector, const char *) ;
 static void relvarConstraintErrorMsg(Tcl_DString *, const char *, Ral_Relation,
     Ral_IntVector, const char *) ;
 static void relvarAssocConstraintToString(const char *,
     Ral_AssociationConstraint, Tcl_DString *) ;
 static void relvarPartitionConstraintToString(const char *,
     Ral_PartitionConstraint, Tcl_DString *) ;
+static void relvarCorrelationConstraintToString(const char *,
+    Ral_CorrelationConstraint, Tcl_DString *) ;
 
 /*
 EXTERNAL DATA REFERENCES
@@ -109,7 +115,11 @@ Ral_RelvarError Ral_RelvarLastError = RELVAR_OK ;
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.7 $" ;
+static char const * const condMultStrings[2][2] = {
+    {"1", "+"},
+    {"?", "*"}
+} ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.8 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -420,6 +430,24 @@ Ral_ConstraintPartitionCreate(
     return constraint ;
 }
 
+Ral_Constraint
+Ral_ConstraintCorrelationCreate(
+    const char *name,
+    Ral_RelvarInfo info)
+{
+    int newPtr ;
+    Tcl_HashEntry *entry ;
+    Ral_Constraint constraint = NULL ;
+
+    entry = Tcl_CreateHashEntry(&info->constraints, name, &newPtr) ;
+    if (newPtr) {
+	constraint = Ral_ConstraintNewCorrelation(name) ;
+	Tcl_SetHashValue(entry, constraint) ;
+    }
+
+    return constraint ;
+}
+
 int
 Ral_ConstraintDeleteByName(
     const char *name,
@@ -476,7 +504,8 @@ Ral_ConstraintNewAssociation(
 
     constraint->type = ConstraintAssociation ;
     constraint->association = (Ral_AssociationConstraint)ckalloc(
-	sizeof(struct Ral_AssociationConstraint)) ;
+	sizeof(*constraint->association)) ;
+    memset(constraint->association, 0, sizeof(*constraint->association)) ;
 
     return constraint ;
 }
@@ -489,8 +518,22 @@ Ral_ConstraintNewPartition(
 
     constraint->type = ConstraintPartition ;
     constraint->partition = (Ral_PartitionConstraint)ckalloc(
-	sizeof(struct Ral_PartitionConstraint)) ;
+	sizeof(*constraint->partition)) ;
     constraint->partition->subsetReferences = Ral_PtrVectorNew(2) ;
+
+    return constraint ;
+}
+
+Ral_Constraint
+Ral_ConstraintNewCorrelation(
+    const char *name)
+{
+    Ral_Constraint constraint = Ral_ConstraintNew(name) ;
+
+    constraint->type = ConstraintCorrelation ;
+    constraint->correlation = (Ral_CorrelationConstraint)ckalloc(
+	sizeof(*constraint->correlation)) ;
+    memset(constraint->correlation, 0, sizeof(*constraint->correlation)) ;
 
     return constraint ;
 }
@@ -564,7 +607,9 @@ Ral_ConstraintDelete(
 		Ral_PtrVectorErase(sub->constraints, found, found + 1) ;
 	    }
 	}
-
+	/*
+	 * Iterate through the subset references and free the join maps.
+	 */
 	sEnd = Ral_PtrVectorEnd(partition->subsetReferences) ;
 	for (sIter = Ral_PtrVectorBegin(partition->subsetReferences) ;
 	    sIter != sEnd ; ++sIter) {
@@ -575,6 +620,48 @@ Ral_ConstraintDelete(
 	}
 	Ral_PtrVectorDelete(partition->subsetReferences) ;
 	ckfree((char *)constraint->partition) ;
+    }
+	break ;
+
+    case ConstraintCorrelation:
+    {
+	Ral_CorrelationConstraint correl = constraint->correlation ;
+	Ral_Relvar referring = correl->referringRelvar ;
+	Ral_Relvar aRef = correl->aRefToRelvar ;
+	Ral_Relvar bRef = correl->bRefToRelvar ;
+	Ral_PtrVectorIter found ;
+
+	/*
+	 * Like the association case, delete this constraint from
+	 * those associated with the participating relvars.
+	 * In this case there are three different relvars to examine.
+	 */
+	found = Ral_PtrVectorFind(referring->constraints, constraint) ;
+	/*
+	 * We allow the constraint to not be found in case this
+	 * is called as a clean up when the constraint is only
+	 * partially formed.
+	 */
+	if (found != Ral_PtrVectorEnd(referring->constraints)) {
+	    Ral_PtrVectorErase(referring->constraints, found, found + 1) ;
+	}
+
+	found = Ral_PtrVectorFind(aRef->constraints, constraint) ;
+	if (found != Ral_PtrVectorEnd(aRef->constraints)) {
+	    Ral_PtrVectorErase(aRef->constraints, found, found + 1) ;
+	}
+	if (correl->aReferenceMap) {
+	    Ral_JoinMapDelete(correl->aReferenceMap) ;
+	}
+	found = Ral_PtrVectorFind(bRef->constraints, constraint) ;
+	if (found != Ral_PtrVectorEnd(bRef->constraints)) {
+	    Ral_PtrVectorErase(bRef->constraints, found, found + 1) ;
+	}
+	if (correl->bReferenceMap) {
+	    Ral_JoinMapDelete(correl->bReferenceMap) ;
+	}
+
+	ckfree((char *)correl) ;
     }
 	break ;
 
@@ -600,6 +687,11 @@ Ral_RelvarConstraintEval(
     case ConstraintPartition:
 	return relvarPartitionConstraintEval(constraint->name,
 	    constraint->partition, errMsg) ;
+	break ;
+
+    case ConstraintCorrelation:
+	return relvarCorrelationConstraintEval(constraint->name,
+	    constraint->correlation, errMsg) ;
 	break ;
 
     default:
@@ -902,6 +994,183 @@ relvarPartitionConstraintEval(
     return result ;
 }
 
+/*
+ * Evaluate a correlation type constraint.
+ * Return 1 if the constraint is satisfied,  0 otherwise.
+ * On error, "errMsg" if it is non-NULL, contains text to identify the error.
+ * Assumes that, "errMsg" is properly initialized on entry.
+ *
+ * Correlation constraints look, at this level, like two association
+ * constraints where the referring spec is always "1".
+ */
+static int
+relvarCorrelationConstraintEval(
+    const char *name,
+    Ral_CorrelationConstraint correlation,
+    Tcl_DString *errMsg)
+{
+    Ral_Relvar referringRelvar ;
+    Ral_Relation referringRel ;
+    Ral_Relvar aRefToRelvar ;
+    Ral_Relation aRefToRel ;
+    Ral_Relvar bRefToRelvar ;
+    Ral_Relation bRefToRel ;
+    Ral_IntVector cnts ;
+    Ral_IntVector multViolations ;
+    Ral_IntVector condViolations ;
+    int aRef_result ;
+    int aRefTo_result ;
+    int bRef_result ;
+    int bRefTo_result ;
+    int comp_result ;
+
+    referringRelvar = correlation->referringRelvar ;
+    assert(referringRelvar->relObj->typePtr == &Ral_RelationObjType) ;
+    referringRel = referringRelvar->relObj->internalRep.otherValuePtr ;
+
+    aRefToRelvar = correlation->aRefToRelvar ;
+    assert(aRefToRelvar->relObj->typePtr == &Ral_RelationObjType) ;
+    aRefToRel = aRefToRelvar->relObj->internalRep.otherValuePtr ;
+    /*
+     * Map the tuples as if they were to be joined.
+     */
+    Ral_RelationFindJoinTuples(referringRel, aRefToRel,
+	correlation->aReferenceMap) ;
+    /*
+     * Now we count the tuples in the mapping and verify that the join
+     * would match the conditionality and multiplicity of the correlation.
+     */
+    cnts = Ral_IntVectorNew(Ral_RelationCardinality(aRefToRel), 0) ;
+    Ral_JoinMapTupleCounts(correlation->aReferenceMap, 1, cnts) ;
+
+    multViolations = Ral_IntVectorNewEmpty(0) ;
+    condViolations = Ral_IntVectorNewEmpty(0) ;
+    aRef_result = relvarEvalAssocTupleCounts(cnts, correlation->aMult,
+	correlation->aCond, multViolations, condViolations) ;
+    Ral_IntVectorDelete(cnts) ;
+    /*
+     * Leave error messages.
+     */
+    if (!aRef_result) {
+	relvarCorrelationConstraintErrorMsg(errMsg, name, correlation,
+	    aRefToRelvar, multViolations,
+	    "is referenced by multiple tuples") ;
+	relvarCorrelationConstraintErrorMsg(errMsg, name, correlation,
+	    aRefToRelvar, condViolations,
+	    "is not referenced by any tuple") ;
+    }
+    Ral_IntVectorDelete(multViolations) ;
+    Ral_IntVectorDelete(condViolations) ;
+    /*
+     * Now do the same for the referred to direction.
+     */
+    cnts = Ral_IntVectorNew(Ral_RelationCardinality(referringRel), 0) ;
+    Ral_JoinMapTupleCounts(correlation->aReferenceMap, 0, cnts) ;
+
+    multViolations = Ral_IntVectorNewEmpty(0) ;
+    condViolations = Ral_IntVectorNewEmpty(0) ;
+    /*
+     * The referred to direction is always unconditionally singular.
+     */
+    aRefTo_result = relvarEvalAssocTupleCounts(cnts, 0, 0,
+	multViolations, condViolations) ;
+    Ral_IntVectorDelete(cnts) ;
+    if (!aRefTo_result) {
+	relvarCorrelationConstraintErrorMsg(errMsg, name, correlation,
+	    referringRelvar, multViolations, "references multiple tuples") ;
+	relvarCorrelationConstraintErrorMsg(errMsg, name, correlation,
+	    referringRelvar, condViolations, "references no tuple") ;
+    }
+    Ral_IntVectorDelete(multViolations) ;
+    Ral_IntVectorDelete(condViolations) ;
+    /*
+     * Clean out the tuple matches from the join map.
+     */
+    Ral_JoinMapTupleEmpty(correlation->aReferenceMap) ;
+
+    /*
+     * Now do the whole thing over again for the other side.
+     */
+    bRefToRelvar = correlation->bRefToRelvar ;
+    bRefToRel = bRefToRelvar->relObj->internalRep.otherValuePtr ;
+    /*
+     * Map the tuples as if they were to be joined.
+     */
+    Ral_RelationFindJoinTuples(referringRel, bRefToRel,
+	correlation->bReferenceMap) ;
+    /*
+     * Now we count the tuples in the mapping and verify that the join
+     * would match the conditionality and multiplicity of the correlation.
+     */
+    cnts = Ral_IntVectorNew(Ral_RelationCardinality(bRefToRel), 0) ;
+    Ral_JoinMapTupleCounts(correlation->bReferenceMap, 1, cnts) ;
+
+    multViolations = Ral_IntVectorNewEmpty(0) ;
+    condViolations = Ral_IntVectorNewEmpty(0) ;
+    bRef_result = relvarEvalAssocTupleCounts(cnts, correlation->bMult,
+	correlation->bCond, multViolations, condViolations) ;
+    Ral_IntVectorDelete(cnts) ;
+    /*
+     * Leave error messages.
+     */
+    if (!bRef_result) {
+	relvarCorrelationConstraintErrorMsg(errMsg, name, correlation,
+	    bRefToRelvar, multViolations,
+	    "is referenced by multiple tuples") ;
+	relvarCorrelationConstraintErrorMsg(errMsg, name, correlation,
+	    bRefToRelvar, condViolations,
+	    "is not referenced by any tuple") ;
+    }
+    Ral_IntVectorDelete(multViolations) ;
+    Ral_IntVectorDelete(condViolations) ;
+    /*
+     * Now do the same for the referred to direction.
+     */
+    cnts = Ral_IntVectorNew(Ral_RelationCardinality(referringRel), 0) ;
+    Ral_JoinMapTupleCounts(correlation->bReferenceMap, 0, cnts) ;
+
+    multViolations = Ral_IntVectorNewEmpty(0) ;
+    condViolations = Ral_IntVectorNewEmpty(0) ;
+    /*
+     * The referred to direction is always unconditionally singular.
+     */
+    bRefTo_result = relvarEvalAssocTupleCounts(cnts, 0, 0,
+	multViolations, condViolations) ;
+    Ral_IntVectorDelete(cnts) ;
+    if (!bRefTo_result) {
+	relvarCorrelationConstraintErrorMsg(errMsg, name, correlation,
+	    referringRelvar, multViolations, "references multiple tuples") ;
+	relvarCorrelationConstraintErrorMsg(errMsg, name, correlation,
+	    referringRelvar, condViolations, "references no tuple") ;
+    }
+    Ral_IntVectorDelete(multViolations) ;
+    Ral_IntVectorDelete(condViolations) ;
+    /*
+     * Clean out the tuple matches from the join map.
+     */
+    Ral_JoinMapTupleEmpty(correlation->bReferenceMap) ;
+    /*
+     * Check for "complete" and if set, then the cardinality of
+     * relvarC must equal the cardinality of relvarA * cardinality of relvarB
+     */
+    comp_result = 1 ;
+    if (correlation->complete && (Ral_RelationCardinality(referringRel) !=
+	    Ral_RelationCardinality(aRefToRel) *
+	    Ral_RelationCardinality(bRefToRel))) {
+	{
+	    comp_result = 0 ;
+	    Tcl_DStringAppend(errMsg, "correlation ", -1) ;
+	    relvarCorrelationConstraintToString(name, correlation, errMsg) ;
+	    Tcl_DStringAppend(errMsg, "does not form a complete correlation",
+		-1) ;
+	}
+    }
+
+    return aRef_result && aRefTo_result
+	    && bRef_result && bRefTo_result
+	    && comp_result ;
+}
+
 static int
 relvarEvalAssocTupleCounts(
     Ral_IntVector counts,
@@ -986,6 +1255,29 @@ relvarPartitionConstraintErrorMsg(
 }
 
 static void
+relvarCorrelationConstraintErrorMsg(
+    Tcl_DString *msg,		    /* error text appended here */
+    const char *name,		    /* constraint name */
+    Ral_CorrelationConstraint correlation,/* correlation contraint in error */
+    Ral_Relvar relvar,		    /* the relvar in error */
+    Ral_IntVector violations,	    /* a list of tuple indices in error */
+    const char *detail)		    /* text detail for the error */
+{
+    Ral_Relation rel ;
+
+    if (msg == NULL || Ral_IntVectorSize(violations) == 0) {
+	return ;
+    }
+
+    assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
+    rel = relvar->relObj->internalRep.otherValuePtr ;
+
+    Tcl_DStringAppend(msg, "for correlation ", -1) ;
+    relvarCorrelationConstraintToString(name, correlation, msg) ;
+    relvarConstraintErrorMsg(msg, relvar->name, rel, violations, detail) ;
+}
+
+static void
 relvarConstraintErrorMsg(
     Tcl_DString *msg,
     const char *relvarName,
@@ -1019,11 +1311,6 @@ relvarAssocConstraintToString(
     Ral_AssociationConstraint assoc,
     Tcl_DString *result)
 {
-    static char const * const condMultStrings[2][2] = {
-	{"1", "+"},
-	{"?", "*"}
-    } ;
-
     Ral_Relvar referringRelvar = assoc->referringRelvar ;
     Ral_Relvar referredToRelvar = assoc->referredToRelvar ;
 
@@ -1069,4 +1356,33 @@ relvarPartitionConstraintToString(
     Tcl_DStringSetLength(result, Tcl_DStringLength(result) - 3) ;
 
     Tcl_DStringAppend(result, "])", -1) ;
+}
+
+static void
+relvarCorrelationConstraintToString(
+    const char *name,
+    Ral_CorrelationConstraint correlation,
+    Tcl_DString *result)
+{
+    Ral_Relvar referringRelvar = correlation->referringRelvar ;
+    Ral_Relvar aReferredToRelvar = correlation->aRefToRelvar ;
+    Ral_Relvar bReferredToRelvar = correlation->bRefToRelvar ;
+
+    Tcl_DStringAppend(result, name, -1) ;
+    Tcl_DStringAppend(result, "(", -1) ;
+    Tcl_DStringAppend(result, aReferredToRelvar->name, -1) ;
+    Tcl_DStringAppend(result, " [", -1) ;
+    Tcl_DStringAppend(result,
+	condMultStrings[correlation->aCond][correlation->aMult], -1) ;
+    Tcl_DStringAppend(result, "] <== ", -1) ;
+    Tcl_DStringAppend(result, referringRelvar->name, -1) ;
+    if (correlation->complete) {
+	Tcl_DStringAppend(result, " [C]", -1) ;
+    }
+    Tcl_DStringAppend(result, " ==> [", -1) ;
+    Tcl_DStringAppend(result,
+	condMultStrings[correlation->bCond][correlation->bMult], -1) ;
+    Tcl_DStringAppend(result, "] ", -1) ;
+    Tcl_DStringAppend(result, bReferredToRelvar->name, -1) ;
+    Tcl_DStringAppend(result, ")", -1) ;
 }

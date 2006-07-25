@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.h,v $
-$Revision: 1.5 $
-$Date: 2006/05/19 04:54:32 $
+$Revision: 1.6 $
+$Date: 2006/07/25 04:13:51 $
  *--
  */
 #ifndef _ral_relvar_h_
@@ -79,6 +79,7 @@ TYPE DECLARATIONS
 typedef enum {
     ConstraintAssociation,
     ConstraintPartition,
+    ConstraintCorrelation,
 } Ral_ConstraintType ;
 
 typedef struct Ral_AssociationConstraint {
@@ -101,12 +102,26 @@ typedef struct Ral_PartitionConstraint {
     Ral_PtrVector subsetReferences ;	/* list of Ral_SubsetReference */
 } *Ral_PartitionConstraint ;
 
+typedef struct Ral_CorrelationConstraint {
+    struct Ral_Relvar *referringRelvar ;
+    struct Ral_Relvar *aRefToRelvar ;
+    int aCond ;
+    int aMult ;
+    Ral_JoinMap aReferenceMap ;
+    struct Ral_Relvar *bRefToRelvar ;
+    int bCond ;
+    int bMult ;
+    Ral_JoinMap bReferenceMap ;
+    int complete ;
+} *Ral_CorrelationConstraint ;
+
 typedef struct Ral_Constraint {
     Ral_ConstraintType type ;
     char *name ;
     union {
 	Ral_AssociationConstraint association ;
 	Ral_PartitionConstraint partition ;
+	Ral_CorrelationConstraint correlation ;
     } ;
 } *Ral_Constraint ;
 
@@ -180,15 +195,20 @@ extern void Ral_RelvarDeleteTransaction(Ral_RelvarTransaction) ;
 extern Ral_Constraint Ral_ConstraintAssocCreate(const char *, Ral_RelvarInfo) ;
 extern Ral_Constraint Ral_ConstraintPartitionCreate(const char *,
     Ral_RelvarInfo) ;
+extern Ral_Constraint Ral_ConstraintCorrelationCreate(const char *,
+    Ral_RelvarInfo) ;
+
 extern int Ral_ConstraintDeleteByName(const char *, Ral_RelvarInfo) ;
 extern Ral_Constraint Ral_ConstraintFindByName(const char *, Ral_RelvarInfo) ;
 extern Ral_Constraint Ral_ConstraintNewAssociation(const char *) ;
 extern Ral_Constraint Ral_ConstraintNewPartition(const char *) ;
+extern Ral_Constraint Ral_ConstraintNewCorrelation(const char *) ;
 extern void Ral_ConstraintDelete(Ral_Constraint) ;
 extern int Ral_RelvarConstraintEval(Ral_Constraint, Tcl_DString *) ;
 
 extern void Ral_RelvarSetRelation(Ral_Relvar, Ral_Relation) ;
 extern void Ral_RelvarRestorePrev(Ral_Relvar) ;
 extern void Ral_RelvarDiscardPrev(Ral_Relvar) ;
+
 
 #endif /* _ral_relvar_h_ */

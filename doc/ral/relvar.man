@@ -47,8 +47,8 @@
 #   This command is part of TclRAL. This file is in Tcl Markup Language
 #   format.
 # $RCSfile: relvar.man,v $
-# $Revision: 1.5 $
-# $Date: 2006/07/19 04:06:24 $
+# $Revision: 1.6 $
+# $Date: 2006/07/25 04:13:51 $
 #  *--
 }]
 [moddesc "Relvar Operators"]
@@ -112,7 +112,7 @@ set is placed in their own relvar namespace.
 TclRAL supports the notion of [emph constraints] as a means of
 insuring integrity among a set of relvars.
 There are many types of constraints that might be used to insure integrity,
-but TclRAL supports two types of declarative constraints.
+but TclRAL supports three types of declarative constraints.
 [list_begin definitions]
 
 [lst_item Association]
@@ -135,6 +135,13 @@ known as the sub sets.
 This constraint declares that every tuple of the super set relvar is
 referred to by exactly one tuple from among all the tuples in the
 sub set relvars.
+
+[lst_item Correlation]
+Correlation constraints define a referential association between two
+relvars that is mediated by a third relvar.
+The third relvar, the correlation relvar, contains attributes that
+reference identifiers in the two associated relvars.
+It is similar in some ways to two Association Constraints.
 
 [list_end]
 
@@ -177,7 +184,7 @@ attributes that are referred to by [arg refToAttrList]. The referring
 and referred to attribute lists are ordered and referring attributes
 refer to the corresponding referred to attribute.
 The set of attributes given by [arg refToAttrList] must constitute
-and identifier for [arg refToRelvar].
+an identifier for [arg refToRelvar].
 The [arg refToSpec] argument defines
 the multiplicity and conditionality of the reference.
 It can be one of:
@@ -282,6 +289,46 @@ The returned names are fully qualified.
 % relvar constraint names *2
 ::A2
 }]
+
+[call [cmd "::ral::relvar correlation"] [opt -complete] [arg name]\
+[arg correlRelvar]\
+[arg correlAttrListA] [arg refToSpecA] [arg refToRelvarA] [arg refToAttrListA]\
+[arg correlAttrListB] [arg refToSpecB] [arg refToRelvarB] [arg refToAttrListB]]
+
+The [cmd correlation] subcommand creates a referential correlation
+called [arg name].
+The referential correlation is between a correlation relvar, [arg correlRelvar],
+and two other relvars, [arg refToRelvarA] and [arg refToRelvarB].
+The return value of [cmd correlation] is the empty string.
+
+Correlations declare that every tuple in [arg correlRelvar] refers to
+exactly one tuple of [arg refToRelvarA] and exactly one tuple of
+[arg refToRelvarB].
+The [arg correlAttrListA] attributes in [arg correlRelvar] refer to the
+identifier of [arg refToRelvarA] that are given by [arg refToAttrListA].
+Similarly,
+the [arg correlAttrListB] attributes in [arg correlRelvar] refer to the
+identifier of [arg refToRelvarB] that are given by [arg refToAttrListB].
+Both [arg refToAttrListA] and [arg refToAttrListB] must constitute
+an identifier for their corresponding relvars.
+The [arg refToSpecA] and [arg refToSpecB] arguments can have the same values
+as for the [cmd "::ral::relvar association"] command and specify
+the multiplicity and conditionality of how [arg refToRelvarA] and
+[arg refToRelvarB] are referred to by the tuples of [arg correlRelvar].
+If the [opt -complete] option is given,
+then every tuple of [arg refToRelvarA] must be correlated to every
+tuple of [arg refToRelvarB] and [emph "vice versa"].
+That is, the cardinality of [arg correlRelvar] must equal the product
+of the cardinality of [arg refToRelvarA] and [arg refToRelvarB].
+If the [opt -complete] option is missing,
+then [arg correlRelvar] is allowed to have a subset of cartesian product
+of the references.
+
+Correlation constraints are often used to enforce the referential
+constraints for relvars that are related in a many to many fashion.
+However, they also arise in situation where the multiplicity is not
+many to many and when the [arg correlRelvar] contains attributes that
+apply to the association of [arg refToRelvarA] and [arg refToRelvarB] itself.
 
 [call [cmd "::ral::relvar create"] [arg relvarName] [arg heading]]
 

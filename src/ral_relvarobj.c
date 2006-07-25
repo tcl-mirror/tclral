@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.11 $
-$Date: 2006/07/17 03:55:46 $
+$Revision: 1.12 $
+$Date: 2006/07/25 04:13:51 $
  *--
  */
 
@@ -102,8 +102,20 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
+static struct {
+    const char *specString ;
+    int conditionality ;
+    int multiplicity ;
+} specTable[] = {
+    {"1", 0, 0},
+    {"+", 0, 1},
+    {"?", 1, 0},
+    {"*", 1, 1},
+    {NULL, 0, 0}
+} ;
+static const char specErrMsg[] = "multiplicity specification" ;
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.11 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.12 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -295,20 +307,9 @@ Ral_RelvarObjCreateAssoc(
     Tcl_Obj *const*objv,
     Ral_RelvarInfo info)
 {
-    /* name relvar1 attr-list1 spec1 relvar2 attr-list2 spec2 */
-
-    static struct {
-	const char *specString ;
-	int conditionality ;
-	int multiplicity ;
-    } specTable[] = {
-	{"1", 0, 0},
-	{"+", 0, 1},
-	{"?", 1, 0},
-	{"*", 1, 1},
-	{NULL, 0, 0}
-    } ;
-    static const char specErrMsg[] = "multiplicity specification" ;
+    /*
+     * name relvar1 attr-list1 spec1 relvar2 attr-list2 spec2
+     */
 
     Ral_Relvar relvar1 ;
     Ral_Relation r1 ;
@@ -708,6 +709,300 @@ errorOut:
 }
 
 int
+Ral_RelvarObjCreateCorrelation(
+    Tcl_Interp *interp,
+    Tcl_Obj *const*objv,
+    Ral_RelvarInfo info)
+{
+    /*
+     * ?-complete? name corrRelvar corr-attr1-list spec1 relvar1 attr-list1
+     *                             corr-attr2-list spec2 relvar2 attr-list2
+     */
+
+    int complete = 0 ;
+    Ral_Relvar relvarC ;
+    Ral_Relation rC ;
+    int elemcC1 ;
+    Tcl_Obj **elemvC1 ;
+    int elemcC2 ;
+    Tcl_Obj **elemvC2 ;
+
+    Ral_Relvar relvar1 ;
+    Ral_Relation r1 ;
+    int elemc1 ;
+    Tcl_Obj **elemv1 ;
+    int specIndex1 ;
+
+    Ral_Relvar relvar2 ;
+    Ral_Relation r2 ;
+    int elemc2 ;
+    Tcl_Obj **elemv2 ;
+    int specIndex2 ;
+
+    const char *name ;
+    Tcl_DString resolve ;
+    Ral_JoinMap refMap ;
+    Ral_TupleHeading thC ;
+    Ral_TupleHeading th1 ;
+    Ral_TupleHeading th2 ;
+    Ral_IntVector refAttrs ;
+    int isNotId ;
+    Ral_Constraint constraint ;
+    Ral_CorrelationConstraint correl ;
+    int result = TCL_OK ;
+    Tcl_DString errMsg ;
+
+    /*
+     * Creating a correlation is not allowed during an "eval" script.
+     */
+    if (Ral_RelvarIsTransOnGoing(info)) {
+	Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptCorrelation,
+	    RAL_ERR_BAD_TRANS_OP, "correlation") ;
+	return TCL_ERROR ;
+    }
+    /*
+     * Check if we got the "-complete" option.
+     */
+    if (strcmp(Tcl_GetString(objv[0]), "-complete") == 0) {
+	complete = 1 ;
+	++objv ;
+    }
+    /*
+     * Look up the correlation relvar.
+     */
+    relvarC = Ral_RelvarObjFindRelvar(interp, info, Tcl_GetString(objv[1]),
+	NULL) ;
+    if (relvarC == NULL) {
+	return TCL_ERROR ;
+    }
+    if (Tcl_ConvertToType(interp, relvarC->relObj, &Ral_RelationObjType)
+	!= TCL_OK) {
+	return TCL_ERROR ;
+    }
+    rC = relvarC->relObj->internalRep.otherValuePtr ;
+    /*
+     * Get the correlation attribute lists.
+     */
+    if (Tcl_ListObjGetElements(interp, objv[2], &elemcC1, &elemvC1) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    if (Tcl_ListObjGetElements(interp, objv[6], &elemcC2, &elemvC2) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    /*
+     * Check the correlation specifiers.
+     */
+    if (Tcl_GetIndexFromObjStruct(interp, objv[3], specTable,
+	sizeof(specTable[0]), specErrMsg, 0, &specIndex1) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    /*
+     * Check the spec against "complete". If "complete" was specified
+     * then the correlation spec must be "+".
+     */
+    if (complete && (specTable[specIndex1].conditionality == 0 ||
+	specTable[specIndex1].multiplicity == 0)) {
+	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptCorrelation,
+	    RAL_ERR_INCOMPLETE_SPEC, objv[3]) ;
+    }
+    if (Tcl_GetIndexFromObjStruct(interp, objv[7], specTable,
+	sizeof(specTable[0]), specErrMsg, 0, &specIndex2) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    if (complete && (specTable[specIndex2].conditionality == 0 ||
+	specTable[specIndex2].multiplicity == 0)) {
+	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptCorrelation,
+	    RAL_ERR_INCOMPLETE_SPEC, objv[7]) ;
+    }
+    /*
+     * Look up relvar 1.
+     */
+    relvar1 = Ral_RelvarObjFindRelvar(interp, info, Tcl_GetString(objv[4]),
+	NULL) ;
+    if (relvar1 == NULL) {
+	return TCL_ERROR ;
+    }
+    if (Tcl_ConvertToType(interp, relvar1->relObj, &Ral_RelationObjType)
+	!= TCL_OK) {
+	return TCL_ERROR ;
+    }
+    r1 = relvar1->relObj->internalRep.otherValuePtr ;
+    /*
+     * Get the elements from the attribute list.
+     */
+    if (Tcl_ListObjGetElements(interp, objv[5], &elemc1, &elemv1) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+
+    relvar2 = Ral_RelvarObjFindRelvar(interp, info, Tcl_GetString(objv[8]),
+	NULL) ;
+    if (relvar2 == NULL) {
+	return TCL_ERROR ;
+    }
+    if (Tcl_ConvertToType(interp, relvar2->relObj, &Ral_RelationObjType)
+	!= TCL_OK) {
+	return TCL_ERROR ;
+    }
+    r2 = relvar2->relObj->internalRep.otherValuePtr ;
+    if (Tcl_ListObjGetElements(interp, objv[9], &elemc2, &elemv2) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+
+    /*
+     * The same number of attributes must be specified on each side of the
+     * association.
+     */
+    if (elemc1 != elemcC1) {
+	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptCorrelation,
+	    RELVAR_REFATTR_MISMATCH, objv[5]) ;
+	return TCL_ERROR ;
+    }
+    if (elemc2 != elemcC2) {
+	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptCorrelation,
+	    RELVAR_REFATTR_MISMATCH, objv[9]) ;
+	return TCL_ERROR ;
+    }
+
+    /*
+     * Create the correlation constraint data structure and fill in
+     * what we know.
+     */
+    name = relvarResolveName(interp, Tcl_GetString(objv[0]), &resolve) ;
+    constraint = Ral_ConstraintCorrelationCreate(name, info) ;
+    if (constraint == NULL) {
+	Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptCorrelation,
+	    RAL_ERR_DUP_CONSTRAINT, name) ;
+	Tcl_DStringFree(&resolve) ;
+	return TCL_ERROR ;
+    }
+    correl = constraint->correlation ;
+    correl->referringRelvar = relvarC ;
+    correl->aRefToRelvar = relvar1 ;
+    correl->aCond = specTable[specIndex1].conditionality ;
+    correl->aMult = specTable[specIndex1].multiplicity ;
+    correl->aReferenceMap = Ral_JoinMapNew(0, 0) ;
+    correl->bRefToRelvar = relvar2 ;
+    correl->bCond = specTable[specIndex2].conditionality ;
+    correl->bMult = specTable[specIndex2].multiplicity ;
+    correl->bReferenceMap = Ral_JoinMapNew(0, 0) ;
+    correl->complete = complete ;
+    /*
+     * Now we construct two mappings. First from the correlation relvar to
+     * relvar 1 and then from the correlation relvar to relvar 2.
+     * The attributes in relvar 1 and relvar 2 must be identifiers.
+     * The attributes in the correlation relvar are the referring attributes.
+     */
+    thC = rC->heading->tupleHeading ;
+    th1 = r1->heading->tupleHeading ;
+    refMap = correl->aReferenceMap ;
+    while (elemc1-- > 0) {
+	int attrIndexC = Ral_TupleHeadingIndexOf(thC, Tcl_GetString(*elemvC1)) ;
+	int attrIndex1 = Ral_TupleHeadingIndexOf(th1, Tcl_GetString(*elemv1)) ;
+
+	if (attrIndexC < 0) {
+	    Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptCorrelation,
+		RAL_ERR_UNKNOWN_ATTR, *elemvC1) ;
+	    goto errorOut ;
+	}
+	if (attrIndex1 < 0) {
+	    Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptCorrelation,
+		RAL_ERR_UNKNOWN_ATTR, *elemv1) ;
+	    goto errorOut ;
+	}
+	Ral_JoinMapAddAttrMapping(refMap, attrIndexC, attrIndex1) ;
+	++elemvC1 ;
+	++elemv1 ;
+    }
+    /*
+     * The referred to attributes in the second relvar must constitute an
+     * identifier of the relation.
+     */
+    refAttrs = Ral_JoinMapGetAttr(refMap, 1) ;
+    isNotId = Ral_RelationHeadingFindIdentifier(r1->heading, refAttrs) < 0 ;
+    Ral_IntVectorDelete(refAttrs) ;
+    if (isNotId) {
+	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptCorrelation,
+	    RAL_ERR_NOT_AN_IDENTIFIER, objv[5]) ;
+	goto errorOut ;
+    }
+    /*
+     * Sort the join map attributes to match the identifier order.
+     */
+    Ral_JoinMapSortAttr(refMap, 1) ;
+
+    refMap = correl->bReferenceMap ;
+    th2 = r2->heading->tupleHeading ;
+    while (elemc2-- > 0) {
+	int attrIndexC = Ral_TupleHeadingIndexOf(thC, Tcl_GetString(*elemvC2)) ;
+	int attrIndex2 = Ral_TupleHeadingIndexOf(th2, Tcl_GetString(*elemv2)) ;
+
+	if (attrIndexC < 0) {
+	    Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptCorrelation,
+		RAL_ERR_UNKNOWN_ATTR, *elemvC2) ;
+	    goto errorOut ;
+	}
+	if (attrIndex2 < 0) {
+	    Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptCorrelation,
+		RAL_ERR_UNKNOWN_ATTR, *elemv2) ;
+	    goto errorOut ;
+	}
+	Ral_JoinMapAddAttrMapping(refMap, attrIndexC, attrIndex2) ;
+	++elemvC2 ;
+	++elemv2 ;
+    }
+    /*
+     * The referred to attributes in the second relvar must constitute an
+     * identifier of the relation.
+     */
+    refAttrs = Ral_JoinMapGetAttr(refMap, 1) ;
+    isNotId = Ral_RelationHeadingFindIdentifier(r2->heading, refAttrs) < 0 ;
+    Ral_IntVectorDelete(refAttrs) ;
+    if (isNotId) {
+	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptCorrelation,
+	    RAL_ERR_NOT_AN_IDENTIFIER, objv[9]) ;
+	goto errorOut ;
+    }
+    /*
+     * Sort the join map attributes to match the identifier order.
+     */
+    Ral_JoinMapSortAttr(refMap, 1) ;
+
+    /*
+     * Record which constraints apply to a given relvar. This is what allows
+     * us to find the constraints that apply to a relvar when it is modified.
+     * Treat the creation of the association as modifying the participating
+     * relvars.
+     */
+    Ral_PtrVectorPushBack(relvar1->constraints, constraint) ;
+    Ral_PtrVectorPushBack(relvar2->constraints, constraint) ;
+    /*
+     * Evaluate the newly created constraint to make sure that the
+     * current values of the relvar pass the constraint evaluation.
+     * If not, we delete the constraint because the state of the
+     * relvar values is not correct.
+     */
+    Tcl_DStringInit(&errMsg) ;
+    if (!Ral_RelvarConstraintEval(constraint, &errMsg)) {
+	int status ;
+
+	Tcl_DStringResult(interp, &errMsg) ;
+	status = Ral_ConstraintDeleteByName(name, info) ;
+	assert(status != 0) ;
+
+	result = TCL_ERROR ;
+    }
+
+    Tcl_DStringFree(&resolve) ;
+    Tcl_DStringFree(&errMsg) ;
+    return result ;
+
+errorOut:
+    Ral_ConstraintDeleteByName(name, info) ;
+    Tcl_DStringFree(&resolve) ;
+    return TCL_ERROR ;
+}
+
+int
 Ral_RelvarObjConstraintDelete(
     Tcl_Interp *interp,
     const char *name,
@@ -873,6 +1168,90 @@ Ral_RelvarObjConstraintInfo(
 		!= TCL_OK) {
 		goto errorOut ;
 	    }
+	}
+    }
+	break ;
+
+    case ConstraintCorrelation:
+    {
+	/* correlation ?-complete? name relvarC
+	 *	attr-listC1 spec1 relvar1 attr-list1
+	 *	attr-listC2 spec2 relvar2 attr-list2
+	 */
+	Ral_CorrelationConstraint correl = constraint->correlation ;
+
+	if (Tcl_ListObjAppendElement(interp, resultObj,
+	    Tcl_NewStringObj("correlation", -1)) != TCL_OK) {
+	    goto errorOut ;
+	}
+	if (correl->complete && Tcl_ListObjAppendElement(interp, resultObj,
+	    Tcl_NewStringObj("-complete", -1)) != TCL_OK) {
+	    goto errorOut ;
+	}
+	if (Tcl_ListObjAppendElement(interp, resultObj,
+	    Tcl_NewStringObj(fullName, -1)) != TCL_OK) {
+	    goto errorOut ;
+	}
+	/*
+	 * Correlation relvar name
+	 */
+	if (Tcl_ListObjAppendElement(interp, resultObj,
+	    Tcl_NewStringObj(correl->referringRelvar->name, -1)) != TCL_OK) {
+	    goto errorOut ;
+	}
+	/*
+	 * The "A" side.
+	 */
+	attrList = relvarConstraintAttrNames(interp, correl->referringRelvar,
+	    correl->aReferenceMap, 0) ;
+	if (attrList == NULL) {
+	    goto errorOut ;
+	}
+	if (Tcl_ListObjAppendElement(interp, resultObj, attrList) != TCL_OK) {
+	    goto errorOut ;
+	}
+	if (Tcl_ListObjAppendElement(interp, resultObj,
+	    relvarAssocSpec(correl->aCond, correl->aMult)) != TCL_OK) {
+	    goto errorOut ;
+	}
+	if (Tcl_ListObjAppendElement(interp, resultObj,
+	    Tcl_NewStringObj(correl->aRefToRelvar->name, -1)) != TCL_OK) {
+	    goto errorOut ;
+	}
+	attrList = relvarConstraintAttrNames(interp, correl->aRefToRelvar,
+	    correl->aReferenceMap, 1) ;
+	if (attrList == NULL) {
+	    goto errorOut ;
+	}
+	if (Tcl_ListObjAppendElement(interp, resultObj, attrList) != TCL_OK) {
+	    goto errorOut ;
+	}
+	/*
+	 * The "B" side.
+	 */
+	attrList = relvarConstraintAttrNames(interp, correl->referringRelvar,
+	    correl->bReferenceMap, 0) ;
+	if (attrList == NULL) {
+	    goto errorOut ;
+	}
+	if (Tcl_ListObjAppendElement(interp, resultObj, attrList) != TCL_OK) {
+	    goto errorOut ;
+	}
+	if (Tcl_ListObjAppendElement(interp, resultObj,
+	    relvarAssocSpec(correl->bCond, correl->bMult)) != TCL_OK) {
+	    goto errorOut ;
+	}
+	if (Tcl_ListObjAppendElement(interp, resultObj,
+	    Tcl_NewStringObj(correl->bRefToRelvar->name, -1)) != TCL_OK) {
+	    goto errorOut ;
+	}
+	attrList = relvarConstraintAttrNames(interp, correl->bRefToRelvar,
+	    correl->bReferenceMap, 1) ;
+	if (attrList == NULL) {
+	    goto errorOut ;
+	}
+	if (Tcl_ListObjAppendElement(interp, resultObj, attrList) != TCL_OK) {
+	    goto errorOut ;
 	}
     }
 	break ;

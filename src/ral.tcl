@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.15 $
-# $Date: 2006/07/13 02:52:16 $
+# $Revision: 1.16 $
+# $Date: 2006/07/25 04:13:51 $
 #  *--
 
 namespace eval ::ral {
@@ -201,12 +201,16 @@ proc ::ral::tupleformat {tupleValue {title {}} {noheading 0}} {
 #	{<relvar name> <relvar heading>}
 #
 #   <list of constaints> :
-#	{association | partition <constraint detail>}
+#	{association | partition | correlation <constraint detail>}
 #   <association constaint detail> :
 #	<association name> <relvar name> {<attr list>} <mult/cond>\
 #	    <relvar name> {<attr list>} <mult/cond>
 #   <partition constraint detail> :
 #	<partition name> <supertype> {<attr list>} <subtype1> {<attr list>} ...
+#   <correlation constaint detail> :
+#	<?-complete?> <correlation name> <correl relvar>
+#	    {<attr list>} <mult/cond> <relvarA>
+#	    {<attr list>} <mult/cond> <relvarB>
 #
 #   <list of relvar bodies> :
 #	{<relvar name> {<tuple value>}}
@@ -339,6 +343,10 @@ proc ::ral::storeToMk {fileName {ns {}}} {
     ::mk::view layout db.__ral_association $assocLayout
     ::mk::view layout db.__ral_partition\
 	{Name SupRelvar SupAttr {SubTypes {SubRelvar SubAttr}}}
+    set correlLayout {Complete Name CorrelRelvar\
+	RingAttrA RingMCA RtoRelvarA RtoAttrA\
+	RingAttrB RingMCB RtoRelvarB RtoAttrB}
+    ::mk::view layout db.__ral_correlation $correlLayout
 
     # Get the names of the relvars and insert them into the catalog.
     # Convert the names to be relative before inserting.
@@ -369,7 +377,12 @@ proc ::ral::storeToMk {fileName {ns {}}} {
 		    lappend value $col [lindex $cinfo $cindex]
 		    incr cindex
 		}
-		::mk::row append db.__ral_association {expand}$value
+		if {[package vsatisfies [package require Tcl] 8.5]} {
+		    ::mk::row append db.__ral_association {expand}$value
+		} else {
+		    eval [linsert $value 0\
+			::mk::row append db.__ral_association]
+		}
 	    }
 	    partition {
 		::mk::row append db.__ral_partition Name [lindex $cinfo 1]\
@@ -379,6 +392,27 @@ proc ::ral::storeToMk {fileName {ns {}}} {
 			SubRelvar $subname SubAttr $subattr
 		}
 		incr partIndex
+	    }
+	    correlation {
+		set value [list]
+		if {[lindex $cinfo 0] eq "-complete"} {
+		    lappend value [lindex $correlLayout 0] 1
+		    set cinfo [lrange $cinfo 1 end]
+		} else {
+		    lappend value [lindex $correlLayout 0] 0
+		}
+		set correlLayout [lrange $correlLayout 1 end]
+		set cindex 1
+		foreach col $correlLayout {
+		    lappend value $col [lindex $cinfo $cindex]
+		    incr cindex
+		}
+		if {[package vsatisfies [package require Tcl] 8.5]} {
+		    ::mk::row append db.__ral_correlation {expand}$value
+		} else {
+		    eval [linsert $value 0\
+			::mk::row append db.__ral_correlation]
+		}
 	    }
 	    default {
 		error "unknown constraint type, \"[lindex $cinfo 0]\""
@@ -443,9 +477,28 @@ proc ::ral::loadFromMk {fileName {ns ::}} {
 	    }
 	}
 	array set partValues [::mk::get $partCursor]
-	namespace eval $ns [list ::ral::relvar partition\
-	    $partValues(Name) $partValues(SupRelvar)\
-	    $partValues(SupAttr) {expand}$subtypes]
+	if {[package vsatisfies [package require Tcl] 8.5]} {
+	    namespace eval $ns [list ::ral::relvar partition\
+		$partValues(Name) $partValues(SupRelvar)\
+		$partValues(SupAttr) {expand}$subtypes]
+	} else {
+	    namespace eval $ns [linsert $subtypes 0\
+		$partValues(Name) $partValues(SupRelvar) $partValues(SupAttr)]
+	}
+    }
+    # create the correlation constraints
+    ::mk::loop correlCursor db.__ral_correlation {
+	set correlCmd [list ::ral::relvar correlation]
+	foreach {col value} [::mk::get $correlCursor] {
+	    if {$col eq "Complete"} {
+		if {$value == 1} {
+		    lappend correlCmd -complete
+		}
+	    } else {
+		lappend correlCmd $value
+	    }
+	}
+	namespace eval $ns $correlCmd
     }
     # fetch the relation values from the views
     relvar eval {
@@ -609,6 +662,12 @@ proc ::ral::getConstraint {cname} {
 	    for {set index 4} {$index < [llength $cinfo]} {incr index 2} {
 		lset cinfo $index [namespace tail [lindex $cinfo $index]]
 	    }
+	}
+	correlation {
+	    lset cinfo 1 [namespace tail [lindex $cinfo 1]]
+	    lset cinfo 2 [namespace tail [lindex $cinfo 2]]
+	    lset cinfo 5 [namespace tail [lindex $cinfo 5]]
+	    lset cinfo 9 [namespace tail [lindex $cinfo 9]]
 	}
 	default {
 	    error "unknown constraint type, \"[lindex $cinfo 0]\""

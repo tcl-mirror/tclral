@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_utils.c,v $
-$Revision: 1.7 $
-$Date: 2006/07/17 03:55:46 $
+$Revision: 1.8 $
+$Date: 2006/07/25 04:13:51 $
  *--
  */
 
@@ -87,7 +87,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_utils.c,v $ $Revision: 1.7 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_utils.c,v $ $Revision: 1.8 $" ;
 
 static char const * const cmdStrings[] = {
     "unknown command",
@@ -106,6 +106,7 @@ static char const * const optStrings[] = {
     "CARDINALITY",
     "CHOOSE",
     "CONSTRAINT",
+    "CORRELATION",
     "CREATE",
     "DEGREE",
     "DELETE",
@@ -200,6 +201,7 @@ static char const * const resultStrings[] = {
     "referred to identifiers can not have non-singular multiplicities",
     "operation is not allowed during \"eval\" command",
     "a super set relvar may not be named as one of its own sub sets",
+    "correlation spec is not available for a \"-complete\" correlation",
 } ;
 
 static char const * const errorStrings[] = {
@@ -246,6 +248,7 @@ static char const * const errorStrings[] = {
     "BAD_MULT",
     "BAD_TRANS_OP",
     "SUPER_NAME",
+    "INCOMPLETE_SPEC",
 } ;
 /*
 FUNCTION DEFINITIONS

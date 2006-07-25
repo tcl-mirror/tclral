@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.13 $
-$Date: 2006/07/17 03:55:46 $
+$Revision: 1.14 $
+$Date: 2006/07/25 04:13:51 $
  *--
  */
 
@@ -84,6 +84,8 @@ static int RelvarAssociationCmd(Tcl_Interp *, int, Tcl_Obj *const*,
     Ral_RelvarInfo) ;
 static int RelvarConstraintCmd(Tcl_Interp *, int, Tcl_Obj *const*,
     Ral_RelvarInfo) ;
+static int RelvarCorrelationCmd(Tcl_Interp *, int, Tcl_Obj *const*,
+    Ral_RelvarInfo) ;
 static int RelvarCreateCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarDeleteCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarDeleteOneCmd(Tcl_Interp *, int, Tcl_Obj *const*,
@@ -111,7 +113,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.13 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.14 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -130,6 +132,7 @@ relvarCmd(
     } cmdTable[] = {
 	{"association", RelvarAssociationCmd},
 	{"constraint", RelvarConstraintCmd},
+	{"correlation", RelvarCorrelationCmd},
 	{"create", RelvarCreateCmd},
 	{"delete", RelvarDeleteCmd},
 	{"deleteone", RelvarDeleteOneCmd},
@@ -185,11 +188,6 @@ RelvarAssociationCmd(
 	    "refToRelvar refToAttrList refrngSpec") ;
 	return TCL_ERROR ;
     }
-    Tcl_ResetResult(interp) ;
-    /*
-     * Creating an association is an implicit transaction as each
-     * relvar participating in the association is treated as modified.
-     */
     return Ral_RelvarObjCreateAssoc(interp, objv + 2, rInfo) ;
 }
 
@@ -267,6 +265,26 @@ RelvarConstraintCmd(
     }
 
     return result ;
+}
+
+static int RelvarCorrelationCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv,
+    Ral_RelvarInfo rInfo)
+{
+    /* relvar correlation ?-complete? name corrRelvar
+     *      corr-attr-list1 relvar1 attr-list1 spec1
+     *      corr-attr-list2 relvar2 attr-list2 spec2
+     */
+    if (objc < 12 || objc > 13) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+	    "?-complete? name corrRelvar "
+	    "corr-attr-list1 relvar1 attr-list1 spec1 "
+	    "corr-attr-list2 relvar2 attr-list2 spec2") ;
+	return TCL_ERROR ;
+    }
+    return Ral_RelvarObjCreateCorrelation(interp, objv + 2, rInfo) ;
 }
 
 static int
