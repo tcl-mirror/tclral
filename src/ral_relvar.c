@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.c,v $
-$Revision: 1.8 $
-$Date: 2006/07/25 04:13:51 $
+$Revision: 1.9 $
+$Date: 2006/07/30 23:45:56 $
  *--
  */
 
@@ -119,7 +119,7 @@ static char const * const condMultStrings[2][2] = {
     {"1", "+"},
     {"?", "*"}
 } ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.8 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.9 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -1161,7 +1161,7 @@ relvarCorrelationConstraintEval(
 	    comp_result = 0 ;
 	    Tcl_DStringAppend(errMsg, "correlation ", -1) ;
 	    relvarCorrelationConstraintToString(name, correlation, errMsg) ;
-	    Tcl_DStringAppend(errMsg, "does not form a complete correlation",
+	    Tcl_DStringAppend(errMsg, " does not form a complete correlation",
 		-1) ;
 	}
     }
@@ -1371,18 +1371,18 @@ relvarCorrelationConstraintToString(
     Tcl_DStringAppend(result, name, -1) ;
     Tcl_DStringAppend(result, "(", -1) ;
     Tcl_DStringAppend(result, aReferredToRelvar->name, -1) ;
-    Tcl_DStringAppend(result, " [", -1) ;
+    Tcl_DStringAppend(result, " <== [", -1) ;
     Tcl_DStringAppend(result,
 	condMultStrings[correlation->aCond][correlation->aMult], -1) ;
-    Tcl_DStringAppend(result, "] <== ", -1) ;
+    Tcl_DStringAppend(result, "] ", -1) ;
     Tcl_DStringAppend(result, referringRelvar->name, -1) ;
     if (correlation->complete) {
-	Tcl_DStringAppend(result, " [C]", -1) ;
+	Tcl_DStringAppend(result, " (Complete)", -1) ;
     }
-    Tcl_DStringAppend(result, " ==> [", -1) ;
+    Tcl_DStringAppend(result, " [", -1) ;
     Tcl_DStringAppend(result,
 	condMultStrings[correlation->bCond][correlation->bMult], -1) ;
-    Tcl_DStringAppend(result, "] ", -1) ;
+    Tcl_DStringAppend(result, "] ==> ", -1) ;
     Tcl_DStringAppend(result, bReferredToRelvar->name, -1) ;
     Tcl_DStringAppend(result, ")", -1) ;
 }

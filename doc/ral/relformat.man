@@ -47,8 +47,8 @@
 #   Relformat is part of the TCLRAL package.
 # 
 # $RCSfile: relformat.man,v $
-# $Revision: 1.3 $
-# $Date: 2006/07/19 04:06:24 $
+# $Revision: 1.4 $
+# $Date: 2006/07/30 23:45:56 $
 #  *--
 }]
 [moddesc "Relation formatting"]
@@ -200,12 +200,41 @@ removes those rows from the returned matrix.
 It is the responsibility of the caller to [cmd destroy] the matrix
 when it is no longer needed.
 
-[call [cmd "::ral::csv"] [arg relationValue] [opt sortAttr] [opt noheading]]
+[call [cmd "::ral::csv"] [arg relationValue] [opt sortAttrs] [opt noheading]]
+
+The [cmd csv] command formats the relation value given by [arg relationValue]
+into comma separated value formatted string.
+If [arg sortAttrs] is given, then the tuples of the relation value
+will appear in the order implied by the list of attributes contained
+in [arg sortAttrs].
+If [arg noheading] is given as 1, then no heading will be placed in the returned
+CSV string.
+By default, heading information is placed in the output.
+This command uses the [package csv] package from [cmd tcllib].
+
 [call [cmd "::ral::csvToFile"] [arg relationValue] [arg fileName]\
 	[opt sortAttr] [opt noheading]]
+The [cmd csvToFile] command writes the value of [arg relationValue] to
+the file named [arg fileName] in comma separated values format.
+If [arg sortAttrs] is given, then the tuples of the relation value
+will appear in the order implied by the list of attributes contained
+in [arg sortAttrs].
+If [arg noheading] is given as 1, then no heading will be placed in the returned
+CSV string.
+By default, heading information is placed in the output.
+This command uses the [package csv] package from [cmd tcllib].
 
 [call [cmd "::ral::tupleAsTable"] [opt capRows]]
+The [cmd tupleAsTable] command is a report style for use with the
+[package report] package in [cmd tcllib].
+This is the default report style used by the commands in TclRAL for
+formatting tuples.
+
 [call [cmd "::ral::relationAsTable"] [opt idCols] [opt capRows]]
+The [cmd relationAsTable] command is a report style for use with the
+[package report] package in [cmd tcllib].
+This is the default report style used by the commands in TclRAL for
+formatting relations.
 
 [list_end]
 

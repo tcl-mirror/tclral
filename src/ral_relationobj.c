@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationobj.c,v $
-$Revision: 1.16 $
-$Date: 2006/07/01 23:56:31 $
+$Revision: 1.17 $
+$Date: 2006/07/30 23:45:56 $
  *--
  */
 
@@ -107,7 +107,7 @@ Tcl_ObjType Ral_RelationObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.16 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.17 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -516,11 +516,11 @@ Ral_RelationFindJoinAttrs(
 	int r2Index = Ral_TupleHeadingIndexOf(r2TupleHeading,
 	    Tcl_GetString(*(objv + 1))) ;
 	if (r1Index < 0) {
-	    Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_DUPLICATE_ATTR, *objv) ;
+	    Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_UNKNOWN_ATTR, *objv) ;
 	    goto errorOut ;
 	}
 	if (r2Index < 0) {
-	    Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_DUPLICATE_ATTR,
+	    Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_UNKNOWN_ATTR,
 		*(objv + 1)) ;
 	    goto errorOut ;
 	}

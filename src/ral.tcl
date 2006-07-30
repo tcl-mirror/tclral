@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.16 $
-# $Date: 2006/07/25 04:13:51 $
+# $Revision: 1.17 $
+# $Date: 2006/07/30 23:45:56 $
 #  *--
 
 namespace eval ::ral {
@@ -63,6 +63,7 @@ namespace eval ::ral {
     namespace export dumpToFile
     namespace export csv
     namespace export csvToFile
+    namespace export navigate
 
     if {![catch {package require report}]} {
 	# Default report style for Tuple types
@@ -582,6 +583,187 @@ proc ::ral::csvToFile {relValue fileName {sortAttr {}} {noheading 0}} {
     return
 }
 
+# traverse via semijoins across constraints.
+# navigate relValue constraint relvarName ?-ref | -refto?
+# where "relValue" is a value of the same type as the value contained
+# in "srcRelvar" and presumably contains a subset of the tuples of "srcRelvar"
+#
+proc ::ral::navigate {relValue constraintName relvarName {dir {}}} {
+    set cmd [list ::ral::relation semijoin $relValue\
+	[::ral::relvar set $relvarName] -using]
+    set cInfo [relvar constraint info $constraintName]
+    switch -- [lindex $cInfo 0] {
+	association {
+	    lassign $cInfo type name rngRelvar rngAttrs rngSpec\
+		rtoRelvar rtoAttrs rtoSpec
+	    if {$rngRelvar eq $rtoRelvar} {
+		if {$dir eq "-ref"} {
+		    set srcAttrs $rngAttrs
+		    set dstAttrs $rtoAttrs
+		} elseif {$dir eq "-refto"} {
+		    set srcAttrs $rtoAttrs
+		    set dstAttrs $rngAttrs
+		} else {
+		    error "bad navigation direction, \"$dir\""
+		}
+	    } else {
+		# If the constraint is not reflexive, then we
+		# determine the direction from relvar name
+		if {[matchRelvarName $rngRelvar $relvarName]} {
+		    set srcAttrs $rngAttrs
+		    set dstAttrs $rtoAttrs
+		} elseif {[matchRelvarName $rtoRelvar $relvarName]} {
+		    set srcAttrs $rngAttrs
+		    set dstAttrs $rtoAttrs
+		} else {
+		    error "relvar, \"$relvarName\", does not participate in\
+			constraint, \"$constraintName\""
+		}
+	    }
+	    lappend cmd [mergeJoinAttrs $srcAttrs $dstAttrs]
+	}
+	partition {
+	    set subSets [lassign $cInfo type name superRelvar superAttrs]
+	    if {[matchRelvarName $superRelvar $relvarName]} {
+		# sub set to super set reference
+		# but we don't know which sub set it is -- so we compare
+		# the headings of the subsets and find the first one
+		# that matching the heading of the relation value.
+		set srcAttrs [findSubSetType $relValue $subSets]
+		set dstAttrs $superAttrs
+	    } else {
+		# super set to sub set navigation
+		# determine which subset we are navigating to
+		set srcAttrs $superAttrs
+		set dstAttrs [findSubSetRef $relvarName $subSets]
+	    }
+	    lappend cmd [mergeJoinAttrs $srcAttrs $dstAttrs]
+	}
+	correlation {
+	    # Navigation across a correlation constraint may involve
+	    # two semijoins.
+	    lassign $cInfo type name rngRelvar rngAttrsA rngSpecA\
+		rtoRelvarA rtoAttrsA rngAttrsB rngSpecB rtoRelvarB rtoAttrsB
+	    # If the navigation is to the correlation relvar, then a
+	    # single semijoin will do the job.
+	    if {[matchRelvarName $rngRelvar $relvarName]} {
+		# This is very much like the "association" case
+		# First, we must deal with the reflexive case.
+		# If the correlation is reflexive, then the ambiguity
+		# has to be broken by supplying the referred to attributes
+		if {$rtoRelvarA eq $rtoRelvarB} {
+		    if {$dir eq $rtoAttrsA} {
+			set srcAttrs $rtoAttrsA
+			set dstAttrs $rngAttrsA
+		    } elseif {$dir eq $rtoAttrsB} {
+			set srcAttrs $rtoAttrsB
+			set dstAttrs $rngAttrsB
+		    } else {
+			error "bad navigation attributes, \"$dir\""
+		    }
+		} else {
+		    # Otherwise, we must find out which side of the
+		    # correlation we are starting from.
+		    if {[matchValueType $relValue $rtoRelvarA]} {
+			set srcAttrs $rtoAttrsA
+			set dstAttrs $rngAttrsA
+		    } elseif {[matchValueType $relValue $rtoRelvarB]} {
+			set srcAttrs $rtoAttrsB
+			set dstAttrs $rngAttrsB
+		    } else {
+			error "the type of \"$relValue\" does not match the\
+			    types of either \"$rtoRelvarA\" or \"$rtoRelvarB\""
+		    }
+		}
+		lappend cmd [mergeJoinAttrs $srcAttrs $dstAttrs]
+	    } elseif {[matchValueType $relValue $rngRelvar]} {
+		# navigation is from the correlation relvar to one of
+		# the ends of the correlation
+		# Again reflexivity complicates things.
+		if {$rtoRelvarA eq $rtoRelvarB} {
+		    if {$dir eq $rngAttrsA} {
+			set srcAttrs $rngAttrsA
+			set dstAttrs $rtoAttrsA
+		    } elseif {$dir eq $rngAttrsB} {
+			set srcAttrs $rngAttrsB
+			set dstAttrs $rtoAttrsB
+		    } else {
+			error "bad navigation attributes, \"$dir\""
+		    }
+		} elseif {[matchRelvarName $rtoRelvarA $relvarName]} {
+		    set srcAttrs $rngAttrsA
+		    set dstAttrs $rtoAttrsA
+		} elseif {[matchRelvarName $rtoRelvarB $relvarName]} {
+		    set srcAttrs $rngAttrsB
+		    set dstAttrs $rtoAttrsB
+		} else {
+		    error "relvar, \"$relvarName\", does not participate in\
+			constraint, \"$constraintName\""
+		}
+		lappend cmd [mergeJoinAttrs $srcAttrs $dstAttrs]
+	    } elseif {[matchRelvarName $rtoRelvarA $relvarName] ||\
+		      [matchRelvarName $rtoRelvarB $relvarName]} {
+		# The destination is one of the two referred to relvars.
+		# If the source is one of the referred to relvars then
+		# two semijoins are necessary to complete the traversal.
+		# If the source is the correlation relvar, then only
+		# a single semijoin is required.
+		# Reflexivity requires more information to break the ambiguity.
+		if {$rtoRelvarA eq $rtoRelvarB} {
+		    if {$dir eq $rngAttrsA} {
+			set srcAttrs $rtoAttrsA
+			set correlSrc $rngAttrsA
+			set correlDst $rngAttrsB
+			set dstAttrs $rtoAttrsB
+			set dst $rtoRelvarB
+		    } elseif {$dir eq $rngAttrsB} {
+			set srcAttrs $rtoAttrsB
+			set correlSrc $rngAttrsB
+			set correlDst $rngAttrsA
+			set dstAttrs $rtoAttrsA
+			set dst $rtoRelvarA
+		    } else {
+			error "bad navigation attributes, \"$dir\""
+		    }
+		} else {
+		    if {[matchValueType $relValue $rtoRelvarA]} {
+			set srcAttrs $rtoAttrsA
+			set correlSrc $rngAttrsA
+			set correlDst $rngAttrsB
+			set dstAttrs $rtoAttrsB
+			set dst $rtoRelvarB
+		    } elseif {[matchValueType $relValue $rtoRelvarB]} {
+			set srcAttrs $rtoAttrsB
+			set correlSrc $rngAttrsB
+			set correlDst $rngAttrsA
+			set dstAttrs $rtoAttrsA
+			set dst $rtoRelvarA
+		    } else {
+			error "type of \"$relValue\" does matches neither that\
+			    of \"$rtoRelvarA\" nor \"$rtoRelvarB\""
+		    }
+		}
+		# So the semijoins will traverse:
+		# "src" -> correlation -> "dst"
+		set cmd1 [list\
+		    ::ral::relation semijoin $relValue\
+		    [::ral::relvar set $rngRelvar]\
+		    -using [mergeJoinAttrs $srcAttrs $correlSrc]\
+		]
+		set cmd [list\
+		    ::ral::relation semijoin [eval $cmd1]\
+		    [::ral::relvar set $dst]\
+		    -using [mergeJoinAttrs $correlDst $dstAttrs]\
+		]
+	    } else {
+		error "\"$relvarName\" does not participate in correlation,\
+		    \"$constraintName\""
+	    }
+	}
+    }
+    return [eval $cmd]
+}
+
 # PRIVATE PROCS
 
 # Add heading rows to the matrix.
@@ -776,6 +958,43 @@ proc ::ral::mkLoadRelation {cursor heading} {
 	lappend value [mkLoadTuple $rCursor $heading]
     }
     return $value
+}
+
+proc ::ral::matchRelvarName {n1 n2} {
+    return [expr {[namespace tail $n1] eq $n2}]
+}
+
+proc ::ral::matchValueType {relVal relvarName} {
+    set rv [::ral::relation emptyof $relVal]
+    set sv [::ral::relation emptyof [::ral::relvar set $relvarName]]
+    catch {::ral::relation is $rv == $sv} result
+    return [expr {$result == 1}]
+}
+
+proc ::ral::mergeJoinAttrs {attrs1 attrs2} {
+    set joinAttrs [list]
+    foreach a1 $attrs1 a2 $attrs2 {
+	lappend joinAttrs $a1 $a2
+    }
+    return $joinAttrs
+}
+
+proc ::ral::findSubSetType {relValue subSets} {
+    foreach {ssName ssAttrs} $subSets {
+	if {[matchValueType $relValue $ssName]} {
+	    return $ssAttrs
+	}
+    }
+    error "did not find type of \"$relVal\" among the subsets types"
+}
+
+proc ::ral::findSubSetRef {name subSets} {
+    foreach {ssName ssAttrs} $subSets {
+	if {[matchRelvarName $ssName $name]} {
+	    return $ssAttrs
+	}
+    }
+    error "did not find \"$name\" among the subsets names"
 }
 
 package provide ral 0.8

@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.30 $
-# $Date: 2006/07/25 04:13:51 $
+# $Revision: 1.31 $
+# $Date: 2006/07/30 23:45:56 $
 #  *--
 
 package require tcltest 2.2
@@ -823,6 +823,32 @@ namespace eval ::ral::test {
 	}
     } -match relation
 
+    test relation-shimmer-7.0 {error in identifiers} -body {
+	set r {
+	    Relation
+	    {a1 string a2 string a3 string}
+	    a4
+	    {
+		{a1 a a2 b a3 c}
+		{a1 d a2 e a3 f}
+	    }
+	}
+	relation cardinality $r
+    } -result {unknown attribute name, "a4"} -returnCodes error
+
+    test relation-shimmer-7.1 {error in body} -body {
+	set r {
+	    Relation
+	    {a1 string a2 string a3 string}
+	    a1
+	    {
+		{a1 a a2 b a3 c}
+		{a1 d a2 e a4 f}
+	    }
+	}
+	relation cardinality $r
+    } -result {unknown attribute name, "a4"} -returnCodes error
+
     # relation array subcommand
     test relation-array-1.0 {supplier number / city map} -body {
 	relation array [relation project $S S# CITY] smap
@@ -1113,11 +1139,11 @@ namespace eval ::ral::test {
 
     test relation-foreach-4.0 {visit of suppliers ordered by multiple} -body {
 	set nameList [list]
-	relation foreach sup $S -ascending {STATUS CITY} {
+	relation foreach sup $S -ascending {CITY SNAME} {
 	    lappend nameList [tuple extract [relation tuple $sup] SNAME]
 	}
 	set nameList
-    } -result {Jones Smith Clark Adams Blake}
+    } -result {Adams Clark Smith Blake Jones}
 
     test relation-foreach-5.0 {unset tuple variable} -body {
 	set nameList [list]
@@ -2415,6 +2441,49 @@ namespace eval ::ral::test {
 	    {A1 b1 A2 a2 PrevA1 a1}
 	}
     } -match relation
+
+    test relation-semijoin-6.1 {unknown using attribute} -setup {
+	relvar create A {
+	    Relation
+	    {
+		A_ID string
+	    }
+	    A_ID
+	}
+	relvar create B {
+	    Relation
+	    {
+		B_ID string
+	    }
+	    B_ID
+	}
+    } -cleanup {
+	relvar unset A B
+    } -body {
+	relation semijoin $A $B -using {A_ID A_ID}
+    } -result {unknown attribute name, "A_ID"} -returnCodes error
+
+    test relation-semijoin-6.2 {bad -using list} -setup {
+	relvar create A {
+	    Relation
+	    {
+		A_ID string
+	    }
+	    A_ID
+	}
+	relvar create B {
+	    Relation
+	    {
+		B_ID string
+	    }
+	    B_ID
+	}
+    } -cleanup {
+	relvar unset A B
+    } -body {
+	relation semijoin $A $B -using {A_ID}
+    } -result {bad list of pairs, "A_ID"} -returnCodes error
+
     # HERE -- add tests
 
     # relation semiminus subcommand
@@ -2605,24 +2674,24 @@ namespace eval ::ral::test {
     } -match relation
 
     test relation-tag-3.1 {within scope -- descending P#} -body {
-	relation tag $SP -ascending QTY -within S# SOrder
+	relation tag $SP -descending P# -within S# POrder
     } -result {
 	Relation
-	{S# string P# string QTY int SOrder int}
-	{{S# P#} {S# SOrder}}
+	{S# string P# string QTY int POrder int}
+	{{S# P#} {S# POrder}}
 	{
-	    {S# S1 P# P1 QTY 300 SOrder 4}
-	    {S# S1 P# P2 QTY 200 SOrder 2}
-	    {S# S1 P# P3 QTY 400 SOrder 5}
-	    {S# S1 P# P4 QTY 200 SOrder 3}
-	    {S# S1 P# P5 QTY 100 SOrder 0}
-	    {S# S1 P# P6 QTY 100 SOrder 1}
-	    {S# S2 P# P1 QTY 300 SOrder 0}
-	    {S# S2 P# P2 QTY 400 SOrder 1}
-	    {S# S3 P# P2 QTY 200 SOrder 0}
-	    {S# S4 P# P2 QTY 200 SOrder 0}
-	    {S# S4 P# P4 QTY 300 SOrder 1}
-	    {S# S4 P# P5 QTY 400 SOrder 2}
+	    {S# S1 P# P1 QTY 300 POrder 5}
+	    {S# S1 P# P2 QTY 200 POrder 4}
+	    {S# S1 P# P3 QTY 400 POrder 3}
+	    {S# S1 P# P4 QTY 200 POrder 2}
+	    {S# S1 P# P5 QTY 100 POrder 1}
+	    {S# S1 P# P6 QTY 100 POrder 0}
+	    {S# S2 P# P1 QTY 300 POrder 1}
+	    {S# S2 P# P2 QTY 400 POrder 0}
+	    {S# S3 P# P2 QTY 200 POrder 0}
+	    {S# S4 P# P2 QTY 200 POrder 2}
+	    {S# S4 P# P4 QTY 300 POrder 1}
+	    {S# S4 P# P5 QTY 400 POrder 0}
 	}
     } -match relation
 
@@ -3564,6 +3633,74 @@ tuple {C1 c C2 42} references no tuple
 	}
 	return
     } -result {}
+
+    test relvar-correlation-1.2 {many to many complete} -setup {
+	relvar create A {
+	    Relation
+	    {A1 int X_ID string Y_ID string}
+	    {{X_ID Y_ID}}
+	}
+	relvar create X {
+	    Relation
+	    {X_ID string X2 string}
+	    X_ID
+	}
+	relvar create Y {
+	    Relation
+	    {Y_ID string Y2 string}
+	    Y_ID
+	}
+	relvar correlation -complete R1 A X_ID + X X_ID Y_ID + Y Y_ID
+    } -cleanup {
+	relvar constraint delete R1
+	relvar unset A X Y
+    } -body {
+	relvar eval {
+	    relvar insert X {X_ID x1 X2 one}
+	    relvar insert X {X_ID x2 X2 two}
+	    relvar insert Y {Y_ID y1 Y2 one}
+	    relvar insert Y {Y_ID y2 Y2 two}
+	    relvar insert A {A1 1 X_ID x1 Y_ID y1}
+	    relvar insert A {A1 1 X_ID x1 Y_ID y2}
+	    relvar insert A {A1 2 X_ID x2 Y_ID y1}
+	    relvar insert A {A1 2 X_ID x2 Y_ID y2}
+	}
+	return
+    } -result {}
+
+    test relvar-correlation-1.3 {many to many complete -- failure} -setup {
+	relvar create A {
+	    Relation
+	    {A1 int X_ID string Y_ID string}
+	    {{X_ID Y_ID}}
+	}
+	relvar create X {
+	    Relation
+	    {X_ID string X2 string}
+	    X_ID
+	}
+	relvar create Y {
+	    Relation
+	    {Y_ID string Y2 string}
+	    Y_ID
+	}
+	relvar correlation -complete R1 A X_ID + X X_ID Y_ID + Y Y_ID
+    } -cleanup {
+	relvar constraint delete R1
+	relvar unset A X Y
+    } -body {
+	relvar eval {
+	    relvar insert X {X_ID x1 X2 one}
+	    relvar insert X {X_ID x2 X2 two}
+	    relvar insert Y {Y_ID y1 Y2 one}
+	    relvar insert Y {Y_ID y2 Y2 two}
+	    relvar insert A {A1 1 X_ID x1 Y_ID y1}
+	    relvar insert A {A1 2 X_ID x2 Y_ID y1}
+	    relvar insert A {A1 2 X_ID x2 Y_ID y2}
+	}
+	return
+    } -result {correlation ::ral::test::R1(::ral::test::X <== [+] ::ral::test::A (Complete) [+] ==> ::ral::test::Y) does not form a complete correlation}\
+    -returnCodes error
 
     test relvar-correlation-2.1 {1 to 1} -setup {
 	relvar create A {
