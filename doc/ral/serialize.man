@@ -45,8 +45,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: serialize.man,v $
-# $Revision: 1.1 $
-# $Date: 2006/07/10 01:17:44 $
+# $Revision: 1.2 $
+# $Date: 2006/07/31 15:35:40 $
 #  *--
 }]
 [moddesc "Relation persistence"]
@@ -56,18 +56,140 @@
 [description]
 This manpage describes a set of commands that are used for
 saving the values of relvars on external storage.
+All of the commands below take an optional [arg namespace] argument.
+If present, then the command is applied to relvars from the given namespace.
+Otherwise by default all relvars are considered.
+Since TclRAL manages relvar names using [cmd namespace]-like syntax,
+this may be used to manage distinct sets of relvars without risking
+naming conflicts.
 
 [section COMMANDS]
 [list_begin definitions]
 [call [cmd "::ral::serialize"] [opt namespace]]
-[call [cmd "::ral::serializeToFile"] [arg fileName] [opt namespace]]
-[call [cmd "::ral::deserialize"] [arg value] [opt namespace]]
-[call [cmd "::ral::deserializeFromFile"] [arg fileName] [opt namespace]]
-[call [cmd "::ral::storeToMk"] [arg fileName] [opt namespace]]
-[call [cmd "::ral::loadFromMk"] [arg fileName] [opt namespace]]
-[call [cmd "::ral::dump"] [opt namespace]]
-[call [cmd "::ral::dumpToFile"] [arg fileName] [opt namespace]]
 
+The [cmd serialize] command returns a string that represents the values
+and constraints for all of the relvars contained within [arg namespace].
+The string returned by [cmd serialize] may be given to [cmd deserialize]
+to restore the values of the relvars.
+
+[call [cmd "::ral::serializeToFile"] [arg fileName] [opt namespace]]
+
+The [cmd serializeToFile] command invokes [cmd serialize] and places the
+resulting serialization string into the file given by [arg fileName].
+
+[call [cmd "::ral::deserialize"] [arg serialization] [opt namespace]]
+
+The [cmd deserialize] command restores the values and constraints on a
+set of relvars.
+The [arg serialization] argument must be a value returned from the
+[cmd serialize] command.
+If the [arg namespace] argument is given,
+then the relvars and constraints are placed in the given namespace which
+need not exist prior to invoking the command.
+
+[call [cmd "::ral::deserializeFromFile"] [arg fileName] [opt namespace]]
+
+The [cmd deserializeFromFile] command reads the file given by the
+[arg fileName] argument and invokes [cmd deserialize] on its contents.
+
+[call [cmd "::ral::storeToMk"] [arg fileName] [opt namespace]]
+
+The [cmd storeToMk] command stores the state of a set of relvars into
+a metaKit database.
+Each relvar is stored in a separate metaKit [emph view].
+Several additional views are created to hold system catalog information.
+The additional views have names that start with [emph __ral].
+If [arg fileName] exists already, it is renamed to be [arg fileName]~ before
+a new file is created with the current state of the relvars.
+
+[call [cmd "::ral::loadFromMk"] [arg fileName] [opt namespace]]
+
+The [cmd loadFromMk] command restores the state of a set of relvars
+from the information contained in a metaKit database.
+That database must have been created using the [cmd storeToMk] command.
+
+[call [cmd "::ral::dump"] [opt namespace]]
+
+The [cmd dump] command returns a Tcl script that when evaluated will
+restore the state of a set of relvars to be the same as when the [cmd dump]
+command was executed.
+The [cmd dump] command is another form of serialization for a set of relvars
+and is often useful when creating Tcl packages that create an empty
+schema of relvars.
+
+[call [cmd "::ral::dumpToFile"] [arg fileName] [opt namespace]]
+The [cmd dumpToFile] invokes the [cmd dump] command and writes the
+resulting script to the file given by [arg fileName].
+
+[list_end]
+
+[section "SERIALIZATION FORMAT"]
+The format used for serialization of a set of relvars consists of a Tcl list
+with four elements.
+
+[list_begin bullet]
+[bullet]
+Version information.
+    [list_begin bullet]
+    [bullet]
+    Version
+    [bullet]
+    <library version>
+    [list_end]
+[bullet]
+Relvar definition.
+    [list_begin bullet]
+    [bullet]
+    Relvars
+    [bullet]
+    <list of relvar defs>
+	[list_begin bullet]
+	[bullet]
+	<relvar name>
+	[bullet]
+	<relvar heading>
+	[list_end]
+    [list_end]
+[bullet]
+Constraint definition.
+    [list_begin bullet]
+    [bullet]
+    Constraints
+    [bullet]
+    <list of constraints>
+	[list_begin bullet]
+	[bullet]
+	association | partition | correlation
+	[bullet]
+	<constraint definition>
+	    [list_begin bullet]
+	    [bullet]
+	    <association constraint definition>
+	    [nl]
+	    <association name> <relvar name> <attribute list> <mult/cond>
+		<relvar name> <attribute list> <mult/cond>
+	    [bullet]
+	    <partition constraint definition>
+	    [nl]
+	    <partition name> <superset> <attribute list>
+		<subset1> <attribute list> <subset2> <attribute list> ...
+	    [bullet]
+	    <correlation constraint definition>
+	    [nl]
+	    <?-complete?> <correlation name> <relvar name>
+		<attribute list> <mult/cond> <relvar name> <attribute list>
+		<attribute list> <mult/cond> <relvar name> <attribute list>
+	    [list_end]
+	[list_end]
+    [list_end]
+[bullet]
+Relvar values.
+    [list_begin bullet]
+    [bullet]
+    <relvar name>
+    [bullet]
+    <tuple list>
+    [list_end]
 [list_end]
 
 [see_also relvar relation tuple]

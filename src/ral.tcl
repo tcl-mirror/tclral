@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.17 $
-# $Date: 2006/07/30 23:45:56 $
+# $Revision: 1.18 $
+# $Date: 2006/07/31 15:35:41 $
 #  *--
 
 namespace eval ::ral {
@@ -210,8 +210,8 @@ proc ::ral::tupleformat {tupleValue {title {}} {noheading 0}} {
 #	<partition name> <supertype> {<attr list>} <subtype1> {<attr list>} ...
 #   <correlation constaint detail> :
 #	<?-complete?> <correlation name> <correl relvar>
-#	    {<attr list>} <mult/cond> <relvarA>
-#	    {<attr list>} <mult/cond> <relvarB>
+#	    {<attr list>} <mult/cond> <relvarA> {<attr list>}
+#	    {<attr list>} <mult/cond> <relvarB> {<attr list>}
 #
 #   <list of relvar bodies> :
 #	{<relvar name> {<tuple value>}}

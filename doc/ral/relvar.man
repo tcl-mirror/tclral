@@ -47,13 +47,13 @@
 #   This command is part of TclRAL. This file is in Tcl Markup Language
 #   format.
 # $RCSfile: relvar.man,v $
-# $Revision: 1.6 $
-# $Date: 2006/07/25 04:13:51 $
+# $Revision: 1.7 $
+# $Date: 2006/07/31 15:35:40 $
 #  *--
 }]
 [moddesc "Relvar Operators"]
 [titledesc "Operators for Relation Variables"]
-[copyright "2004 by G. Andrew Mangogna"]
+[copyright "2004, 2005, 2006 by G. Andrew Mangogna"]
 [require ral [opt 0.8]]
 [description]
 This manpage describes the [cmd relvar] command.
@@ -304,11 +304,12 @@ The return value of [cmd correlation] is the empty string.
 Correlations declare that every tuple in [arg correlRelvar] refers to
 exactly one tuple of [arg refToRelvarA] and exactly one tuple of
 [arg refToRelvarB].
-The [arg correlAttrListA] attributes in [arg correlRelvar] refer to the
-identifier of [arg refToRelvarA] that are given by [arg refToAttrListA].
+The [arg correlAttrListA] attributes in [arg correlRelvar] refer to an
+identifier of [arg refToRelvarA] that is given by the
+attributes contained in the [arg refToAttrListA] list.
 Similarly,
-the [arg correlAttrListB] attributes in [arg correlRelvar] refer to the
-identifier of [arg refToRelvarB] that are given by [arg refToAttrListB].
+the [arg correlAttrListB] attributes in [arg correlRelvar] refer to an
+identifier of [arg refToRelvarB] that is given by [arg refToAttrListB].
 Both [arg refToAttrListA] and [arg refToAttrListB] must constitute
 an identifier for their corresponding relvars.
 The [arg refToSpecA] and [arg refToSpecB] arguments can have the same values
@@ -321,14 +322,19 @@ tuple of [arg refToRelvarB] and [emph "vice versa"].
 That is, the cardinality of [arg correlRelvar] must equal the product
 of the cardinality of [arg refToRelvarA] and [arg refToRelvarB].
 If the [opt -complete] option is missing,
-then [arg correlRelvar] is allowed to have a subset of cartesian product
+then [arg correlRelvar] is allowed to have a subset of the cartesian product
 of the references.
 
 Correlation constraints are often used to enforce the referential
 constraints for relvars that are related in a many to many fashion.
-However, they also arise in situation where the multiplicity is not
-many to many and when the [arg correlRelvar] contains attributes that
-apply to the association of [arg refToRelvarA] and [arg refToRelvarB] itself.
+However, they also arise in situations where the multiplicity is not
+many-to-many but when the [arg correlRelvar] contains attributes that
+apply to the association between [arg refToRelvarA] and [arg refToRelvarB]
+themselves.
+
+[example {
+% relvar correlation C1 OWNERSHIP OwnerName + OWNER OwnerName DogName * DOG DogName
+}]
 
 [call [cmd "::ral::relvar create"] [arg relvarName] [arg heading]]
 
@@ -669,7 +675,7 @@ that is of a different type than the type of the value
 that the variable currently holds.
 In other words, it is not possible to change the type of a relvar
 by assignment.
-The return value of the subcommand the current value
+The return value of the subcommand is the current value
 held by [arg relvarName].
 If the [arg relationValue] argument is missing, then no attempt is made to
 change the value of [arg relvarName].
