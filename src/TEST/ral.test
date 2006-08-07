@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.31 $
-# $Date: 2006/07/30 23:45:56 $
+# $Revision: 1.32 $
+# $Date: 2006/08/07 00:07:51 $
 #  *--
 
 package require tcltest 2.2
@@ -82,11 +82,33 @@ proc dictMatch {expected actual} {
     return 1
 }
 
-proc ::tcl::mathfunc::rcount {relation} {
+if {[package vsatisfies [package require Tcl] 8.5]} {
+    ::tcltest::testConstraint tcl8.5 1
+    proc ::tcl::mathfunc::rcount {relation} {
+	return [::ral::relation cardinality $relation]
+    }
+
+    proc ::tcl::mathfunc::rsum {relation attr} {
+	set result 0
+	::ral::relation foreach r $relation {
+	    set t [::ral::relation tuple $r]
+	    set result [expr {$result + [::ral::tuple extract $t $attr]}]
+	}
+	return $result
+    }
+
+    proc ::tcl::mathfunc::ravg {relation attr} {
+	return [expr {rsum($relation, $attr) / rcount($relation)}]
+    }
+} else {
+    package require dict
+}
+
+proc rcount {relation} {
     return [::ral::relation cardinality $relation]
 }
 
-proc ::tcl::mathfunc::rsum {relation attr} {
+proc rsum {relation attr} {
     set result 0
     ::ral::relation foreach r $relation {
 	set t [::ral::relation tuple $r]
@@ -95,9 +117,8 @@ proc ::tcl::mathfunc::rsum {relation attr} {
     return $result
 }
 
-proc ::tcl::mathfunc::ravg {relation attr} {
-    return [expr {rsum($relation, $attr) /\
-	[::ral::relation cardinality $relation]}]
+proc ravg {relation attr} {
+    return [expr {[rsum $relation $attr] / [rcount $relation]}]
 }
 
 namespace eval ::ral::test {
@@ -994,7 +1015,9 @@ namespace eval ::ral::test {
     } -match relation
 
     # relation dict subcommand
-    test relation-dict-1.0 {supplier number / city map} -body {
+    test relation-dict-1.0 {supplier number / city map} -constraints {
+	tcl8.5
+    } -body {
 	relation dict [relation project $S S# CITY]
     } -result {
 	    S1 London
@@ -1004,7 +1027,9 @@ namespace eval ::ral::test {
 	    S5 Athens
     } -match dict
 
-    test relation-dict-2.0 {id problem} -body {
+    test relation-dict-2.0 {id problem} -constraints {
+	tcl8.5
+    } -body {
 	relation dict [relation project $S SNAME CITY]
     } -result {identifier must have only a single attribute, "Relation {SNAME string CITY string} {{SNAME CITY}} {{SNAME Smith CITY London} {SNAME Jones CITY Paris} {SNAME Blake CITY Paris} {SNAME Clark CITY London} {SNAME Adams CITY Athens}}"} -returnCodes error
 
@@ -2539,7 +2564,9 @@ namespace eval ::ral::test {
     # HERE -- add tests
 
     # relation summarize subcommand
-    test relation-summarize-1.0 {count} -body {
+    test relation-summarize-1.0 {count} -constraints {
+	tcl8.5
+    } -body {
 	set p [relation project $P P#]
 	relation summarize $SP $p r Total int {rsum($r, "QTY")}
     } -result {
@@ -2556,7 +2583,27 @@ namespace eval ::ral::test {
 	}
     } -match relation
 
-    test relation-summarize-2.0 {summarize per dee} -body {
+    # For tcl8.4
+    test relation-summarize-1.0.1 {count} -body {
+	set p [relation project $P P#]
+	relation summarize $SP $p r Total int {[rsum $r "QTY"]}
+    } -result {
+	Relation
+	{P# string Total int}
+	P#
+	{
+	    {P# P1 Total 600}
+	    {P# P2 Total 1000}
+	    {P# P3 Total 400}
+	    {P# P4 Total 500}
+	    {P# P5 Total 500}
+	    {P# P6 Total 100}
+	}
+    } -match relation
+
+    test relation-summarize-2.0 {summarize per dee} -constraints {
+	tcl8.5
+    } -body {
 	relation summarize $SP $DEE r GrandTotal int {rsum($r, "QTY")}
     } -result {
 	Relation
@@ -2567,7 +2614,21 @@ namespace eval ::ral::test {
 	}
     } -match relation
 
-    test relation-summarize-2.1 {summarize per dee, average} -body {
+    # For tcl8.4
+    test relation-summarize-2.0.1 {summarize per dee} -body {
+	relation summarize $SP $DEE r GrandTotal int {[rsum $r "QTY"]}
+    } -result {
+	Relation
+	{GrandTotal int}
+	GrandTotal
+	{
+	    {GrandTotal 3100}
+	}
+    } -match relation
+
+    test relation-summarize-2.1 {summarize per dee, average} -constraints {
+	tcl8.5
+    } -body {
 	relation summarize $SP $DEE r GrandAvg int {ravg($r, "QTY")}
     } -result {
 	Relation
@@ -2578,8 +2639,34 @@ namespace eval ::ral::test {
 	}
     } -match relation
 
-    test relation-summarize-2.2 {summarize per dee, average} -body {
+    # For tcl8.4
+    test relation-summarize-2.1.1 {summarize per dee, average} -body {
+	relation summarize $SP $DEE r GrandAvg int {[ravg $r "QTY"]}
+    } -result {
+	Relation
+	{GrandAvg int}
+	GrandAvg
+	{
+	    {GrandAvg 258}
+	}
+    } -match relation
+
+    test relation-summarize-2.2 {summarize per dee, average} -constraints {
+	tcl8.5
+    } -body {
 	relation summarize $OWNER $DEE r AverageAge int {ravg($r, "Age")}
+    } -result {
+	Relation
+	{AverageAge int}
+	AverageAge
+	{
+	    {AverageAge 36}
+	}
+    } -match relation
+
+    # For tcl8.4
+    test relation-summarize-2.2.1 {summarize per dee, average} -body {
+	relation summarize $OWNER $DEE r AverageAge int {[ravg $r "Age"]}
     } -result {
 	Relation
 	{AverageAge int}
@@ -2591,7 +2678,7 @@ namespace eval ::ral::test {
 
     test relation-summarize-3.0 {projection} -body {
 	relation summarize $S [relation project $S STATUS CITY] r\
-	    TOTAL int {rcount($r)}
+	    TOTAL int {[relation cardinality $r]}
     } -result {
 	Relation
 	{STATUS int CITY string TOTAL int}
