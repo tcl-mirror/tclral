@@ -49,8 +49,8 @@ ABSTRACT:
     Algebra.
 
 $RCSfile: ral.c,v $
-$Revision: 1.27 $
-$Date: 2006/04/16 19:00:12 $
+$Revision: 1.28 $
+$Date: 2006/08/08 03:35:34 $
  *--
  */
 
@@ -104,7 +104,7 @@ STATIC DATA ALLOCATION
 static const char ral_pkgname[] = "ral" ;
 static const char ral_version[] = "0.8" ;
 static const char ral_rcsid[] =
-    "$Id: ral.c,v 1.27 2006/04/16 19:00:12 mangoa01 Exp $" ;
+    "$Id: ral.c,v 1.28 2006/08/08 03:35:34 mangoa01 Exp $" ;
 static const char ral_copyright[] =
     "This software is copyrighted 2004, 2005, 2006 by G. Andrew Mangogna."
     "Terms and conditions for use are distributed with the source code." ;
@@ -170,4 +170,14 @@ Ral_Init(
     return TCL_OK ;
 
 #   undef NAMEBUFSIZE
+}
+
+/*
+ * No real difference between normal and safe interpreters.
+ */
+int
+Ral_SafeInit(
+    Tcl_Interp *interp)
+{
+    return Ral_Init(interp) ;
 }
