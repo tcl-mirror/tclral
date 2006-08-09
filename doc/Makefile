@@ -19,4 +19,4 @@ html : $(SRCS)
 	dtplite -o HTML html ral
 
 man : $(SRCS)
-	dtplite -o MAN nroff ral
+	dtplite -o MAN -ext n nroff ral

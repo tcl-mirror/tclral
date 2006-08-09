@@ -49,8 +49,8 @@ ABSTRACT:
     Algebra.
 
 $RCSfile: ral.c,v $
-$Revision: 1.28 $
-$Date: 2006/08/08 03:35:34 $
+$Revision: 1.29 $
+$Date: 2006/08/09 01:15:57 $
  *--
  */
 
@@ -72,7 +72,7 @@ INCLUDE FILES
 
 /*
  * We use Tcl_CreateNamespace() and Tcl_Export().
- * Before 8.4, they not part of the supported external interface.
+ * Before 8.5, they not part of the supported external interface.
  */
 #if TCL_MINOR_VERSION <= 4
 #   include "tclInt.h"
@@ -104,7 +104,7 @@ STATIC DATA ALLOCATION
 static const char ral_pkgname[] = "ral" ;
 static const char ral_version[] = "0.8" ;
 static const char ral_rcsid[] =
-    "$Id: ral.c,v 1.28 2006/08/08 03:35:34 mangoa01 Exp $" ;
+    "$Id: ral.c,v 1.29 2006/08/09 01:15:57 mangoa01 Exp $" ;
 static const char ral_copyright[] =
     "This software is copyrighted 2004, 2005, 2006 by G. Andrew Mangogna."
     "Terms and conditions for use are distributed with the source code." ;

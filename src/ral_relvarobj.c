@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.12 $
-$Date: 2006/07/25 04:13:51 $
+$Revision: 1.13 $
+$Date: 2006/08/09 01:15:57 $
  *--
  */
 
@@ -63,6 +63,14 @@ INCLUDE FILES
 #include "ral_relvar.h"
 #include "ral_relationobj.h"
 #include "ral_utils.h"
+
+/*
+ * We use Tcl_GetCurrentNamespace()
+ * Before 8.5, they not part of the supported external interface.
+ */
+#if TCL_MINOR_VERSION <= 4
+#   include "tclInt.h"
+#endif
 
 /*
 MACRO DEFINITIONS
@@ -115,7 +123,7 @@ static struct {
 } ;
 static const char specErrMsg[] = "multiplicity specification" ;
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.12 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.13 $" ;
 
 /*
 FUNCTION DEFINITIONS
