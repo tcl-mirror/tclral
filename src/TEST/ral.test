@@ -1,9 +1,9 @@
 #!/bin/sh
 # \
 exec tclsh "$0" "$@"
-# This software is copyrighted 2004, 2005 by G. Andrew Mangogna.  The following
-# terms apply to all files associated with the software unless explicitly
-# disclaimed in individual files.
+# This software is copyrighted 2004, 2005, 2006 by G. Andrew Mangogna.
+# The following terms apply to all files associated with the software unless
+# explicitly disclaimed in individual files.
 # 
 # The authors hereby grant permission to use, copy, modify, distribute,
 # and license this software and its documentation for any purpose, provided
@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.32 $
-# $Date: 2006/08/07 00:07:51 $
+# $Revision: 1.33 $
+# $Date: 2006/08/13 23:14:58 $
 #  *--
 
 package require tcltest 2.2
