@@ -45,8 +45,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.6 $
-# $Date: 2006/07/19 04:06:24 $
+# $Revision: 1.7 $
+# $Date: 2006/08/22 02:33:03 $
 #  *--
 }]
 [moddesc "Relation Operators"]
@@ -455,8 +455,7 @@ The [cmd emptyof] subcommand returns a new relation that has the same
 heading as [arg relationValue] but whose cardinality is zero.
 
 [call [cmd "::ral::relation extend"] [arg relationValue]\
-    [opt "-ascending | -descending attrNameList"] [arg tupleVariable]\
-    [opt "attr1 type1 expr1 attr2 type2 expr2 ..."]]
+    [arg tupleVariable] [opt "attr1 type1 expr1 attr2 type2 expr2 ..."]]
 
 The [cmd extend] subcommand returns a new relation which has the same
 heading as [arg relationValue] with zero or more additional attributes.

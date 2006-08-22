@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.18 $
-# $Date: 2006/07/31 15:35:41 $
+# $Revision: 1.19 $
+# $Date: 2006/08/22 02:33:03 $
 #  *--
 
 namespace eval ::ral {
@@ -99,6 +99,14 @@ namespace eval ::ral {
     # Maximum width of a column that holds a scalar value.
     # Relation and Tuple values are always shown in their "normal" width.
     variable maxColLen 30
+
+    # We need lassign
+    if {[info procs lassign] eq ""} {
+	proc lassign {values args} {
+	    uplevel 1 [list foreach $args $values break]
+	    lrange $values [llength $args] end
+	}
+    }
 }
 
 # Convert a tuple into a matrix.
@@ -378,12 +386,7 @@ proc ::ral::storeToMk {fileName {ns {}}} {
 		    lappend value $col [lindex $cinfo $cindex]
 		    incr cindex
 		}
-		if {[package vsatisfies [package require Tcl] 8.5]} {
-		    ::mk::row append db.__ral_association {expand}$value
-		} else {
-		    eval [linsert $value 0\
-			::mk::row append db.__ral_association]
-		}
+		eval [linsert $value 0 ::mk::row append db.__ral_association]
 	    }
 	    partition {
 		::mk::row append db.__ral_partition Name [lindex $cinfo 1]\
@@ -402,18 +405,12 @@ proc ::ral::storeToMk {fileName {ns {}}} {
 		} else {
 		    lappend value [lindex $correlLayout 0] 0
 		}
-		set correlLayout [lrange $correlLayout 1 end]
 		set cindex 1
-		foreach col $correlLayout {
+		foreach col [lrange $correlLayout 1 end] {
 		    lappend value $col [lindex $cinfo $cindex]
 		    incr cindex
 		}
-		if {[package vsatisfies [package require Tcl] 8.5]} {
-		    ::mk::row append db.__ral_correlation {expand}$value
-		} else {
-		    eval [linsert $value 0\
-			::mk::row append db.__ral_correlation]
-		}
+		eval [linsert $value 0 ::mk::row append db.__ral_correlation]
 	    }
 	    default {
 		error "unknown constraint type, \"[lindex $cinfo 0]\""
@@ -478,14 +475,9 @@ proc ::ral::loadFromMk {fileName {ns ::}} {
 	    }
 	}
 	array set partValues [::mk::get $partCursor]
-	if {[package vsatisfies [package require Tcl] 8.5]} {
-	    namespace eval $ns [list ::ral::relvar partition\
-		$partValues(Name) $partValues(SupRelvar)\
-		$partValues(SupAttr) {expand}$subtypes]
-	} else {
-	    namespace eval $ns [linsert $subtypes 0\
-		$partValues(Name) $partValues(SupRelvar) $partValues(SupAttr)]
-	}
+	namespace eval $ns [linsert $subtypes 0\
+	    ::ral::relvar partition\
+	    $partValues(Name) $partValues(SupRelvar) $partValues(SupAttr)]
     }
     # create the correlation constraints
     ::mk::loop correlCursor db.__ral_correlation {
@@ -584,7 +576,7 @@ proc ::ral::csvToFile {relValue fileName {sortAttr {}} {noheading 0}} {
 }
 
 # traverse via semijoins across constraints.
-# navigate relValue constraint relvarName ?-ref | -refto?
+# navigate relValue constraint relvarName ?-ref | -refto | <attr list>?
 # where "relValue" is a value of the same type as the value contained
 # in "srcRelvar" and presumably contains a subset of the tuples of "srcRelvar"
 #

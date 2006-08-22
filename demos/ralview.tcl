@@ -46,24 +46,24 @@ exec wish "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: ralview.tcl,v $
-# $Revision: 1.2 $
-# $Date: 2004/08/01 18:53:05 $
+# $Revision: 1.3 $
+# $Date: 2006/08/22 02:33:03 $
 #  *--
 
 lappend auto_path [file join .. src]
 
 package require BWidget 1.7
-package require Tktable 2.8
-package require ral 0.6
+package require Tktable 2.9
+package require ral 0.8
 package require struct 2.1
 
 namespace eval ::ralview {
     namespace import ::ral::*
 
     variable status {}
-    variable version "Version 0.1"
+    variable version "Version 0.2"
     variable filetypes {
-	{{Tcl Scripts} .tcl}
+	{{Metakit files} .mk}
 	{{All Files} *}
     }
 
@@ -198,7 +198,8 @@ proc ::ralview::openmenu {} {
 
 proc ::ralview::showRelVars {nb} {
     variable notebook
-    foreach n [lsort -dictionary [::ral::relvar names]] {
+    foreach n [lsort -dictionary [relvar names]] {
+	set n [namespace tail $n]
 	$notebook insert end $n -text $n
 	set pf [$notebook getframe $n]
 	createRelvarWindow $pf $n
@@ -237,7 +238,7 @@ proc ::ralview::createRelationWindow {win relation} {
     set typeMap [dict create]
     set colCntr 0
     # attribute names and types as title rows
-    foreach {attrName attrType} [relation heading $relation] {
+    foreach {attrName attrType} [lindex [relation heading $relation] 1] {
 	set tableArray(-2,$colCntr) $attrName
 	set valueType [lindex $attrType 0]
 	set tableArray(-1,$colCntr) $valueType
@@ -262,7 +263,8 @@ proc ::ralview::createRelationWindow {win relation} {
 
     # put in the data
     set rowCntr 0
-    relation foreach t $relation {
+    relation foreach r $relation {
+	set t [relation tuple $r]
 	dict for {attrName attrValue} [tuple get $t] {
 	    set attrType [dict get $typeMap $attrName]
 	    set col [dict get $colMap $attrName]
@@ -323,7 +325,7 @@ proc ::ralview::createTupleWindow {win tuple} {
     ]
 
     set col 0
-    foreach {attrName attrType} [tuple heading $tuple] {
+    foreach {attrName attrType} [lindex [tuple heading $tuple] 1] {
 	set tableArray(-2,$col) $attrName
 	set valType [lindex $attrType 0]
 	set tableArray(-1,$col) $valType
@@ -375,7 +377,7 @@ proc ::ralview::pastemenu {} {
 
 proc ::ralview::openfile {filename} {
     clearDataDisplay
-    if {[catch [list namespace eval :: source $filename] msg]} {
+    if {[catch {loadFromMk $filename} msg]} {
 	MessageDlg::create .openerror -icon error -type ok -message $msg
 	return
     }
@@ -396,7 +398,7 @@ proc ::ralview::clearDataDisplay {} {
     variable mainframe
     set frame [$mainframe getframe]
     destroy {expand}[winfo children $frame]
-    ::ral::relvar destroy {expand}[::ral::relvar names]
+    relvar unset {expand}[relvar names]
     return
 }
 
