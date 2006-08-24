@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.19 $
-# $Date: 2006/08/22 02:33:03 $
+# $Revision: 1.20 $
+# $Date: 2006/08/24 01:56:44 $
 #  *--
 
 namespace eval ::ral {
@@ -338,95 +338,107 @@ proc ::ral::storeToMk {fileName {ns {}}} {
     }
 
     ::mk::file open db $fileName
-    # Add some versioning information into a view. Just a sanity check
-    # when the data is loaded later.
-    ::mk::view layout db.__ral_version {Version Date Comment}
-    ::mk::row append db.__ral_version\
-	Version [package require ral]\
-	Date [clock format [clock seconds]]\
-	Comment "Created by: \"[info level 0]\""
-    # Create a set of views that are used as catalogs to hold
-    # the relvar info that will be needed to reconstruct the values.
-    ::mk::view layout db.__ral_relvar {Name Heading}
-    set assocLayout {Name RingRelvar RingAttr RingMC RtoRelvar RtoAttr RtoMC}
-    ::mk::view layout db.__ral_association $assocLayout
-    ::mk::view layout db.__ral_partition\
-	{Name SupRelvar SupAttr {SubTypes {SubRelvar SubAttr}}}
-    set correlLayout {Complete Name CorrelRelvar\
-	RingAttrA RingMCA RtoRelvarA RtoAttrA\
-	RingAttrB RingMCB RtoRelvarB RtoAttrB}
-    ::mk::view layout db.__ral_correlation $correlLayout
+    set err [catch {
+	# Add some versioning information into a view. Just a sanity check
+	# when the data is loaded later.
+	::mk::view layout db.__ral_version {Version Date Comment}
+	::mk::row append db.__ral_version\
+	    Version [package require ral]\
+	    Date [clock format [clock seconds]]\
+	    Comment "Created by: \"[info level 0]\""
+	# Create a set of views that are used as catalogs to hold
+	# the relvar info that will be needed to reconstruct the values.
+	::mk::view layout db.__ral_relvar {Name Heading}
+	set assocLayout {Name RingRelvar RingAttr RingMC RtoRelvar RtoAttr\
+	    RtoMC}
+	::mk::view layout db.__ral_association $assocLayout
+	::mk::view layout db.__ral_partition\
+	    {Name SupRelvar SupAttr {SubTypes {SubRelvar SubAttr}}}
+	set correlLayout {Complete Name CorrelRelvar\
+	    RingAttrA RingMCA RtoRelvarA RtoAttrA\
+	    RingAttrB RingMCB RtoRelvarB RtoAttrB}
+	::mk::view layout db.__ral_correlation $correlLayout
 
-    # Get the names of the relvars and insert them into the catalog.
-    # Convert the names to be relative before inserting.
-    # Also create the views that will hold the values.
-    set names [relvar names ${ns}*]
-    foreach name $names {
-	set heading [relation heading [relvar set $name]]
-	::mk::row append db.__ral_relvar Name [namespace tail $name]\
-	    Heading $heading
-	# Determine the structure of the view that will hold the relvar value.
-	# Be careful of Tuple and Relation valued attributes.
-	set relvarLayout [list]
-	foreach {attr type} [lindex $heading 1] {
-	    lappend relvarLayout [mkHeading $attr $type]
+	# Get the names of the relvars and insert them into the catalog.
+	# Convert the names to be relative before inserting.
+	# Also create the views that will hold the values.
+	set names [relvar names ${ns}*]
+	foreach name $names {
+	    set heading [relation heading [relvar set $name]]
+	    ::mk::row append db.__ral_relvar Name [namespace tail $name]\
+		Heading $heading
+	    # Determine the structure of the view that will hold the relvar
+	    # value.  Be careful of Tuple and Relation valued attributes.
+	    set relvarLayout [list]
+	    foreach {attr type} [lindex $heading 1] {
+		lappend relvarLayout [mkHeading $attr $type]
+	    }
+	    ::mk::view layout db.[namespace tail $name] $relvarLayout
 	}
-	::mk::view layout db.[namespace tail $name] $relvarLayout
-    }
-    # Get the constraints and put them into the appropriate catalog
-    # depending upon the type of the constraint.
-    set partIndex 0
-    foreach cname [relvar constraint names ${ns}*] {
-	set cinfo [getConstraint $cname]
-	switch -exact [lindex $cinfo 0] {
-	    association {
-		set cindex 1
-		set value [list]
-		foreach col $assocLayout {
-		    lappend value $col [lindex $cinfo $cindex]
-		    incr cindex
+	# Get the constraints and put them into the appropriate catalog
+	# depending upon the type of the constraint.
+	set partIndex 0
+	foreach cname [relvar constraint names ${ns}*] {
+	    set cinfo [getConstraint $cname]
+	    switch -exact [lindex $cinfo 0] {
+		association {
+		    set cindex 1
+		    set value [list]
+		    foreach col $assocLayout {
+			lappend value $col [lindex $cinfo $cindex]
+			incr cindex
+		    }
+		    eval [linsert $value 0 ::mk::row append\
+			db.__ral_association]
 		}
-		eval [linsert $value 0 ::mk::row append db.__ral_association]
-	    }
-	    partition {
-		::mk::row append db.__ral_partition Name [lindex $cinfo 1]\
-		    SupRelvar [lindex $cinfo 2] SupAttr [lindex $cinfo 3]
-		foreach {subname subattr} [lrange $cinfo 4 end] {
-		    ::mk::row append db.__ral_partition!$partIndex.SubTypes\
-			SubRelvar $subname SubAttr $subattr
+		partition {
+		    ::mk::row append db.__ral_partition Name [lindex $cinfo 1]\
+			SupRelvar [lindex $cinfo 2] SupAttr [lindex $cinfo 3]
+		    foreach {subname subattr} [lrange $cinfo 4 end] {
+			::mk::row append db.__ral_partition!$partIndex.SubTypes\
+			    SubRelvar $subname SubAttr $subattr
+		    }
+		    incr partIndex
 		}
-		incr partIndex
-	    }
-	    correlation {
-		set value [list]
-		if {[lindex $cinfo 0] eq "-complete"} {
-		    lappend value [lindex $correlLayout 0] 1
-		    set cinfo [lrange $cinfo 1 end]
-		} else {
-		    lappend value [lindex $correlLayout 0] 0
+		correlation {
+		    set value [list]
+		    if {[lindex $cinfo 0] eq "-complete"} {
+			lappend value [lindex $correlLayout 0] 1
+			set cinfo [lrange $cinfo 1 end]
+		    } else {
+			lappend value [lindex $correlLayout 0] 0
+		    }
+		    set cindex 1
+		    foreach col [lrange $correlLayout 1 end] {
+			lappend value $col [lindex $cinfo $cindex]
+			incr cindex
+		    }
+		    eval [linsert $value 0 ::mk::row append\
+			db.__ral_correlation]
 		}
-		set cindex 1
-		foreach col [lrange $correlLayout 1 end] {
-		    lappend value $col [lindex $cinfo $cindex]
-		    incr cindex
+		default {
+		    error "unknown constraint type, \"[lindex $cinfo 0]\""
 		}
-		eval [linsert $value 0 ::mk::row append db.__ral_correlation]
-	    }
-	    default {
-		error "unknown constraint type, \"[lindex $cinfo 0]\""
 	    }
 	}
-    }
 
-    # Populate the views for each relavar.
-    foreach name $names {
-	set simpleName [namespace tail $name]
-	::mk::cursor create cursor db.$simpleName 0
-	relation foreach r [relvar set $name] {
-	    ::mk::row insert $cursor
-	    mkStoreTuple $cursor [relation tuple $r]
-	    ::mk::cursor incr cursor
+	# Populate the views for each relavar.
+	foreach name $names {
+	    set simpleName [namespace tail $name]
+	    ::mk::cursor create cursor db.$simpleName 0
+	    relation foreach r [relvar set $name] {
+		::mk::row insert $cursor
+		mkStoreTuple $cursor [relation tuple $r]
+		::mk::cursor incr cursor
+	    }
 	}
+    } errMsg]
+
+    if {$err} {
+	set einfo $::errorInfo
+	set ecode $::errorCode
+	catch {::mk::file close db}
+	return -code $err -errorcode $ecode -errorinfo $einfo $errMsg
     }
 
     ::mk::file close db
@@ -437,72 +449,81 @@ proc ::ral::loadFromMk {fileName {ns ::}} {
     package require Mk4tcl
 
     ::mk::file open db $fileName -readonly
-    # Check that a "version" view exists and that the information
-    # is consistent before we proceed.
-    set views [::mk::file views db]
-    if {[lsearch $views __ral_version] < 0} {
-	error "Cannot find TclRAL catalogs in \"$fileName\":\
-	    file may not contain relvar information"
-    }
-    set result [tuple create\
-	{Version string Date string Comment string}\
-	[::mk::get db.__ral_version!0]]
-    set verNum [::mk::get db.__ral_version!0 Version]
-    if {![package vsatisfies [package require ral] $verNum]} {
-	error "incompatible version number, \"$verNum\",\
-	    current library version is, \"[package require ral]\""
-    }
-    # determine the relvar names and types by reading the catalog
-    ::mk::loop rvCursor db.__ral_relvar {
-	array set relvarInfo [::mk::get $rvCursor]
-	namespace eval $ns [list ::ral::relvar create\
-	    $relvarInfo(Name) $relvarInfo(Heading)]
-    }
-    # create the association constraints
-    ::mk::loop assocCursor db.__ral_association {
-	set assocCmd [list ::ral::relvar association]
-	foreach {col value} [::mk::get $assocCursor] {
-	    lappend assocCmd $value
+    set err [catch {
+	# Check that a "version" view exists and that the information
+	# is consistent before we proceed.
+	set views [::mk::file views db]
+	if {[lsearch $views __ral_version] < 0} {
+	    error "Cannot find TclRAL catalogs in \"$fileName\":\
+		file may not contain relvar information"
 	}
-	namespace eval $ns $assocCmd
-    }
-    # create the partition constraints
-    ::mk::loop partCursor db.__ral_partition {
-	set subtypes [list]
-	::mk::loop subCursor $partCursor.SubTypes {
-	    foreach {col value} [::mk::get $subCursor] {
-		lappend subtypes $value
+	set result [tuple create\
+	    {Version string Date string Comment string}\
+	    [::mk::get db.__ral_version!0]]
+	set verNum [::mk::get db.__ral_version!0 Version]
+	if {![package vsatisfies [package require ral] $verNum]} {
+	    error "incompatible version number, \"$verNum\",\
+		current library version is, \"[package require ral]\""
+	}
+	# determine the relvar names and types by reading the catalog
+	::mk::loop rvCursor db.__ral_relvar {
+	    array set relvarInfo [::mk::get $rvCursor]
+	    namespace eval $ns [list ::ral::relvar create\
+		$relvarInfo(Name) $relvarInfo(Heading)]
+	}
+	# create the association constraints
+	::mk::loop assocCursor db.__ral_association {
+	    set assocCmd [list ::ral::relvar association]
+	    foreach {col value} [::mk::get $assocCursor] {
+		lappend assocCmd $value
 	    }
+	    namespace eval $ns $assocCmd
 	}
-	array set partValues [::mk::get $partCursor]
-	namespace eval $ns [linsert $subtypes 0\
-	    ::ral::relvar partition\
-	    $partValues(Name) $partValues(SupRelvar) $partValues(SupAttr)]
-    }
-    # create the correlation constraints
-    ::mk::loop correlCursor db.__ral_correlation {
-	set correlCmd [list ::ral::relvar correlation]
-	foreach {col value} [::mk::get $correlCursor] {
-	    if {$col eq "Complete"} {
-		if {$value == 1} {
-		    lappend correlCmd -complete
+	# create the partition constraints
+	::mk::loop partCursor db.__ral_partition {
+	    set subtypes [list]
+	    ::mk::loop subCursor $partCursor.SubTypes {
+		foreach {col value} [::mk::get $subCursor] {
+		    lappend subtypes $value
 		}
-	    } else {
-		lappend correlCmd $value
+	    }
+	    array set partValues [::mk::get $partCursor]
+	    namespace eval $ns [linsert $subtypes 0\
+		::ral::relvar partition\
+		$partValues(Name) $partValues(SupRelvar) $partValues(SupAttr)]
+	}
+	# create the correlation constraints
+	::mk::loop correlCursor db.__ral_correlation {
+	    set correlCmd [list ::ral::relvar correlation]
+	    foreach {col value} [::mk::get $correlCursor] {
+		if {$col eq "Complete"} {
+		    if {$value == 1} {
+			lappend correlCmd -complete
+		    }
+		} else {
+		    lappend correlCmd $value
+		}
+	    }
+	    namespace eval $ns $correlCmd
+	}
+	# fetch the relation values from the views
+	relvar eval {
+	    foreach name [relvar names ${ns}*] {
+		set viewName [namespace tail $name]
+		set heading [relation heading [relvar set $name]]
+		::mk::loop vCursor db.$viewName {
+		    namespace eval $ns [list ::ral::relvar insert $name\
+			[mkLoadTuple $vCursor $heading]]
+		}
 	    }
 	}
-	namespace eval $ns $correlCmd
-    }
-    # fetch the relation values from the views
-    relvar eval {
-	foreach name [relvar names ${ns}*] {
-	    set viewName [namespace tail $name]
-	    set heading [relation heading [relvar set $name]]
-	    ::mk::loop vCursor db.$viewName {
-		namespace eval $ns [list ::ral::relvar insert $name\
-		    [mkLoadTuple $vCursor $heading]]
-	    }
-	}
+    } errMsg]
+
+    if {$err} {
+	set einfo $::errorInfo
+	set ecode $::errorCode
+	catch {::mk::file close db}
+	return -code $err -errorcode $ecode -errorinfo $einfo $errMsg
     }
 
     ::mk::file close db
