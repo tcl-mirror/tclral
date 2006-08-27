@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.33 $
-# $Date: 2006/08/13 23:14:58 $
+# $Revision: 1.34 $
+# $Date: 2006/08/27 00:31:33 $
 #  *--
 
 package require tcltest 2.2
@@ -3687,6 +3687,30 @@ tuple {C1 c C2 42} references no tuple
 	relvar constraint info R1
     } -result {partition ::ral::test::R1 ::ral::test::A A1 ::ral::test::B B1 ::ral::test::C C1}
 
+    test relvar-constraint-2.3 {constraint info -- correlation} -setup {
+	relvar create A {Relation {X1 string Y1 string} {{X1 Y1}}}
+	relvar create X {Relation {X1 string} X1}
+	relvar create Y {Relation {Y1 string} Y1}
+	relvar correlation R1 A X1 + X X1 Y1 * Y Y1
+    } -cleanup {
+	relvar constraint delete R1
+	relvar unset A X Y
+    } -body {
+	relvar constraint info R1
+    } -result {correlation ::ral::test::R1 ::ral::test::A X1 + ::ral::test::X X1 Y1 * ::ral::test::Y Y1}
+
+    test relvar-constraint-3.1 {constraint member} -setup {
+	relvar create A {Relation {X1 string Y1 string} {{X1 Y1}}}
+	relvar create X {Relation {X1 string} X1}
+	relvar create Y {Relation {Y1 string} Y1}
+	relvar correlation R1 A X1 + X X1 Y1 * Y Y1
+    } -cleanup {
+	relvar constraint delete R1
+	relvar unset A X Y
+    } -body {
+	relvar constraint member A
+    } -result {::ral::test::R1}
+
     # relvar correlation subcommand
     test relvar-correlation-1.1 {many to many} -setup {
 	relvar create A {
@@ -4414,7 +4438,9 @@ tuple {A1 c} is not referred to by any tuple
     } -cleanup {
 	relvar unset X
     } -body {
-	relvar updateone X {Name Jane} {Status -1}
+	relvar updateone X xTup {Name Jane} {
+	    tuple update xTup Status 10
+	}
     } -result {0}
 
     test relvar-updateone-2.0 {match} -setup {
@@ -4430,7 +4456,9 @@ tuple {A1 c} is not referred to by any tuple
     } -cleanup {
 	relvar unset X
     } -body {
-	relvar updateone X {Name Fred} {Status -1}
+	relvar updateone X xTup {Name Fred} {
+	    tuple update xTup Status 10
+	}
     } -result {1}
 
     test relvar-updateone-2.1 {match, compare result} -setup {
@@ -4446,7 +4474,9 @@ tuple {A1 c} is not referred to by any tuple
     } -cleanup {
 	relvar unset X
     } -body {
-	relvar updateone X {Name Fred} {Status -1}
+	relvar updateone X xTup {Name Fred} {
+	    tuple update xTup Status 10
+	}
 	relvar set X
     } -result {
 	Relation
@@ -4454,7 +4484,7 @@ tuple {A1 c} is not referred to by any tuple
 	Name
 	{
 	    {Name George Status 20}
-	    {Name Fred Status -1}
+	    {Name Fred Status 10}
 	    {Name Alice Status 40}
 	}
     } -match relation
@@ -4472,7 +4502,9 @@ tuple {A1 c} is not referred to by any tuple
     } -cleanup {
 	relvar unset X
     } -body {
-	relvar updateone X {Status 20} {Name Jane}
+	relvar updateone X xTup {Status 20} {
+	    tuple update xTup Status 10
+	}
     } -result {attributes do not constitute an identifier, "during identifier construction operation"}\
     -returnCodes error
 
@@ -4489,7 +4521,9 @@ tuple {A1 c} is not referred to by any tuple
     } -cleanup {
 	relvar unset X
     } -body {
-	relvar updateone X {Name George} {Name Fred}
+	relvar updateone X xTup {Name George} {
+	    tuple update xTup Name Fred
+	}
     } -result {duplicate tuple, "{Name Fred Status 20}"} -returnCodes error
 
     # examples from the Date book

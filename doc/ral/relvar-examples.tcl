@@ -62,7 +62,7 @@ proc setAll {} {
     }
 }
 
-# Example for the tuple manual page.
+# Example for the relvar manual page.
 
 namespace import ::ral::*
 
@@ -159,6 +159,11 @@ displayExample {
     relvar constraint info ::A2
 }
 
+#relvar constraint member
+displayExample {
+    relvar constraint member OWNERSHIP
+}
+
 #relvar partition
 displayExample {
     relvar create Lamp {
@@ -213,7 +218,9 @@ setAll
 #relvar updateone
 displayExample {
     puts [relformat $::OWNER]
-    relvar updateone OWNER {OwnerName George} {Age 37 City {New York}}
+    relvar updateone OWNER o {OwnerName George} {
+	tuple update o Age 37 City {New York}
+    }
     puts [relformat $::OWNER]
 }
 setAll

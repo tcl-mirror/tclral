@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.20 $
-# $Date: 2006/08/24 01:56:44 $
+# $Revision: 1.21 $
+# $Date: 2006/08/27 00:31:31 $
 #  *--
 
 namespace eval ::ral {
@@ -64,6 +64,7 @@ namespace eval ::ral {
     namespace export csv
     namespace export csvToFile
     namespace export navigate
+    namespace export alter
 
     if {![catch {package require report}]} {
 	# Default report style for Tuple types
@@ -758,13 +759,11 @@ proc ::ral::navigate {relValue constraintName relvarName {dir {}}} {
 		}
 		# So the semijoins will traverse:
 		# "src" -> correlation -> "dst"
-		set cmd1 [list\
-		    ::ral::relation semijoin $relValue\
+		set correlRel [::ral::relation semijoin $relValue\
 		    [::ral::relvar set $rngRelvar]\
-		    -using [mergeJoinAttrs $srcAttrs $correlSrc]\
-		]
+		    -using [mergeJoinAttrs $srcAttrs $correlSrc]]
 		set cmd [list\
-		    ::ral::relation semijoin [eval $cmd1]\
+		    ::ral::relation semijoin $correlRel\
 		    [::ral::relvar set $dst]\
 		    -using [mergeJoinAttrs $correlDst $dstAttrs]\
 		]
@@ -775,6 +774,73 @@ proc ::ral::navigate {relValue constraintName relvarName {dir {}}} {
 	}
     }
     return [eval $cmd]
+}
+
+# ::ral::alter <relvarName> <varName> <script>
+# Alter a relvar's structure.
+# "relvarName" is the name of the relvar.
+# "varName" is the name of a Tcl variable that is assigned
+#   the value in "relvarName".
+# "script" is an expression that is evaluated in the context of the caller.
+# The value found in "varName" after "script" is evaluated is taken
+# to be the new value to store in "relvarName".
+# The heading of "relvarName" is modified to reflect the new structure.
+# This is all accomplished by deleting and re-creating "relvarName" taking
+# care to remove and replace the constraints.
+#
+# N.B. very experimental and mildly dangerous as it must delete the
+# relvar and recreate it along with the constraints.
+#
+proc ::ral::alter {relvarName varName script} {
+    # Get the resolved name
+    set relvarName [relvar names $relvarName]
+    # Store all the constraint info to restore later. In order to delete
+    # a relvar, all the constraints must be deleted.
+    set cnstrCmds [list]
+    foreach constraint [relvar constraint member $relvarName] {
+	lappend cnstrCmds [relvar constraint info $constraint]
+	relvar constraint delete $constraint
+    }
+    upvar $varName var
+    set prevValue [set var [relvar set $relvarName]]
+    set prevHeading [relation heading $prevValue]
+    relvar unset $relvarName
+
+    # Evaluate the script.
+    if {![set rCode [catch {uplevel $script} result]]} {
+	# Make sure the result is still a relation, so any old relation command
+	# will do. Since we need the heading later, we use that.
+	if {![set rCode [catch {relation heading $var} result]]} {
+	    # If we make it this far without any errors, we can re-create the
+	    # relvar and set its value.
+	    relvar create $relvarName $result
+	    relvar set $relvarName $var
+	    # Now attempt to restore the constraints
+	    set rCode [catch {
+		foreach cmd $cnstrCmds {
+		    eval relvar $cmd
+		}} result]
+	}
+    }
+    if {$rCode} {
+	# Something went wrong, restore the original relvar, its value and
+	# the constraints.
+	global errorCode
+	global errorInfo
+
+	set eCode $errorCode
+	set eInfo $errorInfo
+	# If something goes wrong here, we will have corrupted the
+	# state of the relvars. Not good. This is why, ultimately, this
+	# may have to be moved into the "C" part of the library.
+	relvar create $relvarName $prevHeading
+	relvar set $relvarName $prevValue
+	foreach cmd $cnstrCmds {
+	    eval relvar $cmd
+	}
+	return -code $rCode -errorinfo $eInfo -errorcode $eCode $result
+    }
+    return [relvar set $relvarName]
 }
 
 # PRIVATE PROCS

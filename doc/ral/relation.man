@@ -45,8 +45,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.7 $
-# $Date: 2006/08/22 02:33:03 $
+# $Revision: 1.8 $
+# $Date: 2006/08/27 00:31:30 $
 #  *--
 }]
 [moddesc "Relation Operators"]
@@ -469,13 +469,6 @@ argument.
 This variable is accessible to the extending expressions so that the
 current tuple values of [arg relationValue] are available for computing
 the values of the new attributes.
-Optionally, the order in which the tuples are considered can be specified
-by giving the a list of attribute names with the [opt -ascending] or
-[opt -descending] argument.
-If the order is specified, then the new relation is created by extending
-[arg relationValue] considering each tuple in the order to which they sort.
-If no ordering is given, then the tuples are extended by considering them
-in an indeterminate order.
 
 [example {
 % relformat [relation extend $::OWNER o AgeInMonths int {[tuple extract $o Age] * 12}]

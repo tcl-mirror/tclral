@@ -47,8 +47,8 @@
 #   This command is part of TclRAL. This file is in Tcl Markup Language
 #   format.
 # $RCSfile: relvar.man,v $
-# $Revision: 1.7 $
-# $Date: 2006/07/31 15:35:40 $
+# $Revision: 1.8 $
+# $Date: 2006/08/27 00:31:31 $
 #  *--
 }]
 [moddesc "Relvar Operators"]
@@ -154,16 +154,16 @@ If any of the constraints fail, the relvar modifications are discarded
 and the relvar values are returned to the values they had before
 the modifications.
 Similarly,
-after the creation of a constraint, the constraint is evaluated
+during the creation of a constraint, the constraint is evaluated
 on all the relvars associated with the constraint.
 If the evaluation fails,
-the constraint is deleted.
+the constraint creation fails.
 
 Like relvars, constraints have names.
 Constraints names follow the same pattern as relvar names, i.e.
 unresolved names are created in the current namespace.
 Thus you are able to keep the relvars and their constraints organized
-together in namespace like groups.
+together in namespace-like groups.
 
 [section COMMANDS]
 [list_begin definitions]
@@ -288,6 +288,17 @@ The returned names are fully qualified.
 ::A1 ::A2
 % relvar constraint names *2
 ::A2
+}]
+
+[call [cmd "::ral::relvar constraint member"] [arg relvarName]]
+
+The [cmd "constraint member"] subcommand returns a list of constraint names
+in which [arg relvarName] participates in some fashion.
+The returned names are fully qualified.
+
+[example {
+% relvar constraint member OWNERSHIP
+::A1 ::A2
 }]
 
 [call [cmd "::ral::relvar correlation"] [opt -complete] [arg name]\
@@ -777,8 +788,8 @@ tuple {OwnerName George DogName Sam Acquired 2000} references no tuple
 +=========+---+-------------+
 }]
 
-[call [cmd "::ral::relvar updateone"] [arg relvarName]\
-    [arg id-name-value-list] [arg name-value-list]]
+[call [cmd "::ral::relvar updateone"] [arg relvarName] [arg tupleVarName]\
+    [arg id-name-value-list] [arg script]]
 
 The [cmd updateone] subcommand modifies at most one tuple from the
 relation variable given by the [arg relvarName] argument.
@@ -788,10 +799,12 @@ The set of attribute names in [arg id-name-value-list] must form one of the
 identifiers of [arg relvarName].
 If [arg relvarName] contains a tuple whose attribute values match those
 in [arg name-value-list] then
-then the attributes whose names are mentioned in the [arg name-value-list]
-are set to the corresponding values and [arg relvarName]
-is modified in place.
-Otherwise [arg relvarName] is unchanged.
+that tuple is assigned to [arg tupleVarName] and [arg script] is executed.
+After executing [arg script] the value contained in [arg tupleVarName]
+replaces the original tuple, modifying [arg relvarName] in place.
+Typically, [arg script] will invoke [cmd "::ral::tuple update"]
+to modify the value of [arg tupleVarName].
+If no matching tuple is found, then [arg relvarName] is unchanged.
 This subcommand is useful in those contexts where the attribute values of an
 identifier are known and evaluating an expression over all the tuples
 in [arg relvarName] is superfluous.
@@ -810,7 +823,9 @@ which will necessarily be either 0 or 1.
 |Mike     |50 |San Jose     |
 |Jim      |42 |San Francisco|
 +=========+---+-------------+
-% relvar updateone OWNER {OwnerName George} {Age 37 City {New York}}
+% relvar updateone OWNER o {OwnerName George} {
+> tuple update o Age 37 City {New York}
+> }
 1
 % puts [relformat $::OWNER]
 +=========+---+-------------+

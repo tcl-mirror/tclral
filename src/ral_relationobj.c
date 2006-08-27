@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationobj.c,v $
-$Revision: 1.17 $
-$Date: 2006/07/30 23:45:56 $
+$Revision: 1.18 $
+$Date: 2006/08/27 00:31:31 $
  *--
  */
 
@@ -107,7 +107,7 @@ Tcl_ObjType Ral_RelationObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.17 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.18 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -432,49 +432,53 @@ error_out:
     return NULL ;
 }
 
+/*
+ * Update a tuple in a relationship by running a script and
+ * retrieving the updated value of a tuple.
+ */
 int
 Ral_RelationObjUpdateTuple(
-    Tcl_Interp *interp,
-    Tcl_Obj *updateList,
-    Ral_Relation relation,
-    Ral_RelationIter tupleIter,
-    Ral_ErrorInfo *errInfo)
+    Tcl_Interp *interp,		/* interpreter */
+    Tcl_Obj *tupleVarNameObj,	/* name of the tuple variable */
+    Tcl_Obj *scriptObj,		/* script to run */
+    Ral_Relation relation,	/* relation to update */
+    Ral_RelationIter tupleIter, /* tuple withing the relation to update */
+    Ral_CmdOption cmdOpt)	/* which command is calling -- for errors */
 {
-    int objc ;
-    Tcl_Obj **objv ;
+    int result ;
+    Tcl_Obj *tupleObj ;
     Ral_Tuple tuple ;
 
-    if (Tcl_ListObjGetElements(interp, updateList, &objc, &objv) != TCL_OK) {
-	return TCL_ERROR ;
-    }
-    if (objc % 2 != 0) {
-	Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_BAD_PAIRS_LIST, updateList) ;
-	goto errorOut ;
+    /*
+     * Evaluate the script.
+     */
+    result = Tcl_EvalObjEx(interp, scriptObj, 0) ;
+    if (result == TCL_ERROR) {
+	return result ;
     }
     /*
-     * Clone the tuple. This is the only way that we can handle the potential
-     * for errors with unknown attributes, etc.
+     * Fetch the value of the variable. It could be different now
+     * that the update has been performed. Once we get the new
+     * tuple value, we can use it to update the relvar.
      */
-    tuple = Ral_TupleDup(*tupleIter) ;
-    for ( ; objc > 0 ; objc -= 2, objv += 2) {
-	const char *attrName = Tcl_GetString(objv[0]) ;
-	if (!Ral_TupleUpdateAttrValue(tuple, attrName, objv[1], errInfo)) {
-	    goto errorOut ;
-	}
+    tupleObj = Tcl_ObjGetVar2(interp, tupleVarNameObj, NULL,
+	TCL_LEAVE_ERR_MSG) ;
+    if (tupleObj == NULL) {
+	return TCL_ERROR ;
     }
+    if (Tcl_ConvertToType(interp, tupleObj, &Ral_TupleObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    assert(tupleObj->typePtr == &Ral_TupleObjType) ;
+    tuple = tupleObj->internalRep.otherValuePtr ;
     if (!Ral_RelationUpdate(relation, tupleIter, tuple, NULL)) {
 	char *tupleStr = Ral_TupleValueStringOf(tuple) ;
-	Ral_ErrorInfoSetError(errInfo, RAL_ERR_DUPLICATE_TUPLE, tupleStr) ;
+	Ral_InterpErrorInfo(interp, Ral_CmdRelvar, cmdOpt,
+	    RAL_ERR_DUPLICATE_TUPLE, tupleStr) ;
 	ckfree(tupleStr) ;
-	Ral_TupleDelete(tuple) ;
-	goto errorOut ;
+	result = TCL_ERROR ;
     }
-
-    return TCL_OK ;
-
-errorOut:
-    Ral_InterpSetError(interp, errInfo) ;
-    return TCL_ERROR ;
+    return result ;
 }
 
 const char *

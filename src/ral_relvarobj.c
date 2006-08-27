@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.13 $
-$Date: 2006/08/09 01:15:57 $
+$Revision: 1.14 $
+$Date: 2006/08/27 00:31:31 $
  *--
  */
 
@@ -123,7 +123,7 @@ static struct {
 } ;
 static const char specErrMsg[] = "multiplicity specification" ;
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.13 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.14 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -478,8 +478,6 @@ Ral_RelvarObjCreateAssoc(
     /*
      * Record which constraints apply to a given relvar. This is what allows
      * us to find the constraints that apply to a relvar when it is modified.
-     * Treat the creation of the association as modifying the participating
-     * relvars.
      */
     Ral_PtrVectorPushBack(relvar1->constraints, constraint) ;
     Ral_PtrVectorPushBack(relvar2->constraints, constraint) ;
@@ -978,11 +976,10 @@ Ral_RelvarObjCreateCorrelation(
     /*
      * Record which constraints apply to a given relvar. This is what allows
      * us to find the constraints that apply to a relvar when it is modified.
-     * Treat the creation of the association as modifying the participating
-     * relvars.
      */
     Ral_PtrVectorPushBack(relvar1->constraints, constraint) ;
     Ral_PtrVectorPushBack(relvar2->constraints, constraint) ;
+    Ral_PtrVectorPushBack(relvarC->constraints, constraint) ;
     /*
      * Evaluate the newly created constraint to make sure that the
      * current values of the relvar pass the constraint evaluation.
@@ -1279,7 +1276,6 @@ errorOut:
     return TCL_ERROR ;
 }
 
-
 int
 Ral_RelvarObjConstraintNames(
     Tcl_Interp *interp,
@@ -1305,6 +1301,44 @@ Ral_RelvarObjConstraintNames(
     }
 
     Tcl_SetObjResult(interp, nameList) ;
+    return TCL_OK ;
+}
+
+/*
+ * returns an interpreter result that is the list of constraints
+ * that a relvar is a member of.
+ */
+int
+Ral_RelvarObjConstraintMember(
+    Tcl_Interp *interp,
+    Tcl_Obj * const relvarName,
+    Ral_RelvarInfo info)
+{
+    Ral_Relvar relvar ;
+    Tcl_Obj *resultObj ;
+    Ral_PtrVectorIter iter ;
+    Ral_PtrVectorIter end ;
+
+    relvar = Ral_RelvarObjFindRelvar(interp, info, Tcl_GetString(relvarName),
+	NULL) ;
+    if (relvar == NULL) {
+	return TCL_ERROR ;
+    }
+
+    resultObj = Tcl_NewListObj(0, NULL) ;
+    end = Ral_PtrVectorEnd(relvar->constraints) ;
+    for (iter = Ral_PtrVectorBegin(relvar->constraints) ; iter != end ;
+	++iter) {
+	Ral_Constraint c = *iter ;
+
+	if (Tcl_ListObjAppendElement(interp, resultObj,
+	    Tcl_NewStringObj(c->name, -1)) != TCL_OK) {
+	    Tcl_DecrRefCount(resultObj) ;
+	    return TCL_ERROR ;
+	}
+    }
+
+    Tcl_SetObjResult(interp, resultObj) ;
     return TCL_OK ;
 }
 
