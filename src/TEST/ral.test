@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.34 $
-# $Date: 2006/08/27 00:31:33 $
+# $Revision: 1.35 $
+# $Date: 2006/08/27 22:04:38 $
 #  *--
 
 package require tcltest 2.2
@@ -70,38 +70,11 @@ proc relationMatch {expected actual} {
     return [::ral::relation is $expected == $actual]
 }
 
-proc dictMatch {expected actual} {
-    if {[dict size $expected] != [dict size $actual]} {
-	return 0
-    }
-    dict for {exKey exVal} $expected {
-	if {[dict get $actual $exKey] != $exVal} {
-	    return 0
-	}
-    }
-    return 1
-}
-
 if {[package vsatisfies [package require Tcl] 8.5]} {
     ::tcltest::testConstraint tcl8.5 1
-    proc ::tcl::mathfunc::rcount {relation} {
-	return [::ral::relation cardinality $relation]
-    }
-
-    proc ::tcl::mathfunc::rsum {relation attr} {
-	set result 0
-	::ral::relation foreach r $relation {
-	    set t [::ral::relation tuple $r]
-	    set result [expr {$result + [::ral::tuple extract $t $attr]}]
-	}
-	return $result
-    }
-
-    proc ::tcl::mathfunc::ravg {relation attr} {
-	return [expr {rsum($relation, $attr) / rcount($relation)}]
-    }
-} else {
-    package require dict
+    ::tcltest::testConstraint haveDict 1
+} elseif {![catch {package require dict}]} {
+    ::tcltest::testConstraint haveDict 1
 }
 
 proc rcount {relation} {
@@ -127,7 +100,20 @@ namespace eval ::ral::test {
 
     customMatch tuple tupleMatch
     customMatch relation relationMatch
-    customMatch dict dictMatch
+    if {[::tcltest::testConstraint haveDict]} {
+	proc ::dictMatch {expected actual} {
+	    if {[dict size $expected] != [dict size $actual]} {
+		return 0
+	    }
+	    dict for {exKey exVal} $expected {
+		if {[dict get $actual $exKey] != $exVal} {
+		    return 0
+		}
+	    }
+	    return 1
+	}
+	customMatch dict dictMatch
+    }
 
     set DEE {Relation {} {{}} {{}}}
     set DUM {Relation {} {{}} {}}
@@ -871,7 +857,9 @@ namespace eval ::ral::test {
     } -result {unknown attribute name, "a4"} -returnCodes error
 
     # relation array subcommand
-    test relation-array-1.0 {supplier number / city map} -body {
+    test relation-array-1.0 {supplier number / city map} -constraints {
+	haveDict
+    } -body {
 	relation array [relation project $S S# CITY] smap
 	array get smap
     } -cleanup {

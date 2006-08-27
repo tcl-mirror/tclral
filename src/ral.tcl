@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.21 $
-# $Date: 2006/08/27 00:31:31 $
+# $Revision: 1.22 $
+# $Date: 2006/08/27 22:04:38 $
 #  *--
 
 namespace eval ::ral {
@@ -841,6 +841,52 @@ proc ::ral::alter {relvarName varName script} {
 	return -code $rCode -errorinfo $eInfo -errorcode $eCode $result
     }
     return [relvar set $relvarName]
+}
+
+# If we have Tcl 8.5, then we can supply some "scalar functions" that
+# are useful and have "expr" syntax
+if {[package vsatisfies [package require Tcl] 8.5]} {
+    # Count the number of tuples in a relation
+    proc ::tcl::mathfunc::rcount {relation} {
+	return [::ral::relation cardinality $relation]
+    }
+    # Count the number of distinct values of an attribute in a relation
+    proc ::tcl::mathfunc::rcountd {relation attr} {
+	return [::ral::relation cardinality\
+	    [::ral::relation project $relation $attr]]
+    }
+    # Compute the sum over an attribute
+    proc ::tcl::mathfunc::rsum {relation attr} {
+	set result 0
+	::ral::relation foreach r $relation {
+	    set result [expr {$result +\
+		[::ral::tuple extract [::ral::relation tuple $r] $attr]}]
+	}
+	return $result
+    }
+    # Compute the sum over the distinct values of an attribute.
+    proc ::tcl::mathfunc::rsumd {relation attr} {
+	set result 0
+	::ral::relation foreach v [::ral::relation list\
+	    [::ral::relation project $relation $attr]] {
+	    incr result $v
+	}
+	return $result
+    }
+    proc ::tcl::mathfunc::ravg {relation attr} {
+	return [expr {rsum($relation, $attr) / rcount($relation)}]
+    }
+    # Some redundancy here viz a viz "rsumd" but it saves computing the
+    # projection twice.
+    proc ::tcl::mathfunc::ravgd {relation attr} {
+	set result 0
+	set dvalues [::ral::relation list\
+	    [::ral::relation project $relation $attr]]
+	::ral::relation foreach v $dvalues {
+	    incr result $v
+	}
+	return [expr {$result / [llength $dvalues]}]
+    }
 }
 
 # PRIVATE PROCS

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.15 $
-$Date: 2006/08/27 00:31:31 $
+$Revision: 1.16 $
+$Date: 2006/08/27 22:04:38 $
  *--
  */
 
@@ -113,7 +113,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.15 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.16 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -803,7 +803,10 @@ RelvarUpdateCmd(
 		result = TCL_OK ;
 		break ;
 	    }else if (result == TCL_ERROR) {
-		static const char msg[] = "\n    (\"relvar update\")" ;
+		static const char msgfmt[] =
+		    "\n    (\"in ::ral::relvar update\" body line %d)" ;
+		char msg[sizeof(msgfmt) + TCL_INTEGER_SPACE] ;
+		sprintf(msg, msgfmt, interp->errorLine) ;
 		Tcl_AddObjErrorInfo(interp, msg, -1) ;
 		break ;
 	    } else {
@@ -847,6 +850,8 @@ RelvarUpdateOneCmd(
     int idNum ;
     Ral_RelationIter found ;
     int result = TCL_OK ;
+    int upResult ;
+    int endResult ;
     int updated = 0 ;
     Ral_ErrorInfo errInfo ;
 
@@ -879,13 +884,13 @@ RelvarUpdateOneCmd(
     key = Ral_RelationObjKeyTuple(interp, relation, elemc, elemv, &idNum,
 	&errInfo) ;
     if (key == NULL) {
+	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
     found = Ral_RelationFindKey(relation, idNum, key, NULL) ;
     Ral_TupleDelete(key) ;
 
     if (found != Ral_RelationEnd(relation)) {
-	int failed = 0 ;
 	Tcl_Obj *tupleVarNameObj = objv[3] ;
 	Tcl_Obj *tupleObj ;
 
@@ -905,15 +910,21 @@ RelvarUpdateOneCmd(
 	 * Evaluate the script and update the relvar with
 	 * the new value that is found in the tuple variable.
 	 */
-	if (Ral_RelationObjUpdateTuple(interp, tupleVarNameObj, objv[5],
-		relation, found, Ral_OptUpdateone) != TCL_OK) {
-	    failed = 1 ;
+	upResult = Ral_RelationObjUpdateTuple(interp, tupleVarNameObj, objv[5],
+		relation, found, Ral_OptUpdateone) ;
+	if (upResult == TCL_ERROR) {
+	    static const char msgfmt[] =
+		"\n    (\"in ::ral::relvar updateone\" body line %d)" ;
+	    char msg[sizeof(msgfmt) + TCL_INTEGER_SPACE] ;
+	    sprintf(msg, msgfmt, interp->errorLine) ;
+	    Tcl_AddObjErrorInfo(interp, msg, -1) ;
 	} else {
 	    Tcl_InvalidateStringRep(relvar->relObj) ;
 	    relvar->relObj->length = 0 ;
 	}
-	result = Ral_RelvarObjEndCmd(interp, rInfo, failed) ;
+	endResult = Ral_RelvarObjEndCmd(interp, rInfo, upResult == TCL_ERROR) ;
 	updated = 1 ;
+	result = endResult == TCL_OK ? upResult : endResult ;
 	/*
 	 * Delete the variable.
 	 */
