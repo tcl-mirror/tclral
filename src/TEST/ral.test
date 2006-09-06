@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.35 $
-# $Date: 2006/08/27 22:04:38 $
+# $Revision: 1.36 $
+# $Date: 2006/09/06 02:21:03 $
 #  *--
 
 package require tcltest 2.2
@@ -2074,6 +2074,70 @@ namespace eval ::ral::test {
 	{
 	    {Name George Age 20 City {San Jose} Status 20}
 	    {Name Fred Age 10 City Saratoga Status 10}
+	}
+    } -match relation
+
+    test relation-join-7.0 {identifier subsets} -body {
+	set r1 {
+	    Relation
+	    {XId string A2 int A3 string}
+	    {XId A2}
+	    {
+		{A2 20 XId George A3 {San Jose}}
+		{A3 Saratoga A2 10 XId Fred}
+	    }
+	}
+	set r2 {
+	    Relation
+	    {XId string A4 int}
+	    {{XId A4}}
+	    {
+		{A4 30 XId George}
+		{A4 20 XId Fred}
+		{XId Fred A4 10}
+	    }
+	}
+	relation join $r1 $r2
+    } -result {
+	Relation
+	{XId string A2 int A3 string A4 int}
+	{{XId A4}}
+	{
+	    {XId George A2 20 A3 {San Jose} A4 30}
+	    {XId Fred A2 10 A3 Saratoga A4 20}
+	    {XId Fred A2 10 A3 Saratoga A4 10}
+	}
+    } -match relation
+
+    test relation-join-7.1 {identifier subsets} -body {
+	set r1 {
+	    Relation
+	    {XId string A2 int A3 string}
+	    {XId A2}
+	    {
+		{A2 20 XId George A3 {San Jose}}
+		{A3 Saratoga A2 10 XId Fred}
+	    }
+	}
+	set r2 {
+	    Relation
+	    {XId string A4 int}
+	    {{XId A4}}
+	    {
+		{A4 30 XId George}
+		{A4 20 XId Fred}
+		{XId Fred A4 10}
+	    }
+	}
+	relation join $r2 $r1
+    } -result {
+	Relation
+	{XId string A2 int A3 string A4 int}
+	{{XId A4}}
+	{
+	    {XId George A2 20 A3 {San Jose} A4 30}
+	    {XId Fred A2 10 A3 Saratoga A4 20}
+	    {XId Fred A2 10 A3 Saratoga A4 10}
 	}
     } -match relation
 

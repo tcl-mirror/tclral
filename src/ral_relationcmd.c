@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.21 $
-$Date: 2006/07/19 04:06:24 $
+$Revision: 1.22 $
+$Date: 2006/09/06 02:21:03 $
  *--
  */
 
@@ -141,7 +141,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.21 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.22 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -2143,7 +2143,6 @@ RelationSummarizeCmd(
 	Ral_JoinMapDelete(joinMap) ;
 	return TCL_ERROR ;
     }
-
     varNameObj = objv[4] ;
 
     objc -= 5 ;
@@ -2153,10 +2152,10 @@ RelationSummarizeCmd(
 	    "attribute / type / expression arguments "
 	    "must be given in triples") ;
 	Ral_InterpSetError(interp, &errInfo) ;
+	Ral_JoinMapDelete(joinMap) ;
 	return TCL_ERROR ;
     }
 
-    Tcl_IncrRefCount(varNameObj) ;
     /*
      * Construct the heading for the result. It the heading of the
      * "per" relation plus the summary attributes.
@@ -2173,6 +2172,7 @@ RelationSummarizeCmd(
 	if (attr == NULL) {
 	    Ral_TupleHeadingDelete(sumTupleHeading) ;
 	    Ral_InterpSetError(interp, &errInfo) ;
+	    return TCL_ERROR ;
 	}
 	inserted = Ral_TupleHeadingPushBack(sumTupleHeading, attr) ;
 	if (inserted == Ral_TupleHeadingEnd(sumTupleHeading)) {
@@ -2191,10 +2191,11 @@ RelationSummarizeCmd(
      * attribute is computed by evaluating the expression and assigning the
      * result to the attribute.
      */
+    Tcl_IncrRefCount(varNameObj) ;
     Ral_RelationFindJoinTuples(perRelation, relation, joinMap) ;
-    perEnd = Ral_RelationEnd(perRelation) ;
     sumHeadingIter = Ral_TupleHeadingBegin(sumTupleHeading) +
 	Ral_RelationDegree(perRelation) ;
+    perEnd = Ral_RelationEnd(perRelation) ;
     for (perIter = Ral_RelationBegin(perRelation) ; perIter != perEnd ;
 	++perIter) {
 	Ral_Tuple perTuple = *perIter ;
@@ -2208,7 +2209,6 @@ RelationSummarizeCmd(
 	int status ;
 
 	Ral_IntVectorDelete(matchSet) ;
-	Tcl_IncrRefCount(matchObj) ;
 
 	if (Tcl_ObjSetVar2(interp, varNameObj, NULL, matchObj,
 	    TCL_LEAVE_ERR_MSG) == NULL) {
@@ -2221,26 +2221,20 @@ RelationSummarizeCmd(
 	    Ral_TupleEnd(perTuple), sumIter) ;
 
 	for (c = objc, v = objv + 2 ; c > 0 ; c -= 3, v += 3) {
-	    Tcl_Obj *exprResult ;
-
-	    if (Tcl_ExprObj(interp, *v, &exprResult) != TCL_OK) {
+	    if (Tcl_ExprObj(interp, *v, sumIter) != TCL_OK) {
 		Ral_TupleDelete(sumTuple) ;
-		Tcl_DecrRefCount(matchObj) ;
 		goto errorOut ;
 	    }
 	    if (Ral_AttributeConvertValueToType(interp, *attrIter++,
-		exprResult, &errInfo) != TCL_OK) {
+		*sumIter, &errInfo) != TCL_OK) {
 		Ral_TupleDelete(sumTuple) ;
-		Tcl_DecrRefCount(matchObj) ;
-		Tcl_DecrRefCount(exprResult) ;
+		Tcl_DecrRefCount(*sumIter) ;
 		goto errorOut ;
 	    }
-	    Tcl_IncrRefCount(*sumIter++ = exprResult) ;
-	    Tcl_DecrRefCount(exprResult) ;
+	    ++sumIter ;
 	}
 	status = Ral_RelationPushBack(sumRelation, sumTuple, NULL) ;
 	assert(status != 0) ;
-	Tcl_DecrRefCount(matchObj) ;
     }
 
     Tcl_UnsetVar(interp, Tcl_GetString(varNameObj), 0) ;
