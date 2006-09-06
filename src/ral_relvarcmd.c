@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.16 $
-$Date: 2006/08/27 22:04:38 $
+$Revision: 1.17 $
+$Date: 2006/09/06 02:17:56 $
  *--
  */
 
@@ -113,7 +113,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.16 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.17 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -884,7 +884,6 @@ RelvarUpdateOneCmd(
     key = Ral_RelationObjKeyTuple(interp, relation, elemc, elemv, &idNum,
 	&errInfo) ;
     if (key == NULL) {
-	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
     found = Ral_RelationFindKey(relation, idNum, key, NULL) ;
