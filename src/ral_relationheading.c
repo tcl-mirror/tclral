@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationheading.c,v $
-$Revision: 1.14 $
-$Date: 2006/06/24 18:07:38 $
+$Revision: 1.15 $
+$Date: 2006/09/06 02:19:54 $
  *--
  */
 
@@ -89,7 +89,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.14 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.15 $" ;
 
 static const char relationKeyword[] = "Relation" ;
 static const char openList = '{' ;
@@ -485,15 +485,17 @@ Ral_RelationHeadingAddIdentifier(
      */
     Ral_IntVectorSort(id) ;
     /*
-     * Only add the identifier if it is not a subset of an existing
-     * identifier. So we iterate through the identifiers of the heading
-     * and make sure that the new one is not equal to or a subset of
-     * an existing identifier.
+     * Only add the identifier if it is not a subset of an existing identifier
+     * or it is not a super set of an existing identifier. So we iterate
+     * through the identifiers of the heading and make sure that the new one is
+     * not equal to or a subset of an existing identifier.
      */
     while (idCount-- > 0) {
 	Ral_IntVector headingId = *idArray++ ;
 
-	if (headingId && Ral_IntVectorSubsetOf(id, headingId)) {
+	if (headingId &&
+	    (Ral_IntVectorSubsetOf(id, headingId) ||
+	     Ral_IntVectorSubsetOf(headingId, id))) {
 	    return 0 ;
 	}
     }
@@ -697,8 +699,9 @@ Ral_RelationHeadingJoin(
     }
     /*
      * Construct the relation heading -- infer the identifiers.
-     * The identifiers for the join are the cross product of the identifiers
-     * of the two relations, minus any join attributes of r2.
+     * The maximun number of identifiers is the product of the number
+     * of identifiers in the two relations.
+     * We adjust the "idCount" later to match what actually turned up.
      */
     joinHeading = Ral_RelationHeadingNew(joinTupleHeading,
 	h1->idCount * h2->idCount) ;
@@ -754,13 +757,25 @@ Ral_RelationHeadingJoin(
 	    }
 	    /*
 	     * Add the newly formed identifier.
-	     * It should always add.
+	     * It is possible that that identifier will not add, e.g. when
+	     * the joined relations have an identifier subset in common.
 	     */
-	    added = Ral_RelationHeadingAddIdentifier(joinHeading, idNum++,
+	    added = Ral_RelationHeadingAddIdentifier(joinHeading, idNum,
 		joinId) ;
-	    assert(added == 1) ;
+	    if (added == 0) {
+		/*
+		 * If we didn't add, we need to clean up things.
+		 */
+		Ral_IntVectorDelete(joinId) ;
+	    } else {
+		++idNum ;
+	    }
 	}
     }
+    /*
+     * Patch up the actual number of identifiers generated.
+     */
+    joinHeading->idCount = idNum ;
 
     return joinHeading ;
 }
