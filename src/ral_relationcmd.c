@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.22 $
-$Date: 2006/09/06 02:21:03 $
+$Revision: 1.23 $
+$Date: 2006/09/07 02:15:40 $
  *--
  */
 
@@ -141,7 +141,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.22 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.23 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -1889,9 +1889,8 @@ RelationRestrictWithCmd(
 	for (tupIter = Ral_TupleBegin(tuple) ; tupIter != tupEnd ; ++tupIter) {
 	    Tcl_Obj *attrValueObj = *tupIter ;
 	    Ral_Attribute attr = *thIter++ ;
-	    Tcl_Obj *attrNameObj = Tcl_NewStringObj(attr->name, -1) ;
 
-	    if (Tcl_ObjSetVar2(interp, attrNameObj, NULL, attrValueObj,
+	    if (Tcl_SetVar2Ex(interp, attr->name, NULL, attrValueObj,
 		TCL_LEAVE_ERR_MSG) == NULL) {
 		goto errorOut ;
 	    }

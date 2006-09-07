@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuplecmd.c,v $
-$Revision: 1.11 $
-$Date: 2006/07/07 01:57:57 $
+$Revision: 1.12 $
+$Date: 2006/09/07 02:15:40 $
  *--
  */
 
@@ -104,7 +104,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tuplecmd.c,v $ $Revision: 1.11 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tuplecmd.c,v $ $Revision: 1.12 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -207,8 +207,8 @@ TupleAssignCmd(
     values = tuple->values ;
     for (hiter = Ral_TupleHeadingBegin(heading) ; hiter != hend ; ++hiter) {
 	Ral_Attribute attr = *hiter ;
-	if (Tcl_ObjSetVar2(interp, Tcl_NewStringObj(attr->name, -1), NULL,
-	    *values++, TCL_LEAVE_ERR_MSG) == NULL) {
+	if (Tcl_SetVar2Ex(interp, attr->name, NULL, *values++,
+	    TCL_LEAVE_ERR_MSG) == NULL) {
 	    return TCL_ERROR ;
 	}
     }

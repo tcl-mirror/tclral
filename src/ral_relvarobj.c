@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.14 $
-$Date: 2006/08/27 00:31:31 $
+$Revision: 1.15 $
+$Date: 2006/09/07 02:15:40 $
  *--
  */
 
@@ -123,7 +123,7 @@ static struct {
 } ;
 static const char specErrMsg[] = "multiplicity specification" ;
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.14 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.15 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -139,7 +139,6 @@ Ral_RelvarObjNew(
     Tcl_DString resolve ;
     const char *resolvedName ;
     Ral_Relvar relvar ;
-    Tcl_Obj *varName ;
     int status ;
 
     /*
@@ -167,11 +166,10 @@ Ral_RelvarObjNew(
     /*
      * Create a variable by the same name.
      */
-    varName = Tcl_NewStringObj(resolvedName, -1) ;
-    if (Tcl_ObjSetVar2(interp, varName, NULL, relvar->relObj,
+    if (Tcl_SetVar2Ex(interp, resolvedName, NULL, relvar->relObj,
 	TCL_LEAVE_ERR_MSG) == NULL) {
 	Tcl_DStringFree(&resolve) ;
-	Ral_RelvarObjDelete(interp, info, varName) ;
+	Ral_RelvarDelete(info, resolvedName) ;
 	return TCL_ERROR ;
     }
     /*
