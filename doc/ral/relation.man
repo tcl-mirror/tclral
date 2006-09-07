@@ -45,8 +45,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.8 $
-# $Date: 2006/08/27 00:31:30 $
+# $Revision: 1.9 $
+# $Date: 2006/09/07 02:21:09 $
 #  *--
 }]
 [moddesc "Relation Operators"]
@@ -981,7 +981,8 @@ For example, to find all dogs that have no owner:
 }]
 
 [call [cmd "::ral::relation summarize"] [arg relationValue] [arg perRelation]\
-    [arg relationVarName] [arg attr] [arg type] [arg summary]]
+    [arg relationVarName] [arg attr] [arg type] [arg summary]\
+    [opt "[arg relationVarName] [arg attr] [arg type] [arg summary] ..."]]
 
 The [cmd summarize] subcommand allows for computations across sets of
 attributes.
@@ -993,9 +994,11 @@ The [arg attr] gives the name of the new attribute.
 The name of the new attribute may not match any existing attributes in
 [arg perRelation].
 The [arg type] argument is data type of the new attribute.
+Several new attributes may be added in one [cmd summarize] command.
 The body of the returned relation consists of all the tuples of
-[arg perRelation] with a value for the new attribute.
-That value is computed by evaluating [arg summmary] as an expression.
+[arg perRelation] with values for the new attributes.
+Those values are computed by evaluating the [arg summmary] arguments
+as an expression.
 Before evaluating [arg summary] for a tuple in [arg perRelation],
 [arg relationVarName] is set to a relation value consisting of
 all the tuples in [arg relationValue] whose attributes match the
