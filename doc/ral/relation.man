@@ -45,8 +45,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.9 $
-# $Date: 2006/09/07 02:21:09 $
+# $Revision: 1.10 $
+# $Date: 2006/09/08 14:52:50 $
 #  *--
 }]
 [moddesc "Relation Operators"]
@@ -981,8 +981,8 @@ For example, to find all dogs that have no owner:
 }]
 
 [call [cmd "::ral::relation summarize"] [arg relationValue] [arg perRelation]\
-    [arg relationVarName] [arg attr] [arg type] [arg summary]\
-    [opt "[arg relationVarName] [arg attr] [arg type] [arg summary] ..."]]
+    [arg relationVarName] [arg attr] [arg type] [arg expression]\
+    [opt "[arg attr] [arg type] [arg expression] ..."]]
 
 The [cmd summarize] subcommand allows for computations across sets of
 attributes.
@@ -999,13 +999,13 @@ The body of the returned relation consists of all the tuples of
 [arg perRelation] with values for the new attributes.
 Those values are computed by evaluating the [arg summmary] arguments
 as an expression.
-Before evaluating [arg summary] for a tuple in [arg perRelation],
+Before evaluating [arg expression] for a tuple in [arg perRelation],
 [arg relationVarName] is set to a relation value consisting of
 all the tuples in [arg relationValue] whose attributes match the
 corresponding attributes in [arg perRelation].
-The [arg summary] expression may then access the value of that relation
+The [arg expression] expression may then access the value of that relation
 using the given [arg relationVarName] variable name.
-The [arg summary] command is expected to return a result of the
+The [arg expression] is expected to return a result of the
 same type as the new attribute.
 
 In this example we determine the years when dogs were acquired and the
@@ -1067,14 +1067,14 @@ If no [arg sort-attr-list] argument is given,
 then the tagging order is arbitrary.
 If the [opt [arg -within]] argument is given then the attribute names given
 in [arg idsubset-attr-list] must consist of all the attributes of some
-identifier of [arg relationValue] minus one.
+identifier of [arg relationValue] except one.
 In this case,
 the values of [arg attrName] will be unique within the subset of tuples which
-match the value of [arg idsubset-attr-list]
+match the values of [arg idsubset-attr-list]
 and a new identifiers is created consisting of the attributes in
 [arg idsubset-attr-list] plus [arg attrName].
 
-The [cmd tag] command is useful when a full ordering need to be placed
+The [cmd tag] command is useful when a full ordering needs to be placed
 on a relation.
 For example, tagging a relation will allow projecting both the tag and
 another, non-identifying attribute without loosing any values.
@@ -1135,14 +1135,14 @@ to John, then we have:
   {Employee string Supervisor string}
   {{Employee Supervisor}}
   {
-  {Employee Sue Supervisor John}
-  {Employee Bob Supervisor John}
-  {Employee Jane Supervisor Sue}
-  {Employee Joe Supervisor Sue}
-  {Employee Carl Supervisor Bob}
-  {Employee James Supervisor Alice}
+    {Employee Sue Supervisor John}
+    {Employee Bob Supervisor John}
+    {Employee Jane Supervisor Sue}
+    {Employee Joe Supervisor Sue}
+    {Employee Carl Supervisor Bob}
+    {Employee James Supervisor Alice}
   }
-  }
+}
 
 % relformat [relation project [relation restrictwith [relation tclose $REPORTS_TO] {$Supervisor eq "John"} ] Employee  ] "Direct/Indirect Reports to John"
 +========+
