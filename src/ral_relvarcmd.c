@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.17 $
-$Date: 2006/09/06 02:17:56 $
+$Revision: 1.18 $
+$Date: 2006/09/08 14:52:17 $
  *--
  */
 
@@ -113,7 +113,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.17 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.18 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -337,7 +337,6 @@ RelvarCreateCmd(
     heading = Ral_RelationHeadingNewFromObjs(interp, elemv[1], elemv[2],
 	&errInfo) ;
     if (!heading) {
-	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
 
