@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.h,v $
-$Revision: 1.15 $
-$Date: 2006/06/24 18:07:38 $
+$Revision: 1.16 $
+$Date: 2006/09/09 21:37:47 $
  *--
  */
 #ifndef _ral_relation_h_
@@ -195,8 +195,7 @@ extern Ral_Relation Ral_RelationDivide(Ral_Relation, Ral_Relation, Ral_Relation,
     Ral_ErrorInfo *) ;
 extern Ral_Relation Ral_RelationTclose(Ral_Relation) ;
 
-extern Ral_IntVector Ral_RelationSortAscending(Ral_Relation, Ral_IntVector) ;
-extern Ral_IntVector Ral_RelationSortDescending(Ral_Relation, Ral_IntVector) ;
+extern Ral_IntVector Ral_RelationSort(Ral_Relation, Ral_IntVector, int) ;
 
 extern int Ral_RelationCopy(Ral_Relation, Ral_RelationIter,
     Ral_RelationIter, Ral_Relation, Ral_IntVector) ;

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_vector.c,v $
-$Revision: 1.11 $
-$Date: 2006/05/07 03:53:28 $
+$Revision: 1.12 $
+$Date: 2006/09/09 21:37:47 $
  *--
  */
 
@@ -90,7 +90,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_vector.c,v $ $Revision: 1.11 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_vector.c,v $ $Revision: 1.12 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -366,6 +366,27 @@ Ral_IntVectorErase(
     v->finish -= last - first ;
 
     return first ;
+}
+
+void
+Ral_IntVectorExchange(
+    Ral_IntVector v,
+    int a,
+    int b)
+{
+    int tmp ;
+    if (v->start + a >= v->finish) {
+	Tcl_Panic("Ral_IntVectorFetch: out of bounds access at offset \"%d\"",
+	    a) ;
+    }
+    if (v->start + b >= v->finish) {
+	Tcl_Panic("Ral_IntVectorFetch: out of bounds access at offset \"%d\"",
+	    b) ;
+    }
+
+    tmp = v->start[a] ;
+    v->start[a] = v->start[b] ;
+    v->start[b] = tmp ;
 }
 
 int

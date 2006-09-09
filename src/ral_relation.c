@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.18 $
-$Date: 2006/07/12 01:41:49 $
+$Revision: 1.19 $
+$Date: 2006/09/09 21:37:47 $
  *--
  */
 
@@ -57,6 +57,7 @@ PRAGMAS
 /*
 INCLUDE FILES
 */
+#include "tcl.h"
 #include "ral_relation.h"
 #include "ral_relationheading.h"
 #include "ral_tupleheading.h"
@@ -72,6 +73,18 @@ MACRO DEFINITIONS
 /*
 TYPE DEFINITIONS
 */
+typedef int (*Ral_CmpFunc)(Tcl_Obj *, Tcl_Obj *) ;
+typedef struct {
+    Ral_Relation relation ;
+    Ral_IntVector attrs ;
+    Ral_IntVector sortVect ;
+    int sortDirection ;	    /* 0 ==> ascending, 1 ==> descending */
+    Tcl_ObjType *type ;
+    Ral_CmpFunc cmpFunc ;   /* NULL if multiple attributes or non-numeric
+			       attributes, otherwise points to a comparison
+			       function. Used for single int, double, or
+			       wideInt sorting attribute */
+} Ral_RelSortProps ;
 
 /*
 EXTERNAL FUNCTION REFERENCES
@@ -91,9 +104,6 @@ static int Ral_RelationIndexIdentifier(Ral_Relation, int, Ral_Tuple,
     Ral_RelationIter) ;
 static int Ral_RelationIndexTuple(Ral_Relation, Ral_Tuple, Ral_RelationIter) ;
 static void Ral_RelationRemoveTupleIndex(Ral_Relation, Ral_Tuple) ;
-static void Ral_RelationTupleSortKey(const Ral_Tuple, Tcl_DString *) ;
-static int Ral_RelationTupleCompareAscending(const void *, const void *) ;
-static int Ral_RelationTupleCompareDescending(const void *, const void *) ;
 static void Ral_RelationGetJoinMapKey(Ral_Tuple, Ral_JoinMap, int,
     Tcl_DString *) ;
 static int Ral_RelationFindJoinId(Ral_Relation, Ral_JoinMap, int) ;
@@ -101,6 +111,9 @@ static int Ral_RelationFindJoinId(Ral_Relation, Ral_JoinMap, int) ;
 /*
 EXTERNAL DATA REFERENCES
 */
+extern Tcl_ObjType tclIntType ;
+extern Tcl_ObjType tclDoubleType ;
+extern Tcl_ObjType tclWideIntType ;
 
 /*
 EXTERNAL DATA DEFINITIONS
@@ -109,11 +122,9 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static Ral_RelationIter sortBegin ;
-static Ral_IntVector sortAttrs ;
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.18 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.19 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -1688,59 +1699,187 @@ Ral_RelationTclose(
     return tclose ;
 }
 
-/*
- * Return a vector that contains tuple indices in the order corresponding
- * to the sort.
- * Caller must delete the returned vector.
- */
-Ral_IntVector
-Ral_RelationSortAscending(
-    Ral_Relation relation,
-    Ral_IntVector attrs)
+static void
+Ral_TupleKeyFromAttrs(
+    const Ral_Tuple tuple,
+    Ral_IntVector attrs,
+    Tcl_DString *idKey)
 {
-    Ral_IntVector sortVect = Ral_IntVectorNew(
-	Ral_RelationCardinality(relation), 0) ;
+    Ral_IntVectorIter end = Ral_IntVectorEnd(attrs) ;
+    Ral_IntVectorIter iter ;
+    Ral_TupleIter values = tuple->values ;
 
-    Ral_IntVectorFillConsecutive(sortVect, 0) ;
-    assert(sortBegin == NULL) ;
-    sortBegin = Ral_RelationBegin(relation) ;
-    assert(sortAttrs == NULL) ;
-    sortAttrs = attrs ;
-
-    qsort(Ral_IntVectorBegin(sortVect), Ral_IntVectorSize(sortVect),
-	sizeof(Ral_IntVectorValueType), Ral_RelationTupleCompareAscending) ;
-
-#   ifndef NDEBUG
-    sortBegin = NULL ;
-    sortAttrs = NULL ;
-#   endif
-
-    return sortVect ;
+    Tcl_DStringInit(idKey) ;
+    for (iter = Ral_IntVectorBegin(attrs) ; iter != end ; ++iter) {
+	Tcl_DStringAppend(idKey, Tcl_GetString(values[*iter]), -1) ;
+    }
 }
 
-Ral_IntVector
-Ral_RelationSortDescending(
-    Ral_Relation relation,
-    Ral_IntVector attrs)
+static int
+Ral_CmpIntTypes(
+    Tcl_Obj *o1,
+    Tcl_Obj *o2)
 {
-    Ral_IntVector sortVect = Ral_IntVectorNew(
-	Ral_RelationCardinality(relation), 0) ;
+    if (Tcl_ConvertToType(NULL, o1, &tclIntType) != TCL_OK ||
+	Tcl_ConvertToType(NULL, o2, &tclIntType) != TCL_OK) {
+	Tcl_Panic("Ral_CmpIntTypes: cannot convert to int") ;
+    }
+    return o1->internalRep.longValue - o2->internalRep.longValue ;
+}
 
-    Ral_IntVectorFillConsecutive(sortVect, 0) ;
-    assert(sortBegin == NULL) ;
-    sortBegin = Ral_RelationBegin(relation) ;
-    assert(sortAttrs == NULL) ;
-    sortAttrs = attrs ;
+static int
+Ral_CmpDoubleTypes(
+    Tcl_Obj *o1,
+    Tcl_Obj *o2)
+{
+    if (Tcl_ConvertToType(NULL, o1, &tclDoubleType) != TCL_OK ||
+	Tcl_ConvertToType(NULL, o2, &tclDoubleType) != TCL_OK) {
+	Tcl_Panic("Ral_CmpDoubleTypes: cannot convert to double") ;
+    }
+    return o1->internalRep.doubleValue - o2->internalRep.doubleValue ;
+}
 
-    qsort(Ral_IntVectorBegin(sortVect), Ral_IntVectorSize(sortVect),
-	sizeof(Ral_IntVectorValueType), Ral_RelationTupleCompareDescending) ;
+#ifndef NO_WIDE_TYPE
+static int
+Ral_CmpWideIntTypes(
+    Tcl_Obj *o1,
+    Tcl_Obj *o2)
+{
+    if (Tcl_ConvertToType(NULL, o1, &tclWideIntType) != TCL_OK ||
+	Tcl_ConvertToType(NULL, o2, &tclWideIntType) != TCL_OK) {
+	Tcl_Panic("Ral_CmpWideIntTypes: cannot convert to wideInt") ;
+    }
+    return o1->internalRep.wideValue - o2->internalRep.wideValue ;
+}
+#endif
 
-#   ifndef NDEBUG
-    sortBegin = NULL ;
-    sortAttrs = NULL ;
-#   endif
+static int
+Ral_TupleCompare(
+    int l,
+    int r,
+    Ral_RelSortProps *props)
+{
+    Ral_RelationIter begin = Ral_RelationBegin(props->relation) ;
+    Ral_Tuple t1 = *(begin + Ral_IntVectorFetch(props->sortVect, l)) ;
+    Ral_Tuple t2 = *(begin + Ral_IntVectorFetch(props->sortVect, r)) ;
+    int result ;
 
-    return sortVect ;
+    if (props->cmpFunc) {
+	int index = Ral_IntVectorFront(props->attrs) ;
+	Tcl_Obj *v1 = t1->values[index] ;
+	Tcl_Obj *v2 = t2->values[index] ;
+
+	assert(Ral_IntVectorSize(props->attrs) == 1) ;
+	result = props->cmpFunc(v1, v2) ;
+    } else {
+	Tcl_DString sortKey1 ;
+	Tcl_DString sortKey2 ;
+
+	Ral_TupleKeyFromAttrs(t1, props->attrs, &sortKey1) ;
+	Ral_TupleKeyFromAttrs(t2, props->attrs, &sortKey2) ;
+
+	result = strcmp(Tcl_DStringValue(&sortKey1),
+	    Tcl_DStringValue(&sortKey2)) ;
+
+	Tcl_DStringFree(&sortKey1) ;
+	Tcl_DStringFree(&sortKey2) ;
+    }
+
+    return props->sortDirection ? -result : result ;
+}
+
+static void
+Ral_DownHeap(
+    int v,
+    int n,
+    Ral_RelSortProps *props)
+{
+    int w = 2 * v + 1 ;
+
+    while (w < n) {
+	if (w + 1 < n) {
+	    if (Ral_TupleCompare(w + 1, w, props) > 0) {
+		w++ ;
+	    }
+	}
+	if (Ral_TupleCompare(v, w, props) >= 0) {
+	    return ;
+	}
+
+	Ral_IntVectorExchange(props->sortVect, v, w) ;
+
+	v = w ;
+	w = 2 * v + 1 ;
+    }
+}
+
+static void
+Ral_BuildHeap(
+    Ral_RelSortProps *props)
+{
+    int v ;
+    int n = Ral_IntVectorSize(props->sortVect) ;
+
+    for (v = n / 2 - 1 ; v >= 0 ; --v) {
+	Ral_DownHeap(v, n, props) ;
+    }
+}
+
+/*
+ * Return a vector that gives the permutation of the relation tuples
+ * that will achieve the sort. So the value of the returned vector at
+ * index 0 will be the index into the relation for the first tuple according
+ * to the sorting. Sorting algorithm is heap sort.
+ */
+Ral_IntVector
+Ral_RelationSort(
+    Ral_Relation relation,  /* relation to sort */
+    Ral_IntVector attrs,    /* vector of attribute indices to sort by */
+    int direction)	    /* 0 ==> ascending, 1 ==> descending */
+{
+    Ral_RelSortProps props ;
+    int n = Ral_RelationCardinality(relation) ;
+    int nAttrs = Ral_IntVectorSize(attrs) ;
+
+    props.sortVect = Ral_IntVectorNew(n, 0) ;
+    Ral_IntVectorFillConsecutive(props.sortVect, 0) ;
+
+    if (nAttrs > 0) {
+	props.relation = relation ;
+	props.attrs = attrs ;
+	props.sortDirection = direction ;
+	props.cmpFunc = NULL ;
+
+	if (nAttrs == 1) {
+	    /*
+	     * Check if we are sorting on a single attribute of a numeric
+	     * type. If so, then we do type specific sorting. Otherwise
+	     * we simply compare on the string representations.
+	     */
+	    int attrIndex = Ral_IntVectorFront(attrs) ;
+	    Ral_TupleHeading heading = relation->heading->tupleHeading ;
+	    Ral_Attribute sortAttr = Ral_TupleHeadingFetch(heading, attrIndex) ;
+
+	    if (sortAttr->attrType == Tcl_Type) {
+		if (sortAttr->tclType == &tclIntType) {
+		    props.cmpFunc = Ral_CmpIntTypes ;
+		} else if (sortAttr->tclType == &tclDoubleType) {
+		    props.cmpFunc = Ral_CmpDoubleTypes ;
+		} else if (sortAttr->tclType == &tclWideIntType) {
+		    props.cmpFunc = Ral_CmpWideIntTypes ;
+		}
+	    }
+	}
+
+	Ral_BuildHeap(&props) ;
+	while (n > 1) {
+	    --n ;
+	    Ral_IntVectorExchange(props.sortVect, 0, n) ;
+	    Ral_DownHeap(0, n, &props) ;
+	}
+    }
+
+    return props.sortVect ;
 }
 
 Ral_RelationIter
@@ -2505,69 +2644,6 @@ Ral_RelationRemoveTupleIndex(
     for (i = 0 ; i < relation->heading->idCount ; ++i) {
 	Ral_RelationRemoveIndex(relation, i, tuple) ;
     }
-}
-
-static void
-Ral_RelationTupleSortKey(
-    const Ral_Tuple tuple,
-    Tcl_DString *idKey)
-{
-    Ral_IntVectorIter end = Ral_IntVectorEnd(sortAttrs) ;
-    Ral_IntVectorIter iter ;
-    Ral_TupleIter values = tuple->values ;
-
-    Tcl_DStringInit(idKey) ;
-    for (iter = Ral_IntVectorBegin(sortAttrs) ; iter != end ; ++iter) {
-	Tcl_DStringAppend(idKey, Tcl_GetString(values[*iter]), -1) ;
-    }
-}
-
-static int
-Ral_RelationTupleCompareAscending(
-    const void *v1,
-    const void *v2)
-{
-    const Ral_IntVectorValueType *i1 = v1 ;
-    const Ral_IntVectorValueType *i2 = v2 ;
-    Tcl_DString sortKey1 ;
-    Tcl_DString sortKey2 ;
-    int result ;
-
-    Ral_RelationTupleSortKey(*(sortBegin + *i1), &sortKey1) ;
-    Ral_RelationTupleSortKey(*(sortBegin + *i2), &sortKey2) ;
-
-    result = strcmp(Tcl_DStringValue(&sortKey1), Tcl_DStringValue(&sortKey2)) ;
-
-    Tcl_DStringFree(&sortKey1) ;
-    Tcl_DStringFree(&sortKey2) ;
-
-    return result ;
-}
-
-static int
-Ral_RelationTupleCompareDescending(
-    const void *v1,
-    const void *v2)
-{
-    const Ral_IntVectorValueType *i1 = v1 ;
-    const Ral_IntVectorValueType *i2 = v2 ;
-    Tcl_DString sortKey1 ;
-    Tcl_DString sortKey2 ;
-    int result ;
-
-    Ral_RelationTupleSortKey(*(sortBegin + *i1), &sortKey1) ;
-    Ral_RelationTupleSortKey(*(sortBegin + *i2), &sortKey2) ;
-
-    /*
-     * N.B. inverted order of first and second tuple to obtain
-     * the proper result for descending order.
-     */
-    result = strcmp(Tcl_DStringValue(&sortKey2), Tcl_DStringValue(&sortKey1)) ;
-
-    Tcl_DStringFree(&sortKey1) ;
-    Tcl_DStringFree(&sortKey2) ;
-
-    return result ;
 }
 
 static void

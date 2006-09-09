@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.24 $
-$Date: 2006/09/09 16:32:44 $
+$Revision: 1.25 $
+$Date: 2006/09/09 21:37:47 $
  *--
  */
 
@@ -142,7 +142,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.24 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.25 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -870,7 +870,7 @@ RelationForeachCmd(
 	if (sortAttrs == NULL) {
 	    return TCL_ERROR ;
 	}
-	sortMap = Ral_RelationSortAscending(relation, sortAttrs) ;
+	sortMap = Ral_RelationSort(relation, sortAttrs, 0) ;
 	Ral_IntVectorDelete(sortAttrs) ;
 	scriptObj = objv[5] ;
     } else /* objc == 7 */ {
@@ -889,9 +889,8 @@ RelationForeachCmd(
 	if (sortAttrs == NULL) {
 	    return TCL_ERROR ;
 	}
-	sortMap = orderOptions[index].type == SORT_ASCENDING ?
-	    Ral_RelationSortAscending(relation, sortAttrs) :
-	    Ral_RelationSortDescending(relation, sortAttrs) ;
+	sortMap = Ral_RelationSort(relation, sortAttrs,
+	    orderOptions[index].type == SORT_DESCENDING) ;
 	Ral_IntVectorDelete(sortAttrs) ;
 	scriptObj = objv[6] ;
     }
@@ -2406,7 +2405,7 @@ RelationTagCmd(
 		Ral_RelationDelete(tagRelation) ;
 		return TCL_ERROR ;
 	    }
-	    sortMap = Ral_RelationSortAscending(relation, sortAttrs) ;
+	    sortMap = Ral_RelationSort(relation, sortAttrs, 0) ;
 	    Ral_IntVectorDelete(sortAttrs) ;
 	    break;
 
@@ -2417,7 +2416,7 @@ RelationTagCmd(
 		Ral_RelationDelete(tagRelation) ;
 		return TCL_ERROR ;
 	    }
-	    sortMap = Ral_RelationSortDescending(relation, sortAttrs) ;
+	    sortMap = Ral_RelationSort(relation, sortAttrs, 1) ;
 	    Ral_IntVectorDelete(sortAttrs) ;
 	    break ;
 
