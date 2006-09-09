@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.c,v $
-$Revision: 1.13 $
-$Date: 2006/07/01 23:56:31 $
+$Revision: 1.14 $
+$Date: 2006/09/09 16:57:45 $
  *--
  */
 
@@ -96,7 +96,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.13 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.14 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -375,19 +375,27 @@ Ral_AttributeNewFromObjs(
     }
     attrName = Tcl_GetString(nameObj) ;
     typeName = Tcl_GetString(*typev) ;
-    if (strcmp("Tuple", typeName) == 0 && typec == 2) {
-	Ral_TupleHeading heading =
-	    Ral_TupleHeadingNewFromObj(interp, *(typev + 1), errInfo) ;
-
-	if (heading) {
-	    attribute = Ral_AttributeNewTupleType(attrName, heading) ;
+    if (strcmp("Tuple", typeName) == 0) {
+	if (typec == 2) {
+	    Ral_TupleHeading heading =
+		Ral_TupleHeadingNewFromObj(interp, *(typev + 1), errInfo) ;
+	    if (heading) {
+		attribute = Ral_AttributeNewTupleType(attrName, heading) ;
+	    }
+	} else {
+	    Ral_ErrorInfoSetError(errInfo, RAL_ERR_HEADING_ERR, typeName) ;
+	    Ral_InterpSetError(interp, errInfo) ;
 	}
-    } else if (strcmp("Relation", typeName) == 0 && typec == 3) {
-	Ral_RelationHeading heading = Ral_RelationHeadingNewFromObjs(interp,
-	    typev[1], typev[2], errInfo) ;
-
-	if (heading) {
-	    attribute = Ral_AttributeNewRelationType(attrName, heading) ;
+    } else if (strcmp("Relation", typeName) == 0) {
+	if (typec == 3) {
+	    Ral_RelationHeading heading = Ral_RelationHeadingNewFromObjs(interp,
+		typev[1], typev[2], errInfo) ;
+	    if (heading) {
+		attribute = Ral_AttributeNewRelationType(attrName, heading) ;
+	    }
+	} else {
+	    Ral_ErrorInfoSetError(errInfo, RAL_ERR_HEADING_ERR, typeName) ;
+	    Ral_InterpSetError(interp, errInfo) ;
 	}
     } else if (typec == 1) {
 	Tcl_ObjType *tclType = Tcl_GetObjType(typeName) ;
