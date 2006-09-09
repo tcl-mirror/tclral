@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuplecmd.c,v $
-$Revision: 1.12 $
-$Date: 2006/09/07 02:15:40 $
+$Revision: 1.13 $
+$Date: 2006/09/09 16:32:44 $
  *--
  */
 
@@ -104,7 +104,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tuplecmd.c,v $ $Revision: 1.12 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tuplecmd.c,v $ $Revision: 1.13 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -171,10 +171,11 @@ Ral_TupleCmdVersion(void)
  */
 
 /*
- * tuple assign tupleValue
+ * tuple assign tupleValue ?attrName | attr-var-pair ... ?
  *
  * Assign the values of the tuple attributes to Tcl variables that are
- * the same name as the attribute names.
+ * either the same name as the attribute names or assign the given
+ * attributes to the given variable names.
  *
  * Returns the degree of the tuple which is the number of variable assignment
  * made.
@@ -187,13 +188,11 @@ TupleAssignCmd(
 {
     Tcl_Obj *tupleObj = objv[2] ;
     Ral_Tuple tuple ;
-    Ral_TupleHeading heading ;
-    Ral_TupleHeadingIter hiter ;
-    Ral_TupleHeadingIter hend ;
-    Tcl_Obj **values ;
+    Ral_ErrorInfo errInfo ;
 
-    if (objc != 3) {
-	Tcl_WrongNumArgs(interp, 2, objv, "tupleValue") ;
+    if (objc < 3) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+	    "tupleValue ?attrName | attr-var-pair ... ?") ;
 	return TCL_ERROR ;
     }
 
@@ -201,20 +200,9 @@ TupleAssignCmd(
 	return TCL_ERROR ;
     }
     tuple = tupleObj->internalRep.otherValuePtr ;
-    heading = tuple->heading ;
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdTuple, Ral_OptAssign) ;
 
-    hend = Ral_TupleHeadingEnd(heading) ;
-    values = tuple->values ;
-    for (hiter = Ral_TupleHeadingBegin(heading) ; hiter != hend ; ++hiter) {
-	Ral_Attribute attr = *hiter ;
-	if (Tcl_SetVar2Ex(interp, attr->name, NULL, *values++,
-	    TCL_LEAVE_ERR_MSG) == NULL) {
-	    return TCL_ERROR ;
-	}
-    }
-
-    Tcl_SetObjResult(interp, Tcl_NewIntObj(Ral_TupleDegree(tuple))) ;
-    return TCL_OK ;
+    return Ral_TupleAssignToVars(tuple, interp, objc - 3, objv + 3, &errInfo) ;
 }
 
 /*

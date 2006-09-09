@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.23 $
-$Date: 2006/09/07 02:15:40 $
+$Revision: 1.24 $
+$Date: 2006/09/09 16:32:44 $
  *--
  */
 
@@ -92,6 +92,7 @@ EXTERNAL FUNCTION REFERENCES
 FORWARD FUNCTION REFERENCES
 */
 static int RelationArrayCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
+static int RelationAssignCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationAttributesCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationCardinalityCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationChooseCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
@@ -141,7 +142,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.23 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.24 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -165,6 +166,7 @@ relationCmd(
 	int (*const cmdFunc)(Tcl_Interp *, int, Tcl_Obj *const*) ;
     } cmdTable[] = {
 	{"array", RelationArrayCmd},
+	{"assign", RelationAssignCmd},
 	{"attributes", RelationAttributesCmd},
 	{"cardinality", RelationCardinalityCmd},
 	{"choose", RelationChooseCmd},
@@ -290,6 +292,40 @@ RelationArrayCmd(
 
     Tcl_ResetResult(interp) ;
     return TCL_OK ;
+}
+
+static int
+RelationAssignCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    /* relation tuple relationValue ?attrName | attr-var-list ...? */
+    Tcl_Obj *relObj ;
+    Ral_Relation relation ;
+    Ral_ErrorInfo errInfo ;
+
+    if (objc < 3) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+	    "relationValue ?attrName | attr-var-list ...?") ;
+	return TCL_ERROR ;
+    }
+
+    relObj = *(objv + 2) ;
+    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relObj->internalRep.otherValuePtr ;
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptAssign) ;
+
+    if (Ral_RelationCardinality(relation) != 1) {
+	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_CARDINALITY_ONE, relObj) ;
+	Ral_InterpSetError(interp, &errInfo) ;
+	return TCL_ERROR ;
+    }
+
+    return Ral_TupleAssignToVars(*Ral_RelationBegin(relation), interp,
+	objc - 3, objv + 3, &errInfo) ;
 }
 
 static int
@@ -2582,7 +2618,7 @@ RelationTcloseCmd(
 
     thIter = Ral_TupleHeadingBegin(tupleHeading) ;
     if (!Ral_AttributeTypeEqual(*thIter, *(thIter + 1))) {
-	Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptTag,
+	Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptTclose,
 	    RAL_ERR_TYPE_MISMATCH, relObj) ;
 	return TCL_ERROR ;
     }
@@ -2679,7 +2715,7 @@ RelationTupleCmd(
     }
     relation = relObj->internalRep.otherValuePtr ;
     if (Ral_RelationCardinality(relation) != 1) {
-	Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptTag,
+	Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptTuple,
 	    RAL_ERR_CARDINALITY_ONE, relObj) ;
 	return TCL_ERROR ;
     }

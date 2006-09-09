@@ -45,8 +45,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: tuple.man,v $
-# $Revision: 1.2 $
-# $Date: 2006/07/07 01:57:57 $
+# $Revision: 1.3 $
+# $Date: 2006/09/09 16:32:44 $
 #  *--
 }]
 [moddesc "Tuple Operators"]
@@ -157,15 +157,32 @@ three attributes.
 
 [section COMMANDS]
 [list_begin definitions]
-[call [cmd "::ral::tuple assign"] [arg tupleValue]]
+[call [cmd "::ral::tuple assign"] [arg tupleValue]\
+    [opt "attrName | attr/var-name-list ..."]]
 
 The [cmd assign] subcommand provides a convenient way to place the values
 of the attributes of a tuple into Tcl variables.
-The [cmd assign] subcommand places the value of each attribute
-of a tuple into Tcl variables that have the same name as the
-attribute names of the tuple.
-Any existing variable that has the same name as an attribute is assigned a
-new value.
+The [cmd assign] subcommand can place all the attributes into variables
+or only a subset of the attributes.
+The variables may be named the same as the attribute name or may be placed
+in variables of a specified name.
+If no optional arguments are given,
+then [cmd assign] places the value of each attribute
+of a tuple into a Tcl variable that has the same name as the
+attribute.
+If any optional arguments are present, then only the given attributes are
+assigned to variables.
+Each optional argument is considered as a list containing one or two elements.
+If the argument is of the form [arg attrName], [emph i.e.] a single
+element list, then it is taken as an attribute name and the corresponding
+value is placed in a Tcl variable by the same name.
+if the argument is of the form [arg attr/var-name-list] then it is
+take as an attribute / variable name pair and the corresponding attribute
+value is assigned to a variable by the given name.
+Assignments are made in left to right order and it is not an error to
+assign the same attribute multiple times or to assign the same attribute
+to multple variables.
+Any existing variables that have the same name are assigned a new value.
 Variables are created as necessary.
 All variables are created in the local scope.
 The [cmd assign] subcommand returns the number of variables assigned to which

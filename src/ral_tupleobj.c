@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleobj.c,v $
-$Revision: 1.10 $
-$Date: 2006/07/10 01:17:44 $
+$Revision: 1.11 $
+$Date: 2006/09/09 16:32:44 $
  *--
  */
 
@@ -108,7 +108,7 @@ Tcl_ObjType Ral_TupleObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tupleobj.c,v $ $Revision: 1.10 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tupleobj.c,v $ $Revision: 1.11 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -374,6 +374,102 @@ Ral_TupleUpdateFromObj(
 	}
     }
 
+    return TCL_OK ;
+}
+
+/*
+ * Assign tuple attributes to Tcl variables. May assign all or part
+ * of the attributes to variable of either the same name as the attribute
+ * or a specified name.
+ * The interpreter value is set to the number of assignment made.
+ */
+int
+Ral_TupleAssignToVars(
+    Ral_Tuple tuple,	    /* tuple to assign */
+    Tcl_Interp *interp,	    /* ubiquitous interpreter */
+    int varc,		    /* count of attribute / variable name objects */
+    Tcl_Obj *const*varv,    /* vector of attribute / variable name objects
+			     * Attribute / Variable name objects may be one or
+			     * two element lists. If one, it is the name of an
+			     * attribute and a variable of the same name is
+			     * created. If two, the first is an attribute name
+			     * and the second is the name of the variable to
+			     * which the attribute value is assigned. */
+    Ral_ErrorInfo *errInfo) /* error information to identify the command */
+{
+    Ral_TupleHeading heading = tuple->heading ;
+    Tcl_Obj **values ;
+    int assigned = 0 ;
+
+    /*
+     * If there are no at attribute / variable names given, than assign
+     * all attributes to variables that are the same name as the attribute.
+     */
+    if (varc == 0) {
+	Ral_TupleHeadingIter hiter ;
+	Ral_TupleHeadingIter hend = Ral_TupleHeadingEnd(heading) ;
+
+	/*
+	 * Iterate through the tuple heading and create the variables
+	 * by the same name.
+	 */
+	values = tuple->values ;
+	for (hiter = Ral_TupleHeadingBegin(heading) ; hiter != hend ;
+	    ++hiter, ++assigned) {
+	    Ral_Attribute attr = *hiter ;
+	    if (Tcl_SetVar2Ex(interp, attr->name, NULL, *values++,
+		TCL_LEAVE_ERR_MSG) == NULL) {
+		return TCL_ERROR ;
+	    }
+	}
+    } else {
+	/*
+	 * If attribute variable name lists are given, then iterate
+	 * through them, finding the attribute mentions and creating
+	 * variables.
+	 */
+	for ( ; varc-- > 0 ; ++varv, ++assigned) {
+	    int elemc ;
+	    Tcl_Obj **elemv ;
+
+	    /*
+	     * Split into a list so we can see if there are one or
+	     * two elements.
+	     */
+	    if (Tcl_ListObjGetElements(interp, *varv, &elemc, &elemv)
+		!= TCL_OK) {
+		return TCL_ERROR ;
+	    }
+	    if (elemc == 1 || elemc == 2) {
+		const char *attrName = Tcl_GetString(*elemv) ;
+		/*
+		 * Look up the attribute in the tuple heading.
+		 */
+		int hindex = Ral_TupleHeadingIndexOf(tuple->heading, attrName) ;
+		/*
+		 * Determine the name of the variable. A little too cute.
+		 */
+		Tcl_Obj *varName = *(elemv + elemc - 1) ;
+
+		if (hindex < 0) {
+		    Ral_ErrorInfoSetError(errInfo, RAL_ERR_UNKNOWN_ATTR,
+			attrName) ;
+		    Ral_InterpSetError(interp, errInfo) ;
+		    return TCL_ERROR ;
+		} else if (Tcl_ObjSetVar2(interp, varName, NULL,
+		    tuple->values[hindex], TCL_LEAVE_ERR_MSG) == NULL) {
+		    return TCL_ERROR ;
+		}
+	    } else {
+		Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_BAD_PAIRS_LIST,
+		    *varv) ;
+		Ral_InterpSetError(interp, errInfo) ;
+		return TCL_ERROR ;
+	    }
+	}
+    }
+
+    Tcl_SetObjResult(interp, Tcl_NewIntObj(assigned)) ;
     return TCL_OK ;
 }
 

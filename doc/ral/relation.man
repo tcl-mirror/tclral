@@ -45,8 +45,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.10 $
-# $Date: 2006/09/08 14:52:50 $
+# $Revision: 1.11 $
+# $Date: 2006/09/09 16:32:44 $
 #  *--
 }]
 [moddesc "Relation Operators"]
@@ -252,6 +252,25 @@ dogarray(Jumper) = Mutt
 dogarray(Rover)  = Retriever
 dogarray(Sam)    = Collie
 dogarray(Spot)   = Terrier
+}]
+
+[call [cmd "::ral::relation assign"] [arg relationValue]\
+    [opt "attrName | attr/var-name-list ..."]]
+
+The [cmd assign] subcommand is short hand for
+[cmd "tuple assign \[relation tuple [arg relationValue]\] \?...\?"].
+
+[example {
+% relation foreach d $DOG -descending DogName {
+    relation assign $d DogName
+    puts $DogName
+}
+Spot
+Sam
+Rover
+Jumper
+Fred
+Fido
 }]
 
 [call [cmd "::ral::relation attributes"] [arg relationValue]]

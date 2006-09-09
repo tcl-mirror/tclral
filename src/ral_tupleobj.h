@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleobj.h,v $
-$Revision: 1.6 $
-$Date: 2006/06/24 18:07:39 $
+$Revision: 1.7 $
+$Date: 2006/09/09 16:32:44 $
  *--
  */
 #ifndef _ral_tupleobj_h_
@@ -101,6 +101,8 @@ extern int Ral_TupleSetFromObj(Ral_Tuple, Tcl_Interp *, Tcl_Obj *,
     Ral_ErrorInfo *) ;
 extern int Ral_TupleUpdateFromObj(Ral_Tuple, Tcl_Interp *, Tcl_Obj *,
     Ral_ErrorInfo *) ;
+extern int Ral_TupleAssignToVars(Ral_Tuple, Tcl_Interp *, int, Tcl_Obj *const*,
+    Ral_ErrorInfo *errInfo) ;
 extern const char *Ral_TupleObjVersion(void) ;
 
 #endif /* _ral_tupleobj_h_ */

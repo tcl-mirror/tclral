@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.36 $
-# $Date: 2006/09/06 02:21:03 $
+# $Revision: 1.37 $
+# $Date: 2006/09/09 16:32:44 $
 #  *--
 
 package require tcltest 2.2
@@ -294,6 +294,27 @@ namespace eval ::ral::test {
     test tuple-assign-3.0 {no attributes} -body {
 	tuple assign {Tuple {} {}}
     } -result 0
+
+    test tuple-assign-4.0 {assign only some of attributes} -body {
+	set n [tuple assign {Tuple {Name string Age int} {Name Andrew Age 20}} \
+	    Name]
+	expr {$Name eq "Andrew" && $n == 1}
+    } -result 1
+
+    test tuple-assign-5.0 {assign to different named variable} -body {
+	set n [tuple assign {Tuple {Name string Age int} {Name Andrew Age 20}} \
+	    {Name nm}]
+	expr {$nm eq "Andrew" && $n == 1}
+    } -result 1
+
+    test tuple-assign-6.0 {error, no attribute} -body {
+	tuple assign {Tuple {Name string Age int} {Name Andrew Age 20}} foo
+    } -result {unknown attribute name, "foo"} -returnCodes error
+
+    test tuple-assign-6.1 {error, bad attr-var-name list} -body {
+	tuple assign {Tuple {Name string Age int} {Name Andrew Age 20}} \
+	    {Name nm foo}
+    } -result {bad list of pairs, "Name nm foo"} -returnCodes error
 
     # tuple create subcommand
     test tuple-create-1.0 {single attribute} -body {
@@ -871,6 +892,23 @@ namespace eval ::ral::test {
 	    S4 London
 	    S5 Athens
     } -match dict
+
+    # relation assign subcommand
+    test relation-assign-1.0 {assign all attributes} -body {
+	relation assign [relation choose $S S# S1]
+	expr {${S#} eq "S1" && $SNAME eq "Smith" && $STATUS == 20 &&\
+	    $CITY eq "London"}
+    } -result 1
+
+    test relation-assign-2.0 {assign some attributes} -body {
+	relation assign [relation choose $S S# S1] SNAME
+	expr {$SNAME eq "Smith"}
+    } -result 1
+
+    test relation-assign-3.0 {assign attributes to different var name} -body {
+	relation assign [relation choose $S S# S1] {SNAME name}
+	expr {$name eq "Smith"}
+    } -result 1
 
     # relation attributes subcommand
     test relation-attributes-1.0 {DOG relation} -body {
