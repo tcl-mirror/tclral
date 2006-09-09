@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.19 $
-$Date: 2006/09/09 21:37:47 $
+$Revision: 1.20 $
+$Date: 2006/09/09 23:28:17 $
  *--
  */
 
@@ -79,11 +79,6 @@ typedef struct {
     Ral_IntVector attrs ;
     Ral_IntVector sortVect ;
     int sortDirection ;	    /* 0 ==> ascending, 1 ==> descending */
-    Tcl_ObjType *type ;
-    Ral_CmpFunc cmpFunc ;   /* NULL if multiple attributes or non-numeric
-			       attributes, otherwise points to a comparison
-			       function. Used for single int, double, or
-			       wideInt sorting attribute */
 } Ral_RelSortProps ;
 
 /*
@@ -124,7 +119,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.19 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.20 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -1699,90 +1694,82 @@ Ral_RelationTclose(
     return tclose ;
 }
 
-static void
-Ral_TupleKeyFromAttrs(
-    const Ral_Tuple tuple,
-    Ral_IntVector attrs,
-    Tcl_DString *idKey)
-{
-    Ral_IntVectorIter end = Ral_IntVectorEnd(attrs) ;
-    Ral_IntVectorIter iter ;
-    Ral_TupleIter values = tuple->values ;
-
-    Tcl_DStringInit(idKey) ;
-    for (iter = Ral_IntVectorBegin(attrs) ; iter != end ; ++iter) {
-	Tcl_DStringAppend(idKey, Tcl_GetString(values[*iter]), -1) ;
-    }
-}
-
-static int
-Ral_CmpIntTypes(
-    Tcl_Obj *o1,
-    Tcl_Obj *o2)
-{
-    if (Tcl_ConvertToType(NULL, o1, &tclIntType) != TCL_OK ||
-	Tcl_ConvertToType(NULL, o2, &tclIntType) != TCL_OK) {
-	Tcl_Panic("Ral_CmpIntTypes: cannot convert to int") ;
-    }
-    return o1->internalRep.longValue - o2->internalRep.longValue ;
-}
-
-static int
-Ral_CmpDoubleTypes(
-    Tcl_Obj *o1,
-    Tcl_Obj *o2)
-{
-    if (Tcl_ConvertToType(NULL, o1, &tclDoubleType) != TCL_OK ||
-	Tcl_ConvertToType(NULL, o2, &tclDoubleType) != TCL_OK) {
-	Tcl_Panic("Ral_CmpDoubleTypes: cannot convert to double") ;
-    }
-    return o1->internalRep.doubleValue - o2->internalRep.doubleValue ;
-}
-
-#ifndef NO_WIDE_TYPE
-static int
-Ral_CmpWideIntTypes(
-    Tcl_Obj *o1,
-    Tcl_Obj *o2)
-{
-    if (Tcl_ConvertToType(NULL, o1, &tclWideIntType) != TCL_OK ||
-	Tcl_ConvertToType(NULL, o2, &tclWideIntType) != TCL_OK) {
-	Tcl_Panic("Ral_CmpWideIntTypes: cannot convert to wideInt") ;
-    }
-    return o1->internalRep.wideValue - o2->internalRep.wideValue ;
-}
-#endif
-
 static int
 Ral_TupleCompare(
     int l,
     int r,
     Ral_RelSortProps *props)
 {
+    Ral_TupleHeading heading = props->relation->heading->tupleHeading ;
     Ral_RelationIter begin = Ral_RelationBegin(props->relation) ;
     Ral_Tuple t1 = *(begin + Ral_IntVectorFetch(props->sortVect, l)) ;
     Ral_Tuple t2 = *(begin + Ral_IntVectorFetch(props->sortVect, r)) ;
-    int result ;
+    Ral_IntVectorIter aEnd = Ral_IntVectorEnd(props->attrs) ;
+    Ral_IntVectorIter aIter ;
+    int result = 0 ;
 
-    if (props->cmpFunc) {
-	int index = Ral_IntVectorFront(props->attrs) ;
-	Tcl_Obj *v1 = t1->values[index] ;
-	Tcl_Obj *v2 = t2->values[index] ;
+    for (aIter = Ral_IntVectorBegin(props->attrs) ;
+	result == 0 && aIter != aEnd ; ++aIter) {
+	int attrIndex = *aIter ;
+	Ral_Attribute sortAttr = Ral_TupleHeadingFetch(heading, attrIndex) ;
+	Tcl_Obj *o1 = t1->values[attrIndex] ;
+	Tcl_Obj *o2 = t2->values[attrIndex] ;
 
-	assert(Ral_IntVectorSize(props->attrs) == 1) ;
-	result = props->cmpFunc(v1, v2) ;
-    } else {
-	Tcl_DString sortKey1 ;
-	Tcl_DString sortKey2 ;
+	switch (sortAttr->attrType) {
+	case Tcl_Type:
+	    if (sortAttr->tclType == &tclIntType) {
+		if (Tcl_ConvertToType(NULL, o1, &tclIntType) != TCL_OK ||
+		    Tcl_ConvertToType(NULL, o2, &tclIntType) != TCL_OK) {
+		    Tcl_Panic("Ral_TupleCompare: cannot convert to int") ;
+		}
+		result = o1->internalRep.longValue - o2->internalRep.longValue ;
+	    } else if (sortAttr->tclType == &tclDoubleType) {
+		if (Tcl_ConvertToType(NULL, o1, &tclDoubleType) != TCL_OK ||
+		    Tcl_ConvertToType(NULL, o2, &tclDoubleType) != TCL_OK) {
+		    Tcl_Panic("Ral_TupleCompare: cannot convert to double") ;
+		}
+		result =  o1->internalRep.doubleValue -
+		    o2->internalRep.doubleValue ;
+	    }
+#		ifndef NO_WIDE_TYPE
+	    else if (sortAttr->tclType == &tclWideIntType) {
+		if (Tcl_ConvertToType(NULL, o1, &tclWideIntType) != TCL_OK ||
+		    Tcl_ConvertToType(NULL, o2, &tclWideIntType) != TCL_OK) {
+		    Tcl_Panic("Ral_TupleCompare: cannot convert to wideInt") ;
+		}
+		result = o1->internalRep.wideValue - o2->internalRep.wideValue ;
+	    }
+#		endif
+	    else {
+		result = strcmp(Tcl_GetString(o1), Tcl_GetString(o2)) ;
+	    }
+	    break ;
 
-	Ral_TupleKeyFromAttrs(t1, props->attrs, &sortKey1) ;
-	Ral_TupleKeyFromAttrs(t2, props->attrs, &sortKey2) ;
+	case Tuple_Type:
+	    /*
+	     * This is probably wrong, but hard to say what is right.
+	     */
+	    result = strcmp(Tcl_GetString(o1), Tcl_GetString(o2)) ;
+	    break ;
 
-	result = strcmp(Tcl_DStringValue(&sortKey1),
-	    Tcl_DStringValue(&sortKey2)) ;
+	case Relation_Type:
+	    /*
+	     * This is probably wrong.
+	     * But comparison based on cardinality is all I've come up
+	     * with so far.
+	     */
+	    if (Tcl_ConvertToType(NULL, o1, &Ral_RelationObjType) != TCL_OK ||
+		Tcl_ConvertToType(NULL, o2, &Ral_RelationObjType) != TCL_OK) {
+		Tcl_Panic("Ral_TupleCompare: cannot convert to Relation") ;
+	    }
+	    result = Ral_RelationCardinality(o1->internalRep.otherValuePtr) -
+		Ral_RelationCardinality(o2->internalRep.otherValuePtr) ;
+	    break ;
 
-	Tcl_DStringFree(&sortKey1) ;
-	Tcl_DStringFree(&sortKey2) ;
+	default:
+	    Tcl_Panic("Ral_TupleCompare: unknown attribute type: %d",
+		sortAttr->attrType) ;
+	}
     }
 
     return props->sortDirection ? -result : result ;
@@ -1848,28 +1835,6 @@ Ral_RelationSort(
 	props.relation = relation ;
 	props.attrs = attrs ;
 	props.sortDirection = direction ;
-	props.cmpFunc = NULL ;
-
-	if (nAttrs == 1) {
-	    /*
-	     * Check if we are sorting on a single attribute of a numeric
-	     * type. If so, then we do type specific sorting. Otherwise
-	     * we simply compare on the string representations.
-	     */
-	    int attrIndex = Ral_IntVectorFront(attrs) ;
-	    Ral_TupleHeading heading = relation->heading->tupleHeading ;
-	    Ral_Attribute sortAttr = Ral_TupleHeadingFetch(heading, attrIndex) ;
-
-	    if (sortAttr->attrType == Tcl_Type) {
-		if (sortAttr->tclType == &tclIntType) {
-		    props.cmpFunc = Ral_CmpIntTypes ;
-		} else if (sortAttr->tclType == &tclDoubleType) {
-		    props.cmpFunc = Ral_CmpDoubleTypes ;
-		} else if (sortAttr->tclType == &tclWideIntType) {
-		    props.cmpFunc = Ral_CmpWideIntTypes ;
-		}
-	    }
-	}
 
 	Ral_BuildHeap(&props) ;
 	while (n > 1) {
