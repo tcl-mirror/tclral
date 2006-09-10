@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuplecmd.c,v $
-$Revision: 1.13 $
-$Date: 2006/09/09 16:32:44 $
+$Revision: 1.14 $
+$Date: 2006/09/10 18:22:59 $
  *--
  */
 
@@ -104,7 +104,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tuplecmd.c,v $ $Revision: 1.13 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tuplecmd.c,v $ $Revision: 1.14 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -369,7 +369,7 @@ TupleEqualCmd(
     return TCL_OK ;
 }
 
-/* tuple extend tupleValue ?name-type-value ... ? */
+/* tuple extend tupleValue ?name type value ... ? */
 static int
 TupleExtendCmd(
     Tcl_Interp *interp,
@@ -383,8 +383,8 @@ TupleExtendCmd(
     Ral_TupleIter newValues ;
     Ral_ErrorInfo errInfo ;
 
-    if (objc < 3) {
-	Tcl_WrongNumArgs(interp, 2, objv, "tupleValue ?name-type-value ... ?") ;
+    if (objc < 3 || objc % 3 != 0) {
+	Tcl_WrongNumArgs(interp, 2, objv, "tupleValue ?name type value ... ?") ;
 	return TCL_ERROR ;
     }
 
@@ -406,46 +406,37 @@ TupleExtendCmd(
     tuple = tupleObj->internalRep.otherValuePtr ;
     /*
      * The heading for the new tuple is larger by the number of new
-     * attributes given in the command.
+     * attributes given in the command. This is the number of arguments
+     * divided by three.
      */
-    newHeading = Ral_TupleHeadingExtend(tuple->heading, objc) ;
+    newHeading = Ral_TupleHeadingExtend(tuple->heading, objc / 3) ;
     newTuple = Ral_TupleExtend(tuple, newHeading) ;
     Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdTuple, Ral_OptExtend) ;
     /*
      * Add the new attributes to the new tuple.  The new attributes are tacked
      * on at the end of the attributes that came from the original tuple.
      */
-    for (newValues = Ral_TupleEnd(newTuple) ; objc > 0 ; --objc, ++objv) {
-	int elemc ;
-	Tcl_Obj **elemv ;
+    for (newValues = Ral_TupleEnd(newTuple) ; objc > 0 ; objc -= 3, objv += 3) {
 	Ral_Attribute attr ;
 	Ral_TupleHeadingIter hiter ;
 
-	if (Tcl_ListObjGetElements(interp, *objv, &elemc, &elemv) != TCL_OK) {
-	    goto errorOut ;
-	}
-	if (elemc != 3) {
-	    Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_BAD_TRIPLE_LIST, *objv) ;
-	    Ral_InterpSetError(interp, &errInfo) ;
-	    goto errorOut ;
-	}
-	attr = Ral_AttributeNewFromObjs(interp, elemv[0], elemv[1], &errInfo) ;
+	attr = Ral_AttributeNewFromObjs(interp, objv[0], objv[1], &errInfo) ;
 	if (attr == NULL) {
 	    goto errorOut ;
 	}
 	hiter = Ral_TupleHeadingPushBack(newHeading, attr) ;
 	if (hiter == Ral_TupleHeadingEnd(newHeading)) {
 	    Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_DUPLICATE_ATTR,
-		elemv[0]) ;
+		objv[0]) ;
 	    Ral_InterpSetError(interp, &errInfo) ;
 	    goto errorOut ;
 	}
 
-	if (Ral_AttributeConvertValueToType(interp, attr, elemv[2], &errInfo)
+	if (Ral_AttributeConvertValueToType(interp, attr, objv[2], &errInfo)
 	    != TCL_OK) {
 	    goto errorOut ;
 	}
-	Tcl_IncrRefCount(*newValues++ = elemv[2]) ;
+	Tcl_IncrRefCount(*newValues++ = objv[2]) ;
     }
 
     Tcl_SetObjResult(interp, Ral_TupleObjNew(newTuple)) ;

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.15 $
-$Date: 2006/09/07 02:15:40 $
+$Revision: 1.16 $
+$Date: 2006/09/10 18:22:59 $
  *--
  */
 
@@ -123,7 +123,7 @@ static struct {
 } ;
 static const char specErrMsg[] = "multiplicity specification" ;
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.15 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.16 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -1337,6 +1337,27 @@ Ral_RelvarObjConstraintMember(
     }
 
     Tcl_SetObjResult(interp, resultObj) ;
+    return TCL_OK ;
+}
+
+int
+Ral_RelvarObjConstraintPath(
+    Tcl_Interp *interp,
+    Tcl_Obj * const constraintName,
+    Ral_RelvarInfo info)
+{
+    Ral_Constraint constraint ;
+    char *name = Tcl_GetString(constraintName) ;
+    char *fullName ;
+
+    constraint = Ral_RelvarObjFindConstraint(interp, info, name, &fullName) ;
+    if (constraint == NULL) {
+	Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptConstraint,
+	    RAL_ERR_UNKNOWN_CONSTRAINT, name) ;
+	return TCL_ERROR ;
+    }
+    Tcl_SetObjResult(interp, Tcl_NewStringObj(fullName, -1)) ;
+    ckfree(fullName) ;
     return TCL_OK ;
 }
 

@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.22 $
-# $Date: 2006/08/27 22:04:38 $
+# $Revision: 1.23 $
+# $Date: 2006/09/10 18:22:59 $
 #  *--
 
 namespace eval ::ral {
@@ -603,8 +603,10 @@ proc ::ral::csvToFile {relValue fileName {sortAttr {}} {noheading 0}} {
 # in "srcRelvar" and presumably contains a subset of the tuples of "srcRelvar"
 #
 proc ::ral::navigate {relValue constraintName relvarName {dir {}}} {
-    set cmd [list ::ral::relation semijoin $relValue\
-	[::ral::relvar set $relvarName] -using]
+    set relvarName [uplevel ::ral::relvar path $relvarName]
+    set constraintName [uplevel ::ral::relvar constraint path $constraintName]
+    set cmd [list ::ral::relation semijoin $relValue [relvar set $relvarName]\
+	-using]
     set cInfo [relvar constraint info $constraintName]
     switch -- [lindex $cInfo 0] {
 	association {
@@ -623,10 +625,10 @@ proc ::ral::navigate {relValue constraintName relvarName {dir {}}} {
 	    } else {
 		# If the constraint is not reflexive, then we
 		# determine the direction from relvar name
-		if {[matchRelvarName $rngRelvar $relvarName]} {
+		if {$rngRelvar eq $relvarName} {
 		    set srcAttrs $rngAttrs
 		    set dstAttrs $rtoAttrs
-		} elseif {[matchRelvarName $rtoRelvar $relvarName]} {
+		} elseif {$rtoRelvar eq $relvarName} {
 		    set srcAttrs $rngAttrs
 		    set dstAttrs $rtoAttrs
 		} else {
@@ -638,7 +640,7 @@ proc ::ral::navigate {relValue constraintName relvarName {dir {}}} {
 	}
 	partition {
 	    set subSets [lassign $cInfo type name superRelvar superAttrs]
-	    if {[matchRelvarName $superRelvar $relvarName]} {
+	    if {$superRelvar eq $relvarName} {
 		# sub set to super set reference
 		# but we don't know which sub set it is -- so we compare
 		# the headings of the subsets and find the first one
@@ -660,7 +662,7 @@ proc ::ral::navigate {relValue constraintName relvarName {dir {}}} {
 		rtoRelvarA rtoAttrsA rngAttrsB rngSpecB rtoRelvarB rtoAttrsB
 	    # If the navigation is to the correlation relvar, then a
 	    # single semijoin will do the job.
-	    if {[matchRelvarName $rngRelvar $relvarName]} {
+	    if {$rngRelvar eq $relvarName} {
 		# This is very much like the "association" case
 		# First, we must deal with the reflexive case.
 		# If the correlation is reflexive, then the ambiguity
@@ -704,10 +706,10 @@ proc ::ral::navigate {relValue constraintName relvarName {dir {}}} {
 		    } else {
 			error "bad navigation attributes, \"$dir\""
 		    }
-		} elseif {[matchRelvarName $rtoRelvarA $relvarName]} {
+		} elseif {$rtoRelvarA eq $relvarName} {
 		    set srcAttrs $rngAttrsA
 		    set dstAttrs $rtoAttrsA
-		} elseif {[matchRelvarName $rtoRelvarB $relvarName]} {
+		} elseif {$rtoRelvarB eq $relvarName} {
 		    set srcAttrs $rngAttrsB
 		    set dstAttrs $rtoAttrsB
 		} else {
@@ -715,8 +717,8 @@ proc ::ral::navigate {relValue constraintName relvarName {dir {}}} {
 			constraint, \"$constraintName\""
 		}
 		lappend cmd [mergeJoinAttrs $srcAttrs $dstAttrs]
-	    } elseif {[matchRelvarName $rtoRelvarA $relvarName] ||\
-		      [matchRelvarName $rtoRelvarB $relvarName]} {
+	    } elseif {$rtoRelvarA eq $relvarName ||\
+		      $rtoRelvarB eq $relvarName} {
 		# The destination is one of the two referred to relvars.
 		# If the source is one of the referred to relvars then
 		# two semijoins are necessary to complete the traversal.
@@ -1085,10 +1087,6 @@ proc ::ral::mkLoadRelation {cursor heading} {
     return $value
 }
 
-proc ::ral::matchRelvarName {n1 n2} {
-    return [expr {[namespace tail $n1] eq $n2}]
-}
-
 proc ::ral::matchValueType {relVal relvarName} {
     set rv [::ral::relation emptyof $relVal]
     set sv [::ral::relation emptyof [::ral::relvar set $relvarName]]
@@ -1115,7 +1113,7 @@ proc ::ral::findSubSetType {relValue subSets} {
 
 proc ::ral::findSubSetRef {name subSets} {
     foreach {ssName ssAttrs} $subSets {
-	if {[matchRelvarName $ssName $name]} {
+	if {$ssName eq $name} {
 	    return $ssAttrs
 	}
     }

@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.37 $
-# $Date: 2006/09/09 16:32:44 $
+# $Revision: 1.38 $
+# $Date: 2006/09/10 18:22:59 $
 #  *--
 
 package require tcltest 2.2
@@ -439,28 +439,28 @@ namespace eval ::ral::test {
     # tuple extend subcommand
     test tuple-extend-1.0 {single attribute} -body {
 	set t {Tuple {Name string} {Name Andrew}}
-	tuple extend $t {Age int 20}
+	tuple extend $t Age int 20
     } -result {Tuple {Name string Age int} {Name Andrew Age 20}} -match tuple
 
     test tuple-extend-2.0 {multiple attributes} -body {
 	set t {Tuple {Name string} {Name Andrew}}
-	tuple extend $t {Age int 20} {Size double 1.3}
+	tuple extend $t Age int 20 Size double 1.3
     } -result {Tuple {Name string Age int Size double}\
 	{Name Andrew Age 20 Size 1.3}} -match tuple
 
     test tuple-extend-3.0 {duplicate name} -body {
 	set t {Tuple {Name string} {Name Andrew}}
-	tuple extend $t {Name int 20}
+	tuple extend $t Name int 20
     } -result {duplicate attribute name, "Name"} -returnCodes error
 
     test tuple-extend-4.0 {bad value} -body {
 	set t {Tuple {Name string} {Name Andrew}}
-	tuple extend $t {Age int foo}
+	tuple extend $t Age int foo
     } -result {bad value type for value, "foo"} -returnCodes error
 
     test tuple-extend-5.0 {bad type} -body {
 	set t {Tuple {Name string} {Name Andrew}}
-	tuple extend $t {Age foo foo}
+	tuple extend $t Age foo foo
     } -result {unknown data type, "foo"} -returnCodes error
 
     # tuple extract subcommand

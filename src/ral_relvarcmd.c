@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.18 $
-$Date: 2006/09/08 14:52:17 $
+$Revision: 1.19 $
+$Date: 2006/09/10 18:22:59 $
  *--
  */
 
@@ -95,6 +95,7 @@ static int RelvarInsertCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarNamesCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarPartitionCmd(Tcl_Interp *, int, Tcl_Obj *const*,
     Ral_RelvarInfo) ;
+static int RelvarPathCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarSetCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarUnsetCmd(Tcl_Interp *, int, Tcl_Obj *const*,
     Ral_RelvarInfo) ;
@@ -113,7 +114,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.18 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.19 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -140,6 +141,7 @@ relvarCmd(
 	{"insert", RelvarInsertCmd},
 	{"names", RelvarNamesCmd},
 	{"partition", RelvarPartitionCmd},
+	{"path", RelvarPathCmd},
 	{"set", RelvarSetCmd},
 	{"unset", RelvarUnsetCmd},
 	{"update", RelvarUpdateCmd},
@@ -203,12 +205,14 @@ RelvarConstraintCmd(
 	ConstraintInfo,
 	ConstraintNames,
 	ConstraintMember,
+	ConstraintPath,
     } ;
     static char const *constraintCmds[] = {
 	"delete",
 	"info",
 	"names",
 	"member",
+	"path",
 	NULL
     } ;
     int result = TCL_OK ;
@@ -269,6 +273,11 @@ RelvarConstraintCmd(
 	    return TCL_ERROR ;
 	}
 	result = Ral_RelvarObjConstraintMember(interp, objv[3], rInfo) ;
+	break ;
+
+    /* relvar constraint path name */
+    case ConstraintPath:
+	result = Ral_RelvarObjConstraintPath(interp, objv[3], rInfo) ;
 	break ;
 
     default:
@@ -632,6 +641,35 @@ RelvarPartitionCmd(
      * relvar participating in the association is treated as modified.
      */
     return Ral_RelvarObjCreatePartition(interp, objc - 2, objv + 2, rInfo) ;
+}
+
+static int
+RelvarPathCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv,
+    Ral_RelvarInfo rInfo)
+{
+    Ral_Relvar relvar ;
+    char *fullName ;
+
+    /* relvar path relvarName */
+    if (objc != 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relvarName") ;
+	return TCL_ERROR ;
+    }
+    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2]),
+	&fullName) ;
+    if (relvar == NULL) {
+	return TCL_ERROR ;
+    }
+    Tcl_SetObjResult(interp, Tcl_NewStringObj(fullName, -1)) ;
+    ckfree(fullName) ;
+    /*
+     * Creating a partition is an implicit transaction as each
+     * relvar participating in the association is treated as modified.
+     */
+    return TCL_OK ;
 }
 
 static int
