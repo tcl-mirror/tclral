@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.20 $
-$Date: 2006/09/09 23:28:17 $
+$Revision: 1.21 $
+$Date: 2006/09/12 02:26:54 $
  *--
  */
 
@@ -106,9 +106,6 @@ static int Ral_RelationFindJoinId(Ral_Relation, Ral_JoinMap, int) ;
 /*
 EXTERNAL DATA REFERENCES
 */
-extern Tcl_ObjType tclIntType ;
-extern Tcl_ObjType tclDoubleType ;
-extern Tcl_ObjType tclWideIntType ;
 
 /*
 EXTERNAL DATA DEFINITIONS
@@ -119,7 +116,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.20 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.21 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -1714,35 +1711,48 @@ Ral_TupleCompare(
 	Ral_Attribute sortAttr = Ral_TupleHeadingFetch(heading, attrIndex) ;
 	Tcl_Obj *o1 = t1->values[attrIndex] ;
 	Tcl_Obj *o2 = t2->values[attrIndex] ;
+	Tcl_ObjType *type ;
 
 	switch (sortAttr->attrType) {
 	case Tcl_Type:
-	    if (sortAttr->tclType == &tclIntType) {
-		if (Tcl_ConvertToType(NULL, o1, &tclIntType) != TCL_OK ||
-		    Tcl_ConvertToType(NULL, o2, &tclIntType) != TCL_OK) {
+	    type = Tcl_GetObjType("int") ;
+	    if (type && sortAttr->tclType == type) {
+		if (Tcl_ConvertToType(NULL, o1, type) != TCL_OK ||
+		    Tcl_ConvertToType(NULL, o2, type) != TCL_OK) {
 		    Tcl_Panic("Ral_TupleCompare: cannot convert to int") ;
 		}
 		result = o1->internalRep.longValue - o2->internalRep.longValue ;
-	    } else if (sortAttr->tclType == &tclDoubleType) {
-		if (Tcl_ConvertToType(NULL, o1, &tclDoubleType) != TCL_OK ||
-		    Tcl_ConvertToType(NULL, o2, &tclDoubleType) != TCL_OK) {
+		break ;
+	    } 
+
+	    type = Tcl_GetObjType("double") ;
+	    if (type && sortAttr->tclType == type) {
+		if (Tcl_ConvertToType(NULL, o1, type) != TCL_OK ||
+		    Tcl_ConvertToType(NULL, o2, type) != TCL_OK) {
 		    Tcl_Panic("Ral_TupleCompare: cannot convert to double") ;
 		}
 		result =  o1->internalRep.doubleValue -
 		    o2->internalRep.doubleValue ;
+		break ;
 	    }
+
 #		ifndef NO_WIDE_TYPE
-	    else if (sortAttr->tclType == &tclWideIntType) {
-		if (Tcl_ConvertToType(NULL, o1, &tclWideIntType) != TCL_OK ||
-		    Tcl_ConvertToType(NULL, o2, &tclWideIntType) != TCL_OK) {
+	    type = Tcl_GetObjType("wideInt") ;
+	    if (type && sortAttr->tclType == type) {
+		if (Tcl_ConvertToType(NULL, o1, type) != TCL_OK ||
+		    Tcl_ConvertToType(NULL, o2, type) != TCL_OK) {
 		    Tcl_Panic("Ral_TupleCompare: cannot convert to wideInt") ;
 		}
 		result = o1->internalRep.wideValue - o2->internalRep.wideValue ;
+		break ;
 	    }
 #		endif
-	    else {
-		result = strcmp(Tcl_GetString(o1), Tcl_GetString(o2)) ;
-	    }
+
+	    /*
+	     * If we're not one of the numeric types we can handle,
+	     * then just do a string compare.
+	     */
+	    result = strcmp(Tcl_GetString(o1), Tcl_GetString(o2)) ;
 	    break ;
 
 	case Tuple_Type:

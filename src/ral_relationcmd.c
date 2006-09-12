@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.25 $
-$Date: 2006/09/09 21:37:47 $
+$Revision: 1.26 $
+$Date: 2006/09/12 02:26:54 $
  *--
  */
 
@@ -142,7 +142,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.25 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.26 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -1455,15 +1455,16 @@ RelationListCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
-    /* relation list relationValue */
+    /* relation list relationValue ?attrName? */
     Tcl_Obj *relObj ;
     Ral_Relation relation ;
     Tcl_Obj *listObj ;
+    int attrIndex = 0 ;
     Ral_RelationIter iter ;
     Ral_RelationIter end ;
 
-    if (objc != 3) {
-	Tcl_WrongNumArgs(interp, 2, objv, "relationValue") ;
+    if (objc < 3 || objc > 4) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relationValue ?attrName?") ;
 	return TCL_ERROR ;
     }
 
@@ -1472,10 +1473,33 @@ RelationListCmd(
 	return TCL_ERROR ;
     }
     relation = relObj->internalRep.otherValuePtr ;
-    if (Ral_RelationDegree(relation) != 1) {
-	Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptList,
-	    RAL_ERR_DEGREE_ONE, relObj) ;
-	return TCL_ERROR ;
+
+    /*
+     * If no attribute name is mentioned, then we insist that the 
+     * relation be of degree 1. The resulting list will necessarily be
+     * a set.
+     */
+    if (objc == 3) {
+	if (Ral_RelationDegree(relation) != 1) {
+	    Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptList,
+		RAL_ERR_DEGREE_ONE, relObj) ;
+	    return TCL_ERROR ;
+	}
+    } else {
+	/*
+	 * Otherwise we need to find which attribute is referenced and
+	 * will return the values of that attribute in all tuples of
+	 * the relation. If the attribute does not constitute an identifier
+	 * then, in general, the list will not be a set.
+	 */
+	const char *attrName = Tcl_GetString(objv[3]) ;
+	attrIndex = Ral_TupleHeadingIndexOf(relation->heading->tupleHeading,
+	    attrName) ;
+	if (attrIndex < 0) {
+	    Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptList,
+		RAL_ERR_UNKNOWN_ATTR, attrName) ;
+	    return TCL_ERROR ;
+	}
     }
 
     listObj = Tcl_NewListObj(0, NULL) ;
@@ -1483,7 +1507,7 @@ RelationListCmd(
     for (iter = Ral_RelationBegin(relation) ; iter != end ; ++iter) {
 	Ral_Tuple tuple = *iter ;
 
-	if (Tcl_ListObjAppendElement(interp, listObj, *tuple->values)
+	if (Tcl_ListObjAppendElement(interp, listObj, tuple->values[attrIndex])
 	    != TCL_OK) {
 	    Tcl_DecrRefCount(listObj) ;
 	    return TCL_ERROR ;

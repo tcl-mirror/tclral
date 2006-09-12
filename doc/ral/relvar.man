@@ -47,8 +47,8 @@
 #   This command is part of TclRAL. This file is in Tcl Markup Language
 #   format.
 # $RCSfile: relvar.man,v $
-# $Revision: 1.8 $
-# $Date: 2006/08/27 00:31:31 $
+# $Revision: 1.9 $
+# $Date: 2006/09/12 02:26:54 $
 #  *--
 }]
 [moddesc "Relvar Operators"]
@@ -88,11 +88,6 @@ This does abandon the non-procedural nature of relational expressions
 as usually accomplished in the relational model, but is a better fit
 to the Tcl way of doing things.
 
-[para]
-Since it is possible to store a relation value in an ordinary Tcl variable
-and since Tcl variables are convenient to use when formulating expressions,
-creating a relvar also creates a corresponding Tcl variable by the same name.
-
 [section "RELVAR NAMES"]
 
 The namespace of relvar names follows the familiar Tcl method of naming
@@ -106,6 +101,15 @@ If an application uses only one set of relvars,
 then the global namespace of relvars is most convenient.
 Using several distinct sets of relvars is best accomplished if each
 set is placed in their own relvar namespace.
+
+[para]
+Since it is possible to store a relation value in an ordinary Tcl variable
+and since Tcl variables are convenient to use when formulating expressions,
+creating a relvar also creates a corresponding Tcl variable by the same name.
+The Tcl variable created is traced to prevent writing to it, since all
+modifications to a relvar should come via the [cmd relvar] commands.
+So, creating a relvar name [var Dog] at the global level creates a
+relvar named [var ::Dog] and a read-only Tcl variable named [var ::Dog].
 
 [section CONSTRAINTS]
 
@@ -300,6 +304,10 @@ The returned names are fully qualified.
 % relvar constraint member OWNERSHIP
 ::A1 ::A2
 }]
+
+[call [cmd "::ral::relvar constraint path"] [arg constraintName]]
+The [cmd "constraint path"] subcommand returns the fully qualified constraint
+name of [arg constraintName].
 
 [call [cmd "::ral::relvar correlation"] [opt -complete] [arg name]\
 [arg correlRelvar]\
@@ -674,6 +682,10 @@ for partition ::P1(::Lamp is partitioned [::TableLamp | ::FloorLamp]), in relvar
 tuple {SerialNo NF101 Height 72 Sockets 3} references no tuple
 
 }]
+
+[call [cmd "::ral::relvar path"] [arg relvarName]]
+The [cmd path] subcommand returns the fully qualified relvar
+name of [arg relvarName].
 
 
 [call [cmd "::ral::relvar set"] [arg relvarName] [opt relationValue]]

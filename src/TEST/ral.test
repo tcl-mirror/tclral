@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.38 $
-# $Date: 2006/09/10 18:22:59 $
+# $Revision: 1.39 $
+# $Date: 2006/09/12 02:26:54 $
 #  *--
 
 package require tcltest 2.2
@@ -112,8 +112,10 @@ namespace eval ::ral::test {
 	    }
 	    return 1
 	}
-	customMatch dict dictMatch
+    } else {
+	proc ::dictMatch {expected actual} {return 0}
     }
+    customMatch dict dictMatch
 
     set DEE {Relation {} {{}} {{}}}
     set DUM {Relation {} {{}} {}}
@@ -2199,6 +2201,10 @@ namespace eval ::ral::test {
     test relation-list-2.0 {one tuple} -body {
 	relation list {Relation {Name string} Name {{Name Fred}}}
     } -result {Fred}
+
+    test relation-list-3.0 {list of named attribute} -body {
+	lsort [relation list $S CITY]
+    } -result {Athens London London Paris Paris}
 
     # relation minus subcommand
     test relation-minus-1.0 {dum relation} -body {

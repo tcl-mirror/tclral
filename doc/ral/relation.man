@@ -45,8 +45,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.11 $
-# $Date: 2006/09/09 16:32:44 $
+# $Revision: 1.12 $
+# $Date: 2006/09/12 02:26:54 $
 #  *--
 }]
 [moddesc "Relation Operators"]
@@ -255,10 +255,12 @@ dogarray(Spot)   = Terrier
 }]
 
 [call [cmd "::ral::relation assign"] [arg relationValue]\
-    [opt "attrName | attr/var-name-list ..."]]
+    [opt "attrName | attr-var-pair ..."]]
 
 The [cmd assign] subcommand is short hand for
 [cmd "tuple assign \[relation tuple [arg relationValue]\] \?...\?"].
+This allow moving the values of a relation with a single tuple into
+ordinary Tcl variable.
 
 [example {
 % relation foreach d $DOG -descending DogName {
@@ -760,17 +762,19 @@ of the [arg relationValueN] does not affect the result.
 +=========+=======+--------+---------+
 }]
 
-[call [cmd "::ral::relation list"] [arg relationValue]]
+[call [cmd "::ral::relation list"] [arg relationValue] [opt [arg attrName]]]
 
-The [cmd list] subcommand returns the body of [arg relationValue] as
-a proper Tcl list.
+The [cmd list] subcommand returns the values of a single attribute
+from all the tuples of [arg relationValue] as a proper Tcl list.
+If [arg attrName] is not given, then
 [arg RelationValue] must be of degree one or an error is returned.
-The [cmd list] subcommand is complementary to the [cmd tuple] subcommand
-in the sense that it provides proper Tcl list for a relation of degree one where
-the [cmd tuple] subcommand provides a single tuple for a relation of
-cardinality one.
-Note also that the list returned by the [cmd list] subcommand is a
-proper set since there are no duplicates in a relation.
+Note that the list returned from a singular relation is necessarily a set
+and may be used with the [package struct::set] package.
+If [arg attrName] is present, then the returned list will consist of the
+value of the given attribute taken from all the tuples in the relation
+in an arbitrary order.
+In this case if [arg attrName] does not constitute an identifier of
+[arg relationValue], then, in general, the returned list is not a set.
 
 [example {
 % relation list [relation project $OWNERSHIP Acquired]]

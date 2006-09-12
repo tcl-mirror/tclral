@@ -47,8 +47,8 @@
 #   Relformat is part of the TCLRAL package.
 # 
 # $RCSfile: relformat.man,v $
-# $Revision: 1.4 $
-# $Date: 2006/07/30 23:45:56 $
+# $Revision: 1.5 $
+# $Date: 2006/09/12 02:26:54 $
 #  *--
 }]
 [moddesc "Relation formatting"]
@@ -61,8 +61,8 @@ generating text output of relation and tuple values.
 These commands are part of the Tcl Relational Algebra Library (ral) package.
 
 [section DEPENDENCIES]
-The commands described here depend upon access to the [package struct::matrix]
-and [package csv] packages of the Tcl standard library.
+The commands described here depend upon access to the [package struct::matrix],
+[package report] and [package csv] packages of the Tcl standard library.
 If your installation does not include [emph tcllib] then these commands
 will not be available to you.
 
@@ -175,8 +175,8 @@ Owner
 
 The [cmd tuple2matrix] command returns a matrix containing the values
 in [arg tupleValue].
-The matrix is created using the [package struct::matrix] from the standard
-Tcl library.
+The matrix is created using the [package struct::matrix] package
+from the standard Tcl library.
 By default, the first two rows of the matrix contain the attribute
 names and types.
 Setting the [arg noheading] argument to 1,
@@ -189,8 +189,8 @@ when it is no longer needed.
 
 The [cmd relation2matrix] command returns a matrix containing the values
 in [arg relationValue].
-The matrix is created using the [package struct::matrix] from the standard
-Tcl library.
+The matrix is created using the [package struct::matrix] package
+from the standard Tcl library.
 If present, the [arg sortAttr] argument is a list of attributes
 that are used to sort the values before placing in the matrix.
 By default, the first two rows of the matrix contain the attribute
