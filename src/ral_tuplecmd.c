@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuplecmd.c,v $
-$Revision: 1.14 $
-$Date: 2006/09/10 18:22:59 $
+$Revision: 1.15 $
+$Date: 2006/09/17 18:34:23 $
  *--
  */
 
@@ -79,6 +79,7 @@ EXTERNAL FUNCTION REFERENCES
 FORWARD FUNCTION REFERENCES
 */
 static int TupleAssignCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
+static int TupleAttributesCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int TupleCreateCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int TupleDegreeCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int TupleEliminateCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
@@ -104,7 +105,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tuplecmd.c,v $ $Revision: 1.14 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tuplecmd.c,v $ $Revision: 1.15 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -127,6 +128,7 @@ tupleCmd(
 	int (*const cmdFunc)(Tcl_Interp *, int, Tcl_Obj *const*) ;
     } cmdTable[] = {
 	{"assign", TupleAssignCmd},
+	{"attributes", TupleAttributesCmd},
 	{"create", TupleCreateCmd},
 	{"degree", TupleDegreeCmd},
 	{"eliminate", TupleEliminateCmd},
@@ -203,6 +205,48 @@ TupleAssignCmd(
     Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdTuple, Ral_OptAssign) ;
 
     return Ral_TupleAssignToVars(tuple, interp, objc - 3, objv + 3, &errInfo) ;
+}
+
+static int
+TupleAttributesCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_Obj *tupleObj ;
+    Ral_TupleHeading tupleHeading ;
+    Tcl_Obj *attrListObj ;
+    Ral_TupleHeadingIter tIter ;
+    Ral_TupleHeadingIter tEnd ;
+
+    /* tuple attributes tupleValue */
+    if (objc != 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "tupleValue") ;
+	return TCL_ERROR ;
+    }
+
+    tupleObj = *(objv + 2) ;
+    if (Tcl_ConvertToType(interp, tupleObj, &Ral_TupleObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    tupleHeading = ((Ral_Tuple)tupleObj->internalRep.otherValuePtr)->heading ;
+
+    attrListObj = Tcl_NewListObj(0, NULL) ;
+    tEnd = Ral_TupleHeadingEnd(tupleHeading) ;
+    for (tIter = Ral_TupleHeadingBegin(tupleHeading) ;
+	tIter != tEnd ; ++tIter) {
+	Ral_Attribute attr = *tIter ;
+	Tcl_Obj *attrObj = Tcl_NewStringObj(attr->name, -1) ;
+
+	if (Tcl_ListObjAppendElement(interp, attrListObj, attrObj) != TCL_OK) {
+	    Tcl_DecrRefCount(attrObj) ;
+	    Tcl_DecrRefCount(attrListObj) ;
+	    return TCL_ERROR ;
+	}
+    }
+
+    Tcl_SetObjResult(interp, attrListObj) ;
+    return TCL_OK ;
 }
 
 /*

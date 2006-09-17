@@ -45,8 +45,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: tuple.man,v $
-# $Revision: 1.4 $
-# $Date: 2006/09/12 02:26:54 $
+# $Revision: 1.5 $
+# $Date: 2006/09/17 18:34:23 $
 #  *--
 }]
 [moddesc "Tuple Operators"]
@@ -197,6 +197,15 @@ of optional arguments given.
 John
 % set Age
 25
+}]
+
+[call [cmd "::ral::tuple attributes"] [arg tupleValue]]
+The [cmd attributes] subcommand returns a list of the attribute names
+of [arg tupleValue].
+
+[example {
+% tuple attributes {Tuple {Name string Age int} {Name John Age 25}}
+Name Age
 }]
 
 

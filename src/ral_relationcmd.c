@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.26 $
-$Date: 2006/09/12 02:26:54 $
+$Revision: 1.27 $
+$Date: 2006/09/17 18:34:23 $
  *--
  */
 
@@ -104,6 +104,7 @@ static int RelationDivideCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationEliminateCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationEmptyofCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationExtendCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
+static int RelationExtractCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationForeachCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationGroupCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationHeadingCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
@@ -142,7 +143,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.26 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.27 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -178,6 +179,7 @@ relationCmd(
 	{"eliminate", RelationEliminateCmd},
 	{"emptyof", RelationEmptyofCmd},
 	{"extend", RelationExtendCmd},
+	{"extract", RelationExtractCmd},
 	{"foreach", RelationForeachCmd},
 	{"group", RelationGroupCmd},
 	{"heading", RelationHeadingCmd},
@@ -300,7 +302,7 @@ RelationAssignCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
-    /* relation tuple relationValue ?attrName | attr-var-list ...? */
+    /* relation assign relationValue ?attrName | attr-var-list ...? */
     Tcl_Obj *relObj ;
     Ral_Relation relation ;
     Ral_ErrorInfo errInfo ;
@@ -816,6 +818,78 @@ errorOut:
     Tcl_UnsetVar(interp, Tcl_GetString(varNameObj), 0) ;
     Tcl_DecrRefCount(varNameObj) ;
     Ral_RelationDelete(extRelation) ;
+    return TCL_ERROR ;
+}
+
+static int
+RelationExtractCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    /* relation extract relationValue attrName ?attrName2 ...? */
+    Tcl_Obj *relObj ;
+    Ral_Relation relation ;
+    Ral_TupleHeading heading;
+    Ral_Tuple tuple ;
+    char const *attrName ;
+    int attrIndex ;
+    Tcl_Obj *resultObj ;
+
+    if (objc < 4) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+	    "relationValue attrName ?attrName2 ...?") ;
+	return TCL_ERROR ;
+    }
+
+    relObj = *(objv + 2) ;
+    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relObj->internalRep.otherValuePtr ;
+
+    if (Ral_RelationCardinality(relation) != 1) {
+	Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptExtract,
+	    RAL_ERR_CARDINALITY_ONE, relObj) ;
+	return TCL_ERROR ;
+    }
+
+    heading = relation->heading->tupleHeading ;
+    tuple = *Ral_RelationBegin(relation) ;
+
+    objc -= 3 ;
+    objv += 3 ;
+    if (objc < 2) {
+	attrName = Tcl_GetString(*objv) ;
+	attrIndex = Ral_TupleHeadingIndexOf(heading, attrName) ;
+	if (attrIndex < 0) {
+	    Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptExtract,
+		RAL_ERR_UNKNOWN_ATTR, attrName) ;
+	    return TCL_ERROR ;
+	}
+	resultObj = tuple->values[attrIndex] ;
+    } else {
+	resultObj = Tcl_NewListObj(0, NULL) ;
+	while (objc-- > 0) {
+	    attrName = Tcl_GetString(*objv++) ;
+	    attrIndex = Ral_TupleHeadingIndexOf(heading, attrName) ;
+	    if (attrIndex < 0) {
+		Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptExtract,
+		    RAL_ERR_UNKNOWN_ATTR, attrName) ;
+		goto errorOut ;
+	    }
+	    if (Tcl_ListObjAppendElement(interp, resultObj,
+		    tuple->values[attrIndex]) != TCL_OK) {
+		goto errorOut ;
+	    }
+	}
+    }
+
+    Tcl_SetObjResult(interp, resultObj) ;
+    return TCL_OK ;
+
+errorOut:
+    Tcl_DecrRefCount(resultObj) ;
     return TCL_ERROR ;
 }
 

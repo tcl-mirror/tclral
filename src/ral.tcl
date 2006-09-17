@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.23 $
-# $Date: 2006/09/10 18:22:59 $
+# $Revision: 1.24 $
+# $Date: 2006/09/17 18:34:23 $
 #  *--
 
 namespace eval ::ral {
@@ -63,8 +63,16 @@ namespace eval ::ral {
     namespace export dumpToFile
     namespace export csv
     namespace export csvToFile
-    namespace export navigate
-    namespace export alter
+    if {![package vsatisfies [package require Tcl] 8.5]} {
+	namespace export rcount
+	namespace export rcountd
+	namespace export rsum
+	namespace export rsumd
+	namespace export ravg
+	namespace export ravgd
+	namespace export rmin
+	namespace export rmax
+    }
 
     if {![catch {package require report}]} {
 	# Default report style for Tuple types
@@ -146,21 +154,18 @@ proc ::ral::relation2matrix {relValue {sortAttr {}} {noheading 0}} {
 # This procedure is intended to be to relations what "parray" is to arrays.
 # It provides a very simple text formatting of relation values into a
 # tabular layout. Rather than writing the output to a channel "relformat"
-# returns the string as its return value.
+# returns a string containing the formatted relation.
+# There is much more that could be done here, e.g. adding a "-format" option
+# where you could specify the details of the formatting.
 proc ::ral::relformat {relValue {title {}} {sortAttrs {}} {noheading 0}} {
     package require report
 
     # Determine which columns hold attributes that are part of some identifier
-    set attrOffsets [list]
-    set offset -1
-    foreach {name type} [lindex [relation heading $relValue] 1] {
-	lappend attrOffsets $name [incr offset]
-    }
-    array set attrOffsetMap $attrOffsets
+    set relAttrs [relation attributes $relValue]
     set idCols [list]
     foreach id [relation identifiers $relValue] {
 	foreach idAttr $id {
-	    lappend idCols $attrOffsetMap($idAttr)
+	    lappend idCols [lsearch -exact $relAttrs $idAttr]
 	}
     }
 
@@ -597,6 +602,69 @@ proc ::ral::csvToFile {relValue fileName {sortAttr {}} {noheading 0}} {
     return
 }
 
+# If we have Tcl 8.5, then we can supply some "aggregate scalar functions" that
+# are useful and have "expr" syntax. If we don't have Tcl 8.5 then we
+# will define these in the "::ral" namespace and they will require
+# "proc" type syntax.
+set sfuncNS [expr {[package vsatisfies [package require Tcl] 8.5] ?\
+    "::tcl::mathfunc" : "::ral"}]
+# Count the number of tuples in a relation
+proc ${sfuncNS}::rcount {relation} {
+    return [::ral::relation cardinality $relation]
+}
+# Count the number of distinct values of an attribute in a relation
+proc ${sfuncNS}::rcountd {relation attr} {
+    return [::ral::relation cardinality\
+	[::ral::relation project $relation $attr]]
+}
+# Compute the sum over an attribute
+proc ${sfuncNS}::rsum {relation attr} {
+    set result 0
+    foreach v [::ral::relation list $relation $attr] {
+	incr result $v
+    }
+    return $result
+}
+# Compute the sum over the distinct values of an attribute.
+proc ${sfuncNS}::rsumd {relation attr} {
+    set result 0
+    ::ral::relation foreach v [::ral::relation list\
+	[::ral::relation project $relation $attr]] {
+	incr result $v
+    }
+    return $result
+}
+# Compute the average of the values of an attribute
+proc ${sfuncNS}::ravg {relation attr} {
+    return [expr {rsum($relation, $attr) / rcount($relation)}]
+}
+# Compute the average of the distinct values of an attribute
+proc ${sfuncNS}::ravgd {relation attr} {
+    return [expr {rsumd($relation, $attr) / rcount($relation)}]
+}
+# Compute the minimum. N.B. this does not handle "empty" relations properly.
+proc ${sfuncNS}::rmin {relation attr} {
+    set values [::ral::relation list $relation $attr]
+    set min [lindex $values 0]
+    foreach v [lrange $values 1 end] {
+	if {$v < $min} {
+	    set min $v
+	}
+    }
+    return $min
+}
+# Again, empty relations are not handled properly.
+proc ${sfuncNS}::rmax {relation attr} {
+    set values [::ral::relation list $relation $attr]
+    set max [lindex $values 0]
+    foreach v [lrange $values 1 end] {
+	if {$v > $max} {
+	    set max $v
+	}
+    }
+    return $max
+}
+
 # traverse via semijoins across constraints.
 # navigate relValue constraint relvarName ?-ref | -refto | <attr list>?
 # where "relValue" is a value of the same type as the value contained
@@ -793,6 +861,7 @@ proc ::ral::navigate {relValue constraintName relvarName {dir {}}} {
 # N.B. very experimental and mildly dangerous as it must delete the
 # relvar and recreate it along with the constraints.
 #
+if 0 {
 proc ::ral::alter {relvarName varName script} {
     # Get the resolved name
     set relvarName [relvar names $relvarName]
@@ -844,51 +913,6 @@ proc ::ral::alter {relvarName varName script} {
     }
     return [relvar set $relvarName]
 }
-
-# If we have Tcl 8.5, then we can supply some "scalar functions" that
-# are useful and have "expr" syntax
-if {[package vsatisfies [package require Tcl] 8.5]} {
-    # Count the number of tuples in a relation
-    proc ::tcl::mathfunc::rcount {relation} {
-	return [::ral::relation cardinality $relation]
-    }
-    # Count the number of distinct values of an attribute in a relation
-    proc ::tcl::mathfunc::rcountd {relation attr} {
-	return [::ral::relation cardinality\
-	    [::ral::relation project $relation $attr]]
-    }
-    # Compute the sum over an attribute
-    proc ::tcl::mathfunc::rsum {relation attr} {
-	set result 0
-	::ral::relation foreach r $relation {
-	    set result [expr {$result +\
-		[::ral::tuple extract [::ral::relation tuple $r] $attr]}]
-	}
-	return $result
-    }
-    # Compute the sum over the distinct values of an attribute.
-    proc ::tcl::mathfunc::rsumd {relation attr} {
-	set result 0
-	::ral::relation foreach v [::ral::relation list\
-	    [::ral::relation project $relation $attr]] {
-	    incr result $v
-	}
-	return $result
-    }
-    proc ::tcl::mathfunc::ravg {relation attr} {
-	return [expr {rsum($relation, $attr) / rcount($relation)}]
-    }
-    # Some redundancy here viz a viz "rsumd" but it saves computing the
-    # projection twice.
-    proc ::tcl::mathfunc::ravgd {relation attr} {
-	set result 0
-	set dvalues [::ral::relation list\
-	    [::ral::relation project $relation $attr]]
-	::ral::relation foreach v $dvalues {
-	    incr result $v
-	}
-	return [expr {$result / [llength $dvalues]}]
-    }
 }
 
 # PRIVATE PROCS

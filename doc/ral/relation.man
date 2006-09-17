@@ -45,8 +45,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.12 $
-# $Date: 2006/09/12 02:26:54 $
+# $Revision: 1.13 $
+# $Date: 2006/09/17 18:34:23 $
 #  *--
 }]
 [moddesc "Relation Operators"]
@@ -505,6 +505,13 @@ the values of the new attributes.
 +=========+---+-------------+-----------+
 }]
 
+[call [cmd "::ral::relation extract"] [arg relationValue]\
+    [arg attrName] [opt [arg "attrName2 ..."]]]
+
+The [cmd extract] subcommand is short hand for
+[cmd "tuple extract \[relation tuple [arg relationValue]\] [arg attrName] \?...\?"].
+This command obtains one or more attribute values from a relation that
+is of cardinality one.
 
 [call [cmd "::ral::relation foreach"] [arg relationVariable]\
     [arg relationValue] [opt "-ascending | -descending"] [opt attr-list]\

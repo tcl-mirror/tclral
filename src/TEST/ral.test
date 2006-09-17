@@ -50,15 +50,13 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.39 $
-# $Date: 2006/09/12 02:26:54 $
+# $Revision: 1.40 $
+# $Date: 2006/09/17 18:34:23 $
 #  *--
 
 package require tcltest 2.2
 eval tcltest::configure $argv
 
-global env
-set env(LD_LIBRARY_PATH) [file normalize ..]:/usr/local/ActiveTcl/lib
 set ::auto_path [linsert $::auto_path 0 [file normalize ..]]
 package require ral 0.8
 
@@ -75,23 +73,6 @@ if {[package vsatisfies [package require Tcl] 8.5]} {
     ::tcltest::testConstraint haveDict 1
 } elseif {![catch {package require dict}]} {
     ::tcltest::testConstraint haveDict 1
-}
-
-proc rcount {relation} {
-    return [::ral::relation cardinality $relation]
-}
-
-proc rsum {relation attr} {
-    set result 0
-    ::ral::relation foreach r $relation {
-	set t [::ral::relation tuple $r]
-	set result [expr {$result + [::ral::tuple extract $t $attr]}]
-    }
-    return $result
-}
-
-proc ravg {relation attr} {
-    return [expr {[rsum $relation $attr] / [rcount $relation]}]
 }
 
 namespace eval ::ral::test {
@@ -317,6 +298,20 @@ namespace eval ::ral::test {
 	tuple assign {Tuple {Name string Age int} {Name Andrew Age 20}} \
 	    {Name nm foo}
     } -result {bad list of pairs, "Name nm foo"} -returnCodes error
+
+    # tuple attributes subcommand
+    test tuple-attributes-1.0 {single attribute} -body {
+	tuple attributes [tuple create {Name string} {Name Andrew}]
+    } -result {Name}
+
+    test tuple-attributes-2.0 {multiple attributes} -body {
+	lsort [tuple attributes\
+	    [tuple create {Name string Age int} {Name Fred Age 20}]]
+    } -result {Age Name}
+
+    test tuple-attributes-3.0 {no attributes} -body {
+	tuple attributes [tuple create {} {}]
+    } -result {}
 
     # tuple create subcommand
     test tuple-create-1.0 {single attribute} -body {
@@ -1164,6 +1159,56 @@ namespace eval ::ral::test {
 	    {Name Fred Age 20}}}
 	relation extend $r1 t AgeInMonths int {[tuple extract $t foo] * 12}
     } -result {unknown attribute name, "foo"} -returnCodes error
+
+    # relation extract subcommand
+    test relation-extract-1.0 {single attribute} -body {
+	set t {
+	    Relation
+	    {Name string}
+	    Name
+	    {
+		{Name Andrew}
+	    }
+	}
+	relation extract $t Name
+    } -result {Andrew}
+
+    test relation-extract-2.0 {multiple attributes} -body {
+	set t {
+	    Relation
+	    {Name string Age int Size double}
+	    Name
+	    {
+		{Name Andrew Age 20 Size 1.3}
+	    }
+	}
+	relation extract $t Age Size
+    } -result {20 1.3}
+
+    test relation-extract-3.0 {unknown attribute} -body {
+	set t {
+	    Relation
+	    {Name string Age int Size double}
+	    Name
+	    {
+		{Name Andrew Age 20 Size 1.3}
+	    }
+	}
+	relation extract $t foo
+    } -result {unknown attribute name, "foo"} -returnCodes error
+
+    test relation-extract-4.0 {non-singular relation} -body {
+	set t {
+	    Relation
+	    {Name string Age int Size double}
+	    Name
+	    {
+		{Name Andrew Age 20 Size 1.3}
+		{Name Bob Age 30 Size 4.3}
+	    }
+	}
+	relation extract $t Size
+    } -result {relation must have cardinality of one, "Relation {Name string Age int Size double} Name {{Name Andrew Age 20 Size 1.3} {Name Bob Age 30 Size 4.3}}"} -returnCodes error
 
     # relation foreach subcommand
     test relation-foreach-1.0 {simple visit of suppliers} -body {
@@ -2680,7 +2725,9 @@ namespace eval ::ral::test {
     } -match relation
 
     # For tcl8.4
-    test relation-summarize-1.0.1 {count} -body {
+    test relation-summarize-1.0.1 {count} -constraints {
+	tcl8.4
+    } -body {
 	set p [relation project $P P#]
 	relation summarize $SP $p r Total int {[rsum $r "QTY"]}
     } -result {
@@ -2711,7 +2758,9 @@ namespace eval ::ral::test {
     } -match relation
 
     # For tcl8.4
-    test relation-summarize-2.0.1 {summarize per dee} -body {
+    test relation-summarize-2.0.1 {summarize per dee} -constraints {
+	tcl8.4
+    } -body {
 	relation summarize $SP $DEE r GrandTotal int {[rsum $r "QTY"]}
     } -result {
 	Relation
@@ -2736,7 +2785,9 @@ namespace eval ::ral::test {
     } -match relation
 
     # For tcl8.4
-    test relation-summarize-2.1.1 {summarize per dee, average} -body {
+    test relation-summarize-2.1.1 {summarize per dee, average} -constraints {
+	tcl8.4
+    } -body {
 	relation summarize $SP $DEE r GrandAvg int {[ravg $r "QTY"]}
     } -result {
 	Relation
@@ -2761,7 +2812,9 @@ namespace eval ::ral::test {
     } -match relation
 
     # For tcl8.4
-    test relation-summarize-2.2.1 {summarize per dee, average} -body {
+    test relation-summarize-2.2.1 {summarize per dee, average} -constraints {
+	tcl8.4
+    } -body {
 	relation summarize $OWNER $DEE r AverageAge int {[ravg $r "Age"]}
     } -result {
 	Relation
