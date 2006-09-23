@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.16 $
-$Date: 2006/09/10 18:22:59 $
+$Revision: 1.17 $
+$Date: 2006/09/23 18:09:14 $
  *--
  */
 
@@ -123,7 +123,7 @@ static struct {
 } ;
 static const char specErrMsg[] = "multiplicity specification" ;
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.16 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.17 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -407,7 +407,7 @@ Ral_RelvarObjCreateAssoc(
      */
     if (elemc1 != elemc2) {
 	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptAssociation,
-	    RELVAR_REFATTR_MISMATCH, objv[5]) ;
+	    RAL_ERR_REFATTR_MISMATCH, objv[5]) ;
 	return TCL_ERROR ;
     }
 
@@ -858,12 +858,12 @@ Ral_RelvarObjCreateCorrelation(
      */
     if (elemc1 != elemcC1) {
 	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptCorrelation,
-	    RELVAR_REFATTR_MISMATCH, objv[5]) ;
+	    RAL_ERR_REFATTR_MISMATCH, objv[5]) ;
 	return TCL_ERROR ;
     }
     if (elemc2 != elemcC2) {
 	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptCorrelation,
-	    RELVAR_REFATTR_MISMATCH, objv[9]) ;
+	    RAL_ERR_REFATTR_MISMATCH, objv[9]) ;
 	return TCL_ERROR ;
     }
 

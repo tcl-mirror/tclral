@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_utils.c,v $
-$Revision: 1.8 $
-$Date: 2006/07/25 04:13:51 $
+$Revision: 1.9 $
+$Date: 2006/09/23 18:09:14 $
  *--
  */
 
@@ -87,7 +87,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_utils.c,v $ $Revision: 1.8 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_utils.c,v $ $Revision: 1.9 $" ;
 
 static char const * const cmdStrings[] = {
     "unknown command",
@@ -202,6 +202,7 @@ static char const * const resultStrings[] = {
     "operation is not allowed during \"eval\" command",
     "a super set relvar may not be named as one of its own sub sets",
     "correlation spec is not available for a \"-complete\" correlation",
+    "recursively invoking a relvar command outside of a transaction",
 } ;
 
 static char const * const errorStrings[] = {
@@ -249,6 +250,7 @@ static char const * const errorStrings[] = {
     "BAD_TRANS_OP",
     "SUPER_NAME",
     "INCOMPLETE_SPEC",
+    "ONGOING_CMD",
 } ;
 /*
 FUNCTION DEFINITIONS

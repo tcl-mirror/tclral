@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.h,v $
-$Revision: 1.6 $
-$Date: 2006/07/25 04:13:51 $
+$Revision: 1.7 $
+$Date: 2006/09/23 18:09:14 $
  *--
  */
 #ifndef _ral_relvar_h_
@@ -144,28 +144,8 @@ typedef struct Ral_RelvarInfo {
 } *Ral_RelvarInfo ;
 
 /*
- * Order here is important!
- * These enumerators are used as an array index in Ral_RelationObjSetError()
- */
-typedef enum Ral_RelvarError {
-    RELVAR_OK = 0,
-    RELVAR_DUP_NAME,
-    RELVAR_UNKNOWN_NAME,
-    RELVAR_HEADING_MISMATCH,
-    RELVAR_REFATTR_MISMATCH,
-    RELVAR_DUP_CONSTRAINT,
-    RELVAR_NOT_ID,
-    RELVAR_UNKNOWN_CONSTRAINT,
-    RELVAR_CONSTRAINTS_PRESENT,
-    RELVAR_BAD_MULT,
-    RELVAR_BAD_TRANS_OP,
-    RELVAR_BAD_PAIRS_LIST,
-} Ral_RelvarError ;
-
-/*
 DATA DECLARATIONS
 */
-extern Ral_RelvarError Ral_RelvarLastError ;
 
 /*
 FUNCTION DECLARATIONS
@@ -186,7 +166,7 @@ extern int Ral_RelvarEndTransaction(Ral_RelvarInfo, int, Tcl_DString *) ;
 extern int Ral_RelvarIsTransOnGoing(Ral_RelvarInfo) ;
 extern int Ral_RelvarTransModifiedRelvar(Ral_RelvarInfo, Ral_Relvar) ;
 
-extern void Ral_RelvarStartCommand(Ral_RelvarInfo, Ral_Relvar) ;
+extern int Ral_RelvarStartCommand(Ral_RelvarInfo, Ral_Relvar) ;
 extern int Ral_RelvarEndCommand(Ral_RelvarInfo, int, Tcl_DString *) ;
 
 extern Ral_RelvarTransaction Ral_RelvarNewTransaction(void) ;

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_utils.h,v $
-$Revision: 1.6 $
-$Date: 2006/07/25 04:13:51 $
+$Revision: 1.7 $
+$Date: 2006/09/23 18:09:14 $
  *--
  */
 #ifndef _ral_utils_h_
@@ -185,6 +185,7 @@ typedef enum {
     RAL_ERR_BAD_TRANS_OP,
     RAL_ERR_SUPER_NAME,
     RAL_ERR_INCOMPLETE_SPEC,
+    RAL_ERR_ONGOING_CMD,
 } Ral_ErrorCode ;
 
 typedef struct Ral_ErrorInfo {

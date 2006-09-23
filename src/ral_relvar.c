@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.c,v $
-$Revision: 1.9 $
-$Date: 2006/07/30 23:45:56 $
+$Revision: 1.10 $
+$Date: 2006/09/23 18:09:14 $
  *--
  */
 
@@ -110,7 +110,6 @@ EXTERNAL DATA REFERENCES
 /*
 EXTERNAL DATA DEFINITIONS
 */
-Ral_RelvarError Ral_RelvarLastError = RELVAR_OK ;
 
 /*
 STATIC DATA ALLOCATION
@@ -119,7 +118,7 @@ static char const * const condMultStrings[2][2] = {
     {"1", "+"},
     {"?", "*"}
 } ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.9 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.10 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -146,11 +145,6 @@ Ral_RelvarNew(
 	relvar->transStack = Ral_PtrVectorNew(1) ;
 	relvar->constraints = Ral_PtrVectorNew(0) ;
 	Tcl_SetHashValue(entry, relvar) ;
-    } else {
-	/*
-	 * Duplicate name.
-	 */
-	Ral_RelvarLastError = RELVAR_DUP_NAME ;
     }
 
     return relvar ;
@@ -321,22 +315,47 @@ Ral_RelvarIsTransOnGoing(
     return Ral_PtrVectorSize(info->transactions) > 0 ;
 }
 
-void
+/*
+ * Start a relvar command. This keeps track of transactions and deals
+ * with transactions vs. single isolated commands.
+ * Returns 1 if the command is started, 0 otherwise.
+ */
+int
 Ral_RelvarStartCommand(
     Ral_RelvarInfo info,
     Ral_Relvar relvar)
 {
     Ral_RelvarTransaction currTrans ;
+
+    /*
+     * If there is no ongoing transaction, then start a single command
+     * transaction.
+     */
     if (Ral_PtrVectorSize(info->transactions) == 0) {
 	Ral_RelvarStartTransaction(info, 1) ;
+	currTrans = Ral_PtrVectorBack(info->transactions) ;
+    } else {
+	/*
+	 * Otherwise, check if the current transaction is a single command.
+	 * If so, then then we are recursively trying to run relvar commands
+	 * outside of a "relvar eval". This can happen if a "relvar update"
+	 * script runs another relvar command, for example.
+	 */
+	currTrans = Ral_PtrVectorBack(info->transactions) ;
+	if (currTrans->isSingleCmd) {
+	    return 0 ;
+	}
     }
-    assert(Ral_PtrVectorSize(info->transactions) > 0) ;
-    currTrans = Ral_PtrVectorBack(info->transactions) ;
-    int added = Ral_RelvarTransModifiedRelvar(info, relvar) ;
-    if (added) {
+    /*
+     * If we are starting a command on a relvar that is not already part of the
+     * transaction, then we must save its value so that it can be restored at
+     * the end of the transaction if necessary.
+     */
+    if (Ral_RelvarTransModifiedRelvar(info, relvar)) {
 	Ral_Relation rel = relvar->relObj->internalRep.otherValuePtr ;
 	Ral_PtrVectorPushBack(relvar->transStack, Ral_RelationDup(rel)) ;
     }
+    return 1 ;
 }
 
 int

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.19 $
-$Date: 2006/09/10 18:22:59 $
+$Revision: 1.20 $
+$Date: 2006/09/23 18:09:14 $
  *--
  */
 
@@ -114,7 +114,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.19 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.20 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -383,10 +383,15 @@ RelvarDeleteCmd(
     }
     relation = relvar->relObj->internalRep.otherValuePtr ;
 
+    if (!Ral_RelvarStartCommand(rInfo, relvar)) {
+	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptDelete,
+	    RAL_ERR_ONGOING_CMD, objv[2]) ;
+	return TCL_ERROR ;
+    }
+
     Tcl_IncrRefCount(tupleNameObj = objv[3]) ;
     Tcl_IncrRefCount(exprObj = objv[4]) ;
 
-    Ral_RelvarStartCommand(rInfo, relvar) ;
     for (rIter = Ral_RelationBegin(relation) ;
 	    rIter != Ral_RelationEnd(relation) ;) {
 	int boolValue ;
@@ -469,7 +474,12 @@ RelvarDeleteOneCmd(
     if (key == NULL) {
 	return TCL_ERROR ;
     }
-    Ral_RelvarStartCommand(rInfo, relvar) ;
+
+    if (!Ral_RelvarStartCommand(rInfo, relvar)) {
+	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptDeleteone,
+	    RAL_ERR_ONGOING_CMD, objv[2]) ;
+	return TCL_ERROR ;
+    }
     deleted = Ral_RelationEraseTuple(relation, idNum, key, NULL) ;
     Ral_TupleDelete(key) ;
 
@@ -551,11 +561,16 @@ RelvarInsertCmd(
     }
     relation = relvar->relObj->internalRep.otherValuePtr ;
 
+    if (!Ral_RelvarStartCommand(rInfo, relvar)) {
+	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptInsert,
+	    RAL_ERR_ONGOING_CMD, objv[2]) ;
+	return TCL_ERROR ;
+    }
+
     Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelvar, Ral_OptInsert) ;
     objc -= 3 ;
     objv += 3 ;
 
-    Ral_RelvarStartCommand(rInfo, relvar) ;
     Ral_RelationReserve(relation, objc) ;
     while (objc-- > 0) {
 	if (Ral_RelationInsertTupleObj(relation, interp, *objv++, &errInfo)
@@ -719,7 +734,12 @@ RelvarSetCmd(
 	    return TCL_ERROR ;
 	}
 
-	Ral_RelvarStartCommand(rInfo, relvar) ;
+	if (!Ral_RelvarStartCommand(rInfo, relvar)) {
+	    Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptSet,
+		RAL_ERR_ONGOING_CMD, objv[2]) ;
+	    return TCL_ERROR ;
+	}
+
 	Ral_RelvarSetRelation(relvar, relation) ;
 	Tcl_InvalidateStringRep(relvar->relObj) ;
 	relvar->relObj->length = 0 ;
@@ -795,11 +815,15 @@ RelvarUpdateCmd(
     }
     relation = relvar->relObj->internalRep.otherValuePtr ;
 
+    if (!Ral_RelvarStartCommand(rInfo, relvar)) {
+	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptUpdate,
+	    RAL_ERR_ONGOING_CMD, objv[2]) ;
+	return TCL_ERROR ;
+    }
+
     Tcl_IncrRefCount(tupleVarNameObj = objv[3]) ;
     Tcl_IncrRefCount(exprObj = objv[4]) ;
     Tcl_IncrRefCount(scriptObj = objv[5]) ;
-
-    Ral_RelvarStartCommand(rInfo, relvar) ;
 
     rEnd = Ral_RelationEnd(relation) ;
     for (rIter = Ral_RelationBegin(relation) ; rIter != rEnd ; ++rIter) {
@@ -930,7 +954,11 @@ RelvarUpdateOneCmd(
 	Tcl_Obj *tupleVarNameObj = objv[3] ;
 	Tcl_Obj *tupleObj ;
 
-	Ral_RelvarStartCommand(rInfo, relvar) ;
+	if (!Ral_RelvarStartCommand(rInfo, relvar)) {
+	    Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptUpdateone,
+		RAL_ERR_ONGOING_CMD, objv[2]) ;
+	    return TCL_ERROR ;
+	}
 
 	/*
 	 * Clone the tuple into a Tcl object and store it into the
@@ -940,7 +968,7 @@ RelvarUpdateOneCmd(
 	if (Tcl_ObjSetVar2(interp, tupleVarNameObj, NULL, tupleObj,
 	    TCL_LEAVE_ERR_MSG) == NULL) {
 	    Tcl_DecrRefCount(tupleObj) ;
-	    result = TCL_ERROR ;
+	    return TCL_ERROR ;
 	}
 	/*
 	 * Evaluate the script and update the relvar with
