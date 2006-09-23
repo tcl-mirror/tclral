@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationheading.c,v $
-$Revision: 1.15 $
-$Date: 2006/09/06 02:19:54 $
+$Revision: 1.16 $
+$Date: 2006/09/23 19:37:23 $
  *--
  */
 
@@ -77,6 +77,9 @@ EXTERNAL FUNCTION REFERENCES
 /*
 FORWARD FUNCTION REFERENCES
 */
+static int Ral_IsIdASubsetOf(Ral_RelationHeading, Ral_IntVector) ;
+static int Ral_IsForeignIdASubsetOf(Ral_RelationHeading, Ral_RelationHeading,
+    Ral_IntVector) ;
 
 /*
 EXTERNAL DATA REFERENCES
@@ -89,7 +92,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.15 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.16 $" ;
 
 static const char relationKeyword[] = "Relation" ;
 static const char openList = '{' ;
@@ -475,38 +478,24 @@ Ral_RelationHeadingAddIdentifier(
     int idNum,
     Ral_IntVector id)
 {
-    int idCount = heading->idCount ;
-    Ral_IntVector *idArray = heading->identifiers ;
+    int result = 0 ;
 
     assert (idNum < heading->idCount) ;
     assert (heading->identifiers[idNum] == NULL) ;
     /*
-     * Make sure the identifier is in canonical order.
+     * Check if the identifier is not a subset of an existing one.
      */
-    Ral_IntVectorSort(id) ;
-    /*
-     * Only add the identifier if it is not a subset of an existing identifier
-     * or it is not a super set of an existing identifier. So we iterate
-     * through the identifiers of the heading and make sure that the new one is
-     * not equal to or a subset of an existing identifier.
-     */
-    while (idCount-- > 0) {
-	Ral_IntVector headingId = *idArray++ ;
-
-	if (headingId &&
-	    (Ral_IntVectorSubsetOf(id, headingId) ||
-	     Ral_IntVectorSubsetOf(headingId, id))) {
-	    return 0 ;
+    if (!Ral_IsIdASubsetOf(heading, id)) {
+	/*
+	 * Take possession of the identifier vector.
+	 */
+	if (heading->identifiers[idNum]) {
+	    Ral_IntVectorDelete(heading->identifiers[idNum]) ;
 	}
+	heading->identifiers[idNum] = id ;
+	result = 1 ;
     }
-    /*
-     * Take possession of the identifier vector.
-     */
-    if (heading->identifiers[idNum]) {
-	Ral_IntVectorDelete(heading->identifiers[idNum]) ;
-    }
-    heading->identifiers[idNum] = id ;
-    return 1 ;
+    return result ;
 }
 
 /*
@@ -664,7 +653,7 @@ Ral_RelationHeadingJoin(
 	Ral_TupleHeadingEnd(h1TupleHeading), joinTupleHeading) ;
     assert(status != 0) ;
     /*
-     * The tuple heading contains all the attributes of the second relations
+     * The tuple heading contains all the attributes of the second relation
      * except those that are used in the join. So create a vector that
      * contains a boolean that indicates whether or not a given attribute
      * index is contained in the join map and use that determine which
@@ -729,30 +718,42 @@ Ral_RelationHeadingJoin(
 	    Ral_IntVectorCopy(h1Id, Ral_IntVectorBegin(h1Id),
 		Ral_IntVectorEnd(h1Id), joinId, Ral_IntVectorBegin(joinId)) ;
 	    /*
-	     * The identifier indices from the second header must
-	     * be corrected for the place where the attributes will end up.
-	     * If the identifier is to be eliminated, the we have to find
-	     * the corresponding attribute in the first relation.
+	     * If the identifier in the second relation is a subset of
+	     * an identifier in the first relation, then it cannot contribute
+	     * to the identification of the join. The complication is that
+	     * we must transform the attribute indices of the identifier
+	     * to be relative to those of the first relation.
+	     * HERE
 	     */
-	    for (h2IdIter = Ral_IntVectorBegin(h2Id) ; h2IdIter != h2IdEnd ;
-		++h2IdIter) {
-		Ral_IntVectorValueType index = Ral_IntVectorFetch(h2JoinAttrs,
-		    *h2IdIter) ;
-		if (index >= 0) {
-		    Ral_IntVectorPushBack(joinId, index) ;
-		} else {
-		    /*
-		     * Identifier in the second relation is to be eliminated.
-		     * Find its corresponding attribute in the first and
-		     * it will become an identifier (if it is not already).
-		     */
-		    int attrInr1 = Ral_JoinMapFindAttr(map, 1, *h2IdIter) ;
-		    assert(attrInr1 != -1) ;
-		    /*
-		     * Add the corresponding attribute in r1 in a set fashion
-		     * in case it is already part of this identifier.
-		     */
-		    Ral_IntVectorSetAdd(joinId, attrInr1) ;
+	    if (!Ral_IsForeignIdASubsetOf(h1, h2, h2Id)) {
+		/*
+		 * The identifier indices from the second header must
+		 * be corrected for the place where the attributes will end up.
+		 * If the identifier is to be eliminated, the we have to find
+		 * the corresponding attribute in the first relation.
+		 */
+		for (h2IdIter = Ral_IntVectorBegin(h2Id) ; h2IdIter != h2IdEnd ;
+		    ++h2IdIter) {
+		    Ral_IntVectorValueType index =
+			Ral_IntVectorFetch(h2JoinAttrs, *h2IdIter) ;
+		    if (index >= 0) {
+			Ral_IntVectorPushBack(joinId, index) ;
+		    } else {
+			/*
+			 * Identifier in the second relation is to be
+			 * eliminated.  Find its corresponding attribute in the
+			 * first and it will become an identifier (if it is not
+			 * already).
+			 */
+			int attrInr1 = Ral_JoinMapFindAttr(map, 1, *h2IdIter) ;
+			assert(attrInr1 != -1) ;
+			/*
+			 * Add the corresponding attribute in r1 in a set
+			 * fashion in case it is already part of this
+			 * identifier.
+			 */
+			Ral_IntVectorSetAdd(joinId, attrInr1) ;
+		    }
 		}
 	    }
 	    /*
@@ -962,4 +963,76 @@ const char *
 Ral_RelationHeadingVersion(void)
 {
     return rcsid ;
+}
+
+/*
+ * PRIVATE FUNCTIONS
+ */
+
+static int
+Ral_IsIdASubsetOf(
+    Ral_RelationHeading heading,
+    Ral_IntVector id)
+{
+    int idCount = heading->idCount ;
+    Ral_IntVector *idArray = heading->identifiers ;
+
+    /*
+     * Make sure the identifier is in canonical order.
+     */
+    Ral_IntVectorSort(id) ;
+    /*
+     * Iterate through the identifiers of the heading and make sure that the
+     * given one is not equal to or a subset of an existing identifier.
+     */
+    while (idCount-- > 0) {
+	Ral_IntVector headingId = *idArray++ ;
+
+	if (headingId &&
+	    (Ral_IntVectorSubsetOf(id, headingId) ||
+	     Ral_IntVectorSubsetOf(headingId, id))) {
+	    return 1 ;
+	}
+    }
+    return 0 ;
+}
+
+static int
+Ral_IsForeignIdASubsetOf(
+    Ral_RelationHeading h1,
+    Ral_RelationHeading h2,
+    Ral_IntVector h2Id)
+{
+    Ral_IntVectorIter id2Iter ;
+    Ral_IntVectorIter id2End = Ral_IntVectorEnd(h2Id) ;
+    Ral_IntVector h1Id = Ral_IntVectorNew(Ral_IntVectorSize(h2Id), -1) ;
+    Ral_IntVectorIter h1Iter = Ral_IntVectorBegin(h1Id) ;
+    Ral_TupleHeading th1 = h1->tupleHeading ;
+    Ral_TupleHeading th2 = h2->tupleHeading ;
+    int isSubset ;
+
+    /*
+     * Loop through the indices of the id, find the attribute name
+     * and look up that attribute in h1. If the attribute is not found,
+     * then the id cannot possibly be a subset of an id in h1.
+     */
+    for (id2Iter = Ral_IntVectorBegin(h2Id) ; id2Iter != id2End ; ++id2Iter) {
+	Ral_Attribute h2Attr = Ral_TupleHeadingFetch(th2, *id2Iter) ;
+	int h1Index = Ral_TupleHeadingIndexOf(th1, h2Attr->name) ;
+
+	if (h1Index >= 0) {
+	    *h1Iter++ = h1Index ;
+	} else {
+	    Ral_IntVectorDelete(h1Id) ;
+	    return 0 ;
+	}
+    }
+    /*
+     * At this point, h1Id contains the attribute indices of the identifier
+     * relative to "h1". Now we need to find out if this is a subset of
+     * any of the identifiers of h1.
+     */
+    isSubset = Ral_IsIdASubsetOf(h1, h1Id) ;
+    Ral_IntVectorDelete(h1Id) ;
+    return isSubset ;
 }

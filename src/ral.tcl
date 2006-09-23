@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.24 $
-# $Date: 2006/09/17 18:34:23 $
+# $Revision: 1.25 $
+# $Date: 2006/09/23 19:37:23 $
 #  *--
 
 namespace eval ::ral {
@@ -634,13 +634,24 @@ proc ${sfuncNS}::rsumd {relation attr} {
     }
     return $result
 }
-# Compute the average of the values of an attribute
-proc ${sfuncNS}::ravg {relation attr} {
-    return [expr {rsum($relation, $attr) / rcount($relation)}]
-}
-# Compute the average of the distinct values of an attribute
-proc ${sfuncNS}::ravgd {relation attr} {
-    return [expr {rsumd($relation, $attr) / rcount($relation)}]
+if {[package vsatisfies [package require Tcl] 8.5]} {
+    # Compute the average of the values of an attribute
+    proc ${sfuncNS}::ravg {relation attr} {
+	return [expr {rsum($relation, $attr) / rcount($relation)}]
+    }
+    # Compute the average of the distinct values of an attribute
+    proc ${sfuncNS}::ravgd {relation attr} {
+	return [expr {rsumd($relation, $attr) / rcount($relation)}]
+    }
+} else {
+    # Compute the average of the values of an attribute
+    proc ${sfuncNS}::ravg {relation attr} {
+	return [expr {[rsum $relation $attr] / [rcount $relation]}]
+    }
+    # Compute the average of the distinct values of an attribute
+    proc ${sfuncNS}::ravgd {relation attr} {
+	return [expr {[rsumd $relation $attr] / [rcount $relation]}]
+    }
 }
 # Compute the minimum. N.B. this does not handle "empty" relations properly.
 proc ${sfuncNS}::rmin {relation attr} {

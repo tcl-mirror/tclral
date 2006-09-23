@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.40 $
-# $Date: 2006/09/17 18:34:23 $
+# $Revision: 1.41 $
+# $Date: 2006/09/23 19:37:23 $
 #  *--
 
 package require tcltest 2.2
@@ -71,8 +71,13 @@ proc relationMatch {expected actual} {
 if {[package vsatisfies [package require Tcl] 8.5]} {
     ::tcltest::testConstraint tcl8.5 1
     ::tcltest::testConstraint haveDict 1
-} elseif {![catch {package require dict}]} {
-    ::tcltest::testConstraint haveDict 1
+} elseif {[package vsatisfies [package require Tcl] 8.4]} {
+    ::tcltest::testConstraint tcl8.4 1
+    if {![catch {package require dict}]} {
+	::tcltest::testConstraint haveDict 1
+    }
+} else {
+    error "TclRAL has only been tested against Tcl 8.4 and 8.5"
 }
 
 namespace eval ::ral::test {

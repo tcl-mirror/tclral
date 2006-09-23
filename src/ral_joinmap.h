@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_joinmap.h,v $
-$Revision: 1.5 $
-$Date: 2006/07/11 02:04:31 $
+$Revision: 1.6 $
+$Date: 2006/09/23 19:37:23 $
  *--
  */
 #ifndef _ral_joinmap_h_
@@ -77,6 +77,15 @@ typedef int Ral_JoinMapComponentType ;
 
 /*
  * Each mapping element is just a pair of integers.
+ *
+ * For attributes the join map holds a vector of integer pairs.
+ * The pairs represent mapping of an attribute index in the first
+ * relation to an attribute index in the second relation. This is
+ * one of the "join attributes".
+ *
+ * For tuples, the join map holds a vector of integer pairs also.
+ * The pairs represent the mapping of a tuple in the first relation
+ * that matches a tuple in the second relation across the join attributes.
  */
 #define MAP_ELEMENT_COUNT 2
 typedef struct {
