@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.21 $
-$Date: 2006/09/12 02:26:54 $
+$Revision: 1.22 $
+$Date: 2006/09/24 16:49:00 $
  *--
  */
 
@@ -116,7 +116,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.21 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.22 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -395,9 +395,7 @@ Ral_RelationUnion(
     /*
      * Headings must be equal to perform a union.
      */
-    if (!Ral_RelationHeadingEqual(r1->heading, r2->heading)) {
-	Ral_ErrorInfoSetError(errInfo, RAL_ERR_HEADING_NOT_EQUAL,
-	    "while computing union") ;
+    if (!Ral_RelationHeadingMatch(r1->heading, r2->heading, errInfo)) {
 	return NULL ;
     }
     unionRel = Ral_RelationNew(r1->heading) ;
@@ -439,9 +437,7 @@ Ral_RelationIntersect(
     /*
      * Headings must be equal to perform a union.
      */
-    if (!Ral_RelationHeadingEqual(r1->heading, r2->heading)) {
-	Ral_ErrorInfoSetError(errInfo, RAL_ERR_HEADING_NOT_EQUAL,
-	    "while computing intersection") ;
+    if (!Ral_RelationHeadingMatch(r1->heading, r2->heading, errInfo)) {
 	return NULL ;
     }
     /*
@@ -487,9 +483,7 @@ Ral_RelationMinus(
     /*
      * Headings must be equal to perform a union.
      */
-    if (!Ral_RelationHeadingEqual(r1->heading, r2->heading)) {
-	Ral_ErrorInfoSetError(errInfo, RAL_ERR_HEADING_NOT_EQUAL,
-	    "while computing difference") ;
+    if (!Ral_RelationHeadingMatch(r1->heading, r2->heading, errInfo)) {
 	return NULL ;
     }
     /*

@@ -50,15 +50,13 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.22 $
-# $Date: 2006/08/13 23:14:58 $
+# $Revision: 1.23 $
+# $Date: 2006/09/24 16:49:00 $
 #  *--
 
 package require tcltest 2.2
 eval tcltest::configure $argv
 
-global env
-set env(LD_LIBRARY_PATH) [file normalize ..]:/usr/local/ActiveTcl/lib
 set ::auto_path [linsert $::auto_path 0 [file normalize ..]]
 package require ral 0.8
 
@@ -70,55 +68,16 @@ proc relationMatch {expected actual} {
     return [::ral::relation is $expected == $actual]
 }
 
-proc dictMatch {expected actual} {
-    if {[dict size $expected] != [dict size $actual]} {
-	return 0
-    }
-    dict for {exKey exVal} $expected {
-	if {[dict get $actual $exKey] != $exVal} {
-	    return 0
-	}
-    }
-    return 1
-}
-
 if {[package vsatisfies [package require Tcl] 8.5]} {
     ::tcltest::testConstraint tcl8.5 1
-    proc ::tcl::mathfunc::rcount {relation} {
-	return [::ral::relation cardinality $relation]
-    }
-
-    proc ::tcl::mathfunc::rsum {relation attr} {
-	set result 0
-	::ral::relation foreach r $relation {
-	    set t [::ral::relation tuple $r]
-	    set result [expr {$result + [::ral::tuple extract $t $attr]}]
-	}
-	return $result
-    }
-
-    proc ::tcl::mathfunc::ravg {relation attr} {
-	return [expr {rsum($relation, $attr) / rcount($relation)}]
+    ::tcltest::testConstraint haveDict 1
+} elseif {[package vsatisfies [package require Tcl] 8.4]} {
+    ::tcltest::testConstraint tcl8.4 1
+    if {![catch {package require dict}]} {
+	::tcltest::testConstraint haveDict 1
     }
 } else {
-    package require dict
-}
-
-proc rcount {relation} {
-    return [::ral::relation cardinality $relation]
-}
-
-proc rsum {relation attr} {
-    set result 0
-    ::ral::relation foreach r $relation {
-	set t [::ral::relation tuple $r]
-	set result [expr {$result + [::ral::tuple extract $t $attr]}]
-    }
-    return $result
-}
-
-proc ravg {relation attr} {
-    return [expr {[rsum $relation $attr] / [rcount $relation]}]
+    error "TclRAL has only been tested against Tcl 8.4 and 8.5"
 }
 
 namespace eval ::ral::test {
@@ -127,6 +86,21 @@ namespace eval ::ral::test {
 
     customMatch tuple tupleMatch
     customMatch relation relationMatch
+    if {[::tcltest::testConstraint haveDict]} {
+	proc ::dictMatch {expected actual} {
+	    if {[dict size $expected] != [dict size $actual]} {
+		return 0
+	    }
+	    dict for {exKey exVal} $expected {
+		if {[dict get $actual $exKey] != $exVal} {
+		    return 0
+		}
+	    }
+	    return 1
+	}
+    } else {
+	proc ::dictMatch {expected actual} {return 0}
+    }
     customMatch dict dictMatch
 
     set DEE {Relation {} {{}} {{}}}
@@ -309,6 +283,41 @@ namespace eval ::ral::test {
 	tuple assign {Tuple {} {}}
     } -result 0
 
+    test tuple-assign-4.0 {assign only some of attributes} -body {
+	set n [tuple assign {Tuple {Name string Age int} {Name Andrew Age 20}} \
+	    Name]
+	expr {$Name eq "Andrew" && $n == 1}
+    } -result 1
+
+    test tuple-assign-5.0 {assign to different named variable} -body {
+	set n [tuple assign {Tuple {Name string Age int} {Name Andrew Age 20}} \
+	    {Name nm}]
+	expr {$nm eq "Andrew" && $n == 1}
+    } -result 1
+
+    test tuple-assign-6.0 {error, no attribute} -body {
+	tuple assign {Tuple {Name string Age int} {Name Andrew Age 20}} foo
+    } -result {unknown attribute name, "foo"} -returnCodes error
+
+    test tuple-assign-6.1 {error, bad attr-var-name list} -body {
+	tuple assign {Tuple {Name string Age int} {Name Andrew Age 20}} \
+	    {Name nm foo}
+    } -result {bad list of pairs, "Name nm foo"} -returnCodes error
+
+    # tuple attributes subcommand
+    test tuple-attributes-1.0 {single attribute} -body {
+	tuple attributes [tuple create {Name string} {Name Andrew}]
+    } -result {Name}
+
+    test tuple-attributes-2.0 {multiple attributes} -body {
+	lsort [tuple attributes\
+	    [tuple create {Name string Age int} {Name Fred Age 20}]]
+    } -result {Age Name}
+
+    test tuple-attributes-3.0 {no attributes} -body {
+	tuple attributes [tuple create {} {}]
+    } -result {}
+
     # tuple create subcommand
     test tuple-create-1.0 {single attribute} -body {
 	tuple create {Name string} {Name Andrew}
@@ -432,28 +441,28 @@ namespace eval ::ral::test {
     # tuple extend subcommand
     test tuple-extend-1.0 {single attribute} -body {
 	set t {Tuple {Name string} {Name Andrew}}
-	tuple extend $t {Age int 20}
+	tuple extend $t Age int 20
     } -result {Tuple {Name string Age int} {Name Andrew Age 20}} -match tuple
 
     test tuple-extend-2.0 {multiple attributes} -body {
 	set t {Tuple {Name string} {Name Andrew}}
-	tuple extend $t {Age int 20} {Size double 1.3}
+	tuple extend $t Age int 20 Size double 1.3
     } -result {Tuple {Name string Age int Size double}\
 	{Name Andrew Age 20 Size 1.3}} -match tuple
 
     test tuple-extend-3.0 {duplicate name} -body {
 	set t {Tuple {Name string} {Name Andrew}}
-	tuple extend $t {Name int 20}
+	tuple extend $t Name int 20
     } -result {duplicate attribute name, "Name"} -returnCodes error
 
     test tuple-extend-4.0 {bad value} -body {
 	set t {Tuple {Name string} {Name Andrew}}
-	tuple extend $t {Age int foo}
+	tuple extend $t Age int foo
     } -result {bad value type for value, "foo"} -returnCodes error
 
     test tuple-extend-5.0 {bad type} -body {
 	set t {Tuple {Name string} {Name Andrew}}
-	tuple extend $t {Age foo foo}
+	tuple extend $t Age foo foo
     } -result {unknown data type, "foo"} -returnCodes error
 
     # tuple extract subcommand
@@ -871,7 +880,9 @@ namespace eval ::ral::test {
     } -result {unknown attribute name, "a4"} -returnCodes error
 
     # relation array subcommand
-    test relation-array-1.0 {supplier number / city map} -body {
+    test relation-array-1.0 {supplier number / city map} -constraints {
+	haveDict
+    } -body {
 	relation array [relation project $S S# CITY] smap
 	array get smap
     } -cleanup {
@@ -883,6 +894,23 @@ namespace eval ::ral::test {
 	    S4 London
 	    S5 Athens
     } -match dict
+
+    # relation assign subcommand
+    test relation-assign-1.0 {assign all attributes} -body {
+	relation assign [relation choose $S S# S1]
+	expr {${S#} eq "S1" && $SNAME eq "Smith" && $STATUS == 20 &&\
+	    $CITY eq "London"}
+    } -result 1
+
+    test relation-assign-2.0 {assign some attributes} -body {
+	relation assign [relation choose $S S# S1] SNAME
+	expr {$SNAME eq "Smith"}
+    } -result 1
+
+    test relation-assign-3.0 {assign attributes to different var name} -body {
+	relation assign [relation choose $S S# S1] {SNAME name}
+	expr {$name eq "Smith"}
+    } -result 1
 
     # relation attributes subcommand
     test relation-attributes-1.0 {DOG relation} -body {
@@ -1136,6 +1164,56 @@ namespace eval ::ral::test {
 	    {Name Fred Age 20}}}
 	relation extend $r1 t AgeInMonths int {[tuple extract $t foo] * 12}
     } -result {unknown attribute name, "foo"} -returnCodes error
+
+    # relation extract subcommand
+    test relation-extract-1.0 {single attribute} -body {
+	set t {
+	    Relation
+	    {Name string}
+	    Name
+	    {
+		{Name Andrew}
+	    }
+	}
+	relation extract $t Name
+    } -result {Andrew}
+
+    test relation-extract-2.0 {multiple attributes} -body {
+	set t {
+	    Relation
+	    {Name string Age int Size double}
+	    Name
+	    {
+		{Name Andrew Age 20 Size 1.3}
+	    }
+	}
+	relation extract $t Age Size
+    } -result {20 1.3}
+
+    test relation-extract-3.0 {unknown attribute} -body {
+	set t {
+	    Relation
+	    {Name string Age int Size double}
+	    Name
+	    {
+		{Name Andrew Age 20 Size 1.3}
+	    }
+	}
+	relation extract $t foo
+    } -result {unknown attribute name, "foo"} -returnCodes error
+
+    test relation-extract-4.0 {non-singular relation} -body {
+	set t {
+	    Relation
+	    {Name string Age int Size double}
+	    Name
+	    {
+		{Name Andrew Age 20 Size 1.3}
+		{Name Bob Age 30 Size 4.3}
+	    }
+	}
+	relation extract $t Size
+    } -result {relation must have cardinality of one, "Relation {Name string Age int Size double} Name {{Name Andrew Age 20 Size 1.3} {Name Bob Age 30 Size 4.3}}"} -returnCodes error
 
     # relation foreach subcommand
     test relation-foreach-1.0 {simple visit of suppliers} -body {
@@ -2089,6 +2167,167 @@ namespace eval ::ral::test {
 	}
     } -match relation
 
+    test relation-join-7.0 {identifier subsets} -body {
+	set r1 {
+	    Relation
+	    {XId string A2 int A3 string}
+	    {XId A2}
+	    {
+		{A2 20 XId George A3 {San Jose}}
+		{A3 Saratoga A2 10 XId Fred}
+	    }
+	}
+	set r2 {
+	    Relation
+	    {XId string A4 int}
+	    {{XId A4}}
+	    {
+		{A4 30 XId George}
+		{A4 20 XId Fred}
+		{XId Fred A4 10}
+	    }
+	}
+	relation join $r1 $r2
+    } -result {
+	Relation
+	{XId string A2 int A3 string A4 int}
+	{{XId A4}}
+	{
+	    {XId George A2 20 A3 {San Jose} A4 30}
+	    {XId Fred A2 10 A3 Saratoga A4 20}
+	    {XId Fred A2 10 A3 Saratoga A4 10}
+	}
+    } -match relation
+
+    test relation-join-7.1 {identifier subsets} -body {
+	set r1 {
+	    Relation
+	    {XId string A2 int A3 string}
+	    {XId A2}
+	    {
+		{A2 20 XId George A3 {San Jose}}
+		{A3 Saratoga A2 10 XId Fred}
+	    }
+	}
+	set r2 {
+	    Relation
+	    {XId string A4 int}
+	    {{XId A4}}
+	    {
+		{A4 30 XId George}
+		{A4 20 XId Fred}
+		{XId Fred A4 10}
+	    }
+	}
+	relation join $r2 $r1
+    } -result {
+	Relation
+	{XId string A2 int A3 string A4 int}
+	{{XId A4}}
+	{
+	    {XId George A2 20 A3 {San Jose} A4 30}
+	    {XId Fred A2 10 A3 Saratoga A4 20}
+	    {XId Fred A2 10 A3 Saratoga A4 10}
+	}
+    } -match relation
+
+    test relation-join-8.0 {common identifiers} -setup {
+	set r1 {
+	    Relation {
+		A1 string
+		A2 string
+	    } {
+		A1 A2
+	    } {
+		{A1 aa A2 ab}
+		{A1 ba A2 bb}
+		{A1 ca A2 cb}
+	    }
+	}
+	set r2 {
+	    Relation {
+		A1 string B1 string
+	    } {
+		A1
+	    } {
+		{A1 aa B1 ab}
+		{A1 ba B1 bb}
+		{A1 ca B1 cb}
+		{A1 da B1 db}
+		{A1 ea B1 eb}
+		{A1 fa B1 fb}
+	    }
+	}
+    } -body {
+	relation join $r1 $r2
+    } -result {
+	Relation
+	{A1 string A2 string B1 string}
+	{A1 A2}
+	{
+	    {A1 aa A2 ab B1 ab}
+	    {A1 ba A2 bb B1 bb}
+	    {A1 ca A2 cb B1 cb}
+	}
+    } -match relation
+
+    test relation-join-8.1 {common identifiers} -setup {
+	set r1 {
+	    Relation {
+		A1 string
+		A2 string
+	    } {
+		A1 A2
+	    } {
+		{A1 aa A2 ab}
+		{A1 ba A2 bb}
+		{A1 ca A2 cb}
+	    }
+	}
+	set r2 {
+	    Relation {
+		A1 string B1 string
+	    } {
+		A1
+	    } {
+		{A1 aa B1 ab}
+		{A1 ba B1 bb}
+		{A1 ca B1 cb}
+		{A1 da B1 db}
+		{A1 ea B1 eb}
+		{A1 fa B1 fb}
+	    }
+	}
+    } -body {
+	relation join $r2 $r1
+    } -result {
+	Relation
+	{A1 string A2 string B1 string}
+	{A1 A2}
+	{
+	    {A1 aa A2 ab B1 ab}
+	    {A1 ba A2 bb B1 bb}
+	    {A1 ca A2 cb B1 cb}
+	}
+    } -match relation
+
+    test relation-join-9.0 {duplicate attribute in join} -setup {
+	set r1 {
+	    Relation {
+		A1 string
+		A2 string
+	    } {
+		A1 A2
+	    } {
+		{A1 aa A2 ab}
+		{A1 ba A2 bb}
+		{A1 ca A2 cb}
+	    }
+	}
+    } -body {
+	relation join $r1 $r1 -using {A1 A1}
+    } -result {duplicate attribute name, "A2"} -returnCodes error
+
     # relation list subcommand
     test relation-list-1.0 {multiple tuples} -body {
 	set r {
@@ -2109,6 +2348,10 @@ namespace eval ::ral::test {
     test relation-list-2.0 {one tuple} -body {
 	relation list {Relation {Name string} Name {{Name Fred}}}
     } -result {Fred}
+
+    test relation-list-3.0 {list of named attribute} -body {
+	lsort [relation list $S CITY]
+    } -result {Athens London London Paris Paris}
 
     # relation minus subcommand
     test relation-minus-1.0 {dum relation} -body {
@@ -2584,7 +2827,9 @@ namespace eval ::ral::test {
     } -match relation
 
     # For tcl8.4
-    test relation-summarize-1.0.1 {count} -body {
+    test relation-summarize-1.0.1 {count} -constraints {
+	tcl8.4
+    } -body {
 	set p [relation project $P P#]
 	relation summarize $SP $p r Total int {[rsum $r "QTY"]}
     } -result {
@@ -2615,7 +2860,9 @@ namespace eval ::ral::test {
     } -match relation
 
     # For tcl8.4
-    test relation-summarize-2.0.1 {summarize per dee} -body {
+    test relation-summarize-2.0.1 {summarize per dee} -constraints {
+	tcl8.4
+    } -body {
 	relation summarize $SP $DEE r GrandTotal int {[rsum $r "QTY"]}
     } -result {
 	Relation
@@ -2640,7 +2887,9 @@ namespace eval ::ral::test {
     } -match relation
 
     # For tcl8.4
-    test relation-summarize-2.1.1 {summarize per dee, average} -body {
+    test relation-summarize-2.1.1 {summarize per dee, average} -constraints {
+	tcl8.4
+    } -body {
 	relation summarize $SP $DEE r GrandAvg int {[ravg $r "QTY"]}
     } -result {
 	Relation
@@ -2665,7 +2914,9 @@ namespace eval ::ral::test {
     } -match relation
 
     # For tcl8.4
-    test relation-summarize-2.2.1 {summarize per dee, average} -body {
+    test relation-summarize-2.2.1 {summarize per dee, average} -constraints {
+	tcl8.4
+    } -body {
 	relation summarize $OWNER $DEE r AverageAge int {[ravg $r "Age"]}
     } -result {
 	Relation
@@ -3315,7 +3566,7 @@ namespace eval ::ral::test {
 	set r2 {Relation {Name string City string} Name\
 	    {{Name George City {San Jose}}}}
 	relation union $r1 $r2
-    } -result {headings not equal, "while computing union"}\
+    } -result {headings not equal, "Relation {Name string City string} Name"}\
     -returnCodes error
 
     test relation-union-8.0 {equal headings of different order} -body {
@@ -3686,6 +3937,30 @@ tuple {C1 c C2 42} references no tuple
     } -body {
 	relvar constraint info R1
     } -result {partition ::ral::test::R1 ::ral::test::A A1 ::ral::test::B B1 ::ral::test::C C1}
+
+    test relvar-constraint-2.3 {constraint info -- correlation} -setup {
+	relvar create A {Relation {X1 string Y1 string} {{X1 Y1}}}
+	relvar create X {Relation {X1 string} X1}
+	relvar create Y {Relation {Y1 string} Y1}
+	relvar correlation R1 A X1 + X X1 Y1 * Y Y1
+    } -cleanup {
+	relvar constraint delete R1
+	relvar unset A X Y
+    } -body {
+	relvar constraint info R1
+    } -result {correlation ::ral::test::R1 ::ral::test::A X1 + ::ral::test::X X1 Y1 * ::ral::test::Y Y1}
+
+    test relvar-constraint-3.1 {constraint member} -setup {
+	relvar create A {Relation {X1 string Y1 string} {{X1 Y1}}}
+	relvar create X {Relation {X1 string} X1}
+	relvar create Y {Relation {Y1 string} Y1}
+	relvar correlation R1 A X1 + X X1 Y1 * Y Y1
+    } -cleanup {
+	relvar constraint delete R1
+	relvar unset A X Y
+    } -body {
+	relvar constraint member A
+    } -result {::ral::test::R1}
 
     # relvar correlation subcommand
     test relvar-correlation-1.1 {many to many} -setup {
@@ -4414,7 +4689,9 @@ tuple {A1 c} is not referred to by any tuple
     } -cleanup {
 	relvar unset X
     } -body {
-	relvar updateone X {Name Jane} {Status -1}
+	relvar updateone X xTup {Name Jane} {
+	    tuple update xTup Status 10
+	}
     } -result {0}
 
     test relvar-updateone-2.0 {match} -setup {
@@ -4430,7 +4707,9 @@ tuple {A1 c} is not referred to by any tuple
     } -cleanup {
 	relvar unset X
     } -body {
-	relvar updateone X {Name Fred} {Status -1}
+	relvar updateone X xTup {Name Fred} {
+	    tuple update xTup Status 10
+	}
     } -result {1}
 
     test relvar-updateone-2.1 {match, compare result} -setup {
@@ -4446,7 +4725,9 @@ tuple {A1 c} is not referred to by any tuple
     } -cleanup {
 	relvar unset X
     } -body {
-	relvar updateone X {Name Fred} {Status -1}
+	relvar updateone X xTup {Name Fred} {
+	    tuple update xTup Status 10
+	}
 	relvar set X
     } -result {
 	Relation
@@ -4454,7 +4735,7 @@ tuple {A1 c} is not referred to by any tuple
 	Name
 	{
 	    {Name George Status 20}
-	    {Name Fred Status -1}
+	    {Name Fred Status 10}
 	    {Name Alice Status 40}
 	}
     } -match relation
@@ -4472,7 +4753,9 @@ tuple {A1 c} is not referred to by any tuple
     } -cleanup {
 	relvar unset X
     } -body {
-	relvar updateone X {Status 20} {Name Jane}
+	relvar updateone X xTup {Status 20} {
+	    tuple update xTup Status 10
+	}
     } -result {attributes do not constitute an identifier, "during identifier construction operation"}\
     -returnCodes error
 
@@ -4489,7 +4772,9 @@ tuple {A1 c} is not referred to by any tuple
     } -cleanup {
 	relvar unset X
     } -body {
-	relvar updateone X {Name George} {Name Fred}
+	relvar updateone X xTup {Name George} {
+	    tuple update xTup Name Fred
+	}
     } -result {duplicate tuple, "{Name Fred Status 20}"} -returnCodes error
 
     # examples from the Date book

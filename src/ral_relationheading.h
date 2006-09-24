@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationheading.h,v $
-$Revision: 1.12 $
-$Date: 2006/06/24 18:07:38 $
+$Revision: 1.13 $
+$Date: 2006/09/24 16:49:00 $
  *--
  */
 #ifndef _ral_relationheading_h_
@@ -117,6 +117,8 @@ extern Ral_RelationIdIter Ral_RelationHeadingIdBegin(Ral_RelationHeading) ;
 extern Ral_RelationIdIter Ral_RelationHeadingIdEnd(Ral_RelationHeading) ;
 extern int Ral_RelationHeadingDegree(Ral_RelationHeading) ;
 extern int Ral_RelationHeadingEqual(Ral_RelationHeading, Ral_RelationHeading) ;
+extern int Ral_RelationHeadingMatch(Ral_RelationHeading, Ral_RelationHeading,
+    Ral_ErrorInfo *) ;
 extern int Ral_RelationHeadingAddIdentifier(Ral_RelationHeading, int,
     Ral_IntVector) ;
 extern int Ral_RelationHeadingFindIdentifier(Ral_RelationHeading,

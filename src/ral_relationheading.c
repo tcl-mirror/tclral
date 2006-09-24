@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationheading.c,v $
-$Revision: 1.16 $
-$Date: 2006/09/23 19:37:23 $
+$Revision: 1.17 $
+$Date: 2006/09/24 16:49:00 $
  *--
  */
 
@@ -80,6 +80,8 @@ FORWARD FUNCTION REFERENCES
 static int Ral_IsIdASubsetOf(Ral_RelationHeading, Ral_IntVector) ;
 static int Ral_IsForeignIdASubsetOf(Ral_RelationHeading, Ral_RelationHeading,
     Ral_IntVector) ;
+static void Ral_AddJoinId( Ral_IntVector, Ral_IntVector, Ral_JoinMap,
+    Ral_IntVector) ;
 
 /*
 EXTERNAL DATA REFERENCES
@@ -92,7 +94,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.16 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.17 $" ;
 
 static const char relationKeyword[] = "Relation" ;
 static const char openList = '{' ;
@@ -472,6 +474,23 @@ Ral_RelationHeadingEqual(
     return 1 ;
 }
 
+/*
+ * Determine if two headings are equal and report the error information if not.
+ */
+int
+Ral_RelationHeadingMatch(
+    Ral_RelationHeading h1,
+    Ral_RelationHeading h2,
+    Ral_ErrorInfo *errInfo)
+{
+    int status = Ral_RelationHeadingEqual(h1, h2) ;
+    if (status == 0) {
+	char *h2str = Ral_RelationHeadingStringOf(h2) ;
+	Ral_ErrorInfoSetError(errInfo, RAL_ERR_HEADING_NOT_EQUAL, h2str) ;
+    }
+    return status ;
+}
+
 int
 Ral_RelationHeadingAddIdentifier(
     Ral_RelationHeading heading,
@@ -671,7 +690,7 @@ Ral_RelationHeadingJoin(
 		h2TupleHeadingIter, h2TupleHeadingIter + 1, joinTupleHeading) ;
 	    if (status == 0) {
 		Ral_ErrorInfoSetError(errInfo, RAL_ERR_DUPLICATE_ATTR,
-		    "while joining tuple headings") ;
+		    (*h2TupleHeadingIter)->name) ;
 		Ral_TupleHeadingDelete(joinTupleHeading) ;
 		Ral_IntVectorDelete(h2JoinAttrs) ;
 		*attrMap = NULL ;
@@ -680,8 +699,8 @@ Ral_RelationHeadingJoin(
 	    *h2AttrMapIter++ = joinIndex++ ;
 	} else {
 	    /*
-	     * Attributes that don't appear in the results are given
-	     * a final index of -1
+	     * Attributes that don't appear in the result are given a final
+	     * index of -1
 	     */
 	    *h2AttrMapIter++ = -1 ;
 	}
@@ -706,55 +725,28 @@ Ral_RelationHeadingJoin(
 	for (id2Iter = Ral_RelationHeadingIdBegin(h2) ;
 	    id2Iter != id2End ; ++id2Iter) {
 	    Ral_IntVector h2Id = *id2Iter ;
-	    Ral_IntVectorIter h2IdIter ;
-	    Ral_IntVectorIter h2IdEnd = Ral_IntVectorEnd(h2Id) ;
 	    Ral_IntVector joinId = Ral_IntVectorNewEmpty(
 		Ral_IntVectorSize(h1Id) + Ral_IntVectorSize(h2Id)) ;
 	    int added ;
+
 	    /*
-	     * Copy the identifier indices from the first header.
-	     * These indices are correct for the join header also.
+	     * In general the identifiers of the join are the cross product of
+	     * the identifiers of the two relations being joined. However, if
+	     * there is any intersection in those identifiers, those
+	     * intersecting identifiers must be eliminated from that element of
+	     * the cross product.
 	     */
-	    Ral_IntVectorCopy(h1Id, Ral_IntVectorBegin(h1Id),
-		Ral_IntVectorEnd(h1Id), joinId, Ral_IntVectorBegin(joinId)) ;
-	    /*
-	     * If the identifier in the second relation is a subset of
-	     * an identifier in the first relation, then it cannot contribute
-	     * to the identification of the join. The complication is that
-	     * we must transform the attribute indices of the identifier
-	     * to be relative to those of the first relation.
-	     * HERE
-	     */
-	    if (!Ral_IsForeignIdASubsetOf(h1, h2, h2Id)) {
-		/*
-		 * The identifier indices from the second header must
-		 * be corrected for the place where the attributes will end up.
-		 * If the identifier is to be eliminated, the we have to find
-		 * the corresponding attribute in the first relation.
-		 */
-		for (h2IdIter = Ral_IntVectorBegin(h2Id) ; h2IdIter != h2IdEnd ;
-		    ++h2IdIter) {
-		    Ral_IntVectorValueType index =
-			Ral_IntVectorFetch(h2JoinAttrs, *h2IdIter) ;
-		    if (index >= 0) {
-			Ral_IntVectorPushBack(joinId, index) ;
-		    } else {
-			/*
-			 * Identifier in the second relation is to be
-			 * eliminated.  Find its corresponding attribute in the
-			 * first and it will become an identifier (if it is not
-			 * already).
-			 */
-			int attrInr1 = Ral_JoinMapFindAttr(map, 1, *h2IdIter) ;
-			assert(attrInr1 != -1) ;
-			/*
-			 * Add the corresponding attribute in r1 in a set
-			 * fashion in case it is already part of this
-			 * identifier.
-			 */
-			Ral_IntVectorSetAdd(joinId, attrInr1) ;
-		    }
-		}
+	    if (Ral_IsForeignIdASubsetOf(h1, h2, h2Id)) {
+		Ral_IntVectorCopy(h1Id, Ral_IntVectorBegin(h1Id),
+		    Ral_IntVectorEnd(h1Id), joinId,
+		    Ral_IntVectorBegin(joinId)) ;
+	    } else if (Ral_IsForeignIdASubsetOf(h2, h1, h1Id)) {
+		Ral_AddJoinId(joinId, h2Id, map, h2JoinAttrs) ;
+	    } else {
+		Ral_IntVectorCopy(h1Id, Ral_IntVectorBegin(h1Id),
+		    Ral_IntVectorEnd(h1Id), joinId,
+		    Ral_IntVectorBegin(joinId)) ;
+		Ral_AddJoinId(joinId, h2Id, map, h2JoinAttrs) ;
 	    }
 	    /*
 	     * Add the newly formed identifier.
@@ -936,7 +928,7 @@ Ral_RelationHeadingPrint(
 }
 
 /*
- * Call must free the returned memory.
+ * Caller must free the returned memory.
  */
 char *
 Ral_RelationHeadingStringOf(
@@ -969,6 +961,9 @@ Ral_RelationHeadingVersion(void)
  * PRIVATE FUNCTIONS
  */
 
+/*
+ * Determine if the given "id" is a subset of any identifier in "heading".
+ */
 static int
 Ral_IsIdASubsetOf(
     Ral_RelationHeading heading,
@@ -997,6 +992,10 @@ Ral_IsIdASubsetOf(
     return 0 ;
 }
 
+/*
+ * Determine if the identifier from "h2" is a subset of any identifier
+ * from "h2".
+ */
 static int
 Ral_IsForeignIdASubsetOf(
     Ral_RelationHeading h1,
@@ -1035,4 +1034,45 @@ Ral_IsForeignIdASubsetOf(
     isSubset = Ral_IsIdASubsetOf(h1, h1Id) ;
     Ral_IntVectorDelete(h1Id) ;
     return isSubset ;
+}
+
+/*
+ * Add identifier attributes to form a new identifier for join.
+ * This is used to add attributes from the second relation of a join.
+ */
+static void
+Ral_AddJoinId(
+    Ral_IntVector joinId,	/* Identifier being built */
+    Ral_IntVector id,		/* Identifier to add */
+    Ral_JoinMap map,		/* Join map of the join */
+    Ral_IntVector joinAttrs)	/* Map of what attribute are in the join */
+{
+    Ral_IntVectorIter idIter ;
+    Ral_IntVectorIter idEnd = Ral_IntVectorEnd(id) ;
+    /*
+     * The identifier indices from the second header must
+     * be corrected for the place where the attributes will end up.
+     * If the identifier is to be eliminated, the we have to find
+     * the corresponding attribute in the first relation.
+     */
+    for (idIter = Ral_IntVectorBegin(id) ; idIter != idEnd ; ++idIter) {
+	Ral_IntVectorValueType index =
+	    Ral_IntVectorFetch(joinAttrs, *idIter) ;
+	if (index >= 0) {
+	    Ral_IntVectorPushBack(joinId, index) ;
+	} else {
+	    /*
+	     * Attribute in the second relation is to be eliminated.  Find its
+	     * corresponding attribute in the first and it will become part of
+	     * the identifier (if it is not already).
+	     */
+	    int attrInr1 = Ral_JoinMapFindAttr(map, 1, *idIter) ;
+	    assert(attrInr1 != -1) ;
+	    /*
+	     * Add the corresponding attribute in r1 in a set fashion in case
+	     * it is already part of this identifier.
+	     */
+	    Ral_IntVectorSetAdd(joinId, attrInr1) ;
+	}
+    }
 }

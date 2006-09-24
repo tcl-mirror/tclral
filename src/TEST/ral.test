@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.41 $
-# $Date: 2006/09/23 19:37:23 $
+# $Revision: 1.42 $
+# $Date: 2006/09/24 16:49:00 $
 #  *--
 
 package require tcltest 2.2
@@ -2231,6 +2231,103 @@ namespace eval ::ral::test {
 	}
     } -match relation
 
+    test relation-join-8.0 {common identifiers} -setup {
+	set r1 {
+	    Relation {
+		A1 string
+		A2 string
+	    } {
+		A1 A2
+	    } {
+		{A1 aa A2 ab}
+		{A1 ba A2 bb}
+		{A1 ca A2 cb}
+	    }
+	}
+	set r2 {
+	    Relation {
+		A1 string B1 string
+	    } {
+		A1
+	    } {
+		{A1 aa B1 ab}
+		{A1 ba B1 bb}
+		{A1 ca B1 cb}
+		{A1 da B1 db}
+		{A1 ea B1 eb}
+		{A1 fa B1 fb}
+	    }
+	}
+    } -body {
+	relation join $r1 $r2
+    } -result {
+	Relation
+	{A1 string A2 string B1 string}
+	{A1 A2}
+	{
+	    {A1 aa A2 ab B1 ab}
+	    {A1 ba A2 bb B1 bb}
+	    {A1 ca A2 cb B1 cb}
+	}
+    } -match relation
+
+    test relation-join-8.1 {common identifiers} -setup {
+	set r1 {
+	    Relation {
+		A1 string
+		A2 string
+	    } {
+		A1 A2
+	    } {
+		{A1 aa A2 ab}
+		{A1 ba A2 bb}
+		{A1 ca A2 cb}
+	    }
+	}
+	set r2 {
+	    Relation {
+		A1 string B1 string
+	    } {
+		A1
+	    } {
+		{A1 aa B1 ab}
+		{A1 ba B1 bb}
+		{A1 ca B1 cb}
+		{A1 da B1 db}
+		{A1 ea B1 eb}
+		{A1 fa B1 fb}
+	    }
+	}
+    } -body {
+	relation join $r2 $r1
+    } -result {
+	Relation
+	{A1 string A2 string B1 string}
+	{A1 A2}
+	{
+	    {A1 aa A2 ab B1 ab}
+	    {A1 ba A2 bb B1 bb}
+	    {A1 ca A2 cb B1 cb}
+	}
+    } -match relation
+
+    test relation-join-9.0 {duplicate attribute in join} -setup {
+	set r1 {
+	    Relation {
+		A1 string
+		A2 string
+	    } {
+		A1 A2
+	    } {
+		{A1 aa A2 ab}
+		{A1 ba A2 bb}
+		{A1 ca A2 cb}
+	    }
+	}
+    } -body {
+	relation join $r1 $r1 -using {A1 A1}
+    } -result {duplicate attribute name, "A2"} -returnCodes error
+
     # relation list subcommand
     test relation-list-1.0 {multiple tuples} -body {
 	set r {
@@ -3469,7 +3566,7 @@ namespace eval ::ral::test {
 	set r2 {Relation {Name string City string} Name\
 	    {{Name George City {San Jose}}}}
 	relation union $r1 $r2
-    } -result {headings not equal, "while computing union"}\
+    } -result {headings not equal, "Relation {Name string City string} Name"}\
     -returnCodes error
 
     test relation-union-8.0 {equal headings of different order} -body {
