@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.22 $
-$Date: 2006/09/24 16:49:00 $
+$Revision: 1.23 $
+$Date: 2006/11/05 00:15:59 $
  *--
  */
 
@@ -116,7 +116,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.22 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.23 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -1705,75 +1705,8 @@ Ral_TupleCompare(
 	Ral_Attribute sortAttr = Ral_TupleHeadingFetch(heading, attrIndex) ;
 	Tcl_Obj *o1 = t1->values[attrIndex] ;
 	Tcl_Obj *o2 = t2->values[attrIndex] ;
-	Tcl_ObjType *type ;
 
-	switch (sortAttr->attrType) {
-	case Tcl_Type:
-	    type = Tcl_GetObjType("int") ;
-	    if (type && sortAttr->tclType == type) {
-		if (Tcl_ConvertToType(NULL, o1, type) != TCL_OK ||
-		    Tcl_ConvertToType(NULL, o2, type) != TCL_OK) {
-		    Tcl_Panic("Ral_TupleCompare: cannot convert to int") ;
-		}
-		result = o1->internalRep.longValue - o2->internalRep.longValue ;
-		break ;
-	    } 
-
-	    type = Tcl_GetObjType("double") ;
-	    if (type && sortAttr->tclType == type) {
-		if (Tcl_ConvertToType(NULL, o1, type) != TCL_OK ||
-		    Tcl_ConvertToType(NULL, o2, type) != TCL_OK) {
-		    Tcl_Panic("Ral_TupleCompare: cannot convert to double") ;
-		}
-		result =  o1->internalRep.doubleValue -
-		    o2->internalRep.doubleValue ;
-		break ;
-	    }
-
-#		ifndef NO_WIDE_TYPE
-	    type = Tcl_GetObjType("wideInt") ;
-	    if (type && sortAttr->tclType == type) {
-		if (Tcl_ConvertToType(NULL, o1, type) != TCL_OK ||
-		    Tcl_ConvertToType(NULL, o2, type) != TCL_OK) {
-		    Tcl_Panic("Ral_TupleCompare: cannot convert to wideInt") ;
-		}
-		result = o1->internalRep.wideValue - o2->internalRep.wideValue ;
-		break ;
-	    }
-#		endif
-
-	    /*
-	     * If we're not one of the numeric types we can handle,
-	     * then just do a string compare.
-	     */
-	    result = strcmp(Tcl_GetString(o1), Tcl_GetString(o2)) ;
-	    break ;
-
-	case Tuple_Type:
-	    /*
-	     * This is probably wrong, but hard to say what is right.
-	     */
-	    result = strcmp(Tcl_GetString(o1), Tcl_GetString(o2)) ;
-	    break ;
-
-	case Relation_Type:
-	    /*
-	     * This is probably wrong.
-	     * But comparison based on cardinality is all I've come up
-	     * with so far.
-	     */
-	    if (Tcl_ConvertToType(NULL, o1, &Ral_RelationObjType) != TCL_OK ||
-		Tcl_ConvertToType(NULL, o2, &Ral_RelationObjType) != TCL_OK) {
-		Tcl_Panic("Ral_TupleCompare: cannot convert to Relation") ;
-	    }
-	    result = Ral_RelationCardinality(o1->internalRep.otherValuePtr) -
-		Ral_RelationCardinality(o2->internalRep.otherValuePtr) ;
-	    break ;
-
-	default:
-	    Tcl_Panic("Ral_TupleCompare: unknown attribute type: %d",
-		sortAttr->attrType) ;
-	}
+	result = Ral_AttributeValueCompare(sortAttr, o1, o2) ;
     }
 
     return props->sortDirection ? -result : result ;

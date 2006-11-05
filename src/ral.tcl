@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.25 $
-# $Date: 2006/09/23 19:37:23 $
+# $Revision: 1.26 $
+# $Date: 2006/11/05 00:15:59 $
 #  *--
 
 namespace eval ::ral {
@@ -235,7 +235,7 @@ proc ::ral::tupleformat {tupleValue {title {}} {noheading 0}} {
 proc ::ral::serialize {{ns {}}} {
     set result [list]
 
-    lappend result [list Version [package require ral]]
+    lappend result [list Version [pkgconfig get version]]
 
     # Convert the names to be relative
     set names [lsort [relvar names ${ns}*]]
@@ -287,9 +287,9 @@ proc ::ral::deserialize {value {ns ::}} {
     if {$versionKeyWord ne "Version"} {
 	error "expected keyword \"Version\", got \"$versionKeyWord\""
     }
-    if {![package vsatisfies [package require ral] $verNum]} {
+    if {![package vsatisfies [pkgconfig get version] $verNum]} {
 	error "incompatible version number, \"$verNum\",\
-	    current library version is, \"[package require ral]\""
+	    current library version is, \"[pkgconfig get version]\""
     }
 
     lassign $relvars relvarKeyWord revarDefs
@@ -349,7 +349,7 @@ proc ::ral::storeToMk {fileName {ns {}}} {
 	# when the data is loaded later.
 	::mk::view layout db.__ral_version {Version Date Comment}
 	::mk::row append db.__ral_version\
-	    Version [package require ral]\
+	    Version [pkgconfig get version]\
 	    Date [clock format [clock seconds]]\
 	    Comment "Created by: \"[info level 0]\""
 	# Create a set of views that are used as catalogs to hold
@@ -467,9 +467,9 @@ proc ::ral::loadFromMk {fileName {ns ::}} {
 	    {Version string Date string Comment string}\
 	    [::mk::get db.__ral_version!0]]
 	set verNum [::mk::get db.__ral_version!0 Version]
-	if {![package vsatisfies [package require ral] $verNum]} {
+	if {![package vsatisfies [pkgconfig get version] $verNum]} {
 	    error "incompatible version number, \"$verNum\",\
-		current library version is, \"[package require ral]\""
+		current library version is, \"[pkgconfig get version]\""
 	}
 	# determine the relvar names and types by reading the catalog
 	::mk::loop rvCursor db.__ral_relvar {
@@ -541,7 +541,7 @@ proc ::ral::dump {{ns {}}} {
     set names [lsort [relvar names ${ns}*]]
 
     append result "# Generated via ::ral::dump\n"
-    append result "package require ral [package require ral]\n"
+    append result "package require ral [pkgconfig get version]\n"
 
     # Convert the names to be relative
     foreach name $names {

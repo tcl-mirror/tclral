@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.c,v $
-$Revision: 1.14 $
-$Date: 2006/09/09 16:57:45 $
+$Revision: 1.15 $
+$Date: 2006/11/05 00:15:59 $
  *--
  */
 
@@ -90,13 +90,15 @@ EXTERNAL DATA REFERENCES
 /*
 EXTERNAL DATA DEFINITIONS
 */
+char tupleKeyword[] = "Tuple" ;
+char relationKeyword[] = "Relation" ;
 
 /*
 STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.14 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.15 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -104,16 +106,21 @@ FUNCTION DEFINITIONS
 
 Ral_Attribute
 Ral_AttributeNewTclType(
-    const char *name,
-    Tcl_ObjType *type)
+    char const *name,
+    char const *typeName)
 {
     Ral_Attribute a ;
+    Tcl_ObjType *tclType = Tcl_GetObjType(typeName) ;
 
+    if (tclType == NULL) {
+	return NULL ;
+    }
     /* +1 for the NUL terminator */
     a = (Ral_Attribute)ckalloc(sizeof(*a) + strlen(name) + 1) ;
     a->name = strcpy((char *)(a + 1), name) ;
+    a->typeName = tclType->name ;
     a->attrType = Tcl_Type ;
-    a->tclType = type ;
+    a->tclType = tclType ;
 
     return a ;
 }
@@ -127,6 +134,7 @@ Ral_AttributeNewTupleType(
 
     a = (Ral_Attribute)ckalloc(sizeof(*a) + strlen(name) + 1) ;
     a->name = strcpy((char *)(a + 1), name) ;
+    a->typeName = tupleKeyword ;
     a->attrType = Tuple_Type ;
     Ral_TupleHeadingReference(a->tupleHeading = heading) ;
 
@@ -142,6 +150,7 @@ Ral_AttributeNewRelationType(
 
     a = (Ral_Attribute)ckalloc(sizeof(*a) + strlen(name) + 1) ;
     a->name = strcpy((char *)(a + 1), name) ;
+    a->typeName = relationKeyword ;
     a->attrType = Relation_Type ;
     Ral_RelationHeadingReference(a->relationHeading = heading) ;
 
@@ -180,7 +189,8 @@ Ral_AttributeDup(
 
     switch (a->attrType) {
     case Tcl_Type:
-	newAttr = Ral_AttributeNewTclType(a->name, a->tclType) ;
+	newAttr = Ral_AttributeNewTclType(a->name, a->typeName) ;
+	assert(newAttr != NULL) ;
 	break ;
 
     case Tuple_Type:
@@ -205,7 +215,7 @@ Ral_AttributeRename(
 {
     switch (a->attrType) {
     case Tcl_Type:
-	return Ral_AttributeNewTclType(newName, a->tclType) ;
+	return Ral_AttributeNewTclType(newName, a->typeName) ;
 
     case Tuple_Type:
 	return Ral_AttributeNewTupleType(newName, a->tupleHeading) ;
@@ -277,7 +287,34 @@ Ral_AttributeValueEqual(
 {
     switch (a->attrType) {
     case Tcl_Type:
-	return Ral_ObjEqual(v1, v2) ;
+	if (Tcl_ConvertToType(NULL, v1, a->tclType) != TCL_OK ||
+	    Tcl_ConvertToType(NULL, v2, a->tclType) != TCL_OK) {
+	    Tcl_Panic("Ral_TupleCompare: cannot convert to %s",
+		a->typeName) ;
+	}
+	if (strcmp(a->typeName, "int") == 0 ||
+	    strcmp(a->typeName, "boolean") == 0 ||
+	    strcmp(a->typeName, "booleanString") == 0) {
+	    return v1->internalRep.longValue == v2->internalRep.longValue ;
+	} else if (strcmp(a->typeName, "double") == 0) {
+	    return v1->internalRep.doubleValue == v2->internalRep.doubleValue ;
+	} else if (strcmp(a->typeName, "boolean") == 0) {
+	    return v1->internalRep.longValue == v2->internalRep.longValue ;
+	} 
+
+#	ifndef NO_WIDE_TYPE
+	  else if (strcmp(a->typeName, "wideInt") == 0) {
+	    return v1->internalRep.wideValue == v2->internalRep.wideValue ;
+	}
+#	endif
+
+	else {
+	    /*
+	     * If we're not one of the numeric types we can handle,
+	     * then just do a string compare.
+	     */
+	    return strcmp(Tcl_GetString(v1), Tcl_GetString(v2)) == 0 ;
+	}
 
     case Tuple_Type:
 	if (Tcl_ConvertToType(NULL, v1, &Ral_TupleObjType) != TCL_OK ||
@@ -301,6 +338,74 @@ Ral_AttributeValueEqual(
     }
     /* Not reached */
     return 1 ;
+}
+
+int
+Ral_AttributeValueCompare(
+    Ral_Attribute a,
+    Tcl_Obj *v1,
+    Tcl_Obj *v2)
+{
+    int result ;
+
+    switch (a->attrType) {
+    case Tcl_Type:
+	if (Tcl_ConvertToType(NULL, v1, a->tclType) != TCL_OK ||
+	    Tcl_ConvertToType(NULL, v2, a->tclType) != TCL_OK) {
+	    Tcl_Panic("Ral_AttributeValueCompare: cannot convert to %s",
+		a->typeName) ;
+	}
+	if (strcmp(a->typeName, "int") == 0 ||
+	    strcmp(a->typeName, "boolean") == 0 ||
+	    strcmp(a->typeName, "booleanString") == 0) {
+	    result = v1->internalRep.longValue - v2->internalRep.longValue ;
+	} else if (strcmp(a->typeName, "double") == 0) {
+	    result =  v1->internalRep.doubleValue -
+		v2->internalRep.doubleValue ;
+	}
+
+#		ifndef NO_WIDE_TYPE
+	  else if (strcmp(a->typeName, "wideInt") == 0) {
+	    result = v1->internalRep.wideValue - v2->internalRep.wideValue ;
+	}
+#		endif
+
+	else {
+	    /*
+	     * If we're not one of the numeric types we can handle,
+	     * then just do a string compare.
+	     */
+	    result = strcmp(Tcl_GetString(v1), Tcl_GetString(v2)) ;
+	}
+	break ;
+
+    case Tuple_Type:
+	/*
+	 * This is probably wrong, but hard to say what is right.
+	 */
+	result = strcmp(Tcl_GetString(v1), Tcl_GetString(v2)) ;
+	break ;
+
+    case Relation_Type:
+	/*
+	 * This is probably wrong.
+	 * But comparison based on cardinality is all I've come up
+	 * with so far.
+	 */
+	if (Tcl_ConvertToType(NULL, v1, &Ral_RelationObjType) != TCL_OK ||
+	    Tcl_ConvertToType(NULL, v2, &Ral_RelationObjType) != TCL_OK) {
+	    Tcl_Panic("Ral_TupleCompare: cannot convert to Relation") ;
+	}
+	result = Ral_RelationCardinality(v1->internalRep.otherValuePtr) -
+	    Ral_RelationCardinality(v2->internalRep.otherValuePtr) ;
+	break ;
+
+    default:
+	Tcl_Panic("Ral_TupleCompare: unknown attribute type: %d",
+	    a->attrType) ;
+    }
+
+    return result ;
 }
 
 Tcl_Obj *
@@ -375,7 +480,7 @@ Ral_AttributeNewFromObjs(
     }
     attrName = Tcl_GetString(nameObj) ;
     typeName = Tcl_GetString(*typev) ;
-    if (strcmp("Tuple", typeName) == 0) {
+    if (strcmp(tupleKeyword, typeName) == 0) {
 	if (typec == 2) {
 	    Ral_TupleHeading heading =
 		Ral_TupleHeadingNewFromObj(interp, *(typev + 1), errInfo) ;
@@ -398,11 +503,9 @@ Ral_AttributeNewFromObjs(
 	    Ral_InterpSetError(interp, errInfo) ;
 	}
     } else if (typec == 1) {
-	Tcl_ObjType *tclType = Tcl_GetObjType(typeName) ;
+	attribute = Ral_AttributeNewTclType(attrName, typeName) ;
 
-	if (tclType != NULL) {
-	    attribute = Ral_AttributeNewTclType(attrName, tclType) ;
-	} else {
+	if (attribute == NULL) {
 	    Ral_ErrorInfoSetError(errInfo, RAL_ERR_BAD_TYPE, typeName) ;
 	    Ral_InterpSetError(interp, errInfo) ;
 	}
@@ -438,13 +541,29 @@ Ral_AttributeConvertValueToType(
      */
     switch (attr->attrType) {
     case Tcl_Type:
+	/*
+	 * For simple Tcl types, attempt to convert the Tcl object
+	 * to the type for the attribute. It is possible for the
+	 * type convertion to succeed, but that the type be assigned
+	 * something other than the requested one. This happens when
+	 * "0" and "1" are used for boolean values. In this case the
+	 * type ends up being "int". This means that "0" and "1" are
+	 * NOT valid boolean values.
+	 */
 	result = Tcl_ConvertToType(interp, objPtr, attr->tclType) ;
-	if (result != TCL_OK) {
+	if (result != TCL_OK || objPtr->typePtr != attr->tclType) {
 	    Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_BAD_VALUE, objPtr) ;
 	    Ral_InterpSetError(interp, errInfo) ;
-	} else if (strcmp(attr->tclType->name, "string") != 0) {
+	} else if (strcmp(attr->tclType->name, "string") != 0 &&
+	    attr->tclType->updateStringProc != NULL) {
+	    /*
+	     * We also want to generate the canonical form of the string
+	     * representation so that string hashes, etc work properly.
+	     * We only do this on non-string types and on those types
+	     * that can actually regenerate a string rep once invalidated.
+	     */
 	    Tcl_InvalidateStringRep(objPtr) ;
-	    objPtr->length = 0 ;
+	    (*attr->tclType->updateStringProc)(objPtr) ;
 	}
 	break ;
 

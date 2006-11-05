@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.h,v $
-$Revision: 1.10 $
-$Date: 2006/06/24 18:07:38 $
+$Revision: 1.11 $
+$Date: 2006/11/05 00:15:59 $
  *--
  */
 #ifndef _ral_attribute_h_
@@ -95,7 +95,8 @@ typedef enum Ral_AttrDataType {
  */
 
 typedef struct Ral_Attribute {
-    const char *name ;		    /* name of the attribute */
+    char const *name ;		    /* name of the attribute */
+    char const *typeName ;	    /* data type name */
     Ral_AttrDataType attrType ;	    /* encoding to distinguish the union */
     union {
 	Tcl_ObjType *tclType ;
@@ -139,13 +140,19 @@ typedef struct Ral_AttributeValueScanFlags {
 } Ral_AttributeValueScanFlags ;
 
 /*
+DATA DECLARATIONS
+*/
+extern char tupleKeyword[] ;
+extern char relationKeyword[] ;
+
+/*
 FUNCTION DECLARATIONS
 */
 
-extern Ral_Attribute Ral_AttributeNewTclType(const char *, Tcl_ObjType *) ;
-extern Ral_Attribute Ral_AttributeNewTupleType(const char *,
+extern Ral_Attribute Ral_AttributeNewTclType(char const *, char const *) ;
+extern Ral_Attribute Ral_AttributeNewTupleType(char const *,
     struct Ral_TupleHeading *) ;
-extern Ral_Attribute Ral_AttributeNewRelationType(const char *,
+extern Ral_Attribute Ral_AttributeNewRelationType(char const *,
     struct Ral_RelationHeading *) ;
 extern Ral_Attribute Ral_AttributeNewFromObjs(Tcl_Interp *, Tcl_Obj *,
     Tcl_Obj*, Ral_ErrorInfo *) ;
@@ -153,10 +160,11 @@ extern int Ral_AttributeConvertValueToType(Tcl_Interp *, Ral_Attribute,
     Tcl_Obj *, Ral_ErrorInfo *) ;
 extern void Ral_AttributeDelete(Ral_Attribute) ;
 extern Ral_Attribute Ral_AttributeDup(Ral_Attribute) ;
-extern Ral_Attribute Ral_AttributeRename(Ral_Attribute, const char *) ;
+extern Ral_Attribute Ral_AttributeRename(Ral_Attribute, char const *) ;
 extern int Ral_AttributeEqual(Ral_Attribute, Ral_Attribute) ;
 extern int Ral_AttributeTypeEqual(Ral_Attribute, Ral_Attribute) ;
 extern int Ral_AttributeValueEqual(Ral_Attribute, Tcl_Obj *, Tcl_Obj *) ;
+extern int Ral_AttributeValueCompare(Ral_Attribute, Tcl_Obj *, Tcl_Obj *) ;
 extern Tcl_Obj *Ral_AttributeValueObj(Tcl_Interp *, Ral_Attribute, Tcl_Obj *) ;
 extern int Ral_AttributeScanName(Ral_Attribute, Ral_AttributeTypeScanFlags *) ;
 extern int Ral_AttributeConvertName(Ral_Attribute, char *,
@@ -171,6 +179,6 @@ extern int Ral_AttributeConvertValue(Ral_Attribute, Tcl_Obj *, char *,
 extern void Ral_AttributeTypeScanFlagsFree(Ral_AttributeTypeScanFlags *) ;
 extern void Ral_AttributeValueScanFlagsFree(Ral_AttributeValueScanFlags *) ;
 extern char *Ral_AttributeToString(Ral_Attribute) ;
-extern const char *Ral_AttributeVersion(void) ;
+extern char const *Ral_AttributeVersion(void) ;
 
 #endif /* _ral_attribute_h_ */

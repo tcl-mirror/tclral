@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationobj.c,v $
-$Revision: 1.18 $
-$Date: 2006/08/27 00:31:31 $
+$Revision: 1.19 $
+$Date: 2006/11/05 00:15:59 $
  *--
  */
 
@@ -58,6 +58,7 @@ PRAGMAS
 INCLUDE FILES
 */
 #include "ral_utils.h"
+#include "ral_attribute.h"
 #include "ral_relationobj.h"
 #include "ral_relation.h"
 #include "ral_tupleobj.h"
@@ -97,7 +98,7 @@ EXTERNAL DATA DEFINITIONS
 */
 
 Tcl_ObjType Ral_RelationObjType = {
-    "Relation",
+    relationKeyword,
     FreeRelationInternalRep,
     DupRelationInternalRep,
     UpdateStringOfRelation,
@@ -107,7 +108,7 @@ Tcl_ObjType Ral_RelationObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.18 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.19 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -118,9 +119,9 @@ Ral_RelationObjNew(
     Ral_Relation relation)
 {
     Tcl_Obj *objPtr = Tcl_NewObj() ;
-    objPtr->typePtr = &Ral_RelationObjType ;
     objPtr->internalRep.otherValuePtr = relation ;
-    Tcl_InvalidateStringRep(objPtr) ;
+    objPtr->typePtr = &Ral_RelationObjType ;
+    objPtr->bytes = NULL ;
     objPtr->length = 0 ;
     return objPtr ;
 }

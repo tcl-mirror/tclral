@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.27 $
-$Date: 2006/09/17 18:34:23 $
+$Revision: 1.28 $
+$Date: 2006/11/05 00:15:59 $
  *--
  */
 
@@ -143,7 +143,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.27 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.28 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -1756,7 +1756,8 @@ RelationRankCmd(
      * Create the new ranked relation, extending it by the "newAttr".
      */
     newAttrName = Tcl_GetString(objv[objc - 1]) ;
-    newAttr = Ral_AttributeNewTclType(newAttrName, Tcl_GetObjType("int")) ;
+    newAttr = Ral_AttributeNewTclType(newAttrName, "int") ;
+    assert(newAttr != NULL) ;
     newTupleHeading = Ral_TupleHeadingExtend(tupleHeading, 1) ;
     inserted = Ral_TupleHeadingPushBack(newTupleHeading, newAttr) ;
     if (inserted == Ral_TupleHeadingEnd(newTupleHeading)) {
@@ -2439,8 +2440,8 @@ RelationTagCmd(
     /*
      * Make a new relation, adding the extended attribute.
      */
-    tagAttr = Ral_AttributeNewTclType(Tcl_GetString(attrNameObj),
-	Tcl_GetObjType("int")) ;
+    tagAttr = Ral_AttributeNewTclType(Tcl_GetString(attrNameObj), "int") ;
+    assert(tagAttr != NULL) ;
     tagTupleHeading = Ral_TupleHeadingExtend(tupleHeading, 1) ;
     inserted = Ral_TupleHeadingPushBack(tagTupleHeading, tagAttr) ;
     if (inserted == Ral_TupleHeadingEnd(tagTupleHeading)) {

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_utils.h,v $
-$Revision: 1.7 $
-$Date: 2006/09/23 18:09:14 $
+$Revision: 1.8 $
+$Date: 2006/11/05 00:15:59 $
  *--
  */
 #ifndef _ral_utils_h_
@@ -199,7 +199,6 @@ typedef struct Ral_ErrorInfo {
 FUNCTION DECLARATIONS
 */
 
-extern int Ral_ObjEqual(Tcl_Obj *, Tcl_Obj *) ;
 extern void Ral_ErrorInfoSetCmd(Ral_ErrorInfo *, Ral_Command, Ral_CmdOption) ;
 extern void Ral_ErrorInfoSetError(Ral_ErrorInfo *info, Ral_ErrorCode,
     const char *) ;

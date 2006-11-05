@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_utils.c,v $
-$Revision: 1.9 $
-$Date: 2006/09/23 18:09:14 $
+$Revision: 1.10 $
+$Date: 2006/11/05 00:15:59 $
  *--
  */
 
@@ -87,7 +87,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_utils.c,v $ $Revision: 1.9 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_utils.c,v $ $Revision: 1.10 $" ;
 
 static char const * const cmdStrings[] = {
     "unknown command",
@@ -255,36 +255,6 @@ static char const * const errorStrings[] = {
 /*
 FUNCTION DEFINITIONS
 */
-
-/*
- * Ral_ObjEqual
-
- * Compare two Tcl objects. The comparison is based on comparing the string
- * representation of the objects.
-
- * Returns 1 if the objects are equal, 0 otherwise.
- */
-
-int
-Ral_ObjEqual(
-    Tcl_Obj *o1,	/* first object pointer to compare */
-    Tcl_Obj *o2)	/* second object pointer to compare */
-{
-    const char *s1 ;
-    int l1 ;
-    const char *s2 ;
-    int l2 ;
-
-    if (o1 == o2) {
-	return 1 ;
-    }
-    s1 = Tcl_GetStringFromObj(o1, &l1) ;
-    s2 = Tcl_GetStringFromObj(o2, &l2) ;
-    if (l1 != l2) {
-	return 0 ;
-    }
-    return memcmp(s1, s2, l1) == 0 ;
-}
 
 void
 Ral_ErrorInfoSetCmd(

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationheading.c,v $
-$Revision: 1.17 $
-$Date: 2006/09/24 16:49:00 $
+$Revision: 1.18 $
+$Date: 2006/11/05 00:15:59 $
  *--
  */
 
@@ -94,11 +94,10 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.17 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.18 $" ;
 
-static const char relationKeyword[] = "Relation" ;
-static const char openList = '{' ;
-static const char closeList = '}' ;
+static char const openList = '{' ;
+static char const closeList = '}' ;
 
 /*
 FUNCTION DEFINITIONS
@@ -861,7 +860,7 @@ Ral_RelationHeadingConvert(
      * Copy in the "Relation" keyword.
      */
     strcpy(p, relationKeyword) ;
-    p += sizeof(relationKeyword) - 1 ;
+    p += strlen(relationKeyword) ;
     /*
      * Add the heading.
      */

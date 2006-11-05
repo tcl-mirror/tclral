@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleheading.c,v $
-$Revision: 1.11 $
-$Date: 2006/04/09 22:15:58 $
+$Revision: 1.12 $
+$Date: 2006/11/05 00:15:59 $
  *--
  */
 
@@ -91,9 +91,8 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tupleheading.c,v $ $Revision: 1.11 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tupleheading.c,v $ $Revision: 1.12 $" ;
 
-static const char tupleKeyword[] = "Tuple" ;
 static const char openList = '{' ;
 static const char closeList = '}' ;
 
@@ -670,8 +669,8 @@ Ral_TupleHeadingConvert(
     assert(flags->attrType == Tuple_Type) ;
     assert(flags->compoundFlags.count == Ral_TupleHeadingSize(h)) ;
 
-    strcpy(p, Ral_TupleObjType.name) ;
-    p += strlen(Ral_TupleObjType.name) ;
+    strcpy(p, tupleKeyword) ;
+    p += strlen(tupleKeyword) ;
     *p++ = ' ' ;
 
     p += Ral_TupleHeadingConvertAttr(h, p, flags) ;

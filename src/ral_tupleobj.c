@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleobj.c,v $
-$Revision: 1.11 $
-$Date: 2006/09/09 16:32:44 $
+$Revision: 1.12 $
+$Date: 2006/11/05 00:15:59 $
  *--
  */
 
@@ -58,6 +58,7 @@ PRAGMAS
 INCLUDE FILES
 */
 #include "tcl.h"
+#include "ral_attribute.h"
 #include "ral_utils.h"
 #include "ral_vector.h"
 #include "ral_tupleobj.h"
@@ -98,7 +99,7 @@ EXTERNAL DATA REFERENCES
 EXTERNAL DATA DEFINITIONS
 */
 Tcl_ObjType Ral_TupleObjType = {
-    "Tuple",
+    tupleKeyword,
     FreeTupleInternalRep,
     DupTupleInternalRep,
     UpdateStringOfTuple,
@@ -108,7 +109,7 @@ Tcl_ObjType Ral_TupleObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tupleobj.c,v $ $Revision: 1.11 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tupleobj.c,v $ $Revision: 1.12 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -121,7 +122,7 @@ Ral_TupleObjNew(
     Tcl_Obj *objPtr = Tcl_NewObj() ;
     objPtr->typePtr = &Ral_TupleObjType ;
     Ral_TupleReference(objPtr->internalRep.otherValuePtr = tuple) ;
-    Tcl_InvalidateStringRep(objPtr) ;
+    objPtr->bytes = NULL ;
     objPtr->length = 0 ;
     return objPtr ;
 }

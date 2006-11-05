@@ -49,8 +49,8 @@ ABSTRACT:
     Algebra.
 
 $RCSfile: ral.c,v $
-$Revision: 1.29 $
-$Date: 2006/08/09 01:15:57 $
+$Revision: 1.30 $
+$Date: 2006/11/05 00:15:59 $
  *--
  */
 
@@ -101,13 +101,21 @@ EXTERNAL DATA REFERENCES
 /*
 STATIC DATA ALLOCATION
 */
-static const char ral_pkgname[] = "ral" ;
-static const char ral_version[] = "0.8" ;
-static const char ral_rcsid[] =
-    "$Id: ral.c,v 1.29 2006/08/09 01:15:57 mangoa01 Exp $" ;
-static const char ral_copyright[] =
+static char const ral_pkgname[] = "ral" ;
+static char const ral_version[] = "0.8" ;
+static char const ral_rcsid[] =
+    "$Id: ral.c,v 1.30 2006/11/05 00:15:59 mangoa01 Exp $" ;
+static char const ral_copyright[] =
     "This software is copyrighted 2004, 2005, 2006 by G. Andrew Mangogna."
-    "Terms and conditions for use are distributed with the source code." ;
+    " Terms and conditions for use are distributed with the source code." ;
+
+static Tcl_Config ral_config[] = {
+    {"pkgname", ral_pkgname},
+    {"version", ral_version},
+    {"rcsid", ral_rcsid},
+    {"copyright", ral_copyright},
+    {NULL, NULL}
+} ;
 
 /*
 FUNCTION DEFINITIONS
@@ -164,6 +172,8 @@ Ral_Init(
     if (Tcl_Export(interp, ralNs, relvarCmdName, 0) != TCL_OK) {
 	return TCL_ERROR ;
     }
+
+    Tcl_RegisterConfig(interp, ral_pkgname, ral_config, "UTF-8") ;
 
     Tcl_PkgProvide(interp, ral_pkgname, ral_version) ;
 
