@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.42 $
-# $Date: 2006/09/24 16:49:00 $
+# $Revision: 1.43 $
+# $Date: 2006/12/17 00:46:58 $
 #  *--
 
 package require tcltest 2.2
@@ -2498,6 +2498,27 @@ namespace eval ::ral::test {
 	}
     } -match relation
 
+    # relation reidentify subcommand
+    test relation-reidentify-1.0 {single identifier} -body {
+	set r {Relation {
+		Name string Age int City string
+		} Name {
+		    {Name Andrew Age 30 City Sunnyvale}
+		    {Name George Age 20 City {San Jose}}
+		}
+	    }
+	relation reidentify $r Age
+    } -result {
+	Relation {
+	    Name string Age int City string
+	} {
+	    Age
+	} {
+	    {Name Andrew Age 30 City Sunnyvale}
+	    {Name George Age 20 City {San Jose}}
+	}
+    } -match relation
+
     # relation rename subcommand
     test relation-rename-1.0 {single attribute} -body {
 	set r {Relation {Name string} Name {{Name Andrew}}}
@@ -2553,8 +2574,8 @@ namespace eval ::ral::test {
 	    {Age 20 Name George City {San Jose}}\
 	    {City Saratoga Age 10 Name Fred}}}
 	relation restrict $r selected {< 20}
-    } -result {syntax error in expression "< 20": unexpected operator <}\
-    -returnCodes error
+    } -result {missing operand at _@_
+in expression "_@_< 20"} -returnCodes error
 
     # relation restrictwith subcommand
     test relation-restrictwith-1.0 {match on one attribute} -body {
@@ -2583,8 +2604,8 @@ namespace eval ::ral::test {
 	    {Age 20 Name George City {San Jose}}\
 	    {City Saratoga Age 10 Name Fred}}}
 	relation restrictwith $r {< 20}
-    } -result {syntax error in expression "< 20": unexpected operator <}\
-    -returnCodes error
+    } -result {missing operand at _@_
+in expression "_@_< 20"} -returnCodes error
 
     # relation semijoin subcommand
     test relation-semijoin-1.0 {one common attribute} -body {

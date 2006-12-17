@@ -45,8 +45,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.13 $
-# $Date: 2006/09/17 18:34:23 $
+# $Revision: 1.14 $
+# $Date: 2006/12/17 00:46:58 $
 #  *--
 }]
 [moddesc "Relation Operators"]
@@ -850,6 +850,20 @@ Relation {OwnerName string Age int City string AgeRank int} OwnerName {{OwnerNam
 +=========+---+
 }]
 
+[call [cmd "::ral::relation reidentify"] [arg relationValue] [arg id1]\
+    [opt "id2 id3 ..."]]
+
+The [cmd reidentify] subcommand returns a relation whose attributes are
+the same as [arg relationValue] but whose identifiers are those given
+by the [arg idN] arguments.
+The body of the returned relation value is the same as [arg relationValue] minus
+any tuples that are duplicates with respect to the new set of identifiers.
+Normally, identifiers are properly inferred by the [cmd relation] subcommands.
+However in certain contexts, the programmer may have knowledge of the
+contents of a relation value and wish to force an identification scheme
+that takes advantage of that knowledge.
+This command can be considered complementary to the [cmd rename] subcommand.
+
 [call [cmd "::ral::relation rename"] [arg relationValue]\
     [opt "oldname newname ..."]]
 
@@ -929,7 +943,7 @@ variables of a separate invocation.
 With that restriction in mind,
 the [cmd restrictwith] subcommand is often more convenient than
 performing all the required [cmd "tuple extract"] commands that are
-othewise required.
+otherwise required.
 
 [example {
 % relformat [relation restrictwith $DOG {[string match S* $DogName]}]

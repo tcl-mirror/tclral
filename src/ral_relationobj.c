@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationobj.c,v $
-$Revision: 1.19 $
-$Date: 2006/11/05 00:15:59 $
+$Revision: 1.20 $
+$Date: 2006/12/17 00:46:58 $
  *--
  */
 
@@ -108,7 +108,7 @@ Tcl_ObjType Ral_RelationObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.19 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.20 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -211,8 +211,7 @@ Ral_RelationHeadingNewFromObjs(
 	return NULL ;
     }
     /*
-     * If a relation has any attributes, then it must also have
-     * an identifier.
+     * If a relation has any attributes, then it must also have an identifier.
      */
     if (idc == 0) {
 	Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_NO_IDENTIFIER, identObj) ;
@@ -222,71 +221,83 @@ Ral_RelationHeadingNewFromObjs(
     }
 
     /*
-     * We now know the number of identifers and can create the
-     * relation heading.
+     * We now know the number of identifers and can create the relation
+     * heading.
      */
     heading = Ral_RelationHeadingNew(tupleHeading, idc) ;
     /*
-     * Iterate over the identifier elements and insert them
-     * into the heading.
+     * Iterate over the identifier lists and insert them into the heading.
      */
     for (idNum = 0 ; idNum < idc ; ++idNum, ++idv) {
-	/*
-	 * Iterate over the members of each identifier.
-	 */
-	int elemc ;
-	Tcl_Obj **elemv ;
-	Ral_IntVector id ;
-
-	if (Tcl_ListObjGetElements(interp, *idv, &elemc, &elemv) != TCL_OK) {
-	    Ral_RelationHeadingDelete(heading) ;
-	    return NULL ;
-	}
-	/*
-	 * Vector to hold the attribute indices that constitute the
-	 * identifier.
-	 */
-	id = Ral_IntVectorNewEmpty(elemc) ;
-	/*
-	 * Find the attribute in the tuple heading and build up a
-	 * vector to install in the relation heading.
-	 */
-	while (elemc-- > 0) {
-	    const char *attrName = Tcl_GetString(*elemv++) ;
-	    int index = Ral_TupleHeadingIndexOf(tupleHeading, attrName) ;
-
-	    if (index < 0) {
-		Ral_ErrorInfoSetError(errInfo, RAL_ERR_UNKNOWN_ATTR, attrName) ;
-		Ral_InterpSetError(interp, errInfo) ;
-		Ral_RelationHeadingDelete(heading) ;
-		return NULL ;
-	    }
-	    /*
-	     * The indices in an identifier must form a set, i.e. you
-	     * cannot have a duplicate attribute in a list of attributes
-	     * that is intended to be an identifier of a relation.
-	     */
-	    if (!Ral_IntVectorSetAdd(id, index)) {
-		Ral_ErrorInfoSetError(errInfo, RAL_ERR_DUP_ATTR_IN_ID,
-		    attrName) ;
-		Ral_InterpSetError(interp, errInfo) ;
-		Ral_RelationHeadingDelete(heading) ;
-		return NULL ;
-	    }
-	}
-	/*
-	 * Add the set of attribute indices as an identifier. Adding
-	 * the vector checks that we do not have a subset dependency.
-	 */
-	if (!Ral_RelationHeadingAddIdentifier(heading, idNum, id)) {
-	    Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_IDENTIFIER_SUBSET, *idv) ;
-	    Ral_InterpSetError(interp, errInfo) ;
+	if (Ral_RelationHeadingNewIdFromObj(interp, heading, idNum, *idv,
+	    errInfo) != TCL_OK) {
 	    Ral_RelationHeadingDelete(heading) ;
 	    return NULL ;
 	}
     }
 
     return heading ;
+}
+
+int
+Ral_RelationHeadingNewIdFromObj(
+    Tcl_Interp *interp,
+    Ral_RelationHeading heading,
+    int idNum,
+    Tcl_Obj *identObj,
+    Ral_ErrorInfo *errInfo)
+{
+    int elemc ;
+    Tcl_Obj **elemv ;
+    Ral_IntVector id ;
+
+    if (Tcl_ListObjGetElements(interp, identObj, &elemc, &elemv) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    /*
+     * Vector to hold the attribute indices that constitute the
+     * identifier.
+     */
+    id = Ral_IntVectorNewEmpty(elemc) ;
+    /*
+     * Find the attribute in the tuple heading and build up a
+     * vector to install in the relation heading.
+     */
+    while (elemc-- > 0) {
+	const char *attrName = Tcl_GetString(*elemv++) ;
+	int index = Ral_TupleHeadingIndexOf(heading->tupleHeading, attrName) ;
+
+	if (index < 0) {
+	    Ral_ErrorInfoSetError(errInfo, RAL_ERR_UNKNOWN_ATTR, attrName) ;
+	    Ral_InterpSetError(interp, errInfo) ;
+	    Ral_IntVectorDelete(id) ;
+	    return TCL_ERROR ;
+	}
+	/*
+	 * The indices in an identifier must form a set, i.e. you
+	 * cannot have a duplicate attribute in a list of attributes
+	 * that is intended to be an identifier of a relation.
+	 */
+	if (!Ral_IntVectorSetAdd(id, index)) {
+	    Ral_ErrorInfoSetError(errInfo, RAL_ERR_DUP_ATTR_IN_ID,
+		attrName) ;
+	    Ral_InterpSetError(interp, errInfo) ;
+	    Ral_IntVectorDelete(id) ;
+	    return TCL_ERROR ;
+	}
+    }
+    /*
+     * Add the set of attribute indices as an identifier. Adding
+     * the vector checks that we do not have a subset dependency.
+     */
+    if (!Ral_RelationHeadingAddIdentifier(heading, idNum, id)) {
+	Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_IDENTIFIER_SUBSET, identObj) ;
+	Ral_InterpSetError(interp, errInfo) ;
+	Ral_IntVectorDelete(id) ;
+	return TCL_ERROR ;
+    }
+
+    return TCL_OK ;
 }
 
 int

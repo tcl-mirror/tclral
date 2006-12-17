@@ -41,12 +41,13 @@ terms specified in this license.
 /*
  *++
 MODULE:
+    ral_relationcmd -- command interface functions for the "relation" command
 
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.28 $
-$Date: 2006/11/05 00:15:59 $
+$Revision: 1.29 $
+$Date: 2006/12/17 00:46:58 $
  *--
  */
 
@@ -119,6 +120,7 @@ static int RelationListCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationMinusCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationProjectCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationRankCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
+static int RelationReidentifyCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationRenameCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationRestrictCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationRestrictWithCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
@@ -143,7 +145,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.28 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.29 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -194,6 +196,7 @@ relationCmd(
 	{"minus", RelationMinusCmd},
 	{"project", RelationProjectCmd},
 	{"rank", RelationRankCmd},
+	{"reidentify", RelationReidentifyCmd},
 	{"rename", RelationRenameCmd},
 	{"restrict", RelationRestrictCmd},
 	{"restrictwith", RelationRestrictWithCmd},
@@ -1851,6 +1854,78 @@ RelationRankCmd(
 	 */
 	status = Ral_RelationPushBack(newRelation, newTuple, NULL) ;
 	assert(status != 0) ;
+    }
+
+    Tcl_SetObjResult(interp, Ral_RelationObjNew(newRelation)) ;
+    return TCL_OK ;
+}
+
+/*
+ * relation reidentify relationValue id1 ?id2 id3 ...?
+ *
+ * Returns a new relation value where the identifiers are
+ * changed to id1, id2  ...
+ * Each "idN" is a list of attribute names that are to form the identifier.
+ * The tuples of the new relation are the same as those of "relationValue"
+ * less any that are duplicates under the new identification scheme.
+ */
+static int
+RelationReidentifyCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const* objv)
+{
+    Tcl_Obj *relObj ;
+    Ral_Relation relation ;
+    Ral_RelationHeading newHeading ;
+    Ral_Relation newRelation ;
+    Ral_ErrorInfo errInfo ;
+    int idNum = 0 ;
+    Ral_RelationIter riter ;
+    Ral_RelationIter rend ;
+
+    if (objc < 4) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relationValue id1 ?id2 id3 ... ?") ;
+	return TCL_ERROR ;
+    }
+
+    relObj = objv[2] ;
+    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relObj->internalRep.otherValuePtr ;
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptReidentify) ;
+
+    /*
+     * Adjust argument bookkeeping to the beginning of the identifiers.
+     */
+    objc -= 3 ;
+    objv += 3 ;
+    newHeading = Ral_RelationHeadingNew(relation->heading->tupleHeading, objc) ;
+
+    /*
+     * Iterate through the argument lists and add them as identifiers to
+     * the heading.
+     */
+    for ( ; objc > 0 ; --objc, ++objv) {
+	if (Ral_RelationHeadingNewIdFromObj(interp, newHeading, idNum++,
+	    *objv, &errInfo) != TCL_OK) {
+	    Ral_RelationHeadingDelete(newHeading) ;
+	    return TCL_ERROR ;
+	}
+    }
+    /*
+     * Create a new relation with the new heading.
+     */
+    newRelation = Ral_RelationNew(newHeading) ;
+    Ral_RelationReserve(newRelation, Ral_RelationCardinality(relation)) ;
+    /*
+     * Iterate through the tuples of the relation value and insert them
+     * into the new relation. We ignore any duplicates.
+     */
+    rend = Ral_RelationEnd(relation) ;
+    for (riter = Ral_RelationBegin(relation) ; riter != rend ; ++riter) {
+	Ral_RelationPushBack(newRelation, *riter, NULL) ;
     }
 
     Tcl_SetObjResult(interp, Ral_RelationObjNew(newRelation)) ;
