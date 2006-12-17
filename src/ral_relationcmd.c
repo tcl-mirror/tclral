@@ -46,8 +46,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.29 $
-$Date: 2006/12/17 00:46:58 $
+$Revision: 1.30 $
+$Date: 2006/12/17 01:31:18 $
  *--
  */
 
@@ -95,6 +95,7 @@ FORWARD FUNCTION REFERENCES
 static int RelationArrayCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationAssignCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationAttributesCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
+static int RelationBodyCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationCardinalityCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationChooseCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationDegreeCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
@@ -145,7 +146,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.29 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.30 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -171,6 +172,7 @@ relationCmd(
 	{"array", RelationArrayCmd},
 	{"assign", RelationAssignCmd},
 	{"attributes", RelationAttributesCmd},
+	{"body", RelationBodyCmd},
 	{"cardinality", RelationCardinalityCmd},
 	{"choose", RelationChooseCmd},
 	{"degree", RelationDegreeCmd},
@@ -377,6 +379,50 @@ RelationAttributesCmd(
     return TCL_OK ;
 }
 
+/*
+ * relation body relationValue
+ *
+ * Returns the body of relation value which is a string formatted as a list
+ * dictionaries of the tuple values in the body.
+ */
+static int
+RelationBodyCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_Obj *relationObj ;
+    Ral_Relation relation ;
+    char *strRep ;
+    Tcl_Obj *resultObj ;
+
+    /* relation cardinality relValue */
+    if (objc != 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relationValue") ;
+	return TCL_ERROR ;
+    }
+
+    relationObj = objv[2] ;
+    if (Tcl_ConvertToType(interp, relationObj, &Ral_RelationObjType)
+	!= TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relationObj->internalRep.otherValuePtr ;
+
+    strRep = Ral_RelationValueStringOf(relation) ;
+    /*
+     * The string representation of a relation value is a list of
+     * lists of tuples.
+     * We want to flatten that so that we end up just a list of tuple values.
+     * So we get rid of the surrounding {}'s.
+     */
+    resultObj = Tcl_NewStringObj(strRep + 1, strlen(strRep) - 2) ;
+    ckfree(strRep) ;
+
+    Tcl_SetObjResult(interp, resultObj) ;
+    return TCL_OK ;
+}
+
 static int
 RelationCardinalityCmd(
     Tcl_Interp *interp,
@@ -386,9 +432,9 @@ RelationCardinalityCmd(
     Tcl_Obj *relationObj ;
     Ral_Relation relation ;
 
-    /* relation cardinality relValue */
+    /* relation cardinality relationValue */
     if (objc != 3) {
-	Tcl_WrongNumArgs(interp, 2, objv, "relValue") ;
+	Tcl_WrongNumArgs(interp, 2, objv, "relationValue") ;
 	return TCL_ERROR ;
     }
 
@@ -1147,7 +1193,7 @@ RelationHeadingCmd(
 	return TCL_ERROR ;
     }
 
-    relObj = *(objv + 2) ;
+    relObj = objv[2] ;
     if (Tcl_ConvertToType(interp, relObj, &Ral_RelationObjType) != TCL_OK) {
 	return TCL_ERROR ;
     }

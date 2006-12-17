@@ -45,8 +45,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.14 $
-# $Date: 2006/12/17 00:46:58 $
+# $Revision: 1.15 $
+# $Date: 2006/12/17 01:31:18 $
 #  *--
 }]
 [moddesc "Relation Operators"]
@@ -285,6 +285,24 @@ The [cmd attributes] subcommand returns the names of the attributes of
 DogName Breed
 % relation attributes $OWNER
 OwnerName Age City
+}]
+
+[call [cmd "::ral::relation body"] [arg relationValue]]
+
+The [cmd body] subcommand returns the body of the relation value
+given by [arg relationValue].
+The body is a list of tuple values, each tuple value being in turn
+a list of attribute name / attribute value pairs.
+The order of the tuple values in the body list is arbitrary.
+
+[example {
+% foreach t [relation body $DOG] {puts $t}
+DogName Fido Breed Poodle
+DogName Sam Breed Collie
+DogName Spot Breed Terrier
+DogName Rover Breed Retriever
+DogName Fred Breed Spaniel
+DogName Jumper Breed Mutt
 }]
 
 [call [cmd "::ral::relation cardinality"] [arg relationValue]]

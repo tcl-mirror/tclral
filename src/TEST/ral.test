@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.43 $
-# $Date: 2006/12/17 00:46:58 $
+# $Revision: 1.44 $
+# $Date: 2006/12/17 01:31:18 $
 #  *--
 
 package require tcltest 2.2
@@ -916,6 +916,16 @@ namespace eval ::ral::test {
     test relation-attributes-1.0 {DOG relation} -body {
 	lsort [relation attributes $P]
     } -result {CITY COLOR P# PNAME WEIGHT}
+
+    # relation body subcommand
+    test relation-body-1.0 {DOG relation} -body {
+	relation body $DOG
+    } -result {{DogName Fido Breed Poodle}\
+	    {DogName Sam Breed Collie}\
+	    {DogName Spot Breed Terrier}\
+	    {DogName Rover Breed Retriever}\
+	    {DogName Fred Breed Spaniel}\
+	    {DogName Jumper Breed Mutt}}
 
     # relation cardinality subcommand
     test relation-cardinality-1.0 {dum relation} -body {

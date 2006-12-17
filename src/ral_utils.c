@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_utils.c,v $
-$Revision: 1.11 $
-$Date: 2006/12/17 00:46:58 $
+$Revision: 1.12 $
+$Date: 2006/12/17 01:31:18 $
  *--
  */
 
@@ -87,7 +87,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_utils.c,v $ $Revision: 1.11 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_utils.c,v $ $Revision: 1.12 $" ;
 
 static char const * const cmdStrings[] = {
     "unknown command",
@@ -98,66 +98,73 @@ static char const * const cmdStrings[] = {
     "updatefromobj",
 } ;
 
+/*
+ * The order here must match that of the definition of "enum Ral_CmdOption"!
+ */
 static char const * const optStrings[] = {
     "NONE",
-    "ARRAY",
-    "ASSIGN",
-    "ASSOCIATION",
-    "CARDINALITY",
-    "CHOOSE",
-    "CONSTRAINT",
-    "CORRELATION",
-    "CREATE",
-    "DEGREE",
-    "DELETE",
-    "DELETEONE",
-    "DESTROY",
-    "DICT",
-    "DIVIDE",
-    "ELIMINATE",
-    "EMPTYOF",
-    "EQUAL",
-    "EVAL",
-    "EXTEND",
-    "EXTRACT",
-    "FOREACH",
-    "GET",
-    "GROUP",
-    "HEADING",
-    "IDENTIFIERS",
-    "INCLUDE",
-    "INSERT",
-    "INTERSECT",
-    "IS",
-    "ISEMPTY",
-    "ISNOTEMPTY",
-    "JOIN",
-    "LIST",
-    "MINUS",
-    "NAMES",
-    "PARTITION",
-    "PROJECT",
-    "RANK",
-    "REIDENTIFY",
-    "RENAME",
-    "RESTRICT",
-    "RESTRICTWITH",
-    "SEMIJOIN",
-    "SEMIMINUS",
-    "SET",
-    "SUMMARIZE",
-    "TAG",
-    "TCLOSE",
-    "TIMES",
-    "TUPLE",
-    "UNGROUP",
-    "UNION",
-    "UNWRAP",
-    "UPDATE",
-    "UPDATEONE",
-    "WRAP",
+    "array",
+    "assign",
+    "association",
+    "body",
+    "cardinality",
+    "choose",
+    "constraint",
+    "correlation",
+    "create",
+    "degree",
+    "delete",
+    "deleteone",
+    "destroy",
+    "dict",
+    "divide",
+    "eliminate",
+    "emptyof",
+    "equal",
+    "eval",
+    "extend",
+    "extract",
+    "foreach",
+    "get",
+    "group",
+    "heading",
+    "identifiers",
+    "include",
+    "insert",
+    "intersect",
+    "is",
+    "isempty",
+    "isnotempty",
+    "join",
+    "list",
+    "minus",
+    "names",
+    "partition",
+    "project",
+    "rank",
+    "reidentify",
+    "rename",
+    "restrict",
+    "restrictwith",
+    "semijoin",
+    "semiminus",
+    "set",
+    "summarize",
+    "tag",
+    "tclose",
+    "times",
+    "tuple",
+    "ungroup",
+    "union",
+    "unwrap",
+    "update",
+    "updateone",
+    "wrap",
 } ;
 
+/*
+ * The order here must match that of the definition of "enum Ral_ErrorCode"!
+ */
 static char const * const resultStrings[] = {
     "no error",
     "unknown attribute name",
