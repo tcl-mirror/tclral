@@ -46,8 +46,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.30 $
-$Date: 2006/12/17 01:31:18 $
+$Revision: 1.31 $
+$Date: 2006/12/17 22:40:49 $
  *--
  */
 
@@ -98,6 +98,7 @@ static int RelationAttributesCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationBodyCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationCardinalityCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationChooseCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
+static int RelationCreateCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationDegreeCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 #if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
 static int RelationDictCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
@@ -146,7 +147,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.30 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.31 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -175,6 +176,7 @@ relationCmd(
 	{"body", RelationBodyCmd},
 	{"cardinality", RelationCardinalityCmd},
 	{"choose", RelationChooseCmd},
+	{"create", RelationCreateCmd},
 	{"degree", RelationDegreeCmd},
 #	    if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
 	{"dict", RelationDictCmd},
@@ -519,6 +521,61 @@ RelationChooseCmd(
     return TCL_OK ;
 }
 
+/*
+ * relation create attrs ids ?tuple1 tuple2 ...?
+ *
+ * Returns a relation value with the given attributes, identifiers and body.
+ * Cf. "tuple create"
+ */
+
+static int
+RelationCreateCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Ral_RelationHeading heading ;
+    Ral_ErrorInfo errInfo ;
+    Ral_Relation relation ;
+
+    if (objc < 4) {
+	Tcl_WrongNumArgs(interp, 2, objv, "attrs ids ?tuple1 tuple2 ...?") ;
+	return TCL_ERROR ;
+    }
+
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptCreate) ;
+    /*
+     * Create the relation heading from the arguments.
+     */
+    heading = Ral_RelationHeadingNewFromObjs(interp, objv[2], objv[3],
+	&errInfo) ;
+    if (heading == NULL) {
+	return TCL_ERROR ;
+    }
+    relation = Ral_RelationNew(heading) ;
+
+    /*
+     * Offset the argument bookkeeping to reference the tuples.
+     */
+    objc -= 4 ;
+    objv += 4 ;
+    Ral_RelationReserve(relation, objc) ;
+    /*
+     * Iterate through the tuple arguments, inserting them into the relation.
+     * Here duplicates matter as we deem creation to have "insert" semantics.
+     */
+    for ( ; objc > 0 ; --objc, ++objv) {
+	if (Ral_RelationInsertTupleObj(relation, interp, *objv, &errInfo)
+	    != TCL_OK) {
+	    Ral_RelationDelete(relation) ;
+	    return TCL_ERROR ;
+	}
+    }
+
+    Tcl_SetObjResult(interp, Ral_RelationObjNew(relation)) ;
+    return TCL_OK ;
+}
+
 static int
 RelationDegreeCmd(
     Tcl_Interp *interp,
@@ -528,9 +585,9 @@ RelationDegreeCmd(
     Tcl_Obj *relationObj ;
     Ral_Relation relation ;
 
-    /* relation degree relValue */
+    /* relation degree relationValue */
     if (objc != 3) {
-	Tcl_WrongNumArgs(interp, 2, objv, "relValue") ;
+	Tcl_WrongNumArgs(interp, 2, objv, "relationValue") ;
 	return TCL_ERROR ;
     }
 

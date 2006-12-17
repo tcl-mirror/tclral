@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.26 $
-# $Date: 2006/11/05 00:15:59 $
+# $Revision: 1.27 $
+# $Date: 2006/12/17 22:40:49 $
 #  *--
 
 namespace eval ::ral {
@@ -1155,4 +1155,4 @@ proc ::ral::findSubSetRef {name subSets} {
     error "did not find \"$name\" among the subsets names"
 }
 
-package provide ral 0.8
+package provide ral 0.8.1

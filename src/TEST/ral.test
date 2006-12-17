@@ -50,15 +50,15 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.44 $
-# $Date: 2006/12/17 01:31:18 $
+# $Revision: 1.45 $
+# $Date: 2006/12/17 22:40:49 $
 #  *--
 
 package require tcltest 2.2
 eval tcltest::configure $argv
 
 set ::auto_path [linsert $::auto_path 0 [file normalize ..]]
-package require ral 0.8
+package require ral
 
 proc tupleMatch {expected actual} {
     return [::ral::tuple equal $expected $actual]
@@ -978,6 +978,15 @@ namespace eval ::ral::test {
 	relation choose $r Age 30
     } -result {Relation {Name string Age int} {Name Age} {{Name Fred Age 30}}}\
     -match relation
+
+    # relation create subcommand
+    test relation-create-1.0 {one id, one tuple} -body {
+	relation create {A1 string} A1 {A1 a1}
+    } -result {Relation {A1 string} A1 {{A1 a1}}} -match relation
+
+    test relation-create-2.0 {one id, zero tuple} -body {
+	relation create {A1 string} A1
+    } -result {Relation {A1 string} A1 {}} -match relation
 
     # relation degree subcommand
     test relation-degree-1.0 {dum relation} -body {

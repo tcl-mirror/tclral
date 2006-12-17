@@ -45,8 +45,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.15 $
-# $Date: 2006/12/17 01:31:18 $
+# $Revision: 1.16 $
+# $Date: 2006/12/17 22:40:49 $
 #  *--
 }]
 [moddesc "Relation Operators"]
@@ -350,6 +350,27 @@ in [arg relationValue] is superfluous.
 |string |string|
 +=======+------+
 +=======+------+
+}]
+
+[call [cmd "::ral::relation create"] [arg attrs] [arg ids]\
+    [opt [arg "tuple1 tuple2 ..."]]]
+
+The [cmd create] subcommand returns the relation value described by
+the [arg attrs], [arg ids] and [arg tupleN] arguments.
+The [arg attrs] argument is a list of attribute name / attribute type pairs.
+The [arg ids] argument is a list of identifiers, each identifier in turn
+being a list of one or more attribute names.
+Any tuples given by the [opt [arg tupleN]] arguments is inserted into the
+relation value.
+Each [arg tupleN] argument is a list of attribute name / attribute value pairs.
+This command allows for creating a relation value without having knowledge of
+the string representation of a relation value. Compare with the
+[cmd "::ral::tuple create"] command.
+
+[example {
+% relation create {DogName string Breed string} DogName\
+    {DogName Fido Breed Poodle}
+Relation {DogName string Breed string} DogName {{DogName Fido Breed Poodle}}
 }]
 
 [call [cmd "::ral::relation degree"] [arg relationValue]]
