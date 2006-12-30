@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.c,v $
-$Revision: 1.10 $
-$Date: 2006/09/23 18:09:14 $
+$Revision: 1.11 $
+$Date: 2006/12/30 02:58:42 $
  *--
  */
 
@@ -79,6 +79,8 @@ EXTERNAL FUNCTION REFERENCES
 FORWARD FUNCTION REFERENCES
 */
 static void relvarCleanup(Ral_Relvar) ;
+static void relvarConstraintCleanup(Ral_Constraint) ;
+static void relvarTraceCleanup(Ral_TraceInfo) ;
 static void relvarSetIntRep(Ral_Relvar, Ral_Relation) ;
 static int relvarAssocConstraintEval(const char *, Ral_AssociationConstraint,
     Tcl_DString *) ;
@@ -118,7 +120,7 @@ static char const * const condMultStrings[2][2] = {
     {"1", "+"},
     {"?", "*"}
 } ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.10 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.11 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -144,6 +146,8 @@ Ral_RelvarNew(
 	    relvar->relObj = Ral_RelationObjNew(Ral_RelationNew(heading))) ;
 	relvar->transStack = Ral_PtrVectorNew(1) ;
 	relvar->constraints = Ral_PtrVectorNew(0) ;
+	relvar->traces = NULL ;
+	relvar->traceFlags = 0 ;
 	Tcl_SetHashValue(entry, relvar) ;
     }
 
@@ -188,6 +192,12 @@ Ral_RelvarFind(
     return relvar ;
 }
 
+/*
+ * Called when the "relvar" command is created to supply the relvar
+ * storage connected with a particular interpreter. The returned "clientdata"
+ * is passed to the relvar command and provides the means of holding
+ * all the relvar information.
+ */
 ClientData
 Ral_RelvarNewInfo(
     const char *name,
@@ -203,6 +213,10 @@ Ral_RelvarNewInfo(
     return (ClientData)info ;
 }
 
+/*
+ * Called when the interpreter is deleted and we need to recover the
+ * memory resources associated with the relvars.
+ */
 void
 Ral_RelvarDeleteInfo(
     ClientData cd,
@@ -223,11 +237,15 @@ Ral_RelvarDeleteInfo(
 	relvarCleanup(Tcl_GetHashValue(entry)) ;
     }
     Tcl_DeleteHashTable(&info->relvars) ;
+    /*
+     * At this point all the memory associated with relvars is cleaned up.
+     * Now do the same for constraints.
+     */
     for (entry = Tcl_FirstHashEntry(&info->constraints, &search) ;
 	entry ; entry = Tcl_NextHashEntry(&search)) {
-	 Ral_ConstraintDelete(Tcl_GetHashValue(entry)) ;
+	 relvarConstraintCleanup(Tcl_GetHashValue(entry)) ;
     }
-    Tcl_DeleteHashTable(&info->relvars) ;
+    Tcl_DeleteHashTable(&info->constraints) ;
     ckfree((char *)info) ;
 }
 
@@ -589,10 +607,6 @@ Ral_ConstraintDelete(
 	if (found != Ral_PtrVectorEnd(referred->constraints)) {
 	    Ral_PtrVectorErase(referred->constraints, found, found + 1) ;
 	}
-	if (assoc->referenceMap) {
-	    Ral_JoinMapDelete(assoc->referenceMap) ;
-	}
-	ckfree((char *)assoc) ;
     }
 	break ;
 
@@ -637,8 +651,6 @@ Ral_ConstraintDelete(
 		Ral_JoinMapDelete(subRef->subsetMap) ;
 	    }
 	}
-	Ral_PtrVectorDelete(partition->subsetReferences) ;
-	ckfree((char *)constraint->partition) ;
     }
 	break ;
 
@@ -669,18 +681,10 @@ Ral_ConstraintDelete(
 	if (found != Ral_PtrVectorEnd(aRef->constraints)) {
 	    Ral_PtrVectorErase(aRef->constraints, found, found + 1) ;
 	}
-	if (correl->aReferenceMap) {
-	    Ral_JoinMapDelete(correl->aReferenceMap) ;
-	}
 	found = Ral_PtrVectorFind(bRef->constraints, constraint) ;
 	if (found != Ral_PtrVectorEnd(bRef->constraints)) {
 	    Ral_PtrVectorErase(bRef->constraints, found, found + 1) ;
 	}
-	if (correl->bReferenceMap) {
-	    Ral_JoinMapDelete(correl->bReferenceMap) ;
-	}
-
-	ckfree((char *)correl) ;
     }
 	break ;
 
@@ -689,7 +693,7 @@ Ral_ConstraintDelete(
 	    constraint->type) ;
     }
 
-    ckfree((char *)constraint) ;
+    relvarConstraintCleanup(constraint) ;
 }
 
 int
@@ -774,6 +778,76 @@ Ral_RelvarDiscardPrev(
 }
 
 /*
+ * Add a new trace to a relvar.
+ */
+void
+Ral_RelvarTraceAdd(
+    Ral_Relvar relvar,
+    int flags,
+    Tcl_Obj *const command)
+{
+    Ral_TraceInfo info = (Ral_TraceInfo)ckalloc(sizeof *info) ;
+
+    info->flags = flags ;
+    Tcl_IncrRefCount(info->command = command) ;
+    /*
+     * Chain the new trace onto the beginning of the list.
+     */
+    info->next = relvar->traces ;
+    relvar->traces = info ;
+}
+
+/*
+ * Find and remove a trace for a relvar.
+ */
+int
+Ral_RelvarTraceRemove(
+    Ral_Relvar relvar,
+    int flags,
+    Tcl_Obj *const command)
+{
+    Ral_TraceInfo prev = NULL ;
+    Ral_TraceInfo trace = relvar->traces ;
+    const char *cmdString = Tcl_GetString(command) ;
+    int nRemoved = 0 ;
+
+    /*
+     * The traces are in a linked list so we must traverse the list
+     * to find the trace. Since it is singly linked we must keep a trailing
+     * pointer to use during relinking.
+     */
+    while (trace) {
+	if (trace->flags == flags &&
+	    strcmp(Tcl_GetString(trace->command), cmdString) == 0) {
+	    /*
+	     * Found a match. Save the one to delete.
+	     */
+	    Ral_TraceInfo del = trace ;
+	    if (prev) {
+		/*
+		 * Unlink and free the trace.
+		 */
+		trace = prev->next = trace->next ;
+	    } else {
+		/*
+		 * First one in the list matched.
+		 */
+		trace = relvar->traces = trace->next ;
+	    }
+	    relvarTraceCleanup(del) ;
+	    ++nRemoved ;
+	} else {
+	    /*
+	     * No match, bookkeep the pointers.
+	     */
+	    prev = trace ;
+	    trace = trace->next ;
+	}
+    }
+    return nRemoved ;
+}
+
+/*
  * PRIVATE FUNCTIONS
  */
 
@@ -781,6 +855,8 @@ static void
 relvarCleanup(
     Ral_Relvar relvar)
 {
+    Ral_TraceInfo t ;
+
     if (relvar->relObj) {
 	assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
 	Tcl_DecrRefCount(relvar->relObj) ;
@@ -793,7 +869,70 @@ relvarCleanup(
     Ral_PtrVectorDelete(relvar->transStack) ;
     Ral_PtrVectorDelete(relvar->constraints) ;
 
+    /*
+     * Free the trace information, making sure to decrement the
+     * reference count on the trace command.
+     */
+    for (t = relvar->traces ; t ; t = t->next) {
+	relvarTraceCleanup(t) ;
+    }
+
     ckfree((char *)relvar) ;
+}
+
+/*
+ * Free the memory associated with a constaint.
+ */
+static void
+relvarConstraintCleanup(
+    Ral_Constraint constraint)
+{
+    switch (constraint->type) {
+    case ConstraintAssociation:
+    {
+	Ral_AssociationConstraint assoc = constraint->association ;
+	if (assoc->referenceMap) {
+	    Ral_JoinMapDelete(assoc->referenceMap) ;
+	}
+	ckfree((char *)assoc) ;
+    }
+	break ;
+
+    case ConstraintPartition:
+    {
+	Ral_PartitionConstraint partition = constraint->partition ;
+	Ral_PtrVectorDelete(partition->subsetReferences) ;
+	ckfree((char *)constraint->partition) ;
+    }
+	break ;
+
+    case ConstraintCorrelation:
+    {
+	Ral_CorrelationConstraint correl = constraint->correlation ;
+	if (correl->aReferenceMap) {
+	    Ral_JoinMapDelete(correl->aReferenceMap) ;
+	}
+	if (correl->bReferenceMap) {
+	    Ral_JoinMapDelete(correl->bReferenceMap) ;
+	}
+	ckfree((char *)correl) ;
+    }
+	break ;
+
+    default:
+	Tcl_Panic("relvarConstraintCleanup: unknown constraint type, %d",
+	    constraint->type) ;
+    }
+
+    ckfree((char *)constraint) ;
+}
+
+static void
+relvarTraceCleanup(
+    Ral_TraceInfo trace)
+{
+    Tcl_DecrRefCount(trace->command) ;
+    ckfree((char *)trace) ;
 }
 
 static void

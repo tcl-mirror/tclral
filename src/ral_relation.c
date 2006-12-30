@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.23 $
-$Date: 2006/11/05 00:15:59 $
+$Revision: 1.24 $
+$Date: 2006/12/30 02:58:42 $
  *--
  */
 
@@ -116,7 +116,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.23 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.24 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -1891,23 +1891,6 @@ Ral_RelationErase(
 	assert(status != 0) ;
     }
     return first ;
-}
-
-int
-Ral_RelationEraseTuple(
-    Ral_Relation relation,
-    int idNum,
-    Ral_Tuple key,
-    Ral_IntVector map)
-{
-    Ral_RelationIter found = Ral_RelationFindKey(relation, idNum, key, map) ;
-    Ral_RelationIter end = Ral_RelationEnd(relation) ;
-
-    if (found != end) {
-	Ral_RelationErase(relation, found, found + 1) ;
-    }
-
-    return found != end ;
 }
 
 /*

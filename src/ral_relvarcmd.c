@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.20 $
-$Date: 2006/09/23 18:09:14 $
+$Revision: 1.21 $
+$Date: 2006/12/30 02:58:42 $
  *--
  */
 
@@ -97,6 +97,7 @@ static int RelvarPartitionCmd(Tcl_Interp *, int, Tcl_Obj *const*,
     Ral_RelvarInfo) ;
 static int RelvarPathCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarSetCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
+static int RelvarTraceCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarUnsetCmd(Tcl_Interp *, int, Tcl_Obj *const*,
     Ral_RelvarInfo) ;
 static int RelvarUpdateCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
@@ -114,7 +115,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.20 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.21 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -142,6 +143,7 @@ relvarCmd(
 	{"names", RelvarNamesCmd},
 	{"partition", RelvarPartitionCmd},
 	{"path", RelvarPathCmd},
+	{"trace", RelvarTraceCmd},
 	{"set", RelvarSetCmd},
 	{"unset", RelvarUnsetCmd},
 	{"update", RelvarUpdateCmd},
@@ -408,7 +410,8 @@ RelvarDeleteCmd(
 	    result = TCL_ERROR ;
 	    break ;
 	}
-	if (boolValue) {
+	if (boolValue &&
+	    Ral_RelvarObjExecDeleteTraces(interp, relvar, tupleObj) == TCL_OK) {
 	    rIter = Ral_RelationErase(relation, rIter, rIter + 1) ;
 	    ++deleted ;
 	} else {
@@ -442,9 +445,10 @@ RelvarDeleteOneCmd(
     Ral_Relation relation ;
     Ral_Tuple key ;
     int idNum ;
-    int deleted ;
+    int deleted = 0 ;
     int result ;
     Ral_ErrorInfo errInfo ;
+    Ral_RelationIter found ;
 
     /* relvar deleteone relvarName ?attrName1 value1 attrName2 value2 ...? */
     if (objc < 3) {
@@ -480,7 +484,19 @@ RelvarDeleteOneCmd(
 	    RAL_ERR_ONGOING_CMD, objv[2]) ;
 	return TCL_ERROR ;
     }
-    deleted = Ral_RelationEraseTuple(relation, idNum, key, NULL) ;
+
+    found = Ral_RelationFindKey(relation, idNum, key, NULL) ;
+    if (found != Ral_RelationEnd(relation)) {
+	Tcl_Obj *tupleObj ;
+
+	Tcl_IncrRefCount(tupleObj = Ral_TupleObjNew(*found)) ;
+	if (Ral_RelvarObjExecDeleteTraces(interp, relvar, tupleObj) == TCL_OK) {
+	    Ral_RelationErase(relation, found, found + 1) ;
+	    deleted = 1 ;
+	}
+	Tcl_DecrRefCount(tupleObj) ;
+    }
+
     Ral_TupleDelete(key) ;
 
     if (deleted) {
@@ -539,7 +555,6 @@ RelvarInsertCmd(
     Ral_RelvarInfo rInfo)
 {
     Ral_Relvar relvar ;
-    Ral_Relation relation ;
     int inserted = 0 ;
     int result ;
     Ral_ErrorInfo errInfo ;
@@ -555,11 +570,6 @@ RelvarInsertCmd(
     if (relvar == NULL) {
 	return TCL_ERROR ;
     }
-    if (Tcl_ConvertToType(interp, relvar->relObj, &Ral_RelationObjType)
-	!= TCL_OK) {
-	return TCL_ERROR ;
-    }
-    relation = relvar->relObj->internalRep.otherValuePtr ;
 
     if (!Ral_RelvarStartCommand(rInfo, relvar)) {
 	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptInsert,
@@ -571,9 +581,8 @@ RelvarInsertCmd(
     objc -= 3 ;
     objv += 3 ;
 
-    Ral_RelationReserve(relation, objc) ;
     while (objc-- > 0) {
-	if (Ral_RelationInsertTupleObj(relation, interp, *objv++, &errInfo)
+	if (Ral_RelvarObjInsertTuple(interp, relvar, *objv++, &errInfo)
 	    != TCL_OK) {
 	    return Ral_RelvarObjEndCmd(interp, rInfo, 1) ;
 	}
@@ -685,6 +694,90 @@ RelvarPathCmd(
      * relvar participating in the association is treated as modified.
      */
     return TCL_OK ;
+}
+
+/*
+ * relvar trace add relvarName ops command
+ * relvar trace remove relvarName ops command
+ * relvar trace info relvarname
+ */
+static int
+RelvarTraceCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv,
+    Ral_RelvarInfo rInfo)
+{
+    enum TraceCmdType {
+	TraceAdd,
+	TraceRemove,
+	TraceInfo,
+    } ;
+    static char const *traceCmds[] = {
+	"add",
+	"remove",
+	"info",
+	NULL
+    } ;
+    int index ;
+    Ral_Relvar relvar ;
+    int result = TCL_ERROR ;
+
+    if (objc < 4) {
+	Tcl_WrongNumArgs(interp, 2, objv, "type relvarName ?arg arg ...?") ;
+	return TCL_ERROR ;
+    }
+
+    /*
+     * Look up the subcommand.
+     */
+    if (Tcl_GetIndexFromObj(interp, objv[2], traceCmds, "trace subcommand", 0,
+	&index) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+
+    /*
+     * Look up the relvar. If the relvar does not exist it is an error.
+     */
+    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[3]),
+	NULL) ;
+    if (relvar == NULL) {
+	return TCL_ERROR ;
+    }
+
+    switch ((enum TraceCmdType)index) {
+    case TraceAdd:
+	/* relvar trace add relvarName ops command */
+	if (objc != 6) {
+	    Tcl_WrongNumArgs(interp, 2, objv, "add relvarName ops command") ;
+	    return TCL_ERROR ;
+	}
+	result = Ral_RelvarObjTraceAdd(interp, relvar, objv[4], objv[5]) ;
+	break ;
+
+    case TraceRemove:
+	/* relvar trace remove relvarName ops command */
+	if (objc != 6) {
+	    Tcl_WrongNumArgs(interp, 2, objv, "remove relvarName ops command") ;
+	    return TCL_ERROR ;
+	}
+	result = Ral_RelvarObjTraceRemove(interp, relvar, objv[4], objv[5]) ;
+	break ;
+
+    case TraceInfo:
+	/* relvar trace info relvarName */
+	if (objc != 4) {
+	    Tcl_WrongNumArgs(interp, 2, objv, "info relvarName") ;
+	    return TCL_ERROR ;
+	}
+	result = Ral_RelvarObjTraceInfo(interp, relvar) ;
+	break ;
+
+    default:
+	Tcl_Panic("Unknown trace command type, %d", index) ;
+    }
+
+    return result ;
 }
 
 static int

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.h,v $
-$Revision: 1.7 $
-$Date: 2006/09/23 18:09:14 $
+$Revision: 1.8 $
+$Date: 2006/12/30 02:58:42 $
  *--
  */
 #ifndef _ral_relvar_h_
@@ -125,11 +125,23 @@ typedef struct Ral_Constraint {
     } ;
 } *Ral_Constraint ;
 
+/*
+ * Currently there is not "C" level access to relvar tracing functionality.
+ * These data structures are just the minimum to allow script level access.
+ */
+typedef struct Ral_TraceInfo {
+    struct Ral_TraceInfo *next ;    /* use a linked list for trace info */
+    int flags ;			    /* to which operations the trace applies */
+    Tcl_Obj *command ;		    /* command prefix for the trace */
+} *Ral_TraceInfo ;
+
 typedef struct Ral_Relvar {
     char *name ;		/* fully resolved name */
     Tcl_Obj *relObj ;		/* relation valued object */
     Ral_PtrVector transStack ;	/* a stack of Ral_Relation */
     Ral_PtrVector constraints ;	/* a list of Ral_Constraint  */
+    Ral_TraceInfo traces ;	/* linked list of Ral_TraceInfo */
+    int traceFlags ;		/* state of tracing */
 } *Ral_Relvar ;
 
 typedef struct Ral_RelvarTransaction {
@@ -189,6 +201,9 @@ extern int Ral_RelvarConstraintEval(Ral_Constraint, Tcl_DString *) ;
 extern void Ral_RelvarSetRelation(Ral_Relvar, Ral_Relation) ;
 extern void Ral_RelvarRestorePrev(Ral_Relvar) ;
 extern void Ral_RelvarDiscardPrev(Ral_Relvar) ;
+
+extern void Ral_RelvarTraceAdd(Ral_Relvar, int, Tcl_Obj *const) ;
+extern int Ral_RelvarTraceRemove(Ral_Relvar, int, Tcl_Obj *const) ;
 
 
 #endif /* _ral_relvar_h_ */

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.h,v $
-$Revision: 1.16 $
-$Date: 2006/09/09 21:37:47 $
+$Revision: 1.17 $
+$Date: 2006/12/30 02:58:42 $
  *--
  */
 #ifndef _ral_relation_h_
@@ -160,7 +160,6 @@ extern Ral_RelationIter Ral_RelationFindKey(Ral_Relation, int, Ral_Tuple,
 extern Ral_Relation Ral_RelationExtract(Ral_Relation, Ral_IntVector) ;
 extern Ral_RelationIter Ral_RelationErase(Ral_Relation, Ral_RelationIter,
     Ral_RelationIter) ;
-extern int Ral_RelationEraseTuple(Ral_Relation, int, Ral_Tuple, Ral_IntVector) ;
 
 extern int Ral_RelationCompare(Ral_Relation, Ral_Relation) ;
 extern int Ral_RelationEqual(Ral_Relation, Ral_Relation) ;
