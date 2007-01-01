@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.46 $
-# $Date: 2006/12/30 02:58:42 $
+# $Revision: 1.47 $
+# $Date: 2007/01/01 01:48:17 $
 #  *--
 
 package require tcltest 2.2
@@ -76,13 +76,10 @@ proc setMatch {expected actual} {
 proc traceProc {relvarName opsList args} {
     variable traceInfo [list]
     lappend traceInfo $relvarName $opsList $args
-    puts "got Trace: $relvarName $opsList $args"
 }
 
 proc modTuple {relvarName opsList tup} {
-    puts "modTuple: oldValue: $tup"
     ::ral::tuple update tup SNAME Baz
-    puts "modTuple: newValue: $tup"
 }
 
 if {[package vsatisfies [package require Tcl] 8.5]} {
@@ -4731,7 +4728,8 @@ tuple {A1 c} is not referred to by any tuple
 	relvar update X t {[tuple extract $t Name] eq "George"} {
 	    tuple update t Name Fred
 	}
-    } -result {duplicate tuple, "{Name Fred Status 20}"} -returnCodes error
+    } -result {duplicate tuple, "Tuple {Name string Status int} {Name Fred Status 20}"}\
+    -returnCodes error
 
     # relvar updateone subcommand
     test relvar-updateone-1.0 {no match} -setup {
@@ -4833,7 +4831,8 @@ tuple {A1 c} is not referred to by any tuple
 	relvar updateone X xTup {Name George} {
 	    tuple update xTup Name Fred
 	}
-    } -result {duplicate tuple, "{Name Fred Status 20}"} -returnCodes error
+    } -result {duplicate tuple, "Tuple {Name string Status int} {Name Fred Status 20}"}\
+    -returnCodes error
 
     # relvar trace subcommand
     test relvar-trace-1.0 {single operation} -setup {

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.18 $
-$Date: 2006/12/30 02:58:42 $
+$Revision: 1.19 $
+$Date: 2007/01/01 01:48:17 $
  *--
  */
 
@@ -152,7 +152,7 @@ static const struct traceOpsMap {
 } ;
 static const char specErrMsg[] = "multiplicity specification" ;
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.18 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.19 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -251,6 +251,10 @@ Ral_RelvarObjDelete(
 	ckfree(fullName) ;
 	return TCL_ERROR ;
     }
+    /*
+     * Run the unset traces.
+     */
+    Ral_RelvarObjExecUnsetTraces(interp, relvar) ;
     /*
      * Remove the trace.
      */
@@ -395,6 +399,72 @@ Ral_RelvarObjInsertTuple(
     }
     Tcl_DecrRefCount(newTuple) ;
 
+    return result ;
+}
+
+int
+Ral_RelvarObjUpdateTuple(
+    Tcl_Interp *interp,
+    Ral_Relvar relvar,
+    Ral_Relation relation,
+    Ral_RelationIter tupleIter,
+    Tcl_Obj *scriptObj,
+    Tcl_Obj *tupleVarNameObj,
+    Ral_ErrorInfo *errInfo)
+{
+    int result ;
+    Tcl_Obj *newTupleObj ;
+    Tcl_Obj *oldTupleObj ;
+    /*
+     * Evaluate the script.
+     */
+    result = Tcl_EvalObjEx(interp, scriptObj, 0) ;
+    if (result == TCL_ERROR) {
+	static const char msgfmt[] =
+	    "\n    (\"in ::ral::%s %s\" body line %d)" ;
+	char msg[sizeof(msgfmt) + TCL_INTEGER_SPACE + 50] ;
+
+	sprintf(msg, msgfmt, Ral_ErrorInfoGetCommand(errInfo),
+	    Ral_ErrorInfoGetOption(errInfo), interp->errorLine) ;
+	Tcl_AddObjErrorInfo(interp, msg, -1) ;
+	return result ;
+    } else if (result != TCL_OK) {
+	return result ;
+    }
+    /*
+     * Fetch the value of the tuple variable. It could be different now that
+     * the script has been executed. Once we get the new tuple value, we can
+     * use it to update the relvar.
+     */
+    newTupleObj = Tcl_ObjGetVar2(interp, tupleVarNameObj, NULL,
+	TCL_LEAVE_ERR_MSG) ;
+    if (newTupleObj == NULL) {
+	return TCL_ERROR ;
+    }
+    result = Tcl_ConvertToType(interp, newTupleObj, &Ral_TupleObjType) ;
+    if (result != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    assert(newTupleObj->typePtr == &Ral_TupleObjType) ;
+    Tcl_IncrRefCount(newTupleObj) ;
+    /*
+     * Create an object out of the old tuple value.
+     */
+    oldTupleObj = Ral_TupleObjNew(*tupleIter) ;
+    Tcl_IncrRefCount(oldTupleObj) ;
+    /*
+     * Call all the traces handing the old tuple value and the new
+     * tuple value.
+     */
+    result = Ral_RelvarObjExecUpdateTraces(interp, relvar, oldTupleObj,
+	newTupleObj) ;
+    if (result == TCL_OK) {
+	result = Ral_RelationUpdateTupleObj(relation, tupleIter, interp,
+	    newTupleObj, errInfo) ;
+    }
+
+    Tcl_DecrRefCount(oldTupleObj) ;
+    Tcl_DecrRefCount(newTupleObj) ;
     return result ;
 }
 
@@ -1900,7 +1970,7 @@ Ral_RelvarObjExecTraces(
     Tcl_Obj *arg1,
     Tcl_Obj *arg2)
 {
-    int result = TCL_ERROR ;
+    int result = TCL_OK ;
     Tcl_Obj *cmdv[5] ;
     int cmdc = 3 ;
     Tcl_Obj *nameObj ;
@@ -1913,7 +1983,8 @@ Ral_RelvarObjExecTraces(
 
     if (Ral_RelvarObjEncodeTraceFlag(interp, relvar->traceFlags, &flagObj)
 	!= TCL_OK) {
-	goto nError ;
+	Tcl_DecrRefCount(nameObj) ;
+	return TCL_ERROR ;
     }
     Tcl_IncrRefCount(cmdv[2] = flagObj) ;
     if (arg1) {
@@ -1927,16 +1998,15 @@ Ral_RelvarObjExecTraces(
 	if (trace->flags & relvar->traceFlags) {
 	    cmdv[0] = trace->command ;
 
-	    result = Tcl_EvalObjv(interp, cmdc, cmdv, TCL_EVAL_GLOBAL) ;
+	    result = Tcl_EvalObjv(interp, cmdc, cmdv, TCL_EVAL_DIRECT) ;
 	    if (result != TCL_OK) {
 		break ;
 	    }
 	}
     }
-
     Tcl_DecrRefCount(flagObj) ;
-nError:
     Tcl_DecrRefCount(nameObj) ;
+
     return result ;
 }
 

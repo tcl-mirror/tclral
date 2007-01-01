@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_utils.h,v $
-$Revision: 1.11 $
-$Date: 2006/12/30 02:58:42 $
+$Revision: 1.12 $
+$Date: 2007/01/01 01:48:17 $
  *--
  */
 #ifndef _ral_utils_h_
@@ -212,5 +212,7 @@ extern void Ral_InterpErrorInfo(Tcl_Interp *, Ral_Command, Ral_CmdOption,
     Ral_ErrorCode, const char *) ;
 extern void Ral_InterpErrorInfoObj(Tcl_Interp *, Ral_Command, Ral_CmdOption,
     Ral_ErrorCode, Tcl_Obj *) ;
+extern char const *Ral_ErrorInfoGetCommand(Ral_ErrorInfo *) ;
+extern char const *Ral_ErrorInfoGetOption(Ral_ErrorInfo *) ;
 
 #endif /* _ral_utils_h_ */

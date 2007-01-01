@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationobj.c,v $
-$Revision: 1.20 $
-$Date: 2006/12/17 00:46:58 $
+$Revision: 1.21 $
+$Date: 2007/01/01 01:48:17 $
  *--
  */
 
@@ -108,7 +108,7 @@ Tcl_ObjType Ral_RelationObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.20 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.21 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -333,6 +333,36 @@ Ral_RelationInsertTupleObj(
     return TCL_OK ;
 }
 
+/*
+ * Update a tuple value contained in a Tcl object into a relation.
+ */
+int
+Ral_RelationUpdateTupleObj(
+    Ral_Relation relation,
+    Ral_RelationIter where,
+    Tcl_Interp *interp,
+    Tcl_Obj *tupleObj,
+    Ral_ErrorInfo *errInfo)
+{
+    Ral_Tuple tuple ;
+
+    /*
+     * Convert to a tuple type.
+     */
+    if (Tcl_ConvertToType(interp, tupleObj, &Ral_TupleObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    assert(tupleObj->typePtr == &Ral_TupleObjType) ;
+    tuple = tupleObj->internalRep.otherValuePtr ;
+    if (!Ral_RelationUpdate(relation, where, tuple, NULL)) {
+	Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_DUPLICATE_TUPLE, tupleObj) ;
+	Ral_InterpSetError(interp, errInfo) ;
+	return TCL_ERROR ;
+    }
+
+    return TCL_OK ;
+}
+
 int
 Ral_RelationObjParseJoinArgs(
     Tcl_Interp *interp,
@@ -442,55 +472,6 @@ error_out:
     Ral_IntVectorDelete(id) ;
     Ral_TupleDelete(key) ;
     return NULL ;
-}
-
-/*
- * Update a tuple in a relationship by running a script and
- * retrieving the updated value of a tuple.
- */
-int
-Ral_RelationObjUpdateTuple(
-    Tcl_Interp *interp,		/* interpreter */
-    Tcl_Obj *tupleVarNameObj,	/* name of the tuple variable */
-    Tcl_Obj *scriptObj,		/* script to run */
-    Ral_Relation relation,	/* relation to update */
-    Ral_RelationIter tupleIter, /* tuple withing the relation to update */
-    Ral_CmdOption cmdOpt)	/* which command is calling -- for errors */
-{
-    int result ;
-    Tcl_Obj *tupleObj ;
-    Ral_Tuple tuple ;
-
-    /*
-     * Evaluate the script.
-     */
-    result = Tcl_EvalObjEx(interp, scriptObj, 0) ;
-    if (result == TCL_ERROR) {
-	return result ;
-    }
-    /*
-     * Fetch the value of the variable. It could be different now
-     * that the update has been performed. Once we get the new
-     * tuple value, we can use it to update the relvar.
-     */
-    tupleObj = Tcl_ObjGetVar2(interp, tupleVarNameObj, NULL,
-	TCL_LEAVE_ERR_MSG) ;
-    if (tupleObj == NULL) {
-	return TCL_ERROR ;
-    }
-    if (Tcl_ConvertToType(interp, tupleObj, &Ral_TupleObjType) != TCL_OK) {
-	return TCL_ERROR ;
-    }
-    assert(tupleObj->typePtr == &Ral_TupleObjType) ;
-    tuple = tupleObj->internalRep.otherValuePtr ;
-    if (!Ral_RelationUpdate(relation, tupleIter, tuple, NULL)) {
-	char *tupleStr = Ral_TupleValueStringOf(tuple) ;
-	Ral_InterpErrorInfo(interp, Ral_CmdRelvar, cmdOpt,
-	    RAL_ERR_DUPLICATE_TUPLE, tupleStr) ;
-	ckfree(tupleStr) ;
-	result = TCL_ERROR ;
-    }
-    return result ;
 }
 
 const char *

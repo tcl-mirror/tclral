@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_utils.c,v $
-$Revision: 1.13 $
-$Date: 2006/12/30 02:58:42 $
+$Revision: 1.14 $
+$Date: 2007/01/01 01:48:17 $
  *--
  */
 
@@ -87,7 +87,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_utils.c,v $ $Revision: 1.13 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_utils.c,v $ $Revision: 1.14 $" ;
 
 static char const * const cmdStrings[] = {
     "unknown command",
@@ -350,4 +350,18 @@ Ral_InterpErrorInfoObj(
     Ral_ErrorInfoSetCmd(&errInfo, cmd, opt) ;
     Ral_ErrorInfoSetErrorObj(&errInfo, errorCode, objPtr) ;
     Ral_InterpSetError(interp, &errInfo) ;
+}
+
+char const *
+Ral_ErrorInfoGetCommand(
+    Ral_ErrorInfo *info)
+{
+    return cmdStrings[info->cmd] ;
+}
+
+char const *
+Ral_ErrorInfoGetOption(
+    Ral_ErrorInfo *info)
+{
+    return optStrings[info->opt] ;
 }
