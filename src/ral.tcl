@@ -45,14 +45,15 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.27 $
-# $Date: 2006/12/17 22:40:49 $
+# $Revision: 1.28 $
+# $Date: 2007/01/02 04:14:45 $
 #  *--
 
 namespace eval ::ral {
     namespace export tuple2matrix
     namespace export relation2matrix
     namespace export relformat
+    namespace export tupleformat
     namespace export serialize
     namespace export serializeToFile
     namespace export deserialize

@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.47 $
-# $Date: 2007/01/01 01:48:17 $
+# $Revision: 1.48 $
+# $Date: 2007/01/02 04:14:45 $
 #  *--
 
 package require tcltest 2.2
@@ -71,15 +71,6 @@ proc relationMatch {expected actual} {
 
 proc setMatch {expected actual} {
     return [::struct::set equal $expected $actual]
-}
-
-proc traceProc {relvarName opsList args} {
-    variable traceInfo [list]
-    lappend traceInfo $relvarName $opsList $args
-}
-
-proc modTuple {relvarName opsList tup} {
-    ::ral::tuple update tup SNAME Baz
 }
 
 if {[package vsatisfies [package require Tcl] 8.5]} {
@@ -117,6 +108,17 @@ namespace eval ::ral::test {
 	proc ::dictMatch {expected actual} {return 0}
     }
     customMatch dict dictMatch
+
+    proc traceProc {relvarName opsList args} {
+	variable traceInfo [list]
+	lappend traceInfo $relvarName $opsList $args
+    }
+
+    proc modTuple {relvarName opsList tup} {
+	variable attrName
+	variable attrValue
+	::ral::tuple update tup $attrName $attrValue
+    }
 
     set DEE {Relation {} {{}} {{}}}
     set DUM {Relation {} {{}} {}}
@@ -4835,7 +4837,35 @@ tuple {A1 c} is not referred to by any tuple
     -returnCodes error
 
     # relvar trace subcommand
-    test relvar-trace-1.0 {single operation} -setup {
+    test relvar-trace-1.0 {unknown relvar} -body {
+	relvar trace add foo insert traceProc
+    } -result {unknown relvar name, "foo"} -returnCodes error
+
+    test relvar-trace-1.1 {bad arguments} -setup {
+	relvar create SV {
+	    Relation
+	    {S# string SNAME string STATUS int CITY string}
+	    S#
+	}
+    } -cleanup {
+	relvar unset SV
+    } -body {
+	relvar trace add SV insert
+    } -result {wrong # args: should be "relvar trace add relvarName ops command"} -returnCodes error
+
+    test relvar-trace-1.2 {bad trace operation} -setup {
+	relvar create SV {
+	    Relation
+	    {S# string SNAME string STATUS int CITY string}
+	    S#
+	}
+    } -cleanup {
+	relvar unset SV
+    } -body {
+	relvar trace add SV foo traceProc
+    } -result {bad traceOp "foo": must be delete, insert, set, unset, or update} -returnCodes error
+
+    test relvar-trace-2.0 {single operation} -setup {
 	relvar create SV {
 	    Relation
 	    {S# string SNAME string STATUS int CITY string}
@@ -4849,7 +4879,7 @@ tuple {A1 c} is not referred to by any tuple
 	relvar trace info SV
     } -result {{insert traceProc}}
 
-    test relvar-trace-2.0 {multiple operations} -setup {
+    test relvar-trace-2.1 {multiple operations} -setup {
 	relvar create SV {
 	    Relation
 	    {S# string SNAME string STATUS int CITY string}
@@ -4905,6 +4935,10 @@ tuple {A1 c} is not referred to by any tuple
     } -cleanup {
 	relvar unset SV
     } -body {
+	variable attrName
+	variable attrValue
+	set attrName SNAME
+	set attrValue Baz
 	relvar trace add SV insert modTuple
 	relvar insert SV {S# S6 SNAME Foo STATUS 40 CITY Bar}
 	relation tuple [relation choose $SV S# S6]

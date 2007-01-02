@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.c,v $
-$Revision: 1.11 $
-$Date: 2006/12/30 02:58:42 $
+$Revision: 1.12 $
+$Date: 2007/01/02 04:14:45 $
  *--
  */
 
@@ -120,7 +120,7 @@ static char const * const condMultStrings[2][2] = {
     {"1", "+"},
     {"?", "*"}
 } ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.11 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.12 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -820,25 +820,31 @@ Ral_RelvarTraceRemove(
 	if (trace->flags == flags &&
 	    strcmp(Tcl_GetString(trace->command), cmdString) == 0) {
 	    /*
-	     * Found a match. Save the one to delete.
+	     * Found a match. Remember the one to delete.
 	     */
 	    Ral_TraceInfo del = trace ;
 	    if (prev) {
 		/*
-		 * Unlink and free the trace.
+		 * Unlinking in the middle of the list.
 		 */
-		trace = prev->next = trace->next ;
+		prev->next = trace->next ;
 	    } else {
 		/*
-		 * First one in the list matched.
+		 * Unlinking the first one in the list.
 		 */
-		trace = relvar->traces = trace->next ;
+		relvar->traces = trace->next ;
 	    }
+	    /*
+	     * Point to the next list item. Do this before freeing
+	     * the item itself since after the cleanup the "trace"
+	     * pointer is invalid.
+	     */
+	    trace = trace->next ;
 	    relvarTraceCleanup(del) ;
 	    ++nRemoved ;
 	} else {
 	    /*
-	     * No match, bookkeep the pointers.
+	     * No match, advance the pointers along the list.
 	     */
 	    prev = trace ;
 	    trace = trace->next ;
@@ -870,8 +876,7 @@ relvarCleanup(
     Ral_PtrVectorDelete(relvar->constraints) ;
 
     /*
-     * Free the trace information, making sure to decrement the
-     * reference count on the trace command.
+     * Free the trace information.
      */
     for (t = relvar->traces ; t ; t = t->next) {
 	relvarTraceCleanup(t) ;
