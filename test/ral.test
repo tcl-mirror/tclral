@@ -50,15 +50,18 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.23 $
-# $Date: 2006/09/24 16:49:00 $
+# $Revision: 1.24 $
+# $Date: 2007/01/02 04:15:06 $
 #  *--
 
+package require Tcl
 package require tcltest 2.2
 eval tcltest::configure $argv
 
-set ::auto_path [linsert $::auto_path 0 [file normalize ..]]
-package require ral 0.8
+set ::auto_path [linsert $::auto_path 0\
+    [file normalize [file join [info script] ..]]]
+package require ral
+package require struct::set
 
 proc tupleMatch {expected actual} {
     return [::ral::tuple equal $expected $actual]
@@ -66,6 +69,10 @@ proc tupleMatch {expected actual} {
 
 proc relationMatch {expected actual} {
     return [::ral::relation is $expected == $actual]
+}
+
+proc setMatch {expected actual} {
+    return [::struct::set equal $expected $actual]
 }
 
 if {[package vsatisfies [package require Tcl] 8.5]} {
@@ -86,6 +93,7 @@ namespace eval ::ral::test {
 
     customMatch tuple tupleMatch
     customMatch relation relationMatch
+    customMatch set setMatch
     if {[::tcltest::testConstraint haveDict]} {
 	proc ::dictMatch {expected actual} {
 	    if {[dict size $expected] != [dict size $actual]} {
@@ -102,6 +110,17 @@ namespace eval ::ral::test {
 	proc ::dictMatch {expected actual} {return 0}
     }
     customMatch dict dictMatch
+
+    proc traceProc {relvarName opsList args} {
+	variable traceInfo [list]
+	lappend traceInfo $relvarName $opsList $args
+    }
+
+    proc modTuple {relvarName opsList tup} {
+	variable attrName
+	variable attrValue
+	::ral::tuple update tup $attrName $attrValue
+    }
 
     set DEE {Relation {} {{}} {{}}}
     set DUM {Relation {} {{}} {}}
@@ -917,6 +936,16 @@ namespace eval ::ral::test {
 	lsort [relation attributes $P]
     } -result {CITY COLOR P# PNAME WEIGHT}
 
+    # relation body subcommand
+    test relation-body-1.0 {DOG relation} -body {
+	relation body $DOG
+    } -result {{DogName Fido Breed Poodle}\
+	    {DogName Sam Breed Collie}\
+	    {DogName Spot Breed Terrier}\
+	    {DogName Rover Breed Retriever}\
+	    {DogName Fred Breed Spaniel}\
+	    {DogName Jumper Breed Mutt}}
+
     # relation cardinality subcommand
     test relation-cardinality-1.0 {dum relation} -body {
 	relation cardinality $DUM
@@ -968,6 +997,15 @@ namespace eval ::ral::test {
 	relation choose $r Age 30
     } -result {Relation {Name string Age int} {Name Age} {{Name Fred Age 30}}}\
     -match relation
+
+    # relation create subcommand
+    test relation-create-1.0 {one id, one tuple} -body {
+	relation create {A1 string} A1 {A1 a1}
+    } -result {Relation {A1 string} A1 {{A1 a1}}} -match relation
+
+    test relation-create-2.0 {one id, zero tuple} -body {
+	relation create {A1 string} A1
+    } -result {Relation {A1 string} A1 {}} -match relation
 
     # relation degree subcommand
     test relation-degree-1.0 {dum relation} -body {
@@ -2498,6 +2536,27 @@ namespace eval ::ral::test {
 	}
     } -match relation
 
+    # relation reidentify subcommand
+    test relation-reidentify-1.0 {single identifier} -body {
+	set r {Relation {
+		Name string Age int City string
+		} Name {
+		    {Name Andrew Age 30 City Sunnyvale}
+		    {Name George Age 20 City {San Jose}}
+		}
+	    }
+	relation reidentify $r Age
+    } -result {
+	Relation {
+	    Name string Age int City string
+	} {
+	    Age
+	} {
+	    {Name Andrew Age 30 City Sunnyvale}
+	    {Name George Age 20 City {San Jose}}
+	}
+    } -match relation
+
     # relation rename subcommand
     test relation-rename-1.0 {single attribute} -body {
 	set r {Relation {Name string} Name {{Name Andrew}}}
@@ -2553,8 +2612,8 @@ namespace eval ::ral::test {
 	    {Age 20 Name George City {San Jose}}\
 	    {City Saratoga Age 10 Name Fred}}}
 	relation restrict $r selected {< 20}
-    } -result {syntax error in expression "< 20": unexpected operator <}\
-    -returnCodes error
+    } -result {missing operand at _@_
+in expression "_@_< 20"} -returnCodes error
 
     # relation restrictwith subcommand
     test relation-restrictwith-1.0 {match on one attribute} -body {
@@ -2583,8 +2642,8 @@ namespace eval ::ral::test {
 	    {Age 20 Name George City {San Jose}}\
 	    {City Saratoga Age 10 Name Fred}}}
 	relation restrictwith $r {< 20}
-    } -result {syntax error in expression "< 20": unexpected operator <}\
-    -returnCodes error
+    } -result {missing operand at _@_
+in expression "_@_< 20"} -returnCodes error
 
     # relation semijoin subcommand
     test relation-semijoin-1.0 {one common attribute} -body {
@@ -4673,7 +4732,8 @@ tuple {A1 c} is not referred to by any tuple
 	relvar update X t {[tuple extract $t Name] eq "George"} {
 	    tuple update t Name Fred
 	}
-    } -result {duplicate tuple, "{Name Fred Status 20}"} -returnCodes error
+    } -result {duplicate tuple, "Tuple {Name string Status int} {Name Fred Status 20}"}\
+    -returnCodes error
 
     # relvar updateone subcommand
     test relvar-updateone-1.0 {no match} -setup {
@@ -4775,7 +4835,120 @@ tuple {A1 c} is not referred to by any tuple
 	relvar updateone X xTup {Name George} {
 	    tuple update xTup Name Fred
 	}
-    } -result {duplicate tuple, "{Name Fred Status 20}"} -returnCodes error
+    } -result {duplicate tuple, "Tuple {Name string Status int} {Name Fred Status 20}"}\
+    -returnCodes error
+
+    # relvar trace subcommand
+    test relvar-trace-1.0 {unknown relvar} -body {
+	relvar trace add foo insert traceProc
+    } -result {unknown relvar name, "foo"} -returnCodes error
+
+    test relvar-trace-1.1 {bad arguments} -setup {
+	relvar create SV {
+	    Relation
+	    {S# string SNAME string STATUS int CITY string}
+	    S#
+	}
+    } -cleanup {
+	relvar unset SV
+    } -body {
+	relvar trace add SV insert
+    } -result {wrong # args: should be "relvar trace add relvarName ops command"} -returnCodes error
+
+    test relvar-trace-1.2 {bad trace operation} -setup {
+	relvar create SV {
+	    Relation
+	    {S# string SNAME string STATUS int CITY string}
+	    S#
+	}
+    } -cleanup {
+	relvar unset SV
+    } -body {
+	relvar trace add SV foo traceProc
+    } -result {bad traceOp "foo": must be delete, insert, set, unset, or update} -returnCodes error
+
+    test relvar-trace-2.0 {single operation} -setup {
+	relvar create SV {
+	    Relation
+	    {S# string SNAME string STATUS int CITY string}
+	    S#
+	}
+	relvar set SV $S
+    } -cleanup {
+	relvar unset SV
+    } -body {
+	relvar trace add SV insert traceProc
+	relvar trace info SV
+    } -result {{insert traceProc}}
+
+    test relvar-trace-2.1 {multiple operations} -setup {
+	relvar create SV {
+	    Relation
+	    {S# string SNAME string STATUS int CITY string}
+	    S#
+	}
+	relvar set SV $S
+    } -cleanup {
+	relvar unset SV
+    } -body {
+	relvar trace add SV {insert delete update} traceProc
+	relvar trace info SV
+    } -result {{{delete insert update} traceProc}}
+
+    test relvar-trace-3.0 {remove trace} -setup {
+	relvar create SV {
+	    Relation
+	    {S# string SNAME string STATUS int CITY string}
+	    S#
+	}
+	relvar set SV $S
+    } -cleanup {
+	relvar unset SV
+    } -body {
+	relvar trace add SV {insert delete update} traceProc
+	relvar trace add SV {set} traceProc
+	relvar trace add SV {unset} traceProc
+	relvar trace remove SV {delete insert update} traceProc
+	relvar trace info SV
+    } -result {{unset traceProc} {set traceProc}}
+
+    test relvar-trace-4.0 {insert tracing} -setup {
+	relvar create SV {
+	    Relation
+	    {S# string SNAME string STATUS int CITY string}
+	    S#
+	}
+	relvar set SV $S
+    } -cleanup {
+	relvar unset SV
+    } -body {
+	relvar trace add SV insert traceProc
+	relvar insert SV {S# S6 SNAME Foo STATUS 40 CITY Bar}
+	set traceInfo
+    } -result {::ral::test::SV insert {{Tuple {S# string SNAME string STATUS int CITY string} {S# S6 SNAME Foo STATUS 40 CITY Bar}}}}
+
+    test relvar-trace-4.1 {modify inserted tuple} -setup {
+	relvar create SV {
+	    Relation
+	    {S# string SNAME string STATUS int CITY string}
+	    S#
+	}
+	relvar set SV $S
+    } -cleanup {
+	relvar unset SV
+    } -body {
+	variable attrName
+	variable attrValue
+	set attrName SNAME
+	set attrValue Baz
+	relvar trace add SV insert modTuple
+	relvar insert SV {S# S6 SNAME Foo STATUS 40 CITY Bar}
+	relation tuple [relation choose $SV S# S6]
+    } -result {
+	Tuple
+	{S# string SNAME string STATUS int CITY string}
+	{S# S6 SNAME Baz STATUS 40 CITY Bar}
+    } -match tuple
 
     # examples from the Date book
     test date-example-1.0 {Get suppliers who supply all parts} -body {

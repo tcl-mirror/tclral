@@ -47,8 +47,8 @@
 #   This command is part of TclRAL. This file is in Tcl Markup Language
 #   format.
 # $RCSfile: relvar.man,v $
-# $Revision: 1.10 $
-# $Date: 2006/12/17 23:24:36 $
+# $Revision: 1.11 $
+# $Date: 2007/01/02 04:15:06 $
 #  *--
 }]
 [moddesc "Relvar Operators"]
@@ -725,10 +725,44 @@ Relation {PuppyName string Dame string Sire string} PuppyName {{PuppyName Bitsy 
 headings not equal, "Relation {DogName string Breed string} DogName"
 }]
 
+[call [cmd "::ral::relvar trace"] [arg type] [arg relvarName] [opt [arg args]]]
+[list_begin definitions]
+[lst_item "[cmd {::ral::relvar trace add}] [arg relvarName]\
+    [arg traceops] [arg command]"]
+[lst_item "[cmd {::ral::relvar trace remove}] [arg relvarName]\
+    [arg traceops] [arg command]"]
+[lst_item "[cmd {::ral::relvar trace info}] [arg relvarName]"]
+[list_end]
+
+The [cmd "trace add"] subcommand adds a trace to [arg relvarName].
+The [arg traceops] argument is a list of one or more trace operation keywords
+from the list:
+[list_begin definitions]
+[lst_item delete]
+[lst_item insert]
+[lst_item set]
+[lst_item unset]
+[lst_item update]
+[list_end]
+
+The [cmd "trace remove"] subcommand deletes any trace on [arg relvarName]
+that matches [arg traceops] and [arg command].
+
+The [cmd "trace info"] subcommand returns the trace information
+for the relvar whose name is given by [arg relvarName].
+The trace information is a list each element of which describes one trace
+on the relvar.
+Each trace information element is in turn a list consisting of two elements,
+the [arg traceops] and [arg command], of the relvar trace.
+
+It is an error to request any trace operation if [arg relvarName] does not
+exist.
+See the [emph "RELVAR TRACES"] section below for further details.
+
 [call [cmd "::ral::relvar unset"] [opt "relvarName ..."]]
 
-The [cmd unset] deletes all the relation variables whose names are given
-as the subcommand arguments.
+The [cmd unset] subcommand deletes all the relation variables whose
+names are given as the subcommand arguments.
 The corresponding Tcl variables that were created when the relvar
 was created are also [cmd unset].
 This command operates in a manner analogous to the [cmd unset] command for
@@ -853,6 +887,8 @@ which will necessarily be either 0 or 1.
 }]
 
 [list_end]
+
+[section "RELVAR TRACES"]
 
 [see_also tuple relation]
 
