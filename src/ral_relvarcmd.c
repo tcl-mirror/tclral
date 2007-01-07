@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.22 $
-$Date: 2007/01/01 01:48:17 $
+$Revision: 1.23 $
+$Date: 2007/01/07 23:32:42 $
  *--
  */
 
@@ -115,7 +115,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.22 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.23 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -789,6 +789,7 @@ RelvarSetCmd(
 {
     Ral_Relvar relvar ;
     Ral_Relation relvalue ;
+    Tcl_Obj *resultObj ;
     int result = TCL_OK ;
 
     /* relvar set relvar relationValue */
@@ -833,11 +834,28 @@ RelvarSetCmd(
 	    return TCL_ERROR ;
 	}
 
-	result = Ral_RelvarObjExecSetTraces(interp, relvar, valueObj) ;
-	if (result == TCL_OK) {
-	    Ral_RelvarSetRelation(relvar, relation) ;
-	    Tcl_InvalidateStringRep(relvar->relObj) ;
-	    relvar->relObj->length = 0 ;
+	resultObj = Ral_RelvarObjExecSetTraces(interp, relvar, valueObj) ;
+	if (resultObj) {
+	    /*
+	     * Result is converted to the proper type by the trace function.
+	     * However, we have to make sure the heading is correct.
+	     */
+	    relation = resultObj->internalRep.otherValuePtr ;
+	    if (Ral_RelationHeadingEqual(relvalue->heading,
+		    relation->heading)) {
+		Ral_RelvarSetRelation(relvar, relation) ;
+		Tcl_InvalidateStringRep(relvar->relObj) ;
+		relvar->relObj->length = 0 ;
+	    } else {
+		char *headingStr =
+		    Ral_RelationHeadingStringOf(relation->heading) ;
+		Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptSet,
+		    RAL_ERR_HEADING_NOT_EQUAL, headingStr) ;
+		ckfree(headingStr) ;
+		result = TCL_ERROR ;
+	    }
+	} else {
+	    result = TCL_ERROR ;
 	}
 	result = Ral_RelvarObjEndCmd(interp, rInfo, result != TCL_OK) ;
     }

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.h,v $
-$Revision: 1.11 $
-$Date: 2007/01/01 01:48:17 $
+$Revision: 1.12 $
+$Date: 2007/01/07 23:32:42 $
  *--
  */
 #ifndef _ral_relvarobj_h_
@@ -115,11 +115,16 @@ extern int Ral_RelvarObjTraceAdd(Tcl_Interp *, Ral_Relvar, Tcl_Obj *const,
 extern int Ral_RelvarObjTraceRemove(Tcl_Interp *, Ral_Relvar, Tcl_Obj *const,
     Tcl_Obj *const) ;
 extern int Ral_RelvarObjTraceInfo(Tcl_Interp *, Ral_Relvar) ;
-extern int Ral_RelvarObjExecDeleteTraces(Tcl_Interp *, Ral_Relvar, Tcl_Obj *) ;
-extern int Ral_RelvarObjExecInsertTraces(Tcl_Interp *, Ral_Relvar, Tcl_Obj *) ;
-extern int Ral_RelvarObjExecUpdateTraces(Tcl_Interp *, Ral_Relvar, Tcl_Obj *,
+extern int Ral_RelvarObjExecDeleteTraces(Tcl_Interp *, Ral_Relvar,
     Tcl_Obj *) ;
-extern int Ral_RelvarObjExecSetTraces(Tcl_Interp *, Ral_Relvar, Tcl_Obj *) ;
-extern int Ral_RelvarObjExecUnsetTraces(Tcl_Interp *, Ral_Relvar) ;
+extern Tcl_Obj *Ral_RelvarObjExecInsertTraces(Tcl_Interp *, Ral_Relvar,
+    Tcl_Obj *) ;
+extern Tcl_Obj *Ral_RelvarObjExecUpdateTraces(Tcl_Interp *, Ral_Relvar,
+    Tcl_Obj *, Tcl_Obj *) ;
+extern Tcl_Obj *Ral_RelvarObjExecSetTraces(Tcl_Interp *, Ral_Relvar,
+    Tcl_Obj *) ;
+extern void Ral_RelvarObjExecUnsetTraces(Tcl_Interp *, Ral_Relvar) ;
+
+extern Tcl_InterpDeleteProc Ral_RelvarObjInterpDeleted ;
 
 #endif /* _ral_relvarobj_h_ */

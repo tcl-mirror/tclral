@@ -42,16 +42,13 @@ exec tclsh "$0" "$@"
 # 
 #  *++
 # MODULE:
-#   ral.test -- test cases for the Tcl Relational Algebra Library
+#   trace.test -- test cases for the Tcl Relational Algebra Library
 # 
 # ABSTRACT:
-#   This file contains a set of test cases suitable for execution via
-#   "tcltest" to test the code associated with the TCL Relational
-#   Algebra library.
 # 
 # $RCSfile: trace.test,v $
-# $Revision: 1.1 $
-# $Date: 2007/01/02 04:15:06 $
+# $Revision: 1.2 $
+# $Date: 2007/01/07 23:32:42 $
 #  *--
 
 package require tcltest 2.2
@@ -61,6 +58,10 @@ set ::auto_path [linsert $::auto_path 0\
     [file normalize [file join [info script] ..]]]
 package require ral
 
+proc tupleMatch {expected actual} {
+    return [::ral::tuple equal $expected $actual]
+}
+
 proc relationMatch {expected actual} {
     return [::ral::relation is $expected == $actual]
 }
@@ -69,9 +70,175 @@ namespace eval ::ral::test {
     namespace import ::tcltest::*
     namespace import ::ral::*
 
+    customMatch tuple tupleMatch
     customMatch relation relationMatch
 
     set recNum 0
+
+    proc traceProc {relvarName op args} {
+	variable traceInfo
+	set traceInfo [lindex $args end]
+    }
+
+    proc insertTrace {relvarName op tup} {
+	variable traceInfo
+	set traceInfo $tup
+	return $tup
+    }
+
+    proc incrStatus {relvarName op tup} {
+	tuple update tup STATUS [expr {[tuple extract $tup STATUS] + 1}]
+	return $tup
+    }
+
+    proc modTuple {relvarName opsList tup} {
+	variable attrName
+	variable attrValue
+	::ral::tuple update tup $attrName $attrValue
+	return $tup
+    }
+    set S [relation create\
+	{S# string SNAME string STATUS int CITY string}\
+	S#\
+	{S# S1 SNAME Smith STATUS 20 CITY London}\
+	{S# S2 SNAME Jones STATUS 10 CITY Paris}\
+	{S# S3 SNAME Blake STATUS 30 CITY Paris}\
+	{S# S4 SNAME Clark STATUS 20 CITY London}\
+	{S# S5 SNAME Adams STATUS 30 CITY Athens}\
+    ]
+
+    # relvar trace subcommand
+    test relvar-trace-1.0 {unknown relvar} -body {
+	relvar trace add foo insert traceProc
+    } -result {unknown relvar name, "foo"} -returnCodes error
+
+    test relvar-trace-1.1 {bad arguments} -setup {
+	relvar create SV {
+	    Relation
+	    {S# string SNAME string STATUS int CITY string}
+	    S#
+	}
+    } -cleanup {
+	relvar unset SV
+    } -body {
+	relvar trace add SV insert
+    } -result {wrong # args: should be "relvar trace add relvarName ops command"} -returnCodes error
+
+    test relvar-trace-1.2 {bad trace operation} -setup {
+	relvar create SV {
+	    Relation
+	    {S# string SNAME string STATUS int CITY string}
+	    S#
+	}
+    } -cleanup {
+	relvar unset SV
+    } -body {
+	relvar trace add SV foo traceProc
+    } -result {bad traceOp "foo": must be delete, insert, set, unset, or update} -returnCodes error
+
+    test relvar-trace-2.0 {single operation} -setup {
+	relvar create SV {
+	    Relation
+	    {S# string SNAME string STATUS int CITY string}
+	    S#
+	}
+	relvar set SV $S
+    } -cleanup {
+	relvar unset SV
+    } -body {
+	relvar trace add SV insert traceProc
+	relvar trace info SV
+    } -result {{insert traceProc}}
+
+    test relvar-trace-2.1 {multiple operations} -setup {
+	relvar create SV {
+	    Relation
+	    {S# string SNAME string STATUS int CITY string}
+	    S#
+	}
+	relvar set SV $S
+    } -cleanup {
+	relvar unset SV
+    } -body {
+	relvar trace add SV {insert delete update} traceProc
+	relvar trace info SV
+    } -result {{{delete insert update} traceProc}}
+
+    test relvar-trace-3.0 {remove trace} -setup {
+	relvar create SV {
+	    Relation
+	    {S# string SNAME string STATUS int CITY string}
+	    S#
+	}
+	relvar set SV $S
+    } -cleanup {
+	relvar unset SV
+    } -body {
+	relvar trace add SV {insert delete update} traceProc
+	relvar trace add SV {set} traceProc
+	relvar trace add SV {unset} traceProc
+	relvar trace remove SV {delete insert update} traceProc
+	relvar trace info SV
+    } -result {{unset traceProc} {set traceProc}}
+
+    test relvar-trace-4.0 {insert tracing} -setup {
+	relvar create SV {
+	    Relation
+	    {S# string SNAME string STATUS int CITY string}
+	    S#
+	}
+	relvar set SV $S
+    } -cleanup {
+	relvar unset SV
+    } -body {
+	relvar trace add SV insert traceProc
+	relvar insert SV {S# S6 SNAME Foo STATUS 40 CITY Bar}
+	set traceInfo
+    } -result {Tuple {S# string SNAME string STATUS int CITY string} {S# S6 SNAME Foo STATUS 40 CITY Bar}}
+
+    test relvar-trace-4.1 {modify inserted tuple} -setup {
+	relvar create SV {
+	    Relation
+	    {S# string SNAME string STATUS int CITY string}
+	    S#
+	}
+	relvar set SV $S
+    } -cleanup {
+	relvar unset SV
+    } -body {
+	variable attrName
+	variable attrValue
+	set attrName SNAME
+	set attrValue Baz
+	relvar trace add SV insert modTuple
+	relvar insert SV {S# S6 SNAME Foo STATUS 40 CITY Bar}
+	relation tuple [relation choose $SV S# S6]
+    } -result {
+	Tuple
+	{S# string SNAME string STATUS int CITY string}
+	{S# S6 SNAME Baz STATUS 40 CITY Bar}
+    } -match tuple
+
+    test relvar-trace-4.2 {modify inserted tuple several times} -setup {
+	relvar create SV {
+	    Relation
+	    {S# string SNAME string STATUS int CITY string}
+	    S#
+	}
+	relvar set SV $S
+    } -cleanup {
+	relvar unset SV
+    } -body {
+	relvar trace add SV insert incrStatus
+	relvar trace add SV insert incrStatus
+	relvar trace add SV insert incrStatus
+	relvar insert SV {S# S6 SNAME Foo STATUS 40 CITY Bar}
+	relation tuple [relation choose $SV S# S6]
+    } -result {
+	Tuple
+	{S# string SNAME string STATUS int CITY string}
+	{S# S6 SNAME Foo STATUS 43 CITY Bar}
+    } -match tuple
 
     proc insertMap {relvarName opsList tup} {
 	variable recNum
@@ -81,6 +248,7 @@ namespace eval ::ral::test {
 	    relvar insert SMap [list R# $recNum S# [tuple extract $tup S#]]
 	}
 	incr recNum
+	return $tup
     }
 
     proc deleteMap {relvarName opsList tup} {
@@ -104,6 +272,7 @@ namespace eval ::ral::test {
 		}
 	    }
 	}
+	return $newtup
     }
 
     proc setMap {relvarName opsList rel} {
@@ -113,8 +282,14 @@ namespace eval ::ral::test {
 	    relvar set SMap $newR
 	}
 	variable recNum [relation cardinality $newR]
+	return $rel
     }
 
+    proc unsetMap {relvarName opsList} {
+	relvar set SMap [relation empty [relvar set SMap]]
+    }
+
+    unset S
     relvar create S {
 	Relation
 	{S# string SNAME string STATUS int CITY string}
@@ -127,7 +302,7 @@ namespace eval ::ral::test {
 	{R# S#}
     }
 
-    test relvar-trace-1.0 {insert tracing} -setup {
+    test relvar-trace-5.1 {insert tracing} -setup {
 	relvar trace add S insert [namespace code insertMap]
     } -cleanup {
 	relvar trace remove S insert [namespace code insertMap]
@@ -152,7 +327,7 @@ namespace eval ::ral::test {
 	}
     } -match relation
 
-    test relvar-trace-2.0 {delete tracing} -setup {
+    test relvar-trace-5.2 {delete tracing} -setup {
 	relvar trace add S delete [namespace code deleteMap]
     } -cleanup {
 	relvar trace remove S delete [namespace code deleteMap]
@@ -171,7 +346,7 @@ namespace eval ::ral::test {
 	}
     } -match relation
 
-    test relvar-trace-3.0 {update tracing} -setup {
+    test relvar-trace-5.3 {update tracing} -setup {
 	relvar trace add S update [namespace code updateMap]
     } -cleanup {
 	relvar trace remove S update [namespace code updateMap]
@@ -192,7 +367,7 @@ namespace eval ::ral::test {
 	}
     } -match relation
 
-    test relvar-trace-4.0 {set tracing} -setup {
+    test relvar-trace-5.4 {set tracing} -setup {
 	relvar trace add S set [namespace code setMap]
     } -cleanup {
 	relvar trace remove S set [namespace code setMap]
@@ -210,6 +385,19 @@ namespace eval ::ral::test {
 	    {R# 3 S# S6}
 	    {R# 4 S# S7}
 	}
+    } -match relation
+
+    test relvar-trace-5.5 {unset tracing} -setup {
+	relvar trace add S unset [namespace code unsetMap]
+    } -cleanup {
+    } -body {
+	relvar unset S
+	relvar set SMap
+    } -result {
+	Relation
+	{R# int S# string}
+	{R# S#}
+	{}
     } -match relation
 
     cleanupTests

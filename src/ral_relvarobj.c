@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.19 $
-$Date: 2007/01/01 01:48:17 $
+$Revision: 1.20 $
+$Date: 2007/01/07 23:32:42 $
  *--
  */
 
@@ -111,10 +111,8 @@ static Ral_Constraint Ral_RelvarObjFindConstraint(Tcl_Interp *, Ral_RelvarInfo,
     const char *, char **) ;
 static int Ral_RelvarObjDecodeTraceOps(Tcl_Interp *, Tcl_Obj *, int *) ;
 static int Ral_RelvarObjEncodeTraceFlag(Tcl_Interp *, int, Tcl_Obj **) ;
-static int Ral_RelvarObjExecTraces(Tcl_Interp *, Ral_Relvar, Tcl_Obj *,
-    Tcl_Obj *) ;
-static int Ral_RelvarObjExecSingleTupleTraces(Tcl_Interp *, Ral_Relvar, int,
-    Tcl_Obj *) ;
+static Tcl_Obj *Ral_RelvarObjExecTraces(Tcl_Interp *, Ral_Relvar, Tcl_ObjType *,
+    Tcl_Obj *, Tcl_Obj *) ;
 
 /*
 EXTERNAL DATA REFERENCES
@@ -152,7 +150,7 @@ static const struct traceOpsMap {
 } ;
 static const char specErrMsg[] = "multiplicity specification" ;
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.19 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.20 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -344,13 +342,13 @@ int
 Ral_RelvarObjInsertTuple(
     Tcl_Interp *interp,
     Ral_Relvar relvar,
-    Tcl_Obj *tupleObj,
+    Tcl_Obj *nameValueObj,
     Ral_ErrorInfo *errInfo)
 {
     Ral_Relation relation ;
     Ral_Tuple tuple ;
-    Tcl_Obj *newTuple ;
-    int result ;
+    int result = TCL_OK ;
+    Tcl_Obj *resultObj ;
 
     if (Tcl_ConvertToType(interp, relvar->relObj, &Ral_RelationObjType)
 	!= TCL_OK) {
@@ -366,38 +364,30 @@ Ral_RelvarObjInsertTuple(
      * Set the values of the attributes from the list of attribute / value
      * pairs.
      */
-    if (Ral_TupleSetFromObj(tuple, interp, tupleObj, errInfo) != TCL_OK) {
+    if (Ral_TupleSetFromObj(tuple, interp, nameValueObj, errInfo) != TCL_OK) {
 	Ral_TupleDelete(tuple) ;
 	return TCL_ERROR ;
     }
     /*
-     * Hold on to the tuple. It will be counted when it is turned into an
-     * object, but then would be deleted when the object is discarded and we
-     * need to hold on to it at least until we can put it into the relation.
+     * Run the traces and get the result back.
      */
-    newTuple = Ral_TupleObjNew(tuple) ;
-    Tcl_IncrRefCount(newTuple) ;
-    result = Ral_RelvarObjExecInsertTraces(interp, relvar, newTuple) ;
-    if (result == TCL_OK) {
-	result = TCL_ERROR ;
+    resultObj = Ral_RelvarObjExecInsertTraces(interp, relvar,
+	Ral_TupleObjNew(tuple)) ;
+    if (resultObj) {
 	/*
-	 * Convert the object back to tuple in case it shimmered.
+	 * Objects returned have already been converted to tuples.
+	 * Insert the tuple into the relation.
 	 */
-	if (Tcl_ConvertToType(interp, newTuple, &Ral_TupleObjType) == TCL_OK) {
-	    /*
-	     * Insert the tuple into the relation.
-	     */
-	    tuple = newTuple->internalRep.otherValuePtr ;
-	    if (!Ral_RelationPushBack(relation, tuple, NULL)) {
-		Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_DUPLICATE_TUPLE,
-		    tupleObj) ;
-		Ral_InterpSetError(interp, errInfo) ;
-	    } else {
-		result = TCL_OK ;
-	    }
+	tuple = resultObj->internalRep.otherValuePtr ;
+	if (!Ral_RelationPushBack(relation, tuple, NULL)) {
+	    Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_DUPLICATE_TUPLE,
+		resultObj) ;
+	    Ral_InterpSetError(interp, errInfo) ;
+	    result = TCL_ERROR ;
 	}
+    } else {
+	result = TCL_ERROR ;
     }
-    Tcl_DecrRefCount(newTuple) ;
 
     return result ;
 }
@@ -415,6 +405,7 @@ Ral_RelvarObjUpdateTuple(
     int result ;
     Tcl_Obj *newTupleObj ;
     Tcl_Obj *oldTupleObj ;
+    Tcl_Obj *resultTupleObj ;
     /*
      * Evaluate the script.
      */
@@ -456,12 +447,12 @@ Ral_RelvarObjUpdateTuple(
      * Call all the traces handing the old tuple value and the new
      * tuple value.
      */
-    result = Ral_RelvarObjExecUpdateTraces(interp, relvar, oldTupleObj,
+    resultTupleObj = Ral_RelvarObjExecUpdateTraces(interp, relvar, oldTupleObj,
 	newTupleObj) ;
-    if (result == TCL_OK) {
-	result = Ral_RelationUpdateTupleObj(relation, tupleIter, interp,
-	    newTupleObj, errInfo) ;
-    }
+    result = resultTupleObj ?
+	Ral_RelationUpdateTupleObj(relation, tupleIter, interp,
+	    resultTupleObj, errInfo) :
+	TCL_ERROR ;
 
     Tcl_DecrRefCount(oldTupleObj) ;
     Tcl_DecrRefCount(newTupleObj) ;
@@ -1634,70 +1625,72 @@ Ral_RelvarObjExecDeleteTraces(
     Ral_Relvar relvar,
     Tcl_Obj *delTuple)
 {
-    return Ral_RelvarObjExecSingleTupleTraces(interp, relvar,
-	TRACEOP_DELETE_FLAG, delTuple) ;
+    int result = TCL_OK ;
+    if (relvar->traces && relvar->traceFlags == 0) {
+	relvar->traceFlags = TRACEOP_DELETE_FLAG ;
+	result = Ral_RelvarObjExecTraces(interp, relvar, NULL, delTuple, NULL) ?
+	    TCL_OK : TCL_ERROR ;
+	relvar->traceFlags = 0 ;
+    }
+    return result ;
 }
 
-int
+Tcl_Obj *
 Ral_RelvarObjExecInsertTraces(
     Tcl_Interp *interp,
     Ral_Relvar relvar,
     Tcl_Obj *insertTuple)
 {
-    return Ral_RelvarObjExecSingleTupleTraces(interp, relvar,
-	TRACEOP_INSERT_FLAG, insertTuple) ;
+    if (relvar->traces && relvar->traceFlags == 0) {
+	relvar->traceFlags = TRACEOP_INSERT_FLAG ;
+	insertTuple = Ral_RelvarObjExecTraces(interp, relvar, &Ral_TupleObjType,
+	    insertTuple, NULL) ;
+	relvar->traceFlags = 0 ;
+    }
+    return insertTuple ;
 }
 
-int
+Tcl_Obj *
 Ral_RelvarObjExecUpdateTraces(
     Tcl_Interp *interp,
     Ral_Relvar relvar,
     Tcl_Obj *oldTuple,
     Tcl_Obj *newTuple)
 {
-    int result ;
-
-    if (relvar->traces == NULL || relvar->traceFlags != 0) {
-	return TCL_OK ;
+    if (relvar->traces && relvar->traceFlags == 0) {
+	relvar->traceFlags = TRACEOP_UPDATE_FLAG ;
+	newTuple = Ral_RelvarObjExecTraces(interp, relvar, &Ral_TupleObjType,
+	    oldTuple, newTuple) ;
+	relvar->traceFlags = 0 ;
     }
-
-    relvar->traceFlags = TRACEOP_UPDATE_FLAG ;
-    result = Ral_RelvarObjExecTraces(interp, relvar, oldTuple, newTuple) ;
-    relvar->traceFlags = 0 ;
-    return result ;
+    return newTuple ;
 }
 
-int
+Tcl_Obj *
 Ral_RelvarObjExecSetTraces(
     Tcl_Interp *interp,
     Ral_Relvar relvar,
     Tcl_Obj *relationObj)
 {
-    int result ;
-
-    if (relvar->traces == NULL || relvar->traceFlags != 0) {
-	return TCL_OK ;
+    if (relvar->traces && relvar->traceFlags == 0) {
+	relvar->traceFlags = TRACEOP_SET_FLAG ;
+	relationObj = Ral_RelvarObjExecTraces(interp, relvar,
+	    &Ral_RelationObjType, relationObj, NULL) ;
+	relvar->traceFlags = 0 ;
     }
-    relvar->traceFlags = TRACEOP_SET_FLAG ;
-    result = Ral_RelvarObjExecTraces(interp, relvar, relationObj, NULL) ;
-    relvar->traceFlags = 0 ;
-    return result ;
+    return relationObj ;
 }
 
-int
+void
 Ral_RelvarObjExecUnsetTraces(
     Tcl_Interp *interp,
     Ral_Relvar relvar)
 {
-    int result ;
-
-    if (relvar->traces == NULL) {
-	return TCL_OK ;
+    if (relvar->traces) {
+	relvar->traceFlags = TRACEOP_UNSET_FLAG ;
+	Ral_RelvarObjExecTraces(interp, relvar, NULL, NULL, NULL) ;
+	relvar->traceFlags = 0 ;
     }
-    relvar->traceFlags = TRACEOP_UNSET_FLAG ;
-    result = Ral_RelvarObjExecTraces(interp, relvar, NULL, NULL) ;
-    relvar->traceFlags = 0 ;
-    return result ;
 }
 
 /*
@@ -1963,10 +1956,11 @@ Ral_RelvarObjEncodeTraceFlag(
     return TCL_OK ;
 }
 
-static int
+static Tcl_Obj *
 Ral_RelvarObjExecTraces(
     Tcl_Interp *interp,
     Ral_Relvar relvar,
+    Tcl_ObjType *type,
     Tcl_Obj *arg1,
     Tcl_Obj *arg2)
 {
@@ -1976,6 +1970,7 @@ Ral_RelvarObjExecTraces(
     Tcl_Obj *nameObj ;
     Tcl_Obj *flagObj ;
     Ral_TraceInfo trace ;
+    int lastIndex ;
 
 
     nameObj = Tcl_NewStringObj(relvar->name, -1) ;
@@ -1984,15 +1979,16 @@ Ral_RelvarObjExecTraces(
     if (Ral_RelvarObjEncodeTraceFlag(interp, relvar->traceFlags, &flagObj)
 	!= TCL_OK) {
 	Tcl_DecrRefCount(nameObj) ;
-	return TCL_ERROR ;
+	return NULL ;
     }
     Tcl_IncrRefCount(cmdv[2] = flagObj) ;
     if (arg1) {
-	cmdv[cmdc++] = arg1 ;
+	Tcl_IncrRefCount(cmdv[cmdc++] = arg1) ;
     }
     if (arg2) {
-	cmdv[cmdc++] = arg2 ;
+	Tcl_IncrRefCount(cmdv[cmdc++] = arg2) ;
     }
+    lastIndex = cmdc - 1 ;
 
     for (trace = relvar->traces ; trace ; trace = trace->next) {
 	if (trace->flags & relvar->traceFlags) {
@@ -2002,28 +1998,55 @@ Ral_RelvarObjExecTraces(
 	    if (result != TCL_OK) {
 		break ;
 	    }
+	    if (type) {
+		Tcl_Obj *traceObj = Tcl_GetObjResult(interp) ;
+		result = Tcl_ConvertToType(interp, traceObj, type) ;
+		if (result != TCL_OK) {
+		    break ;
+		} else {
+		    Tcl_DecrRefCount(cmdv[lastIndex]) ;
+		    Tcl_IncrRefCount(cmdv[lastIndex] = traceObj) ;
+		}
+	    }
 	}
+    }
+
+    /*
+     * N.B. that Tcl_DecrRefCount is a macro that evaluates its argument
+     * twice ==> no side effects are allowed. So we must pull the decrement
+     * of the "cmdc" variable to its own statement.
+     * Wicked, evil macros.
+     */
+    if (arg2) {
+	--cmdc ;
+	Tcl_DecrRefCount(cmdv[cmdc]) ;
+    }
+    if (arg1) {
+	--cmdc ;
+	Tcl_DecrRefCount(cmdv[cmdc]) ;
     }
     Tcl_DecrRefCount(flagObj) ;
     Tcl_DecrRefCount(nameObj) ;
 
-    return result ;
+    return result == TCL_OK ? Tcl_GetObjResult(interp) : NULL ;
 }
 
-static int
-Ral_RelvarObjExecSingleTupleTraces(
-    Tcl_Interp *interp,
-    Ral_Relvar relvar,
-    int flags,
-    Tcl_Obj *tupleObj)
+/*
+ * Called when an interpreter is deleted.
+ * We use this as a hook for executing all the unset traces relvars.
+ */
+void
+Ral_RelvarObjInterpDeleted(
+    ClientData clientData,
+    Tcl_Interp *interp)
 {
-    int result ;
+    Ral_RelvarInfo info = clientData ;
+    Tcl_HashEntry *entry ;
+    Tcl_HashSearch search ;
 
-    if (relvar->traces == NULL || relvar->traceFlags != 0) {
-	return TCL_OK ;
+    for (entry = Tcl_FirstHashEntry(&info->relvars, &search) ; entry ;
+	entry = Tcl_NextHashEntry(&search)) {
+	Ral_Relvar relvar = Tcl_GetHashValue(entry) ;
+	Ral_RelvarObjExecUnsetTraces(interp, relvar) ;
     }
-    relvar->traceFlags = flags ;
-    result = Ral_RelvarObjExecTraces(interp, relvar, tupleObj, NULL) ;
-    relvar->traceFlags = 0 ;
-    return result ;
 }

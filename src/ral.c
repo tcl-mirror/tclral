@@ -49,8 +49,8 @@ ABSTRACT:
     Algebra.
 
 $RCSfile: ral.c,v $
-$Revision: 1.32 $
-$Date: 2006/12/30 02:58:42 $
+$Revision: 1.33 $
+$Date: 2007/01/07 23:32:42 $
  *--
  */
 
@@ -68,6 +68,7 @@ INCLUDE FILES
 #include "ral_relationcmd.h"
 #include "ral_relationobj.h"
 #include "ral_relvar.h"
+#include "ral_relvarobj.h"
 #include "ral_relvarcmd.h"
 
 /*
@@ -104,7 +105,7 @@ STATIC DATA ALLOCATION
 static char const ral_pkgname[] = "ral" ;
 static char const ral_version[] = "0.8.1" ;
 static char const ral_rcsid[] =
-    "$Id: ral.c,v 1.32 2006/12/30 02:58:42 mangoa01 Exp $" ;
+    "$Id: ral.c,v 1.33 2007/01/07 23:32:42 mangoa01 Exp $" ;
 static char const ral_copyright[] =
     "This software is copyrighted 2004, 2005, 2006 by G. Andrew Mangogna."
     " Terms and conditions for use are distributed with the source code." ;
@@ -143,6 +144,7 @@ Ral_Init(
     char cmdName[NAMEBUFSIZE] ;
     char *cmdSlot ;
     Tcl_Namespace *ralNs ;
+    Ral_RelvarInfo rInfo ;
 
     Tcl_InitStubs(interp, TCL_VERSION, 0) ;
 
@@ -169,11 +171,12 @@ Ral_Init(
     }
 
     strcpy(cmdSlot, relvarCmdName) ;
-    Tcl_CreateObjCommand(interp, cmdName, relvarCmd,
-	Ral_RelvarNewInfo(ral_pkgname, interp), NULL) ;
+    rInfo = Ral_RelvarNewInfo(ral_pkgname, interp) ;
+    Tcl_CreateObjCommand(interp, cmdName, relvarCmd, rInfo, NULL) ;
     if (Tcl_Export(interp, ralNs, relvarCmdName, 0) != TCL_OK) {
 	return TCL_ERROR ;
     }
+    Tcl_CallWhenDeleted(interp, Ral_RelvarObjInterpDeleted, rInfo) ;
 
 #   ifdef Tcl_RegisterConfig_TCL_DECLARED
     Tcl_RegisterConfig(interp, ral_pkgname, ral_config, "UTF-8") ;

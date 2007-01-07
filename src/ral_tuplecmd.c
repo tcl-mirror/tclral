@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuplecmd.c,v $
-$Revision: 1.16 $
-$Date: 2006/12/30 02:58:42 $
+$Revision: 1.17 $
+$Date: 2007/01/07 23:32:42 $
  *--
  */
 
@@ -105,7 +105,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tuplecmd.c,v $ $Revision: 1.16 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tuplecmd.c,v $ $Revision: 1.17 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -869,7 +869,6 @@ TupleUpdateCmd(
     if (tupleObj == NULL) {
 	return TCL_ERROR ;
     }
-#if 0
     if (Tcl_IsShared(tupleObj)) {
 	Tcl_Obj *dupObj ;
 
@@ -881,7 +880,6 @@ TupleUpdateCmd(
 	    return TCL_ERROR ;
 	}
     }
-#endif
     if (Tcl_ConvertToType(interp, tupleObj, &Ral_TupleObjType) != TCL_OK) {
 	return TCL_ERROR ;
     }
