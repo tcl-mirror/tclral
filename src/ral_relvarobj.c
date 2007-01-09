@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.20 $
-$Date: 2007/01/07 23:32:42 $
+$Revision: 1.21 $
+$Date: 2007/01/09 02:36:47 $
  *--
  */
 
@@ -150,7 +150,7 @@ static const struct traceOpsMap {
 } ;
 static const char specErrMsg[] = "multiplicity specification" ;
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.20 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.21 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -1956,79 +1956,134 @@ Ral_RelvarObjEncodeTraceFlag(
     return TCL_OK ;
 }
 
-static Tcl_Obj *
+/*
+ * Execute the traces on a given relvar.
+ */
+static Tcl_Obj *	    /* returns the object returned by the trace proc.
+			     * return NULL on error or if "type" is NULL. */
 Ral_RelvarObjExecTraces(
-    Tcl_Interp *interp,
-    Ral_Relvar relvar,
-    Tcl_ObjType *type,
-    Tcl_Obj *arg1,
-    Tcl_Obj *arg2)
+    Tcl_Interp *interp,	    /* the interpreter */
+    Ral_Relvar relvar,	    /* the relvar we are tracing. "flags" will be set
+			     * with the single operation on which the traces
+			     * are being invoked. */
+    Tcl_ObjType *type,	    /* pointer to the type of the trace proc return
+			     * result. NULL if we don't expect the trace proc
+			     * to return a result. */
+    Tcl_Obj *arg1,	    /* First argument passed to trace proc. NULL if
+			     * there is no first argument. */
+    Tcl_Obj *arg2)	    /* Second argument passed to trace proc. NULL if
+			     * there is no second argument. */
 {
     int result = TCL_OK ;
-    Tcl_Obj *cmdv[5] ;
-    int cmdc = 3 ;
     Tcl_Obj *nameObj ;
     Tcl_Obj *flagObj ;
+    Tcl_Obj *traceObj = NULL ;
     Ral_TraceInfo trace ;
-    int lastIndex ;
 
 
+    /*
+     * Get the relvar into an object and hold on to it.
+     */
     nameObj = Tcl_NewStringObj(relvar->name, -1) ;
-    Tcl_IncrRefCount(cmdv[1] = nameObj) ;
+    Tcl_IncrRefCount(nameObj) ;
 
+    /*
+     * Translate the trace flags into a string list. In this case there
+     * will be only one flag bit set. Again we need to hold on to it.
+     */
     if (Ral_RelvarObjEncodeTraceFlag(interp, relvar->traceFlags, &flagObj)
 	!= TCL_OK) {
 	Tcl_DecrRefCount(nameObj) ;
 	return NULL ;
     }
-    Tcl_IncrRefCount(cmdv[2] = flagObj) ;
-    if (arg1) {
-	Tcl_IncrRefCount(cmdv[cmdc++] = arg1) ;
-    }
-    if (arg2) {
-	Tcl_IncrRefCount(cmdv[cmdc++] = arg2) ;
-    }
-    lastIndex = cmdc - 1 ;
+    Tcl_IncrRefCount(flagObj) ;
 
+    /*
+     * Iterate through the traces. We allow the "command" to be a command
+     * prefix and append the necessary argument as given. The strategy is
+     * to accumulate all of this in a list, break out the list and evaluate
+     * the result as pre-parsed command. This should reduce some of the
+     * shimmering.
+     */
     for (trace = relvar->traces ; trace ; trace = trace->next) {
 	if (trace->flags & relvar->traceFlags) {
-	    cmdv[0] = trace->command ;
+	    Tcl_Obj *cmd = Tcl_NewListObj(0, NULL) ;
+	    int cmdc ;
+	    Tcl_Obj **cmdv ;
 
-	    result = Tcl_EvalObjv(interp, cmdc, cmdv, TCL_EVAL_DIRECT) ;
-	    if (result != TCL_OK) {
-		break ;
-	    }
-	    if (type) {
-		Tcl_Obj *traceObj = Tcl_GetObjResult(interp) ;
-		result = Tcl_ConvertToType(interp, traceObj, type) ;
-		if (result != TCL_OK) {
+	    /*
+	     * Compose the command from the prefix, relvar name and flags.
+	     * All trace procs get these arguments.
+	     */
+	    if (Tcl_ListObjAppendList(interp, cmd, trace->command) == TCL_OK &&
+		Tcl_ListObjAppendElement(interp, cmd, nameObj) == TCL_OK &&
+		Tcl_ListObjAppendElement(interp, cmd, flagObj) == TCL_OK) {
+
+		/*
+		 * Add in the other arguments as given.
+		 */
+		if (arg1 != NULL &&
+		    Tcl_ListObjAppendElement(interp, cmd, arg1) != TCL_OK) {
+		    Tcl_DecrRefCount(cmd) ;
 		    break ;
-		} else {
-		    Tcl_DecrRefCount(cmdv[lastIndex]) ;
-		    Tcl_IncrRefCount(cmdv[lastIndex] = traceObj) ;
 		}
+		if (arg2 != NULL &&
+		    Tcl_ListObjAppendElement(interp, cmd, arg2) != TCL_OK) {
+		    Tcl_DecrRefCount(cmd) ;
+		    break ;
+		}
+
+		/*
+		 * Break out the list as a array of argments and evaluate it.
+		 */
+		if (Tcl_ListObjGetElements(interp, cmd, &cmdc, &cmdv)
+			== TCL_OK &&
+		    Tcl_EvalObjv(interp, cmdc, cmdv, TCL_EVAL_DIRECT)
+			== TCL_OK &&
+		    type != NULL) {
+
+		    /*
+		     * When we care about the return object of the trace
+		     * proc we fish it out of the interpreter and make
+		     * sure that it is of the proper type.
+		     */
+		    traceObj = Tcl_GetObjResult(interp) ;
+		    result = Tcl_ConvertToType(interp, traceObj, type) ;
+		    /*
+		     * If we got the correct object type, then we pass it
+		     * along to the next trace proc. That always corresponds
+		     * to the last of the arguments given (if any).
+		     */
+		    if (result == TCL_OK) {
+			if (arg2) {
+			    arg2 = traceObj ;
+			} else if (arg1) {
+			    arg1 = traceObj ;
+			}
+		    } else {
+			Tcl_DecrRefCount(cmd) ;
+			traceObj = NULL ;
+			break ;
+		    }
+		}
+		Tcl_DecrRefCount(cmd) ;
+	    } else {
+		Tcl_DecrRefCount(cmd) ;
+		break ;
 	    }
 	}
     }
 
     /*
-     * N.B. that Tcl_DecrRefCount is a macro that evaluates its argument
-     * twice ==> no side effects are allowed. So we must pull the decrement
-     * of the "cmdc" variable to its own statement.
-     * Wicked, evil macros.
+     * Let go of the trace proc arguments that we created here.
      */
-    if (arg2) {
-	--cmdc ;
-	Tcl_DecrRefCount(cmdv[cmdc]) ;
-    }
-    if (arg1) {
-	--cmdc ;
-	Tcl_DecrRefCount(cmdv[cmdc]) ;
-    }
     Tcl_DecrRefCount(flagObj) ;
     Tcl_DecrRefCount(nameObj) ;
 
-    return result == TCL_OK ? Tcl_GetObjResult(interp) : NULL ;
+    /*
+     * Return the last return value from the chain of trace procs.
+     */
+    return traceObj ;
 }
 
 /*
