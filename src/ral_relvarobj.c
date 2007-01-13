@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.22 $
-$Date: 2007/01/11 06:15:28 $
+$Revision: 1.23 $
+$Date: 2007/01/13 02:23:56 $
  *--
  */
 
@@ -150,7 +150,7 @@ static const struct traceOpsMap {
 } ;
 static const char specErrMsg[] = "multiplicity specification" ;
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.22 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.23 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -2037,10 +2037,13 @@ Ral_RelvarObjExecTraces(
 		 * Break out the list as a array of argments and evaluate it.
 		 */
 		if (Tcl_ListObjGetElements(interp, cmd, &cmdc, &cmdv)
-			== TCL_OK &&
+			!= TCL_OK ||
 		    Tcl_EvalObjv(interp, cmdc, cmdv, TCL_EVAL_DIRECT)
-			== TCL_OK &&
-		    type != NULL) {
+			!= TCL_OK) {
+		    Tcl_DecrRefCount(cmd) ;
+		    break ;
+		}
+		if (type != NULL) {
 
 		    /*
 		     * When we care about the return object of the trace
