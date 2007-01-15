@@ -47,8 +47,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: trace.test,v $
-# $Revision: 1.4 $
-# $Date: 2007/01/11 06:20:35 $
+# $Revision: 1.5 $
+# $Date: 2007/01/15 01:32:03 $
 #  *--
 
 package require tcltest 2.2
@@ -75,23 +75,23 @@ namespace eval ::ral::test {
 
     set recNum 0
 
-    proc traceProc {relvarName op args} {
+    proc traceProc {op relvarName args} {
 	variable traceInfo
 	set traceInfo [lindex $args end]
     }
 
-    proc insertTrace {relvarName op tup} {
+    proc insertTrace {op relvarName tup} {
 	variable traceInfo
 	set traceInfo $tup
 	return $tup
     }
 
-    proc incrAttr {attrName relvarName op tup} {
+    proc incrAttr {attrName op relvarName tup} {
 	tuple update tup $attrName [expr {[tuple extract $tup $attrName] + 1}]
 	return $tup
     }
 
-    proc modTuple {attrName attrValue relvarName opsList tup} {
+    proc modTuple {attrName attrValue op relvarName tup} {
 	::ral::tuple update tup $attrName $attrValue
 	return $tup
     }
@@ -107,7 +107,7 @@ namespace eval ::ral::test {
 
     # relvar trace subcommand
     test relvar-trace-1.0 {unknown relvar} -body {
-	relvar trace add foo insert traceProc
+	relvar trace add variable foo insert traceProc
     } -result {unknown relvar name, "foo"} -returnCodes error
 
     test relvar-trace-1.1 {bad arguments} -setup {
@@ -119,8 +119,8 @@ namespace eval ::ral::test {
     } -cleanup {
 	relvar unset SV
     } -body {
-	relvar trace add SV insert
-    } -result {wrong # args: should be "relvar trace add relvarName ops command"} -returnCodes error
+	relvar trace add variable SV insert
+    } -result {wrong # args: should be "relvar trace add variable relvarName ops cmdPrefix"} -returnCodes error
 
     test relvar-trace-1.2 {bad trace operation} -setup {
 	relvar create SV {
@@ -131,7 +131,7 @@ namespace eval ::ral::test {
     } -cleanup {
 	relvar unset SV
     } -body {
-	relvar trace add SV foo traceProc
+	relvar trace add variable SV foo traceProc
     } -result {bad traceOp "foo": must be delete, insert, set, unset, or update} -returnCodes error
 
     test relvar-trace-2.0 {single operation} -setup {
@@ -144,8 +144,8 @@ namespace eval ::ral::test {
     } -cleanup {
 	relvar unset SV
     } -body {
-	relvar trace add SV insert traceProc
-	relvar trace info SV
+	relvar trace add variable SV insert traceProc
+	relvar trace info variable SV
     } -result {{insert traceProc}}
 
     test relvar-trace-2.1 {multiple operations} -setup {
@@ -158,8 +158,8 @@ namespace eval ::ral::test {
     } -cleanup {
 	relvar unset SV
     } -body {
-	relvar trace add SV {insert delete update} traceProc
-	relvar trace info SV
+	relvar trace add variable SV {insert delete update} traceProc
+	relvar trace info variable SV
     } -result {{{delete insert update} traceProc}}
 
     test relvar-trace-3.0 {remove trace} -setup {
@@ -172,11 +172,11 @@ namespace eval ::ral::test {
     } -cleanup {
 	relvar unset SV
     } -body {
-	relvar trace add SV {insert delete update} traceProc
-	relvar trace add SV {set} traceProc
-	relvar trace add SV {unset} traceProc
-	relvar trace remove SV {delete insert update} traceProc
-	relvar trace info SV
+	relvar trace add variable SV {insert delete update} traceProc
+	relvar trace add variable SV {set} traceProc
+	relvar trace add variable SV {unset} traceProc
+	relvar trace remove variable SV {delete insert update} traceProc
+	relvar trace info variable SV
     } -result {{unset traceProc} {set traceProc}}
 
     test relvar-trace-4.0 {insert tracing} -setup {
@@ -189,7 +189,7 @@ namespace eval ::ral::test {
     } -cleanup {
 	relvar unset SV
     } -body {
-	relvar trace add SV insert traceProc
+	relvar trace add variable SV insert traceProc
 	relvar insert SV {S# S6 SNAME Foo STATUS 40 CITY Bar}
 	set traceInfo
     } -result {Tuple {S# string SNAME string STATUS int CITY string} {S# S6 SNAME Foo STATUS 40 CITY Bar}}
@@ -204,7 +204,7 @@ namespace eval ::ral::test {
     } -cleanup {
 	relvar unset SV
     } -body {
-	relvar trace add SV insert [list modTuple SNAME Baz]
+	relvar trace add variable SV insert [list modTuple SNAME Baz]
 	relvar insert SV {S# S6 SNAME Foo STATUS 40 CITY Bar}
 	relation tuple [relation choose $SV S# S6]
     } -result {
@@ -223,9 +223,9 @@ namespace eval ::ral::test {
     } -cleanup {
 	relvar unset SV
     } -body {
-	relvar trace add SV insert [list incrAttr STATUS]
-	relvar trace add SV insert [list incrAttr STATUS]
-	relvar trace add SV insert [list incrAttr STATUS]
+	relvar trace add variable SV insert [list incrAttr STATUS]
+	relvar trace add variable SV insert [list incrAttr STATUS]
+	relvar trace add variable SV insert [list incrAttr STATUS]
 	relvar insert SV {S# S6 SNAME Foo STATUS 40 CITY Bar}
 	relation tuple [relation choose $SV S# S6]
     } -result {
@@ -297,9 +297,9 @@ namespace eval ::ral::test {
     }
 
     test relvar-trace-5.1 {insert tracing} -setup {
-	relvar trace add S insert [namespace code insertMap]
+	relvar trace add variable S insert [namespace code insertMap]
     } -cleanup {
-	relvar trace remove S insert [namespace code insertMap]
+	relvar trace remove variable S insert [namespace code insertMap]
     } -body {
 	relvar insert S\
 	    {S# S1 SNAME Smith STATUS 20 CITY London}\
@@ -320,10 +320,10 @@ namespace eval ::ral::test {
     } -match relation
 
     test relvar-trace-5.1 {traces present for different operations} -setup {
-	relvar trace add S insert [namespace code insertMap]
-	relvar trace add S delete [namespace code deleteMap]
+	relvar trace add variable S insert [namespace code insertMap]
+	relvar trace add variable S delete [namespace code deleteMap]
     } -cleanup {
-	relvar trace remove S insert [namespace code insertMap]
+	relvar trace remove variable S insert [namespace code insertMap]
     } -body {
 	relvar insert S\
 	    {S# S5 SNAME Adams STATUS 30 CITY Athens}
@@ -342,9 +342,9 @@ namespace eval ::ral::test {
     } -match relation
 
     test relvar-trace-5.2 {delete tracing} -setup {
-	relvar trace add S delete [namespace code deleteMap]
+	relvar trace add variable S delete [namespace code deleteMap]
     } -cleanup {
-	relvar trace remove S delete [namespace code deleteMap]
+	relvar trace remove variable S delete [namespace code deleteMap]
     } -body {
 	relvar deleteone S S# S2
 	relvar set SMap
@@ -361,9 +361,9 @@ namespace eval ::ral::test {
     } -match relation
 
     test relvar-trace-5.3 {update tracing} -setup {
-	relvar trace add S update [namespace code updateMap]
+	relvar trace add variable S update [namespace code updateMap]
     } -cleanup {
-	relvar trace remove S update [namespace code updateMap]
+	relvar trace remove variable S update [namespace code updateMap]
     } -body {
 	relvar updateone S supp {S# S3} {
 	    tuple update supp S# S6
@@ -382,9 +382,9 @@ namespace eval ::ral::test {
     } -match relation
 
     test relvar-trace-5.4 {set tracing} -setup {
-	relvar trace add S set [namespace code setMap]
+	relvar trace add variable S set [namespace code setMap]
     } -cleanup {
-	relvar trace remove S set [namespace code setMap]
+	relvar trace remove variable S set [namespace code setMap]
     } -body {
 	relvar set S [relation include $S {S# S7 SNAME Foo STATUS 25 CITY Bar}]
 	relvar set SMap
@@ -402,7 +402,7 @@ namespace eval ::ral::test {
     } -match relation
 
     test relvar-trace-5.5 {unset tracing} -setup {
-	relvar trace add S unset [namespace code unsetMap]
+	relvar trace add variable S unset [namespace code unsetMap]
     } -cleanup {
     } -body {
 	relvar unset S
@@ -413,6 +413,32 @@ namespace eval ::ral::test {
 	{R# S#}
 	{}
     } -match relation
+
+    relvar create S {
+	Relation
+	{S# string SNAME string STATUS int CITY string}
+	S#
+    }
+    relvar insert S\
+	{S# S1 SNAME Smith STATUS 20 CITY London}\
+	{S# S2 SNAME Jones STATUS 10 CITY Paris}\
+	{S# S3 SNAME Blake STATUS 30 CITY Paris}\
+	{S# S4 SNAME Clark STATUS 20 CITY London}
+
+    proc evalTrace {op begin level} {
+	variable evalInfo
+	lappend evalInfo [list $op $begin $level]
+    }
+
+    test relvar-trace-6.1 {eval tracing} -setup {
+	relvar trace add eval [namespace code evalTrace]
+    } -cleanup {
+	relvar trace remove eval [namespace code evalTrace]
+    } -body {
+	relvar eval {
+	}
+	set evalInfo
+    } -result {{eval begin 1} {eval end 1}}
 
     cleanupTests
 }

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.c,v $
-$Revision: 1.12 $
-$Date: 2007/01/02 04:14:45 $
+$Revision: 1.13 $
+$Date: 2007/01/15 01:32:03 $
  *--
  */
 
@@ -120,7 +120,7 @@ static char const * const condMultStrings[2][2] = {
     {"1", "+"},
     {"?", "*"}
 } ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.12 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.13 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -225,6 +225,7 @@ Ral_RelvarDeleteInfo(
     Ral_RelvarInfo info = (Ral_RelvarInfo)cd ;
     Tcl_HashEntry *entry ;
     Tcl_HashSearch search ;
+    Ral_TraceInfo trace ;
 
     /*
      * We should only be deleting the relvar info outside of a transaction.
@@ -246,6 +247,19 @@ Ral_RelvarDeleteInfo(
 	 relvarConstraintCleanup(Tcl_GetHashValue(entry)) ;
     }
     Tcl_DeleteHashTable(&info->constraints) ;
+    /*
+     * Clean up the eval trace list.
+     */
+    for (trace = info->traces ; trace ; ) {
+	Ral_TraceInfo temp = trace->next ; /* make sure not to access the trace
+					    * memory after it has been freed */
+	Tcl_DecrRefCount(trace->command) ;
+	ckfree((char *)trace) ;
+	trace = temp ;
+    }
+    /*
+     * Finally free the top level memory.
+     */
     ckfree((char *)info) ;
 }
 

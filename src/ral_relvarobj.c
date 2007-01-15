@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.23 $
-$Date: 2007/01/13 02:23:56 $
+$Revision: 1.24 $
+$Date: 2007/01/15 01:32:03 $
  *--
  */
 
@@ -86,6 +86,7 @@ MACRO DEFINITIONS
 #define	TRACEOP_SET_FLAG 0x04
 #define	TRACEOP_UNSET_FLAG 0x08
 #define	TRACEOP_UPDATE_FLAG 0x10
+#define	TRACEOP_EVAL_FLAG 0x20
 
 /*
 TYPE DEFINITIONS
@@ -150,7 +151,7 @@ static const struct traceOpsMap {
 } ;
 static const char specErrMsg[] = "multiplicity specification" ;
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.23 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.24 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -1552,7 +1553,7 @@ Ral_RelvarObjEndCmd(
 }
 
 int
-Ral_RelvarObjTraceAdd(
+Ral_RelvarObjTraceVarAdd(
     Tcl_Interp * interp,
     Ral_Relvar relvar,
     Tcl_Obj *const traceOps,
@@ -1568,7 +1569,7 @@ Ral_RelvarObjTraceAdd(
 }
 
 int
-Ral_RelvarObjTraceRemove(
+Ral_RelvarObjTraceVarRemove(
     Tcl_Interp * interp,
     Ral_Relvar relvar,
     Tcl_Obj *const traceOps,
@@ -1584,7 +1585,7 @@ Ral_RelvarObjTraceRemove(
 }
 
 int
-Ral_RelvarObjTraceInfo(
+Ral_RelvarObjTraceVarInfo(
     Tcl_Interp *interp,
     Ral_Relvar relvar)
 {
@@ -1610,6 +1611,102 @@ Ral_RelvarObjTraceInfo(
 	infoObj[1] = trace->command ;
 	if (Tcl_ListObjAppendElement(interp, resultObj,
 	    Tcl_NewListObj(2, infoObj)) != TCL_OK) {
+	    Tcl_DecrRefCount(resultObj) ;
+	    return TCL_ERROR ;
+	}
+    }
+
+    Tcl_SetObjResult(interp, resultObj) ;
+    return TCL_OK ;
+}
+
+int
+Ral_RelvarObjTraceEvalAdd(
+    Tcl_Interp *interp,
+    Ral_RelvarInfo rInfo,
+    Tcl_Obj *const cmdPrefix)
+{
+    Ral_TraceInfo info = (Ral_TraceInfo)ckalloc(sizeof *info) ;
+
+    info->flags = TRACEOP_EVAL_FLAG ;
+    Tcl_IncrRefCount(info->command = cmdPrefix) ;
+    /*
+     * Chain the new trace onto the beginning of the list.
+     */
+    info->next = rInfo->traces ;
+    rInfo->traces = info ;
+    return TCL_OK ;
+}
+
+int
+Ral_RelvarObjTraceEvalRemove(
+    Tcl_Interp *interp,
+    Ral_RelvarInfo rInfo,
+    Tcl_Obj *const cmdPrefix)
+{
+    Ral_TraceInfo prev = NULL ;
+    Ral_TraceInfo trace = rInfo->traces ;
+    const char *cmdString = Tcl_GetString(cmdPrefix) ;
+    int flags = TRACEOP_EVAL_FLAG ;
+
+    /*
+     * The traces are in a linked list so we must traverse the list
+     * to find the trace. Since it is singly linked we must keep a trailing
+     * pointer to use during relinking.
+     */
+    while (trace) {
+	if (trace->flags == flags &&
+	    strcmp(Tcl_GetString(trace->command), cmdString) == 0) {
+	    /*
+	     * Found a match. Remember the one to delete.
+	     */
+	    Ral_TraceInfo del = trace ;
+	    if (prev) {
+		/*
+		 * Unlinking in the middle of the list.
+		 */
+		prev->next = trace->next ;
+	    } else {
+		/*
+		 * Unlinking the first one in the list.
+		 */
+		rInfo->traces = trace->next ;
+	    }
+	    /*
+	     * Point to the next list item. Do this before freeing
+	     * the item itself since after the cleanup the "trace"
+	     * pointer is invalid.
+	     */
+	    trace = trace->next ;
+	    Tcl_DecrRefCount(del->command) ;
+	    ckfree((char *)del) ;
+	} else {
+	    /*
+	     * No match, advance the pointers along the list.
+	     */
+	    prev = trace ;
+	    trace = trace->next ;
+	}
+    }
+    return TCL_OK ;
+}
+
+int
+Ral_RelvarObjTraceEvalInfo(
+    Tcl_Interp *interp,
+    Ral_RelvarInfo rInfo)
+{
+    Tcl_Obj *resultObj ;
+    Ral_TraceInfo trace ;
+
+    resultObj = Tcl_NewListObj(0, 0) ;
+
+    for (trace = rInfo->traces ; trace ; trace = trace->next) {
+	/*
+	 * Each info element in the result list is just the command prefix.
+	 */
+	if (Tcl_ListObjAppendElement(interp, resultObj, trace->command)
+	    != TCL_OK) {
 	    Tcl_DecrRefCount(resultObj) ;
 	    return TCL_ERROR ;
 	}
@@ -1690,6 +1787,62 @@ Ral_RelvarObjExecUnsetTraces(
 	relvar->traceFlags = TRACEOP_UNSET_FLAG ;
 	Ral_RelvarObjExecTraces(interp, relvar, NULL, NULL, NULL) ;
 	relvar->traceFlags = 0 ;
+    }
+}
+
+void
+Ral_RelvarObjExecEvalTraces(
+    Tcl_Interp *interp,
+    Ral_RelvarInfo rInfo,
+    int isBegin,
+    int level)
+{
+    if (rInfo->traces) {
+	Tcl_Obj *evalObj = Tcl_NewStringObj("eval", -1) ;
+	Tcl_Obj *beginObj = isBegin ?
+	    Tcl_NewStringObj("begin", -1) : Tcl_NewStringObj("end", -1) ;
+	Tcl_Obj *levelObj = Tcl_NewIntObj(level) ;
+	Ral_TraceInfo trace ;
+	Tcl_Obj *resultObj ;
+
+	Tcl_IncrRefCount(evalObj) ;
+	Tcl_IncrRefCount(beginObj) ;
+	Tcl_IncrRefCount(levelObj) ;
+	/*
+	 * Since we ignore any errors from eval traces, we preserve
+	 * the current value of the interpreter result while executing
+	 * the trace commands.
+	 */
+	resultObj = Tcl_GetObjResult(interp) ;
+	Tcl_IncrRefCount(resultObj) ;
+
+	for (trace = rInfo->traces ; trace ; trace = trace->next) {
+	    Tcl_Obj *cmd = Tcl_NewListObj(0, NULL) ;
+
+	    /*
+	     * Compose the command from the prefix, begin keyword and level.
+	     */
+	    if (Tcl_ListObjAppendList(interp, cmd, trace->command) == TCL_OK &&
+		Tcl_ListObjAppendElement(interp, cmd, evalObj) == TCL_OK &&
+		Tcl_ListObjAppendElement(interp, cmd, beginObj) == TCL_OK &&
+		Tcl_ListObjAppendElement(interp, cmd, levelObj) == TCL_OK) {
+		int cmdc ;
+		Tcl_Obj **cmdv ;
+		/*
+		 * Break out the list as a array of argments and evaluate it.
+		 */
+		if (Tcl_ListObjGetElements(interp, cmd, &cmdc, &cmdv)
+		    == TCL_OK) {
+		    Tcl_EvalObjv(interp, cmdc, cmdv, TCL_EVAL_DIRECT) ;
+		}
+	    }
+	}
+
+	Tcl_DecrRefCount(evalObj) ;
+	Tcl_DecrRefCount(beginObj) ;
+	Tcl_DecrRefCount(levelObj) ;
+	Tcl_SetObjResult(interp, resultObj) ;
+	Tcl_DecrRefCount(resultObj) ;
     }
 }
 
@@ -1979,14 +2132,11 @@ Ral_RelvarObjExecTraces(
     Tcl_Obj *flagObj ;
     Tcl_Obj *traceObj = arg2 ? arg2 : (arg1 ? arg1 : NULL) ;
     Ral_TraceInfo trace ;
-
-
     /*
      * Get the relvar into an object and hold on to it.
      */
     nameObj = Tcl_NewStringObj(relvar->name, -1) ;
     Tcl_IncrRefCount(nameObj) ;
-
     /*
      * Translate the trace flags into a string list. In this case there
      * will be only one flag bit set. Again we need to hold on to it.
@@ -1997,7 +2147,6 @@ Ral_RelvarObjExecTraces(
 	return NULL ;
     }
     Tcl_IncrRefCount(flagObj) ;
-
     /*
      * Iterate through the traces. We allow the "command" to be a command
      * prefix and append the necessary argument as given. The strategy is
@@ -2016,8 +2165,8 @@ Ral_RelvarObjExecTraces(
 	     * All trace procs get these arguments.
 	     */
 	    if (Tcl_ListObjAppendList(interp, cmd, trace->command) == TCL_OK &&
-		Tcl_ListObjAppendElement(interp, cmd, nameObj) == TCL_OK &&
-		Tcl_ListObjAppendElement(interp, cmd, flagObj) == TCL_OK) {
+		Tcl_ListObjAppendElement(interp, cmd, flagObj) == TCL_OK &&
+		Tcl_ListObjAppendElement(interp, cmd, nameObj) == TCL_OK) {
 
 		/*
 		 * Add in the other arguments as given.

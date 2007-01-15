@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.h,v $
-$Revision: 1.8 $
-$Date: 2006/12/30 02:58:42 $
+$Revision: 1.9 $
+$Date: 2007/01/15 01:32:03 $
  *--
  */
 #ifndef _ral_relvar_h_
@@ -153,6 +153,7 @@ typedef struct Ral_RelvarInfo {
     Ral_PtrVector transactions ;    /* a stack of Ral_RelvarTransactions */
     Tcl_HashTable relvars ;	    /* mapping name ==> Ral_Relvar */
     Tcl_HashTable constraints ;	    /* mapping name ==> Ral_Constraint */
+    Ral_TraceInfo traces ;	    /* list of eval traces */
 } *Ral_RelvarInfo ;
 
 /*

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.23 $
-$Date: 2007/01/07 23:32:42 $
+$Revision: 1.24 $
+$Date: 2007/01/15 01:32:03 $
  *--
  */
 
@@ -115,7 +115,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.23 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.24 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -529,6 +529,9 @@ RelvarEvalCmd(
 
     Ral_RelvarStartTransaction(rInfo, 0) ;
 
+    Ral_RelvarObjExecEvalTraces(interp, rInfo, 1,
+	Ral_PtrVectorSize(rInfo->transactions)) ;
+
     /*
      * Do not need to worry about deleting the return from Tcl_ConcatObj().
      * Tcl_EvalObjEx will do that after evaluating it.
@@ -542,6 +545,9 @@ RelvarEvalCmd(
 	sprintf(msg, msgfmt, interp->errorLine) ;
 	Tcl_AddObjErrorInfo(interp, msg, -1) ;
     }
+
+    Ral_RelvarObjExecEvalTraces(interp, rInfo, 0,
+	Ral_PtrVectorSize(rInfo->transactions)) ;
 
     return Ral_RelvarObjEndTrans(interp, rInfo, result == TCL_ERROR) == TCL_OK ?
 	result : TCL_ERROR ;
@@ -697,9 +703,13 @@ RelvarPathCmd(
 }
 
 /*
- * relvar trace add relvarName ops command
- * relvar trace remove relvarName ops command
- * relvar trace info relvarname
+ * relvar trace add variable relvarName ops cmdPrefix
+ * relvar trace remove variable relvarName ops cmdPrefix
+ * relvar trace info variable relvarname
+ *
+ * relvar trace add eval cmdPrefix
+ * relvar trace remove eval cmdPrefix
+ * relvar trace info eval
  */
 static int
 RelvarTraceCmd(
@@ -708,73 +718,134 @@ RelvarTraceCmd(
     Tcl_Obj *const*objv,
     Ral_RelvarInfo rInfo)
 {
-    enum TraceCmdType {
+    enum TraceOption {
 	TraceAdd,
 	TraceRemove,
 	TraceInfo,
     } ;
-    static char const *traceCmds[] = {
+    static char const *traceOptions[] = {
 	"add",
 	"remove",
 	"info",
 	NULL
     } ;
-    int index ;
+    enum TraceType {
+	TraceVariable,
+	TraceEval,
+    } ;
+    static char const *traceTypes[] = {
+	"variable",
+	"eval",
+	NULL
+    } ;
+    int option ;
+    int type ;
     Ral_Relvar relvar ;
     int result = TCL_ERROR ;
 
     if (objc < 4) {
-	Tcl_WrongNumArgs(interp, 2, objv, "type relvarName ?arg arg ...?") ;
+	Tcl_WrongNumArgs(interp, 2, objv, "option type ?arg arg ...?") ;
 	return TCL_ERROR ;
     }
 
     /*
-     * Look up the subcommand.
+     * Look up the option that indicates the operation to be performed.
      */
-    if (Tcl_GetIndexFromObj(interp, objv[2], traceCmds, "trace subcommand", 0,
-	&index) != TCL_OK) {
+    if (Tcl_GetIndexFromObj(interp, objv[2], traceOptions, "trace option", 0,
+	&option) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    /*
+     * Look up the type of the trace.
+     */
+    if (Tcl_GetIndexFromObj(interp, objv[3], traceTypes, "trace type", 0,
+	&type) != TCL_OK) {
 	return TCL_ERROR ;
     }
 
     /*
-     * Look up the relvar. If the relvar does not exist it is an error.
+     * Deal with variable tracing first.
      */
-    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[3]),
-	NULL) ;
-    if (relvar == NULL) {
-	return TCL_ERROR ;
+    if ((enum TraceType)type == TraceVariable) {
+	relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[4]),
+	    NULL) ;
+	if (relvar == NULL) {
+	    return TCL_ERROR ;
+	}
+
+	switch ((enum TraceOption)option) {
+	case TraceAdd:
+	    /* relvar trace add variable relvarName ops cmdPrefix */
+	    if (objc != 7) {
+		Tcl_WrongNumArgs(interp, 2, objv,
+		    "add variable relvarName ops cmdPrefix") ;
+		return TCL_ERROR ;
+	    }
+	    result = Ral_RelvarObjTraceVarAdd(interp, relvar, objv[5],
+		objv[6]) ;
+	    break ;
+
+	case TraceRemove:
+	    /* relvar trace remove variable relvarName ops cmdPrefix */
+	    if (objc != 7) {
+		Tcl_WrongNumArgs(interp, 2, objv,
+		    "remove variable relvarName ops cmdPrefix") ;
+		return TCL_ERROR ;
+	    }
+	    result = Ral_RelvarObjTraceVarRemove(interp, relvar, objv[5],
+		objv[6]) ;
+	    break ;
+
+	case TraceInfo:
+	    /* relvar trace info variable relvarName */
+	    if (objc != 5) {
+		Tcl_WrongNumArgs(interp, 2, objv, "info variable relvarName") ;
+		return TCL_ERROR ;
+	    }
+	    result = Ral_RelvarObjTraceVarInfo(interp, relvar) ;
+	    break ;
+
+	default:
+	    Tcl_Panic("Unknown trace option, %d", option) ;
+	}
     }
+    /*
+     * Deal with eval tracing.
+     */
+    else if ((enum TraceType)type == TraceEval) {
+	switch ((enum TraceOption)option) {
+	case TraceAdd:
+	    /* relvar trace add eval cmdPrefix */
+	    if (objc != 5) {
+		Tcl_WrongNumArgs(interp, 2, objv, "add eval cmdPrefix") ;
+		return TCL_ERROR ;
+	    }
+	    result = Ral_RelvarObjTraceEvalAdd(interp, rInfo, objv[4]) ;
+	    break ;
 
-    switch ((enum TraceCmdType)index) {
-    case TraceAdd:
-	/* relvar trace add relvarName ops command */
-	if (objc != 6) {
-	    Tcl_WrongNumArgs(interp, 2, objv, "add relvarName ops command") ;
-	    return TCL_ERROR ;
+	case TraceRemove:
+	    /* relvar trace remove eval cmdPrefix */
+	    if (objc != 5) {
+		Tcl_WrongNumArgs(interp, 2, objv, "remove eval cmdPrefix") ;
+		return TCL_ERROR ;
+	    }
+	    result = Ral_RelvarObjTraceEvalRemove(interp, rInfo, objv[4]) ;
+	    break ;
+
+	case TraceInfo:
+	    /* relvar trace info eval*/
+	    if (objc != 4) {
+		Tcl_WrongNumArgs(interp, 2, objv, "info eval") ;
+		return TCL_ERROR ;
+	    }
+	    result = Ral_RelvarObjTraceEvalInfo(interp, rInfo) ;
+	    break ;
+
+	default:
+	    Tcl_Panic("Unknown trace option, %d", option) ;
 	}
-	result = Ral_RelvarObjTraceAdd(interp, relvar, objv[4], objv[5]) ;
-	break ;
-
-    case TraceRemove:
-	/* relvar trace remove relvarName ops command */
-	if (objc != 6) {
-	    Tcl_WrongNumArgs(interp, 2, objv, "remove relvarName ops command") ;
-	    return TCL_ERROR ;
-	}
-	result = Ral_RelvarObjTraceRemove(interp, relvar, objv[4], objv[5]) ;
-	break ;
-
-    case TraceInfo:
-	/* relvar trace info relvarName */
-	if (objc != 4) {
-	    Tcl_WrongNumArgs(interp, 2, objv, "info relvarName") ;
-	    return TCL_ERROR ;
-	}
-	result = Ral_RelvarObjTraceInfo(interp, relvar) ;
-	break ;
-
-    default:
-	Tcl_Panic("Unknown trace command type, %d", index) ;
+    } else {
+	Tcl_Panic("Unknown trace type, %d", type) ;
     }
 
     return result ;

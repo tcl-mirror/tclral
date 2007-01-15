@@ -47,8 +47,8 @@
 #   This command is part of TclRAL. This file is in Tcl Markup Language
 #   format.
 # $RCSfile: relvar.man,v $
-# $Revision: 1.11 $
-# $Date: 2007/01/02 04:15:06 $
+# $Revision: 1.12 $
+# $Date: 2007/01/15 01:32:03 $
 #  *--
 }]
 [moddesc "Relvar Operators"]
@@ -725,16 +725,19 @@ Relation {PuppyName string Dame string Sire string} PuppyName {{PuppyName Bitsy 
 headings not equal, "Relation {DogName string Breed string} DogName"
 }]
 
-[call [cmd "::ral::relvar trace"] [arg type] [arg relvarName] [opt [arg args]]]
+[call [cmd "::ral::relvar trace"] [arg option] [arg type] [opt [arg args]]]
 [list_begin definitions]
-[lst_item "[cmd {::ral::relvar trace add}] [arg relvarName]\
-    [arg traceops] [arg command]"]
-[lst_item "[cmd {::ral::relvar trace remove}] [arg relvarName]\
-    [arg traceops] [arg command]"]
-[lst_item "[cmd {::ral::relvar trace info}] [arg relvarName]"]
+[lst_item "[cmd {::ral::relvar trace add variable}] [arg relvarName]\
+    [arg traceops] [arg cmdPrefix]"]
+[lst_item "[cmd {::ral::relvar trace remove variable}] [arg relvarName]\
+    [arg traceops] [arg cmdPrefix]"]
+[lst_item "[cmd {::ral::relvar trace info variable}] [arg relvarName]"]
+[lst_item "[cmd {::ral::relvar trace add eval}] [arg cmdPrefix]"]
+[lst_item "[cmd {::ral::relvar trace remove eval}] [arg cmdPrefix]"]
+[lst_item "[cmd {::ral::relvar trace info eval}]"]
 [list_end]
 
-The [cmd "trace add"] subcommand adds a trace to [arg relvarName].
+The [cmd "trace add variable"] subcommand adds a trace to [arg relvarName].
 The [arg traceops] argument is a list of one or more trace operation keywords
 from the list:
 [list_begin definitions]
@@ -745,10 +748,10 @@ from the list:
 [lst_item update]
 [list_end]
 
-The [cmd "trace remove"] subcommand deletes any trace on [arg relvarName]
-that matches [arg traceops] and [arg command].
+The [cmd "trace remove variable"] subcommand deletes any trace on
+[arg relvarName] that matches [arg traceops] and [arg command].
 
-The [cmd "trace info"] subcommand returns the trace information
+The [cmd "trace info variable"] subcommand returns the trace information
 for the relvar whose name is given by [arg relvarName].
 The trace information is a list each element of which describes one trace
 on the relvar.
@@ -757,6 +760,11 @@ the [arg traceops] and [arg command], of the relvar trace.
 
 It is an error to request any trace operation if [arg relvarName] does not
 exist.
+
+The [cmd "trace add eval"], [cmd "trace remove eval"] and
+[cmd "trace info eval"] variations perform the corresponding
+operation for tracing transactions via the [cmd "relvar eval"] command.
+
 See the [emph "RELVAR TRACES"] section below for further details.
 
 [call [cmd "::ral::relvar unset"] [opt "relvarName ..."]]
@@ -889,6 +897,180 @@ which will necessarily be either 0 or 1.
 [list_end]
 
 [section "RELVAR TRACES"]
+
+By analogy to tracing ordinary variables in Tcl,
+relvars can also be traced.
+However, relvar tracing is more complicated to account for the
+operations that are applied to relvars.
+There are five operations that may be traced on the relation values
+held in relvars and one operation that allows tracing of transactions
+on relvars.
+For these operations, if a command prefix has been registered using
+[cmd "relvar trace add variable"] or [cmd "relvar trace add eval"]
+then that command prefix will have
+additional arguments appended and will be invoked as described below.
+Relvar traces operate in a very similar fashion as traces on ordinary
+Tcl variables.
+The trace command is invoked when the corresponding relvar operation
+is invoked and is invoked in the context of the caller of the relvar operation,
+which, in general, is different from the caller of the [cmd "relvar trace add"]
+command.
+When executing a variable type trace for a relvar all other variable type
+tracing for that relvar is inhibited.
+If multiple traces have been added to a relvar,
+the traces are invoked in the order of most recent first to oldest last.
+
+[list_begin definitions]
+[lst_item delete]
+A delete trace is invoked for each tuple in a relvar that is deleted.
+Tuples are deleted from relvars by invocations of [cmd "relvar delete"]
+or [cmd "relvar deleteone"].
+The delete trace command is invoked as:
+[nl]
+[cmd cmdPrefix] [cmd delete] [arg relvarName] [arg tupleValue]
+[nl]
+where [cmd cmdPrefix] is the command prefix of the trace as given
+in [cmd "relvar trace add variable"],
+the string [cmd delete] indicates that a tuple is to be deleted from the relvar,
+[arg relvarName] is the fully qualified name of the relvar
+and [arg tupleValue] is the value of the tuple about to be deleted.
+The trace command is invoked before the tuple is actually removed from
+the relation value held in the relvar.
+If [cmd cmdPrefix] throws an error, then no other delete traces in the chain of
+delete traces for the relvar are invoked and [arg tupleValue] is not removed
+from the relvar value.
+
+[lst_item insert]
+An insert trace is invoked for each tuple in a relvar that is inserted.
+Tuples are inserted into relvars by invocations of [cmd "relvar insert"].
+The insert trace command is invoked as:
+[nl]
+[cmd cmdPrefix] [cmd insert] [arg relvarName] [arg tupleValue]
+[nl]
+where [cmd cmdPrefix] is the command prefix of the trace as given
+in [cmd "relvar trace add variable"],
+the string [cmd insert] indicates that a tuple
+is to be inserted into the relvar,
+[arg relvarName] is the fully qualified name of the relvar
+and [arg tupleValue] is the value of the tuple about to be inserted
+The trace command is invoked before the tuple is actually inserted into
+the relation value held in the relvar.
+The [cmd cmdPrefix] command must return a Tuple value.
+The returned Tuple value is passed along to the next insert trace command.
+The returned Tuple from the last trace command in the chain is then
+inserted into the relvar.
+Insert trace commands may choose to modify the value of [arg tupleValue] but
+are required to return a value that can be cooerced into a Tuple type and the
+heading of the returned Tuple of the last trace command in the chain
+must match that of the relvar if it is to be successfully inserted.
+If [cmd cmdPrefix] throws an error, then no other insert traces in the chain of
+insert traces for the relvar are invoked and [arg tupleValue] is not inserted
+into the relvar value.
+
+[lst_item set]
+A set trace is invoked each time that the relation value held in a relvar
+is assigned.
+Relations values are assigned to relvars by invocation of the [cmd "relvar set"]
+command.
+The set trace command is invoked as:
+[nl]
+[cmd cmdPrefix] [cmd set] [arg relvarName] [arg relationValue]
+[nl]
+where [cmd cmdPrefix] is the command prefix of the trace as given
+in [cmd "relvar trace add variable"],
+the string [cmd set] indicates that a relation value
+is to be assigned to the relvar,
+[arg relvarName] is the fully qualified
+name of the relvar
+and [arg relationValue] is the relation value that is about to be assigned
+to the relvar.
+The trace command is invoked before the relation is actually assigned to the
+relvar.
+The [cmd cmdPrefix] command must return a Relation value.
+The returned Relation value is passed along to the next set trace command.
+The returned Relation from the last trace command in the chain is then
+assigned to the relvar.
+Set trace commands may choose to modify the value of [arg relationValue] but
+are required to return a value that can be cooerced into a Relation type and the
+heading of the returned Relation of the last trace command in the chain
+must match that of the relvar if it is to be successfully assigned
+If [cmd cmdPrefix] throws an error, then no other set traces in the chain of
+set traces for the relvar are invoked and [arg relationValue] is not assigned
+to the relvar.
+
+[lst_item unset]
+An unset trace is invoked each time a relvar is destroyed.
+Relvars are destroyed by the invocation of the [cmd "relvar unset"] command
+and when the interpreter containing the relvar is destroyed.
+The unset trace command is invoked as:
+[nl]
+[cmd cmdPrefix] [cmd unset] [arg relvarName]
+[nl]
+where [cmd cmdPrefix] is the command prefix of the trace as given
+in [cmd "relvar trace add variable"],
+the string [cmd unset] indicates that the relvar
+is being destroyed,
+and [arg relvarName] is the fully qualified
+name of the relvar.
+The trace command is invoked before the relvar is actually destroyed so
+the relation value stored in the relvar is still intact.
+Any errors thown by [cmd cmdPrefix] are ignored.
+
+[lst_item update]
+An update trace is invoked for each tuple in a relvar that is updated.
+Tuples are updated into relvars by invocations of [cmd "relvar update"]
+and [cmd "relvar updateone"].
+The update trace command is invoked as:
+[nl]
+[cmd cmdPrefix] [cmd update] [arg relvarName] [arg oldTupleValue]
+    [arg newTupleValue]
+[nl]
+where [cmd cmdPrefix] is the command prefix of the trace as given
+in [cmd "relvar trace add variable"],
+the string [cmd update] indicates that a tuple
+is to be updated in the relvar,
+[arg relvarName] is the fully qualified name of the relvar,
+[arg oldTupleValue] is the current value of the tuple in the relvar
+and [arg newTupleValue] is the value that the tuple will have when
+the update is performed.
+The trace command is invoked before the tuple is actually updated in
+the relation value held in the relvar.
+The [cmd cmdPrefix] command must return a Tuple value.
+The returned Tuple value is passed along to the next update trace command.
+The returned Tuple from the last trace command in the chain is then
+updated into the relvar.
+Update trace commands may choose to modify the value of [arg newTupleValue] but
+are required to return a value that can be cooerced into a Tuple type and the
+heading of the returned Tuple of the last trace command in the chain
+must match that of the relvar if it is to be successfully updated.
+If [cmd cmdPrefix] throws an error, then no other update traces in the chain of
+update traces for the relvar are invoked and [arg tupleValue] is not updated
+into the relvar value.
+
+[lst_item eval]
+An eval trace is invoked each time that a [cmd "relvar eval"] begins and
+ends.
+Eval traces are different from other relvar traces in that they provide a
+means of determining the boundaries of a transaction rather than specific
+operations on a relvar.
+The eval trace command is invoked as:
+[nl]
+[cmd cmdPrefix] [cmd eval] [arg op] [arg level]
+[nl]
+where [cmd cmdPrefix] is the command prefix of the trace as given
+in [cmd "relvar trace add eval"], 
+the string [cmd eval] indicates that the relvar transaction is in progress,
+the [arg op] is either the string "begin" or "end" indicating whether
+or not the [cmd "relvar eval"] is just starting or is ending and
+[arg level] is an integer greater than zero indicating the nesting depth
+of the transaction.
+The eval trace is invoked with the "begin" op before the script associated
+with a [cmd "relvar eval"] is executed and is invoked with the "end" op
+after the script is executed but before the relvar constraints are evaluated
+for the transaction.
+Any errors thown by [cmd cmdPrefix] are ignored.
+
+[list_end]
 
 [see_also tuple relation]
 
