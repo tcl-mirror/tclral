@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.c,v $
-$Revision: 1.13 $
-$Date: 2007/01/15 01:32:03 $
+$Revision: 1.14 $
+$Date: 2007/01/17 21:12:40 $
  *--
  */
 
@@ -120,7 +120,7 @@ static char const * const condMultStrings[2][2] = {
     {"1", "+"},
     {"?", "*"}
 } ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.13 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.14 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -892,8 +892,10 @@ relvarCleanup(
     /*
      * Free the trace information.
      */
-    for (t = relvar->traces ; t ; t = t->next) {
-	relvarTraceCleanup(t) ;
+    for (t = relvar->traces ; t ; ) {
+	Ral_TraceInfo del = t ;
+	t = t->next ;
+	relvarTraceCleanup(del) ;
     }
 
     ckfree((char *)relvar) ;
