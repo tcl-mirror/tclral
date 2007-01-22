@@ -50,18 +50,18 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.25 $
-# $Date: 2007/01/07 23:32:42 $
+# $Revision: 1.26 $
+# $Date: 2007/01/22 00:24:29 $
 #  *--
-
-package require Tcl
-package require tcltest 2.2
-eval tcltest::configure $argv
 
 set ::auto_path [linsert $::auto_path 0\
     [file normalize [file join [info script] ..]]]
+
+package require tcltest 2.2
 package require ral
 package require struct::set
+
+eval tcltest::configure $argv
 
 proc tupleMatch {expected actual} {
     return [::ral::tuple equal $expected $actual]

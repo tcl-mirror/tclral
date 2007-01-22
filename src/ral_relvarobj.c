@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.25 $
-$Date: 2007/01/17 17:08:56 $
+$Revision: 1.26 $
+$Date: 2007/01/22 00:24:29 $
  *--
  */
 
@@ -151,7 +151,7 @@ static const struct traceOpsMap {
 } ;
 static const char specErrMsg[] = "multiplicity specification" ;
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.25 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.26 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -2237,24 +2237,4 @@ Ral_RelvarObjExecTraces(
      * Return the last return value from the chain of trace procs.
      */
     return traceObj ;
-}
-
-/*
- * Called when an interpreter is deleted.
- * We use this as a hook for executing all the unset traces relvars.
- */
-void
-Ral_RelvarObjInterpDeleted(
-    ClientData clientData,
-    Tcl_Interp *interp)
-{
-    Ral_RelvarInfo info = clientData ;
-    Tcl_HashEntry *entry ;
-    Tcl_HashSearch search ;
-
-    for (entry = Tcl_FirstHashEntry(&info->relvars, &search) ; entry ;
-	entry = Tcl_NextHashEntry(&search)) {
-	Ral_Relvar relvar = Tcl_GetHashValue(entry) ;
-	Ral_RelvarObjExecUnsetTraces(interp, relvar) ;
-    }
 }

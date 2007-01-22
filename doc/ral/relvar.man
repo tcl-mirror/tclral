@@ -47,8 +47,8 @@
 #   This command is part of TclRAL. This file is in Tcl Markup Language
 #   format.
 # $RCSfile: relvar.man,v $
-# $Revision: 1.12 $
-# $Date: 2007/01/15 01:32:03 $
+# $Revision: 1.13 $
+# $Date: 2007/01/22 00:24:29 $
 #  *--
 }]
 [moddesc "Relvar Operators"]
@@ -1000,8 +1000,9 @@ to the relvar.
 
 [lst_item unset]
 An unset trace is invoked each time a relvar is destroyed.
-Relvars are destroyed by the invocation of the [cmd "relvar unset"] command
-and when the interpreter containing the relvar is destroyed.
+Relvars are destroyed by the invocation of the [cmd "relvar unset"] command.
+Note that due to a limitation of Tcl,
+unset traces are not invoked when an interpreter is deleted.
 The unset trace command is invoked as:
 [nl]
 [cmd cmdPrefix] [cmd unset] [arg relvarName]

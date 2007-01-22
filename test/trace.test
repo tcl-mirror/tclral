@@ -1,7 +1,7 @@
 #!/bin/sh
 # \
 exec tclsh "$0" "$@"
-# This software is copyrighted 2004, 2005, 2006 by G. Andrew Mangogna.
+# This software is copyrighted 2006 by G. Andrew Mangogna.
 # The following terms apply to all files associated with the software unless
 # explicitly disclaimed in individual files.
 # 
@@ -42,21 +42,23 @@ exec tclsh "$0" "$@"
 # 
 #  *++
 # MODULE:
-#   trace.test -- test cases for the Tcl Relational Algebra Library
+#   trace.test -- test cases for relvar tracing the Tcl Relational Algebra
+#   Library
 # 
 # ABSTRACT:
 # 
 # $RCSfile: trace.test,v $
-# $Revision: 1.5 $
-# $Date: 2007/01/15 01:32:03 $
+# $Revision: 1.6 $
+# $Date: 2007/01/22 00:24:29 $
 #  *--
-
-package require tcltest 2.2
-eval tcltest::configure $argv
 
 set ::auto_path [linsert $::auto_path 0\
     [file normalize [file join [info script] ..]]]
+
+package require tcltest 2.2
 package require ral
+
+eval tcltest::configure $argv
 
 proc tupleMatch {expected actual} {
     return [::ral::tuple equal $expected $actual]
@@ -80,6 +82,12 @@ namespace eval ::ral::test {
 	set traceInfo [lindex $args end]
     }
 
+    proc unsetTrace {op relvarName} {
+	puts "$op on $relvarName"
+	variable traceInfo
+	set traceInfo [list $op $relvarName]
+    }
+
     proc insertTrace {op relvarName tup} {
 	variable traceInfo
 	set traceInfo $tup
@@ -95,6 +103,7 @@ namespace eval ::ral::test {
 	::ral::tuple update tup $attrName $attrValue
 	return $tup
     }
+
     set S [relation create\
 	{S# string SNAME string STATUS int CITY string}\
 	S#\

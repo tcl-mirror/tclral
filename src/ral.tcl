@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.28 $
-# $Date: 2007/01/02 04:14:45 $
+# $Revision: 1.29 $
+# $Date: 2007/01/22 00:24:29 $
 #  *--
 
 namespace eval ::ral {
@@ -115,6 +115,19 @@ namespace eval ::ral {
 	proc lassign {values args} {
 	    uplevel 1 [list foreach $args $values break]
 	    lrange $values [llength $args] end
+	}
+    }
+    # Define a proc to determine if the version of a serialized file
+    # is compatible with the library. We use "pkgconfig" if it is
+    # available, "package require" if not. If building for some older
+    # versions of Tcl, "pkgconfig" may not be available.
+    if {[llength [info commands ::ral::pkgconfig]]} {
+	proc getVersion {} {
+	    return [getVersion]
+	}
+    } else {
+	proc getVersion {} {
+	    return [package require ral]
 	}
     }
 }
@@ -236,7 +249,7 @@ proc ::ral::tupleformat {tupleValue {title {}} {noheading 0}} {
 proc ::ral::serialize {{ns {}}} {
     set result [list]
 
-    lappend result [list Version [pkgconfig get version]]
+    lappend result [list Version [getVersion]]
 
     # Convert the names to be relative
     set names [lsort [relvar names ${ns}*]]
@@ -288,9 +301,9 @@ proc ::ral::deserialize {value {ns ::}} {
     if {$versionKeyWord ne "Version"} {
 	error "expected keyword \"Version\", got \"$versionKeyWord\""
     }
-    if {![package vsatisfies [pkgconfig get version] $verNum]} {
+    if {![package vsatisfies [getVersion] $verNum]} {
 	error "incompatible version number, \"$verNum\",\
-	    current library version is, \"[pkgconfig get version]\""
+	    current library version is, \"[getVersion]\""
     }
 
     lassign $relvars relvarKeyWord revarDefs
@@ -350,7 +363,7 @@ proc ::ral::storeToMk {fileName {ns {}}} {
 	# when the data is loaded later.
 	::mk::view layout db.__ral_version {Version Date Comment}
 	::mk::row append db.__ral_version\
-	    Version [pkgconfig get version]\
+	    Version [getVersion]\
 	    Date [clock format [clock seconds]]\
 	    Comment "Created by: \"[info level 0]\""
 	# Create a set of views that are used as catalogs to hold
@@ -468,9 +481,9 @@ proc ::ral::loadFromMk {fileName {ns ::}} {
 	    {Version string Date string Comment string}\
 	    [::mk::get db.__ral_version!0]]
 	set verNum [::mk::get db.__ral_version!0 Version]
-	if {![package vsatisfies [pkgconfig get version] $verNum]} {
+	if {![package vsatisfies [getVersion] $verNum]} {
 	    error "incompatible version number, \"$verNum\",\
-		current library version is, \"[pkgconfig get version]\""
+		current library version is, \"[getVersion]\""
 	}
 	# determine the relvar names and types by reading the catalog
 	::mk::loop rvCursor db.__ral_relvar {
@@ -542,7 +555,7 @@ proc ::ral::dump {{ns {}}} {
     set names [lsort [relvar names ${ns}*]]
 
     append result "# Generated via ::ral::dump\n"
-    append result "package require ral [pkgconfig get version]\n"
+    append result "package require ral [getVersion]\n"
 
     # Convert the names to be relative
     foreach name $names {
