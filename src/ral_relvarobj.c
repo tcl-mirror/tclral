@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.26 $
-$Date: 2007/01/22 00:24:29 $
+$Revision: 1.27 $
+$Date: 2007/01/26 02:07:17 $
  *--
  */
 
@@ -151,7 +151,7 @@ static const struct traceOpsMap {
 } ;
 static const char specErrMsg[] = "multiplicity specification" ;
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.26 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.27 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -1767,13 +1767,49 @@ Tcl_Obj *
 Ral_RelvarObjExecSetTraces(
     Tcl_Interp *interp,
     Ral_Relvar relvar,
-    Tcl_Obj *relationObj)
+    Tcl_Obj *relationObj,
+    Ral_ErrorInfo *errInfo)
 {
     if (relvar->traces && relvar->traceFlags == 0) {
 	relvar->traceFlags = TRACEOP_SET_FLAG ;
 	relationObj = Ral_RelvarObjExecTraces(interp, relvar,
 	    &Ral_RelationObjType, relationObj, NULL) ;
 	relvar->traceFlags = 0 ;
+
+	/*
+	 * For set traces, the result heading must match the heading
+	 * for the relvar.
+	 */
+	if (relationObj) {
+	    Ral_Relation resultRel ;
+	    Ral_Relation origRel ;
+	    int result ;
+	    /*
+	     * Result is converted to the proper type by the trace function.
+	     */
+	    resultRel = relationObj->internalRep.otherValuePtr ;
+	    /*
+	     * Make sure the relvar value didn't simmer during the trace.
+	     */
+	    result = Tcl_ConvertToType(interp, relvar->relObj,
+		&Ral_RelationObjType) ;
+	    if (result != TCL_OK) {
+		Tcl_DecrRefCount(relationObj) ;
+		return NULL ;
+	    }
+	    origRel = relvar->relObj->internalRep.otherValuePtr ;
+	    if (!Ral_RelationHeadingEqual(resultRel->heading,
+		    origRel->heading)) {
+		char *headingStr =
+		    Ral_RelationHeadingStringOf(resultRel->heading) ;
+		Ral_ErrorInfoSetError(errInfo, RAL_ERR_HEADING_NOT_EQUAL,
+		    headingStr) ;
+		Ral_InterpSetError(interp, errInfo) ;
+		ckfree(headingStr) ;
+		Tcl_DecrRefCount(relationObj) ;
+		return NULL ;
+	    }
+	}
     }
     return relationObj ;
 }

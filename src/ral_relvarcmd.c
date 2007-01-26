@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.24 $
-$Date: 2007/01/15 01:32:03 $
+$Revision: 1.25 $
+$Date: 2007/01/26 02:07:17 $
  *--
  */
 
@@ -92,12 +92,16 @@ static int RelvarDeleteOneCmd(Tcl_Interp *, int, Tcl_Obj *const*,
     Ral_RelvarInfo) ;
 static int RelvarEvalCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarInsertCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
+static int RelvarIntersectCmd(Tcl_Interp *, int, Tcl_Obj *const*,
+    Ral_RelvarInfo) ;
+static int RelvarMinusCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarNamesCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarPartitionCmd(Tcl_Interp *, int, Tcl_Obj *const*,
     Ral_RelvarInfo) ;
 static int RelvarPathCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarSetCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarTraceCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
+static int RelvarUnionCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarUnsetCmd(Tcl_Interp *, int, Tcl_Obj *const*,
     Ral_RelvarInfo) ;
 static int RelvarUpdateCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
@@ -115,7 +119,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.24 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.25 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -140,11 +144,14 @@ relvarCmd(
 	{"deleteone", RelvarDeleteOneCmd},
 	{"eval", RelvarEvalCmd},
 	{"insert", RelvarInsertCmd},
+	{"intersect", RelvarIntersectCmd},
+	{"minus", RelvarMinusCmd},
 	{"names", RelvarNamesCmd},
 	{"partition", RelvarPartitionCmd},
 	{"path", RelvarPathCmd},
-	{"trace", RelvarTraceCmd},
 	{"set", RelvarSetCmd},
+	{"trace", RelvarTraceCmd},
+	{"union", RelvarUnionCmd},
 	{"unset", RelvarUnsetCmd},
 	{"update", RelvarUpdateCmd},
 	{"updateone", RelvarUpdateOneCmd},
@@ -608,6 +615,176 @@ RelvarInsertCmd(
 }
 
 static int
+RelvarIntersectCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv,
+    Ral_RelvarInfo rInfo)
+{
+    Ral_Relvar relvar ;
+    Ral_Relation relvalue ;
+    Ral_Relation intersectRel ;
+    Tcl_Obj *resultObj ;
+    Tcl_Obj *tObj ;
+    int result = TCL_OK ;
+    Ral_ErrorInfo errInfo ;
+
+    /* relvar intersect relvarName ?relationValue ... ? */
+    if (objc < 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relvarName ?relationValue ...?") ;
+	return TCL_ERROR ;
+    }
+
+    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2]),
+	NULL) ;
+    if (relvar == NULL) {
+	return TCL_ERROR ;
+    }
+    if (Tcl_ConvertToType(interp, relvar->relObj, &Ral_RelationObjType)
+	!= TCL_OK) {
+	return TCL_ERROR ;
+    }
+    intersectRel = relvalue = relvar->relObj->internalRep.otherValuePtr ;
+
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelvar, Ral_OptIntersect) ;
+
+    if (!Ral_RelvarStartCommand(rInfo, relvar)) {
+	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_CMD, objv[2]) ;
+	Ral_InterpSetError(interp, &errInfo) ;
+	return TCL_ERROR ;
+    }
+
+    /*
+     * Index to the first relation value.
+     */
+    objc -= 3 ;
+    objv += 3 ;
+    while (objc-- > 0) {
+	Tcl_Obj *relObj ;
+	Ral_Relation r1 ;
+	Ral_Relation r2 ;
+
+	r1 = intersectRel ;
+
+	relObj = *objv++ ;
+	if (Tcl_ConvertToType(interp, relObj, &Ral_RelationObjType)
+	    != TCL_OK) {
+	    return TCL_ERROR ;
+	}
+	r2 = relObj->internalRep.otherValuePtr ;
+
+	intersectRel = Ral_RelationIntersect(r1, r2, &errInfo) ;
+	if (r1 != relvalue) {
+	    Ral_RelationDelete(r1) ;
+	}
+	if (intersectRel == NULL) {
+	    Ral_InterpSetError(interp, &errInfo) ;
+	    return TCL_ERROR ;
+	}
+    }
+    /*
+     * Put the intersect back into the relvar.
+     */
+    tObj = relvar->relObj ;
+    Tcl_IncrRefCount(relvar->relObj = Ral_RelationObjNew(intersectRel)) ;
+    Tcl_DecrRefCount(tObj) ;
+
+    resultObj = Ral_RelvarObjExecSetTraces(interp, relvar, relvar->relObj,
+	&errInfo) ;
+    if (resultObj) {
+	tObj = relvar->relObj ;
+	Tcl_IncrRefCount(relvar->relObj = resultObj) ;
+	Tcl_DecrRefCount(tObj) ;
+    } else {
+	result = TCL_ERROR ;
+    }
+    result = Ral_RelvarObjEndCmd(interp, rInfo, result != TCL_OK) ;
+
+    if (result == TCL_OK) {
+	Tcl_SetObjResult(interp, relvar->relObj) ;
+    }
+    return result ;
+}
+
+static int
+RelvarMinusCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv,
+    Ral_RelvarInfo rInfo)
+{
+    Ral_Relvar relvar ;
+    Ral_Relation relvalue ;
+    Tcl_Obj *subObj ;
+    Ral_Relation subvalue ;
+    Ral_Relation diffvalue ;
+    Tcl_Obj *resultObj ;
+    Tcl_Obj *tObj ;
+    int result = TCL_OK ;
+    Ral_ErrorInfo errInfo ;
+
+    /* relvar intersect relvarName relationValue */
+    if (objc != 4) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relvarName relationValue") ;
+	return TCL_ERROR ;
+    }
+
+    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2]),
+	NULL) ;
+    if (relvar == NULL) {
+	return TCL_ERROR ;
+    }
+    if (Tcl_ConvertToType(interp, relvar->relObj, &Ral_RelationObjType)
+	!= TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relvalue = relvar->relObj->internalRep.otherValuePtr ;
+
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelvar, Ral_OptMinus) ;
+
+    if (!Ral_RelvarStartCommand(rInfo, relvar)) {
+	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_CMD, objv[2]) ;
+	Ral_InterpSetError(interp, &errInfo) ;
+	return TCL_ERROR ;
+    }
+
+    subObj = objv[3] ;
+    if (Tcl_ConvertToType(interp, subObj, &Ral_RelationObjType)
+	!= TCL_OK) {
+	return TCL_ERROR ;
+    }
+    subvalue = subObj->internalRep.otherValuePtr ;
+
+    diffvalue = Ral_RelationMinus(relvalue, subvalue, &errInfo) ;
+    if (diffvalue == NULL) {
+	Ral_InterpSetError(interp, &errInfo) ;
+	return TCL_ERROR ;
+    }
+    /*
+     * Put the difference back into the relvar.
+     */
+    tObj = relvar->relObj ;
+    Tcl_IncrRefCount(relvar->relObj = Ral_RelationObjNew(diffvalue)) ;
+    Tcl_DecrRefCount(tObj) ;
+
+    resultObj = Ral_RelvarObjExecSetTraces(interp, relvar, relvar->relObj,
+	&errInfo) ;
+    if (resultObj) {
+	tObj = relvar->relObj ;
+	Tcl_IncrRefCount(relvar->relObj = resultObj) ;
+	Tcl_DecrRefCount(tObj) ;
+    } else {
+	result = TCL_ERROR ;
+    }
+    result = Ral_RelvarObjEndCmd(interp, rInfo, result != TCL_OK) ;
+
+    if (result == TCL_OK) {
+	Tcl_SetObjResult(interp, relvar->relObj) ;
+    }
+    return result ;
+}
+
+static int
 RelvarNamesCmd(
     Tcl_Interp *interp,
     int objc,
@@ -700,6 +877,82 @@ RelvarPathCmd(
      * relvar participating in the association is treated as modified.
      */
     return TCL_OK ;
+}
+
+static int
+RelvarSetCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv,
+    Ral_RelvarInfo rInfo)
+{
+    Ral_Relvar relvar ;
+    Ral_Relation relvalue ;
+    Tcl_Obj *resultObj ;
+    int result = TCL_OK ;
+    Ral_ErrorInfo errInfo ;
+
+    /* relvar set relvar relationValue */
+    if (objc < 3 || objc > 4) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relvar ?relationValue?") ;
+	return TCL_ERROR ;
+    }
+
+    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2]),
+	NULL) ;
+    if (relvar == NULL) {
+	return TCL_ERROR ;
+    }
+    if (Tcl_ConvertToType(interp, relvar->relObj, &Ral_RelationObjType)
+	!= TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relvalue = relvar->relObj->internalRep.otherValuePtr ;
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelvar, Ral_OptSet) ;
+
+    if (objc > 3) {
+	Tcl_Obj *valueObj ;
+	Ral_Relation relation ;
+
+	valueObj = objv[3] ;
+	if (Tcl_ConvertToType(interp, valueObj, &Ral_RelationObjType)
+	    != TCL_OK) {
+	    return TCL_ERROR ;
+	}
+	relation = valueObj->internalRep.otherValuePtr ;
+
+	if (!Ral_RelationHeadingEqual(relvalue->heading, relation->heading)) {
+	    char *headingStr = Ral_RelationHeadingStringOf(relation->heading) ;
+	    Ral_ErrorInfoSetError(&errInfo, RAL_ERR_HEADING_NOT_EQUAL,
+		headingStr) ;
+	    Ral_InterpSetError(interp, &errInfo) ;
+	    ckfree(headingStr) ;
+	    return TCL_ERROR ;
+	}
+
+	if (!Ral_RelvarStartCommand(rInfo, relvar)) {
+	    Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_CMD, objv[2]) ;
+	    Ral_InterpSetError(interp, &errInfo) ;
+	    return TCL_ERROR ;
+	}
+
+	resultObj = Ral_RelvarObjExecSetTraces(interp, relvar, valueObj,
+	    &errInfo) ;
+	if (resultObj) {
+	    relation = resultObj->internalRep.otherValuePtr ;
+	    Ral_RelvarSetRelation(relvar, relation) ;
+	    Tcl_InvalidateStringRep(relvar->relObj) ;
+	    relvar->relObj->length = 0 ;
+	} else {
+	    result = TCL_ERROR ;
+	}
+	result = Ral_RelvarObjEndCmd(interp, rInfo, result != TCL_OK) ;
+    }
+
+    if (result == TCL_OK) {
+	Tcl_SetObjResult(interp, relvar->relObj) ;
+    }
+    return result ;
 }
 
 /*
@@ -852,7 +1105,7 @@ RelvarTraceCmd(
 }
 
 static int
-RelvarSetCmd(
+RelvarUnionCmd(
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const*objv,
@@ -860,12 +1113,15 @@ RelvarSetCmd(
 {
     Ral_Relvar relvar ;
     Ral_Relation relvalue ;
+    Ral_Relation unionRel ;
     Tcl_Obj *resultObj ;
+    Tcl_Obj *tObj ;
     int result = TCL_OK ;
+    Ral_ErrorInfo errInfo ;
 
-    /* relvar set relvar relationValue */
-    if (objc < 3 || objc > 4) {
-	Tcl_WrongNumArgs(interp, 2, objv, "relvar ?relationValue?") ;
+    /* relvar union relvarName ?relationValue ... ? */
+    if (objc < 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relvarName ?relationValue ...?") ;
 	return TCL_ERROR ;
     }
 
@@ -878,58 +1134,61 @@ RelvarSetCmd(
 	!= TCL_OK) {
 	return TCL_ERROR ;
     }
-    relvalue = relvar->relObj->internalRep.otherValuePtr ;
+    unionRel = relvalue = relvar->relObj->internalRep.otherValuePtr ;
 
-    if (objc > 3) {
-	Tcl_Obj *valueObj ;
-	Ral_Relation relation ;
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelvar, Ral_OptUnion) ;
 
-	valueObj = objv[3] ;
-	if (Tcl_ConvertToType(interp, valueObj, &Ral_RelationObjType)
+    if (!Ral_RelvarStartCommand(rInfo, relvar)) {
+	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_CMD, objv[2]) ;
+	Ral_InterpSetError(interp, &errInfo) ;
+	return TCL_ERROR ;
+    }
+
+    /*
+     * Index to the first relation value.
+     */
+    objc -= 3 ;
+    objv += 3 ;
+    while (objc-- > 0) {
+	Tcl_Obj *relObj ;
+	Ral_Relation r1 ;
+	Ral_Relation r2 ;
+
+	r1 = unionRel ;
+
+	relObj = *objv++ ;
+	if (Tcl_ConvertToType(interp, relObj, &Ral_RelationObjType)
 	    != TCL_OK) {
 	    return TCL_ERROR ;
 	}
-	relation = valueObj->internalRep.otherValuePtr ;
+	r2 = relObj->internalRep.otherValuePtr ;
 
-	if (!Ral_RelationHeadingEqual(relvalue->heading, relation->heading)) {
-	    char *headingStr = Ral_RelationHeadingStringOf(relation->heading) ;
-	    Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptSet,
-		RAL_ERR_HEADING_NOT_EQUAL, headingStr) ;
-	    ckfree(headingStr) ;
+	unionRel = Ral_RelationUnion(r1, r2, &errInfo) ;
+	if (r1 != relvalue) {
+	    Ral_RelationDelete(r1) ;
+	}
+	if (unionRel == NULL) {
+	    Ral_InterpSetError(interp, &errInfo) ;
 	    return TCL_ERROR ;
 	}
-
-	if (!Ral_RelvarStartCommand(rInfo, relvar)) {
-	    Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptSet,
-		RAL_ERR_ONGOING_CMD, objv[2]) ;
-	    return TCL_ERROR ;
-	}
-
-	resultObj = Ral_RelvarObjExecSetTraces(interp, relvar, valueObj) ;
-	if (resultObj) {
-	    /*
-	     * Result is converted to the proper type by the trace function.
-	     * However, we have to make sure the heading is correct.
-	     */
-	    relation = resultObj->internalRep.otherValuePtr ;
-	    if (Ral_RelationHeadingEqual(relvalue->heading,
-		    relation->heading)) {
-		Ral_RelvarSetRelation(relvar, relation) ;
-		Tcl_InvalidateStringRep(relvar->relObj) ;
-		relvar->relObj->length = 0 ;
-	    } else {
-		char *headingStr =
-		    Ral_RelationHeadingStringOf(relation->heading) ;
-		Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptSet,
-		    RAL_ERR_HEADING_NOT_EQUAL, headingStr) ;
-		ckfree(headingStr) ;
-		result = TCL_ERROR ;
-	    }
-	} else {
-	    result = TCL_ERROR ;
-	}
-	result = Ral_RelvarObjEndCmd(interp, rInfo, result != TCL_OK) ;
     }
+    /*
+     * Put the union back into the relvar.
+     */
+    tObj = relvar->relObj ;
+    Tcl_IncrRefCount(relvar->relObj = Ral_RelationObjNew(unionRel)) ;
+    Tcl_DecrRefCount(tObj) ;
+
+    resultObj = Ral_RelvarObjExecSetTraces(interp, relvar, relvar->relObj,
+	&errInfo) ;
+    if (resultObj) {
+	tObj = relvar->relObj ;
+	Tcl_IncrRefCount(relvar->relObj = resultObj) ;
+	Tcl_DecrRefCount(tObj) ;
+    } else {
+	result = TCL_ERROR ;
+    }
+    result = Ral_RelvarObjEndCmd(interp, rInfo, result != TCL_OK) ;
 
     if (result == TCL_OK) {
 	Tcl_SetObjResult(interp, relvar->relObj) ;

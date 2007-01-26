@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.h,v $
-$Revision: 1.13 $
-$Date: 2007/01/15 01:32:03 $
+$Revision: 1.14 $
+$Date: 2007/01/26 02:07:17 $
  *--
  */
 #ifndef _ral_relvarobj_h_
@@ -128,7 +128,7 @@ extern Tcl_Obj *Ral_RelvarObjExecInsertTraces(Tcl_Interp *, Ral_Relvar,
 extern Tcl_Obj *Ral_RelvarObjExecUpdateTraces(Tcl_Interp *, Ral_Relvar,
     Tcl_Obj *, Tcl_Obj *) ;
 extern Tcl_Obj *Ral_RelvarObjExecSetTraces(Tcl_Interp *, Ral_Relvar,
-    Tcl_Obj *) ;
+    Tcl_Obj *, Ral_ErrorInfo *errInfo) ;
 extern void Ral_RelvarObjExecUnsetTraces(Tcl_Interp *, Ral_Relvar) ;
 extern void Ral_RelvarObjExecEvalTraces(Tcl_Interp *, Ral_RelvarInfo, int,
     int) ;
