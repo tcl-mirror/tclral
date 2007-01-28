@@ -46,8 +46,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.31 $
-$Date: 2006/12/17 22:40:49 $
+$Revision: 1.32 $
+$Date: 2007/01/28 02:21:11 $
  *--
  */
 
@@ -147,7 +147,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.31 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.32 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -252,13 +252,14 @@ RelationArrayCmd(
     Ral_Relation relation ;
     Ral_RelationHeading heading ;
     int keyAttrIndex ;
-    int valAttrIndex ;
+    int valueAttrIndex ;
     Ral_RelationIter rEnd ;
     Ral_RelationIter rIter ;
 
-    /* relation array relation arrayName */
-    if (objc != 4) {
-	Tcl_WrongNumArgs(interp, 2, objv, "relation arrayName") ;
+    /* relation array relation arrayName ?keyAttr valueAttr? */
+    if (!(objc == 4 || objc == 6)) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+	    "relation arrayName ?keyAttr valueAttr?") ;
 	return TCL_ERROR ;
     }
 
@@ -269,32 +270,53 @@ RelationArrayCmd(
     relation = relObj->internalRep.otherValuePtr ;
     heading = relation->heading ;
 
-    if (Ral_RelationDegree(relation) != 2) {
-	Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptArray,
-	    RAL_ERR_DEGREE_TWO, relObj) ;
-	return TCL_ERROR ;
+    if (objc ==4) {
+	if (Ral_RelationDegree(relation) != 2) {
+	    Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptArray,
+		RAL_ERR_DEGREE_TWO, relObj) ;
+	    return TCL_ERROR ;
+	}
+
+	if (heading->idCount != 1) {
+	    Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptArray,
+		RAL_ERR_SINGLE_IDENTIFIER, relObj) ;
+	    return TCL_ERROR ;
+	}
+	if (Ral_IntVectorSize(*heading->identifiers) != 1) {
+	    Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptArray,
+		RAL_ERR_SINGLE_ATTRIBUTE, relObj) ;
+	    return TCL_ERROR ;
+	}
+
+	keyAttrIndex = Ral_IntVectorFetch(*heading->identifiers, 0) ;
+	valueAttrIndex = (keyAttrIndex + 1) % 2 ;
+    } else { /* objc == 6 */
+	const char *keyAttrName = Tcl_GetString(objv[4]) ;
+	const char *valueAttrName = Tcl_GetString(objv[5]) ;
+
+	keyAttrIndex = Ral_TupleHeadingIndexOf(heading->tupleHeading,
+	    keyAttrName) ;
+	if (keyAttrIndex < 0) {
+	    Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptArray,
+		RAL_ERR_UNKNOWN_ATTR, keyAttrName) ;
+	    return TCL_ERROR ;
+	}
+	valueAttrIndex = Ral_TupleHeadingIndexOf(heading->tupleHeading,
+	    valueAttrName) ;
+	if (valueAttrIndex < 0) {
+	    Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptArray,
+		RAL_ERR_UNKNOWN_ATTR, valueAttrName) ;
+	    return TCL_ERROR ;
+	}
     }
 
-    if (heading->idCount != 1) {
-	Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptArray,
-	    RAL_ERR_SINGLE_IDENTIFIER, relObj) ;
-	return TCL_ERROR ;
-    }
-    if (Ral_IntVectorSize(*heading->identifiers) != 1) {
-	Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptArray,
-	    RAL_ERR_SINGLE_ATTRIBUTE, relObj) ;
-	return TCL_ERROR ;
-    }
     arrayNameObj = objv[3] ;
-
-    keyAttrIndex = Ral_IntVectorFetch(*heading->identifiers, 0) ;
-    valAttrIndex = (keyAttrIndex + 1) % 2 ;
 
     rEnd = Ral_RelationEnd(relation) ;
     for (rIter = Ral_RelationBegin(relation) ; rIter != rEnd ; ++rIter) {
 	Ral_TupleIter tBegin = Ral_TupleBegin(*rIter) ;
 	if (Tcl_ObjSetVar2(interp, arrayNameObj, *(tBegin + keyAttrIndex),
-	    *(tBegin + valAttrIndex), TCL_LEAVE_ERR_MSG) == NULL) {
+	    *(tBegin + valueAttrIndex), TCL_LEAVE_ERR_MSG) == NULL) {
 	    return TCL_ERROR ;
 	}
     }
@@ -612,13 +634,13 @@ RelationDictCmd(
     Ral_RelationHeading heading ;
     Tcl_Obj *dictObj ;
     int keyAttrIndex ;
-    int valAttrIndex ;
+    int valueAttrIndex ;
     Ral_RelationIter rEnd ;
     Ral_RelationIter rIter ;
 
-    /* relation dict relation */
-    if (objc != 3) {
-	Tcl_WrongNumArgs(interp, 2, objv, "relation") ;
+    /* relation dict relation ?keyAttr valueAttr? */
+    if (!(objc == 3 || objc == 5)) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relation ?keyAttr valueAttr?") ;
 	return TCL_ERROR ;
     }
 
@@ -629,32 +651,52 @@ RelationDictCmd(
     relation = relObj->internalRep.otherValuePtr ;
     heading = relation->heading ;
 
-    if (Ral_RelationDegree(relation) != 2) {
-	Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptDict,
-	    RAL_ERR_DEGREE_TWO, relObj) ;
-	return TCL_ERROR ;
-    }
+    if (objc == 3) {
+	if (Ral_RelationDegree(relation) != 2) {
+	    Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptDict,
+		RAL_ERR_DEGREE_TWO, relObj) ;
+	    return TCL_ERROR ;
+	}
 
-    if (heading->idCount != 1) {
-	Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptDict,
-	    RAL_ERR_SINGLE_IDENTIFIER, relObj) ;
-	return TCL_ERROR ;
-    }
-    if (Ral_IntVectorSize(*heading->identifiers) != 1) {
-	Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptDict,
-	    RAL_ERR_SINGLE_ATTRIBUTE, relObj) ;
-	return TCL_ERROR ;
-    }
+	if (heading->idCount != 1) {
+	    Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptDict,
+		RAL_ERR_SINGLE_IDENTIFIER, relObj) ;
+	    return TCL_ERROR ;
+	}
+	if (Ral_IntVectorSize(*heading->identifiers) != 1) {
+	    Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptDict,
+		RAL_ERR_SINGLE_ATTRIBUTE, relObj) ;
+	    return TCL_ERROR ;
+	}
 
-    keyAttrIndex = Ral_IntVectorFetch(*heading->identifiers, 0) ;
-    valAttrIndex = (keyAttrIndex + 1) % 2 ;
+	keyAttrIndex = Ral_IntVectorFetch(*heading->identifiers, 0) ;
+	valueAttrIndex = (keyAttrIndex + 1) % 2 ;
+    } else { /* objc == 5 */
+	const char *keyAttrName = Tcl_GetString(objv[3]) ;
+	const char *valueAttrName = Tcl_GetString(objv[4]) ;
+
+	keyAttrIndex = Ral_TupleHeadingIndexOf(heading->tupleHeading,
+	    keyAttrName) ;
+	if (keyAttrIndex < 0) {
+	    Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptDict,
+		RAL_ERR_UNKNOWN_ATTR, keyAttrName) ;
+	    return TCL_ERROR ;
+	}
+	valueAttrIndex = Ral_TupleHeadingIndexOf(heading->tupleHeading,
+	    valueAttrName) ;
+	if (valueAttrIndex < 0) {
+	    Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptDict,
+		RAL_ERR_UNKNOWN_ATTR, valueAttrName) ;
+	    return TCL_ERROR ;
+	}
+    }
 
     dictObj = Tcl_NewDictObj() ;
     rEnd = Ral_RelationEnd(relation) ;
     for (rIter = Ral_RelationBegin(relation) ; rIter != rEnd ; ++rIter) {
 	Ral_TupleIter tBegin = Ral_TupleBegin(*rIter) ;
 	if (Tcl_DictObjPut(interp, dictObj, *(tBegin + keyAttrIndex),
-	    *(tBegin + valAttrIndex)) != TCL_OK) {
+	    *(tBegin + valueAttrIndex)) != TCL_OK) {
 	    Tcl_DecrRefCount(dictObj) ;
 	    return TCL_ERROR ;
 	}
@@ -1349,7 +1391,7 @@ RelationIncludeCmd(
     objc -= 3 ;
     objv += 3 ;
 
-    newRel = Ral_RelationDup(relation) ;
+    newRel = Ral_RelationShallowCopy(relation) ;
     Ral_RelationReserve(newRel, objc) ;
     Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptInclude) ;
     while (objc-- > 0) {
@@ -2070,7 +2112,7 @@ RelationRenameCmd(
 	return TCL_ERROR ;
     }
 
-    newRelation = Ral_RelationDup(relation) ;
+    newRelation = Ral_RelationMediumCopy(relation) ;
     for ( ; objc > 0 ; objc -= 2, objv += 2) {
 	if (!Ral_RelationRenameAttribute(newRelation, Tcl_GetString(objv[0]),
 	    Tcl_GetString(objv[1]), &errInfo)) {

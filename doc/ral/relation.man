@@ -45,8 +45,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.17 $
-# $Date: 2006/12/17 23:24:36 $
+# $Revision: 1.18 $
+# $Date: 2007/01/28 02:21:11 $
 #  *--
 }]
 [moddesc "Relation Operators"]
@@ -232,16 +232,32 @@ OWNERSHIP
 [section COMMANDS]
 [list_begin definitions]
 
-[call [cmd "::ral::relation array"] [arg relationValue] [arg arrayVarName]]
+[call [cmd "::ral::relation array"] [arg relationValue] [arg arrayVarName]\
+    [opt "[arg keyAttr] [arg valueAttr]"]]
 
 The [cmd array] subcommand converts the relation value
 given by [arg relationValue] into an array variable named [arg arrayVarName].
-The [arg relationValue] must be a binary relation with a single identifier
-that has a single attribute.
+The [arg relationValue] must either
+be a binary relation with a single identifier that has a single attribute
+or the [arg keyAttr] and [arg valueAttr] arguments must be supplied.
 The array variable will be created if necessary.
-The values of the identifying attribute of [arg relationValue] will become
+For a binary relation,
+the values of the identifying attribute of [arg relationValue] will become
 the array indices of [arg arrayVarName]
 the other attribute values will be set to the corresponding array values.
+When the optional [arg keyAttr] and [arg valueAttr] are supplied, the
+the values of [arg keyAttr] are used as the array indices and the corresponding
+values of [arg valueAttr] are the array value.
+Note, that if a supplied [arg keyAttr] is not an identifier then it is
+possible that more than one tuple in [arg relationValue] will have the
+same value for [arg keyAttr].
+In this case the array value from [arg valueAttr]
+corresponding to duplicated values of
+[arg keyAttr] is arbitrarily chosen by the implementation.
+Thus the safe approach is to either project any relation value that is
+to be converted into an array to be a
+binary relation or to tag the relation and use the tag attribute name
+as [arg keyAttr] thereby insure that no duplicated array indices can occur.
 
 [example {
 % relation array $DOG dogarray
@@ -383,15 +399,25 @@ heading of [arg relationValue]
 2
 }]
 
-[call [cmd "::ral::relation dict"] [arg relationValue]]
+[call [cmd "::ral::relation dict"] [arg relationValue]\
+    [opt "[arg keyAttr] [arg valueAttr]"]]
 
 The [cmd dict] subcommand returns a dictionary object for an appropriately
 structured [arg relationValue].
-The [arg relationValue] must be a binary relation with a single identifier
-that has a single attribute.
-The returned dictionary will have the values of the identifying attribute
+The [arg relationValue] must either
+be a binary relation with a single identifier that has a single attribute
+or the optional [arg keyAttr] and [arg valueAttr] must be given.
+If the relation is binary, then
+the returned dictionary will have the values of the identifying attribute
 as the dictionary keys and the other attribute values
 as the corresponding dictionary values.
+If the [arg keyAttr] and [arg valueAttr] arguments are given, then
+the value in the tuples corresponding to [arg keyAttr] will be the dictionary
+keys and the corresponding value of [arg valueAttr] will be the dictionary
+values.
+The same conditions for values of [arg keyAttr] that do not correspond
+to an identifying attribute of [arg relationValue] decribed  above
+for the [cmd "relation array"] command apply to this command also.
 
 [example {
 % dict for {name breed} [relation dict $::DOG] {

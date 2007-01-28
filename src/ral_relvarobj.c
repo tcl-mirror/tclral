@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.27 $
-$Date: 2007/01/26 02:07:17 $
+$Revision: 1.28 $
+$Date: 2007/01/28 02:21:11 $
  *--
  */
 
@@ -151,7 +151,7 @@ static const struct traceOpsMap {
 } ;
 static const char specErrMsg[] = "multiplicity specification" ;
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.27 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.28 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -419,8 +419,8 @@ Ral_RelvarObjUpdateTuple(
 	sprintf(msg, msgfmt, Ral_ErrorInfoGetCommand(errInfo),
 	    Ral_ErrorInfoGetOption(errInfo), interp->errorLine) ;
 	Tcl_AddObjErrorInfo(interp, msg, -1) ;
-	return result ;
-    } else if (result != TCL_OK) {
+	return TCL_ERROR ;
+    } else if (result > TCL_CONTINUE) {
 	return result ;
     }
     /*
@@ -433,8 +433,7 @@ Ral_RelvarObjUpdateTuple(
     if (newTupleObj == NULL) {
 	return TCL_ERROR ;
     }
-    result = Tcl_ConvertToType(interp, newTupleObj, &Ral_TupleObjType) ;
-    if (result != TCL_OK) {
+    if (Tcl_ConvertToType(interp, newTupleObj, &Ral_TupleObjType) != TCL_OK) {
 	return TCL_ERROR ;
     }
     assert(newTupleObj->typePtr == &Ral_TupleObjType) ;
@@ -450,10 +449,11 @@ Ral_RelvarObjUpdateTuple(
      */
     resultTupleObj = Ral_RelvarObjExecUpdateTraces(interp, relvar, oldTupleObj,
 	newTupleObj) ;
-    result = resultTupleObj ?
-	Ral_RelationUpdateTupleObj(relation, tupleIter, interp,
-	    resultTupleObj, errInfo) :
-	TCL_ERROR ;
+    if (resultTupleObj == NULL) {
+	return TCL_ERROR ;
+    }
+    result = Ral_RelationUpdateTupleObj(relation, tupleIter, interp,
+	    resultTupleObj, errInfo) != TCL_OK ? TCL_ERROR : result ;
 
     Tcl_DecrRefCount(oldTupleObj) ;
     Tcl_DecrRefCount(newTupleObj) ;
@@ -1787,6 +1787,7 @@ Ral_RelvarObjExecSetTraces(
 	    /*
 	     * Result is converted to the proper type by the trace function.
 	     */
+	    assert(relationObj->typePtr == &Ral_RelationObjType) ;
 	    resultRel = relationObj->internalRep.otherValuePtr ;
 	    /*
 	     * Make sure the relvar value didn't simmer during the trace.
@@ -2169,6 +2170,7 @@ Ral_RelvarObjExecTraces(
     Tcl_Obj *flagObj ;
     Tcl_Obj *traceObj = arg2 ? arg2 : (arg1 ? arg1 : NULL) ;
     Ral_TraceInfo trace ;
+    Tcl_Obj *cmd ;
     /*
      * Get the relvar into an object and hold on to it.
      */
@@ -2193,7 +2195,6 @@ Ral_RelvarObjExecTraces(
      */
     for (trace = relvar->traces ; trace ; trace = trace->next) {
 	if (trace->flags & relvar->traceFlags) {
-	    Tcl_Obj *cmd = Tcl_NewListObj(0, NULL) ;
 	    int cmdc ;
 	    Tcl_Obj **cmdv ;
 
@@ -2201,6 +2202,7 @@ Ral_RelvarObjExecTraces(
 	     * Compose the command from the prefix, relvar name and flags.
 	     * All trace procs get these arguments.
 	     */
+	    cmd = Tcl_NewListObj(0, NULL) ;
 	    if (Tcl_ListObjAppendList(interp, cmd, trace->command) == TCL_OK &&
 		Tcl_ListObjAppendElement(interp, cmd, flagObj) == TCL_OK &&
 		Tcl_ListObjAppendElement(interp, cmd, nameObj) == TCL_OK) {
@@ -2210,13 +2212,11 @@ Ral_RelvarObjExecTraces(
 		 */
 		if (arg1 != NULL &&
 		    Tcl_ListObjAppendElement(interp, cmd, arg1) != TCL_OK) {
-		    Tcl_DecrRefCount(cmd) ;
-		    break ;
+		    goto cmdError ;
 		}
 		if (arg2 != NULL &&
 		    Tcl_ListObjAppendElement(interp, cmd, arg2) != TCL_OK) {
-		    Tcl_DecrRefCount(cmd) ;
-		    break ;
+		    goto cmdError ;
 		}
 
 		/*
@@ -2226,8 +2226,7 @@ Ral_RelvarObjExecTraces(
 			!= TCL_OK ||
 		    Tcl_EvalObjv(interp, cmdc, cmdv, TCL_EVAL_DIRECT)
 			!= TCL_OK) {
-		    Tcl_DecrRefCount(cmd) ;
-		    break ;
+		    goto cmdError ;
 		}
 		if (type != NULL) {
 
@@ -2250,16 +2249,13 @@ Ral_RelvarObjExecTraces(
 			    arg1 = traceObj ;
 			}
 		    } else {
-			Tcl_DecrRefCount(cmd) ;
-			traceObj = NULL ;
-			break ;
+			goto cmdError ;
 		    }
 		}
-		Tcl_DecrRefCount(cmd) ;
 	    } else {
-		Tcl_DecrRefCount(cmd) ;
-		break ;
+		goto cmdError ;
 	    }
+	    Tcl_DecrRefCount(cmd) ;
 	}
     }
 
@@ -2273,4 +2269,8 @@ Ral_RelvarObjExecTraces(
      * Return the last return value from the chain of trace procs.
      */
     return traceObj ;
+
+cmdError:
+    Tcl_DecrRefCount(cmd) ;
+    return NULL ;
 }

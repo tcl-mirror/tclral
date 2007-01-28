@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.h,v $
-$Revision: 1.17 $
-$Date: 2006/12/30 02:58:42 $
+$Revision: 1.18 $
+$Date: 2007/01/28 02:21:11 $
  *--
  */
 #ifndef _ral_relation_h_
@@ -138,6 +138,8 @@ FUNCTION DECLARATIONS
 
 extern Ral_Relation Ral_RelationNew(Ral_RelationHeading) ;
 extern Ral_Relation Ral_RelationDup(Ral_Relation) ;
+extern Ral_Relation Ral_RelationShallowCopy(Ral_Relation) ;
+extern Ral_Relation Ral_RelationMediumCopy(Ral_Relation) ;
 extern void Ral_RelationDelete(Ral_Relation) ;
 
 extern Ral_RelationIter Ral_RelationBegin(Ral_Relation) ;

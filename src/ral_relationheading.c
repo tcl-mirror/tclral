@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationheading.c,v $
-$Revision: 1.18 $
-$Date: 2006/11/05 00:15:59 $
+$Revision: 1.19 $
+$Date: 2007/01/28 02:21:11 $
  *--
  */
 
@@ -94,7 +94,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.18 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.19 $" ;
 
 static char const openList = '{' ;
 static char const closeList = '}' ;
@@ -243,10 +243,6 @@ Ral_RelationHeadingDup(
     Ral_IntVector *dstIds ;
 
     tupleHeading = Ral_TupleHeadingDup(srcHeading->tupleHeading) ;
-    if (!tupleHeading) {
-	return NULL ;
-    }
-
     dupHeading = Ral_RelationHeadingNew(tupleHeading, idCount) ;
     dstIds = dupHeading->identifiers ;
     while (idCount-- > 0) {

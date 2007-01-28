@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.h,v $
-$Revision: 1.9 $
-$Date: 2007/01/15 01:32:03 $
+$Revision: 1.10 $
+$Date: 2007/01/28 02:21:11 $
  *--
  */
 #ifndef _ral_relvar_h_
@@ -199,7 +199,7 @@ extern Ral_Constraint Ral_ConstraintNewCorrelation(const char *) ;
 extern void Ral_ConstraintDelete(Ral_Constraint) ;
 extern int Ral_RelvarConstraintEval(Ral_Constraint, Tcl_DString *) ;
 
-extern void Ral_RelvarSetRelation(Ral_Relvar, Ral_Relation) ;
+extern void Ral_RelvarSetRelation(Ral_Relvar, Tcl_Obj *) ;
 extern void Ral_RelvarRestorePrev(Ral_Relvar) ;
 extern void Ral_RelvarDiscardPrev(Ral_Relvar) ;
 

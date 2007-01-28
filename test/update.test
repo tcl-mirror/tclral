@@ -1,0 +1,463 @@
+#!/bin/sh
+# \
+exec tclsh "$0" "$@"
+# This software is copyrighted 2006 by G. Andrew Mangogna.
+# The following terms apply to all files associated with the software unless
+# explicitly disclaimed in individual files.
+# 
+# The authors hereby grant permission to use, copy, modify, distribute,
+# and license this software and its documentation for any purpose, provided
+# that existing copyright notices are retained in all copies and that this
+# notice is included verbatim in any distributions. No written agreement,
+# license, or royalty fee is required for any of the authorized uses.
+# Modifications to this software may be copyrighted by their authors and
+# need not follow the licensing terms described here, provided that the
+# new terms are clearly indicated on the first page of each file where
+# they apply.
+# 
+# IN NO EVENT SHALL THE AUTHORS OR DISTRIBUTORS BE LIABLE TO ANY PARTY FOR
+# DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING
+# OUT OF THE USE OF THIS SOFTWARE, ITS DOCUMENTATION, OR ANY DERIVATIVES
+# THEREOF, EVEN IF THE AUTHORS HAVE BEEN ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
+# 
+# THE AUTHORS AND DISTRIBUTORS SPECIFICALLY DISCLAIM ANY WARRANTIES,
+# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.  THIS SOFTWARE
+# IS PROVIDED ON AN "AS IS" BASIS, AND THE AUTHORS AND DISTRIBUTORS HAVE
+# NO OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS,
+# OR MODIFICATIONS.
+# 
+# GOVERNMENT USE: If you are acquiring this software on behalf of the
+# U.S. government, the Government shall have only "Restricted Rights"
+# in the software and related documentation as defined in the Federal
+# Acquisition Regulations (FARs) in Clause 52.227.19 (c) (2).  If you
+# are acquiring the software on behalf of the Department of Defense,
+# the software shall be classified as "Commercial Computer Software"
+# and the Government shall have only "Restricted Rights" as defined in
+# Clause 252.227-7013 (c) (1) of DFARs.  Notwithstanding the foregoing,
+# the authors grant the U.S. Government and others acting in its behalf
+# permission to use and distribute the software in accordance with the
+# terms specified in this license.
+# 
+#  *++
+# MODULE:
+#   trace.test -- test cases for relvar tracing the Tcl Relational Algebra
+#   Library
+# 
+# ABSTRACT:
+# 
+# $RCSfile: update.test,v $
+# $Revision: 1.1 $
+# $Date: 2007/01/28 02:21:12 $
+#  *--
+
+set ::auto_path [linsert $::auto_path 0\
+    [file normalize [file join [info script] ..]]]
+
+package require tcltest 2.2
+package require ral
+
+eval tcltest::configure $argv
+
+namespace eval ::ral::test {
+    namespace import ::tcltest::*
+    namespace import ::ral::*
+
+    proc tupleMatch {expected actual} {
+	return [::ral::tuple equal $expected $actual]
+    }
+    customMatch tuple [namespace current]::tupleMatch
+
+    proc relationMatch {expected actual} {
+	return [::ral::relation is $expected == $actual]
+    }
+    customMatch relation [namespace current]::relationMatch
+
+    proc cloneRelvar {oldname newname} {
+	set oldvalue [relvar set $oldname]
+	relvar create $newname [relation heading $oldvalue]
+	relvar set $newname $oldvalue
+    }
+
+    # example relvar data to use
+    source testdata.tcl
+ 
+    # relvar update subcommand
+    test relvar-update-1.0 {
+	expression is false
+    } -setup {
+	relvar create X {
+	    Relation
+	    {Name string Status int}
+	    Name
+	}
+	relvar insert X\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar unset X
+    } -body {
+	relvar update X t {0} {
+	    tuple update t Status -1
+	}
+    } -result {0}
+
+    test relvar-update-2.0 {
+	expression is true
+    } -setup {
+	relvar create X {
+	    Relation
+	    {Name string Status int}
+	    Name
+	}
+	relvar insert X\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar unset X
+    } -body {
+	relvar update X t {1} {
+	    tuple update t Status -1
+	}
+    } -result {3}
+
+    test relvar-update-2.1 {
+	expression is true, check for updates
+    } -setup {
+	relvar create X {
+	    Relation
+	    {Name string Status int}
+	    Name
+	}
+	relvar insert X\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar unset X
+    } -body {
+	relvar update X t {1} {
+	    tuple update t Status -1
+	}
+	relvar set X
+    } -result {
+	Relation
+	{Name string Status int}
+	Name
+	{
+	    {Name George Status -1}\
+	    {Name Fred Status -1}\
+	    {Status -1 Name Alice}
+	}
+    } -match relation
+
+    test relvar-update-3.0 {
+	subset is updated
+    } -setup {
+	relvar create X {
+	    Relation
+	    {Name string Status int}
+	    Name
+	}
+	relvar insert X\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar unset X
+    } -body {
+	relvar update X t {[tuple extract $t Name] eq "George"} {
+	    tuple update t Status -1
+	}
+    } -result {1}
+
+    test relvar-update-4.0 {
+	update creates duplicate
+    } -setup {
+	relvar create X {
+	    Relation
+	    {Name string Status int}
+	    Name
+	}
+	relvar insert X\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar unset X
+    } -body {
+	relvar update X t {[tuple extract $t Name] eq "George"} {
+	    tuple update t Name Fred
+	}
+    } -result {duplicate tuple, "Tuple {Name string Status int} {Name Fred Status 20}"}\
+    -returnCodes error
+
+    test relvar-update-5.0 {
+	error in update script
+    } -setup {
+    } -cleanup {
+    } -body {
+	relvar updateone S sup {S# S1} {
+	    # Comment
+	    # Comment
+	    # Comment
+	    set a 50
+	    set b 50 50
+	}
+    } -result {wrong # args: should be "set varName ?newValue?"}\
+    -returnCodes error
+
+    test relvar-update-6.0 {
+	break status propagated to outer loop
+    } -setup {
+	cloneRelvar S SX
+    } -cleanup {
+	relvar unset SX
+    } -body {
+	while {1} {
+	    relvar updateone SX sup {S# S1} {
+		set status [tuple extract $sup STATUS]
+		incr status 10
+		if {$status >= 50} break
+		# Since the break is before the tuple is updated
+		# the last status value will be < 50
+		tuple update sup STATUS $status
+	    }
+	}
+	relvar set SX
+    } -result {
+	Relation
+	{S# string SNAME string STATUS int CITY string}
+	S#
+	{
+	    {S# S1 SNAME Smith STATUS 40 CITY London}
+	    {S# S2 SNAME Jones STATUS 10 CITY Paris}
+	    {S# S3 SNAME Blake STATUS 30 CITY Paris}
+	    {S# S4 SNAME Clark STATUS 20 CITY London}
+	    {S# S5 SNAME Adams STATUS 30 CITY Athens}
+	}
+    } -match relation
+
+    test relvar-update-7.0 {
+	error implies relvar not updated
+    } -setup {
+    } -cleanup {
+    } -body {
+	catch {
+	    relvar update S sup {[tuple extract $sup STATUS] == 30} {
+		set status [tuple extract $sup STATUS]
+		incr status 1
+		tuple update sup STATUS $status
+		set a 50 50
+	    }
+	}
+	relvar set S
+    } -result {
+	Relation
+	{S# string SNAME string STATUS int CITY string}
+	S#
+	{
+	    {S# S1 SNAME Smith STATUS 20 CITY London}
+	    {S# S2 SNAME Jones STATUS 10 CITY Paris}
+	    {S# S3 SNAME Blake STATUS 30 CITY Paris}
+	    {S# S4 SNAME Clark STATUS 20 CITY London}
+	    {S# S5 SNAME Adams STATUS 30 CITY Athens}
+	}
+    } -match relation
+
+    test relvar-update-8.0 {
+	break in update script stops implied loop
+    } -setup {
+	cloneRelvar S SX
+    } -cleanup {
+	relvar unset SX
+    } -body {
+	set cnt 0
+	relvar update SX sup {[tuple extract $sup STATUS] > 10} {
+	    set status [tuple extract $sup STATUS]
+	    incr status 1
+	    tuple update sup STATUS $status
+	    incr cnt
+	    if {$cnt > 1} break
+	}
+	relvar set SX
+    } -result {
+	Relation
+	{S# string SNAME string STATUS int CITY string}
+	S#
+	{
+	    {S# S1 SNAME Smith STATUS 21 CITY London}
+	    {S# S2 SNAME Jones STATUS 10 CITY Paris}
+	    {S# S3 SNAME Blake STATUS 31 CITY Paris}
+	    {S# S4 SNAME Clark STATUS 20 CITY London}
+	    {S# S5 SNAME Adams STATUS 30 CITY Athens}
+	}
+    } -match relation
+
+    test relvar-update-8.1 {
+	return in script
+    } -setup {
+	cloneRelvar S SX
+	proc tp {} {
+	    relvar update SX sup {[tuple extract $sup STATUS] > 20} {
+		return $sup
+	    }
+	}
+    } -cleanup {
+	relvar unset SX
+    } -body {
+	tp
+    } -result {
+	Tuple
+	{S# string SNAME string STATUS int CITY string}
+	{S# S3 SNAME Blake STATUS 30 CITY Paris}
+    } -match tuple
+
+    test relvar-update-9.0 {
+	recursively updating the same relvar
+    } -setup {
+    } -cleanup {
+    } -body {
+	relvar update S sup {[tuple extract $sup S#] eq "S1"} {
+	    relvar updateone S s2 {S# S1} {
+		tuple update s2 CITY "New York"
+	    }
+	    set status [tuple extract $sup STATUS]
+	    incr status 1
+	    tuple update sup STATUS $status
+	}
+    } -result {recursively invoking a relvar command outside of a transaction, "S"} -returnCodes error
+
+    # relvar updateone subcommand
+    test relvar-updateone-1.0 {no match} -setup {
+	relvar create X {
+	    Relation
+	    {Name string Status int}
+	    Name
+	}
+	relvar insert X\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar unset X
+    } -body {
+	relvar updateone X xTup {Name Jane} {
+	    tuple update xTup Status 10
+	}
+    } -result {0}
+
+    test relvar-updateone-2.0 {match} -setup {
+	relvar create X {
+	    Relation
+	    {Name string Status int}
+	    Name
+	}
+	relvar insert X\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar unset X
+    } -body {
+	relvar updateone X xTup {Name Fred} {
+	    tuple update xTup Status 10
+	}
+    } -result {1}
+
+    test relvar-updateone-2.1 {match, compare result} -setup {
+	relvar create X {
+	    Relation
+	    {Name string Status int}
+	    Name
+	}
+	relvar insert X\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar unset X
+    } -body {
+	relvar updateone X xTup {Name Fred} {
+	    tuple update xTup Status 10
+	}
+	relvar set X
+    } -result {
+	Relation
+	{Name string Status int}
+	Name
+	{
+	    {Name George Status 20}
+	    {Name Fred Status 10}
+	    {Name Alice Status 40}
+	}
+    } -match relation
+
+    test relvar-updateone-3.0 {wrong identifier} -setup {
+	relvar create X {
+	    Relation
+	    {Name string Status int}
+	    Name
+	}
+	relvar insert X\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar unset X
+    } -body {
+	relvar updateone X xTup {Status 20} {
+	    tuple update xTup Status 10
+	}
+    } -result {attributes do not constitute an identifier, "during identifier construction operation"}\
+    -returnCodes error
+
+    test relvar-updateone-4.0 {update creates duplicate} -setup {
+	relvar create X {
+	    Relation
+	    {Name string Status int}
+	    Name
+	}
+	relvar insert X\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar unset X
+    } -body {
+	relvar updateone X xTup {Name George} {
+	    tuple update xTup Name Fred
+	}
+    } -result {duplicate tuple, "Tuple {Name string Status int} {Name Fred Status 20}"}\
+    -returnCodes error
+
+    test relvar-updateone-8.2 {
+	break propagates out
+    } -setup {
+	cloneRelvar S SX
+    } -cleanup {
+	relvar unset SX
+    } -body {
+	relvar updateone SX sup {S# S1} {
+	    break
+	}
+    } -result {} -returnCodes break
+
+
+
+
+if 0 {
+    test relvar-update-X.0 {
+    } -setup {
+    } -cleanup {
+    } -body {
+    } -result {}
+}
+
+    cleanupTests
+}
+
+namespace delete ::ral::test

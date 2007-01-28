@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.26 $
-# $Date: 2007/01/22 00:24:29 $
+# $Revision: 1.27 $
+# $Date: 2007/01/28 02:21:11 $
 #  *--
 
 set ::auto_path [linsert $::auto_path 0\
@@ -62,18 +62,6 @@ package require ral
 package require struct::set
 
 eval tcltest::configure $argv
-
-proc tupleMatch {expected actual} {
-    return [::ral::tuple equal $expected $actual]
-}
-
-proc relationMatch {expected actual} {
-    return [::ral::relation is $expected == $actual]
-}
-
-proc setMatch {expected actual} {
-    return [::struct::set equal $expected $actual]
-}
 
 if {[package vsatisfies [package require Tcl] 8.5]} {
     ::tcltest::testConstraint tcl8.5 1
@@ -91,11 +79,23 @@ namespace eval ::ral::test {
     namespace import ::tcltest::*
     namespace import ::ral::*
 
-    customMatch tuple tupleMatch
-    customMatch relation relationMatch
-    customMatch set setMatch
-    if {[::tcltest::testConstraint haveDict]} {
-	proc ::dictMatch {expected actual} {
+    proc tupleMatch {expected actual} {
+	return [::ral::tuple equal $expected $actual]
+    }
+    customMatch tuple [namespace current]::tupleMatch
+
+    proc relationMatch {expected actual} {
+	return [::ral::relation is $expected == $actual]
+    }
+    customMatch relation [namespace current]::relationMatch
+
+    proc setMatch {expected actual} {
+	return [::struct::set equal $expected $actual]
+    }
+    customMatch set [namespace current]::setMatch
+
+    if {[testConstraint haveDict]} {
+	proc dictMatch {expected actual} {
 	    if {[dict size $expected] != [dict size $actual]} {
 		return 0
 	    }
@@ -107,9 +107,9 @@ namespace eval ::ral::test {
 	    return 1
 	}
     } else {
-	proc ::dictMatch {expected actual} {return 0}
+	proc dictMatch {expected actual} {return 0}
     }
-    customMatch dict dictMatch
+    customMatch dict [namespace current]::dictMatch
 
     set DEE {Relation {} {{}} {{}}}
     set DUM {Relation {} {{}} {}}
@@ -4622,8 +4622,7 @@ tuple {A1 c} is not referred to by any tuple
 	relvar unset SV PV SPV
     } -result {::ral::test::PV ::ral::test::SPV ::ral::test::SV}
 
-    # relvar update subcommand
-    test relvar-update-1.0 {expression is false} -setup {
+    test relvar-union-1.0 {union single relation} -setup {
 	relvar create X {
 	    Relation
 	    {Name string Status int}
@@ -4636,160 +4635,171 @@ tuple {A1 c} is not referred to by any tuple
     } -cleanup {
 	relvar unset X
     } -body {
-	relvar update X t {0} {
-	    tuple update t Status -1
-	}
-    } -result {0}
-
-    test relvar-update-2.0 {expression is true} -setup {
-	relvar create X {
-	    Relation
-	    {Name string Status int}
-	    Name
-	}
-	relvar insert X\
+	set x [relation create {Name string Status int} Name\
 	    {Name George Status 20}\
-	    {Name Fred Status 30}\
-	    {Status 40 Name Alice}
-    } -cleanup {
-	relvar unset X
-    } -body {
-	relvar update X t {1} {
-	    tuple update t Status -1
-	}
-    } -result {3}
-
-    test relvar-update-2.1 {expression is true, check for updates} -setup {
-	relvar create X {
-	    Relation
-	    {Name string Status int}
-	    Name
-	}
-	relvar insert X\
-	    {Name George Status 20}\
-	    {Name Fred Status 30}\
-	    {Status 40 Name Alice}
-    } -cleanup {
-	relvar unset X
-    } -body {
-	relvar update X t {1} {
-	    tuple update t Status -1
-	}
-	relvar set X
-    } -result {
-	Relation
-	{Name string Status int}
-	Name
-	{
-	    {Name George Status -1}\
-	    {Name Fred Status -1}\
-	    {Status -1 Name Alice}
-	}
-    } -match relation
-
-    test relvar-update-3.0 {subset is updated} -setup {
-	relvar create X {
-	    Relation
-	    {Name string Status int}
-	    Name
-	}
-	relvar insert X\
-	    {Name George Status 20}\
-	    {Name Fred Status 30}\
-	    {Status 40 Name Alice}
-    } -cleanup {
-	relvar unset X
-    } -body {
-	relvar update X t {[tuple extract $t Name] eq "George"} {
-	    tuple update t Status -1
-	}
-    } -result {1}
-
-    test relvar-update-4.0 {update creates duplicate} -setup {
-	relvar create X {
-	    Relation
-	    {Name string Status int}
-	    Name
-	}
-	relvar insert X\
-	    {Name George Status 20}\
-	    {Name Fred Status 30}\
-	    {Status 40 Name Alice}
-    } -cleanup {
-	relvar unset X
-    } -body {
-	relvar update X t {[tuple extract $t Name] eq "George"} {
-	    tuple update t Name Fred
-	}
-    } -result {duplicate tuple, "Tuple {Name string Status int} {Name Fred Status 20}"}\
-    -returnCodes error
-
-    # relvar updateone subcommand
-    test relvar-updateone-1.0 {no match} -setup {
-	relvar create X {
-	    Relation
-	    {Name string Status int}
-	    Name
-	}
-	relvar insert X\
-	    {Name George Status 20}\
-	    {Name Fred Status 30}\
-	    {Status 40 Name Alice}
-    } -cleanup {
-	relvar unset X
-    } -body {
-	relvar updateone X xTup {Name Jane} {
-	    tuple update xTup Status 10
-	}
-    } -result {0}
-
-    test relvar-updateone-2.0 {match} -setup {
-	relvar create X {
-	    Relation
-	    {Name string Status int}
-	    Name
-	}
-	relvar insert X\
-	    {Name George Status 20}\
-	    {Name Fred Status 30}\
-	    {Status 40 Name Alice}
-    } -cleanup {
-	relvar unset X
-    } -body {
-	relvar updateone X xTup {Name Fred} {
-	    tuple update xTup Status 10
-	}
-    } -result {1}
-
-    test relvar-updateone-2.1 {match, compare result} -setup {
-	relvar create X {
-	    Relation
-	    {Name string Status int}
-	    Name
-	}
-	relvar insert X\
-	    {Name George Status 20}\
-	    {Name Fred Status 30}\
-	    {Status 40 Name Alice}
-    } -cleanup {
-	relvar unset X
-    } -body {
-	relvar updateone X xTup {Name Fred} {
-	    tuple update xTup Status 10
-	}
-	relvar set X
+	    {Status 40 Name Alice}\
+	    {Name Allen Status 95}\
+	]
+	relvar union X $x
     } -result {
 	Relation
 	{Name string Status int}
 	Name
 	{
 	    {Name George Status 20}
-	    {Name Fred Status 10}
+	    {Name Fred Status 30}
+	    {Status 40 Name Alice}
+	    {Name Allen Status 95}
+	}
+    } -match relation
+
+    test relvar-union-1.1 {union multiple relations} -setup {
+	relvar create X {
+	    Relation
+	    {Name string Status int}
+	    Name
+	}
+	relvar insert X\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar unset X
+    } -body {
+	set x [relation create {Name string Status int} Name\
+	    {Name George Status 20}\
+	    {Status 40 Name Alice}\
+	    {Name Allen Status 95}\
+	]
+	set y [relation create {Name string Status int} Name\
+	    {Name Jean Status 22}\
+	    {Name John Status 28}\
+	]
+	relvar union X $x $y
+    } -result {
+	Relation
+	{Name string Status int}
+	Name
+	{
+	    {Name George Status 20}
+	    {Name Fred Status 30}
+	    {Status 40 Name Alice}
+	    {Name Allen Status 95}
+	    {Name Jean Status 22}
+	    {Name John Status 28}
+	}
+    } -match relation
+
+    test relvar-union-1.2 {
+	different header order
+    } -setup {
+	relvar create X {
+	    Relation
+	    {Name string Status int}
+	    Name
+	}
+	relvar insert X\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar unset X
+    } -body {
+	set x [relation create {Status int Name string} Name\
+	    {Name George Status 20}\
+	    {Status 40 Name Alice}\
+	    {Name Allen Status 95}\
+	]
+	relvar union X $x
+    } -result {
+	Relation
+	{Name string Status int}
+	Name
+	{
+	    {Name George Status 20}
+	    {Name Fred Status 30}
+	    {Status 40 Name Alice}
+	    {Name Allen Status 95}
+	}
+    } -match relation
+
+    test relvar-union-2.0 {incompatible union} -setup {
+	relvar create X {
+	    Relation
+	    {Name string Status int}
+	    Name
+	}
+	relvar insert X\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar unset X
+    } -body {
+	set x [relation create {Name string} Name\
+	    {Name George}\
+	]
+	relvar union X $x
+    } -result {headings not equal, "Relation {Name string} Name"}\
+    -returnCodes error
+
+    test relvar-union-2.1 {
+	error: wrong args
+    } -setup {
+    } -cleanup {
+    } -body {
+	relvar union
+    } -result {wrong # args: should be "relvar union relvarName ?relationValue ...?"}\
+    -returnCodes error
+
+    test relvar-union-2.2 {
+	union with non relation type
+    } -setup {
+	relvar create X {
+	    Relation
+	    {Name string Status int}
+	    Name
+	}
+	relvar insert X\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar unset X
+    } -body {
+	relvar union X 27
+    } -result {bad value format, "27"} -returnCodes error
+
+    test relvar-intersect-1.0 {intersect single relation} -setup {
+	relvar create X {
+	    Relation
+	    {Name string Status int}
+	    Name
+	}
+	relvar insert X\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar unset X
+    } -body {
+	set x [relation create {Name string Status int} Name\
+	    {Name George Status 20}\
+	    {Status 40 Name Alice}\
+	    {Name Allen Status 95}\
+	]
+	relvar intersect X $x
+    } -result {
+	Relation
+	{Name string Status int}
+	Name
+	{
+	    {Name George Status 20}
 	    {Name Alice Status 40}
 	}
     } -match relation
 
-    test relvar-updateone-3.0 {wrong identifier} -setup {
+    test relvar-minus-1.0 {subtract single relation} -setup {
 	relvar create X {
 	    Relation
 	    {Name string Status int}
@@ -4802,30 +4812,20 @@ tuple {A1 c} is not referred to by any tuple
     } -cleanup {
 	relvar unset X
     } -body {
-	relvar updateone X xTup {Status 20} {
-	    tuple update xTup Status 10
-	}
-    } -result {attributes do not constitute an identifier, "during identifier construction operation"}\
-    -returnCodes error
-
-    test relvar-updateone-4.0 {update creates duplicate} -setup {
-	relvar create X {
-	    Relation
-	    {Name string Status int}
-	    Name
-	}
-	relvar insert X\
+	set x [relation create {Name string Status int} Name\
 	    {Name George Status 20}\
-	    {Name Fred Status 30}\
-	    {Status 40 Name Alice}
-    } -cleanup {
-	relvar unset X
-    } -body {
-	relvar updateone X xTup {Name George} {
-	    tuple update xTup Name Fred
+	    {Status 40 Name Alice}\
+	    {Name Allen Status 95}\
+	]
+	relvar minus X $x
+    } -result {
+	Relation
+	{Name string Status int}
+	Name
+	{
+	    {Name Fred Status 30}
 	}
-    } -result {duplicate tuple, "Tuple {Name string Status int} {Name Fred Status 20}"}\
-    -returnCodes error
+    } -match relation
 
     # examples from the Date book
     test date-example-1.0 {Get suppliers who supply all parts} -body {

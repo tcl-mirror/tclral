@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.c,v $
-$Revision: 1.14 $
-$Date: 2007/01/17 21:12:40 $
+$Revision: 1.15 $
+$Date: 2007/01/28 02:21:11 $
  *--
  */
 
@@ -120,7 +120,7 @@ static char const * const condMultStrings[2][2] = {
     {"1", "+"},
     {"?", "*"}
 } ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.14 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.15 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -385,7 +385,8 @@ Ral_RelvarStartCommand(
      */
     if (Ral_RelvarTransModifiedRelvar(info, relvar)) {
 	Ral_Relation rel = relvar->relObj->internalRep.otherValuePtr ;
-	Ral_PtrVectorPushBack(relvar->transStack, Ral_RelationDup(rel)) ;
+	Ral_PtrVectorPushBack(relvar->transStack,
+	    Ral_RelationShallowCopy(rel)) ;
     }
     return 1 ;
 }
@@ -741,29 +742,38 @@ Ral_RelvarConstraintEval(
 void
 Ral_RelvarSetRelation(
     Ral_Relvar relvar,
-    Ral_Relation newRel)
+    Tcl_Obj *newRelObj)
 {
     Ral_Relation oldRel ;
+    Ral_Relation newRel ;
     Ral_Relation copyRel ;
     Ral_IntVector orderMap ;
     int copied ;
 
     assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
     oldRel = relvar->relObj->internalRep.otherValuePtr ;
+    assert(newRelObj->typePtr == &Ral_RelationObjType) ;
+    newRel = newRelObj->internalRep.otherValuePtr ;
     /*
-     * Copy the new relation into a heading that matches the old relation.
-     * This is necessary since the constraints and other relvar info
-     * contain attribute indices that correspond to the heading of the
-     * old relation.
+     * When setting a new value into a relvar, the heading order must be the
+     * same as the old heading order.  This is necessary since the constraints
+     * and other relvar info contain attribute indices that correspond to the
+     * heading order of the old relation.  We can use the fact that
+     * "Ral_TupleHeadingNewOrderMap()" returns NULL if it computes that the
+     * orders are the same. In that case, no copy is necessary.
      */
-    copyRel = Ral_RelationNew(oldRel->heading) ;
-    Ral_RelationReserve(copyRel, Ral_RelationCardinality(newRel)) ;
-    orderMap = Ral_TupleHeadingNewOrderMap(copyRel->heading->tupleHeading,
+    orderMap = Ral_TupleHeadingNewOrderMap(oldRel->heading->tupleHeading,
 	newRel->heading->tupleHeading) ;
-    copied = Ral_RelationCopy(newRel, Ral_RelationBegin(newRel),
-	Ral_RelationEnd(newRel), copyRel, orderMap) ;
-    assert(copied == 1) ;
-    Ral_IntVectorDelete(orderMap) ;
+    if (orderMap) {
+	copyRel = Ral_RelationNew(oldRel->heading) ;
+	Ral_RelationReserve(copyRel, Ral_RelationCardinality(newRel)) ;
+	copied = Ral_RelationCopy(newRel, Ral_RelationBegin(newRel),
+	    Ral_RelationEnd(newRel), copyRel, orderMap) ;
+	assert(copied == 1) ;
+	Ral_IntVectorDelete(orderMap) ;
+    } else {
+	copyRel = Ral_RelationShallowCopy(newRel) ;
+    }
     /*
      * Free up the old relation and install the copy.
      */

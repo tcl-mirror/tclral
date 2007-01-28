@@ -47,8 +47,8 @@
 #   This command is part of TclRAL. This file is in Tcl Markup Language
 #   format.
 # $RCSfile: relvar.man,v $
-# $Revision: 1.13 $
-# $Date: 2007/01/22 00:24:29 $
+# $Revision: 1.14 $
+# $Date: 2007/01/28 02:21:11 $
 #  *--
 }]
 [moddesc "Relvar Operators"]
@@ -792,6 +792,13 @@ The value of [arg tupleVarName] at the end of executing
 Typically, [arg script] will invoke [cmd "::ral::tuple update"]
 to modify the value of [arg tupleVarName].
 The return value of the subcommand is the number of tuples updated.
+If the [arg script] throws an error or the modified value of a tuple cannot
+be updated into [arg relvarName], all changes to [arg relvarName] are
+discarded and the value of [arg relvarName] is restored to its previous value.
+Should [arg script] execute a [cmd break] or [cmd return] command,
+then [arg relvarName] is updated (if possible) and the return code
+is propagated to any surrounding command.
+
 
 [example {
 % puts [relformat $::OWNER]
