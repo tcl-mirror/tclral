@@ -48,15 +48,16 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: trace.test,v $
-# $Revision: 1.7 $
-# $Date: 2007/01/28 02:21:12 $
+# $Revision: 1.8 $
+# $Date: 2007/02/03 20:07:35 $
 #  *--
 
 set ::auto_path [linsert $::auto_path 0\
-    [file normalize [file join [info script] ..]]]
+    [file normalize [file join [file dirname [info script]] ..]]]
 
 package require tcltest 2.2
 package require ral
+package require ralutil
 
 eval tcltest::configure $argv
 
@@ -77,6 +78,7 @@ namespace eval ::ral::test {
 
     set recNum 0
     array set idAttrs {}
+    ralutil::sysIdsInit
 
     proc traceProc {op relvarName args} {
 	variable traceInfo
@@ -92,64 +94,6 @@ namespace eval ::ral::test {
     proc insertTrace {op relvarName tup} {
 	variable traceInfo
 	set traceInfo $tup
-	return $tup
-    }
-
-    # This scheme works as a reasonable way to assign system identifiers
-    # that are incrementing integer based.
-    if {[llength [relvar names ::__ral_systemids__]] == 0} {
-	relvar create ::__ral_systemids__ {
-	    Relation
-	    {RelvarName string IdAttr string IdNum int}
-	    {
-		{RelvarName IdAttr}
-	    }
-	}
-    }
-
-    proc findMaxAttrValue {relvarName attrName} {
-	set relValue [relvar set $relvarName]
-	# If we don't find any, then we just start at 0
-	set idValue 0
-	if {[relation isnotempty $relValue]} {
-	    # We find the maximum by summarizing over DEE
-	    set dee {Relation {} {{}} {{}}}
-	    set idValue [relation extract\
-		[relation summarize $relValue $dee r\
-		    maxValue int {rmax($r, $attrName)}]\
-		maxValue]
-	}
-	return $idValue
-    }
-
-    # Return the last system id assigned to a given attribute
-    proc getLastSysId {relvarName attrName} {
-	return [relation extract\
-	    [relation choose __ral_systemids__\
-		RelvarName $relvarName\
-		IdAttr $attrName]\
-	    IdNum]
-    }
-
-    proc createIdFor {attrName op relvarName tup} {
-	relvar eval {
-	    set updated [\
-		relvar updateone __ral_systemids__ sysid\
-		    [list RelvarName $relvarName IdAttr $attrName] {
-		    set idValue [tuple extract $sysid IdNum]
-		    tuple update sysid IdNum [incr idValue]
-		}]
-	    if {!$updated} {
-		# If we don't update then we need to 
-		# find the maximum value of the atttribute in any tuple
-		# to use as our counter value.
-		set idValue [findMaxAttrValue $relvarName $attrName]
-		# The next one to use is one past the max
-		relvar insert __ral_systemids__ [list RelvarName $relvarName\
-		    IdAttr $attrName IdNum [incr idValue]]
-	    }
-	}
-	tuple update tup $attrName $idValue
 	return $tup
     }
 
@@ -313,7 +257,7 @@ namespace eval ::ral::test {
     } -cleanup {
 	relvar unset SV
     } -body {
-	relvar trace add variable SV insert [list createIdFor S#]
+	relvar trace add variable SV insert {::ralutil::sysIdsCreateIdFor S#}
 	relvar insert SV {S# {} SNAME John STATUS 40 CITY Bar}
 	relvar insert SV {S# {} SNAME John STATUS 40 CITY Bar}
 	relvar set SV

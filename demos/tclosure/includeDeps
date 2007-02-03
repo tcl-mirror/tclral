@@ -1,0 +1,99 @@
+#!/bin/sh
+# -->\
+exec tclsh "$0" "$@"
+
+ # One common activity in building software is determining the include
+ # dependencies of files. Because one file can include another which can itself
+ # include other files, in general the dependencies form a graph. So one
+ # question that often needs to be answered is for a given file, what is the set
+ # of files that needs to be checked in order to determine if the given file is
+ # out of date with respect to its dependencies.
+ #
+ # This example shows a method of computing the dependencies of a "C" file using
+ # TclRAL. The strategy is to examine each file to determine just which other
+ # files it is dependent upon and add these binary dependencies into a relvar.
+ # Then computing the transitive close of the relation value will give us the
+ # list of dependencies.
+ 
+ package require ral
+ namespace import ::ral::*
+ 
+ # We need a relvar to hold the dependency information. Each tuple of the
+ # relvar value represents an edge in an implied graph of dependencies.  The
+ # edge is denoted by the file names showing the "includes" dependency.  N.B.
+ # that both attributes are used to form the single identifier of the relation.
+ # Also, "relation tclose" insists that the relation be binary (i.e. have only
+ # two attributes, which can always be achieved by projection, if necessary).
+ 
+ relvar create FileDep {
+     Relation
+     {FileName string DepFile string}
+     {{FileName DepFile}}
+ }
+ 
+ # Now we must populate the relvar. This proc is overly simplistic for
+ # "real world" use, but serves as a simple example. In practice we would
+ # probably need to worry about include paths, system includes, etc. etc.
+ # For this example, we will scan every line of the file looking for
+ # "# include" constructs.
+ package require fileutil
+ proc scanFile {filename} {
+     # Creating a relvar, creates an ordinary Tcl variable by the same name.
+     global FileDep
+     fileutil::foreachLine line $filename {
+ 	if {[regexp {#include\s+[<"](.*)[>"]} $line match inclFile]} {
+ 	    # The "relvar insert" command throws an error when attempting to
+ 	    # insert a duplicate. We catch this and go on since a duplicate
+ 	    # here implies we are revisiting some previous dependency.
+ 	    catch {relvar insert FileDep [list\
+ 		    FileName [file tail $filename]\
+ 		    DepFile $inclFile]} result
+ 	    # Look to see if the file exists in the current directory and that
+ 	    # we have not already scanned it. If all that is true, then we
+ 	    # recursively look at what files it includes.  We can tell if we
+ 	    # have scanned the file by determining if there are any tuples in
+ 	    # the "FileDep" relvar that have the FileName attribute set to the
+ 	    # name of file that is included.
+ 	    if {[file exists $inclFile] &&
+ 		    [relation isempty [relation restrictwith $FileDep\
+ 			{$FileName eq $inclFile}]]} {
+ 		scanFile $inclFile
+ 	    }
+ 	}
+     }
+ }
+ 
+ # Okay, pull a file name off the command line and scan it
+ set f [lindex $argv 0]
+ cd [file dirname $f]
+ set f [file tail $f]
+ scanFile $f
+ 
+ # The dependency graph has edges described by the tuples of the relvar.
+ puts [relformat $FileDep "File Dependencies"]
+ 
+ # The transitive closure algorithm, which came from Aho, Hopcroft and Ullman,
+ # has memory requirements that are O(N^2) and computation times O(N^3) where
+ # N is the number of nodes in the implied dependency graph. So large graphs
+ # can take some time. Here we time it just for fun.
+ puts [time {set closure [relation tclose $FileDep]} 1]
+ 
+ # The transitive close contains a tuple for every pair of file names where
+ # there is some path from the file to its included file. Thus if a --> b and
+ # b --> c and c --> d, then the transitive closure will contain a tuple for
+ # a --> d (among others). This implies the original relation value is a subset
+ # of the transitive closure.
+ puts [relformat $closure "Transitive Closure"]
+ 
+ # So a list of the ultimate dependencies of the file is a simple expression
+ # finding those tuples where the FileName attribute matches, projecting out
+ # the DepFile attribute and converting the result into a Tcl list.
+ set depList [relation list [relation project\
+     [relation restrictwith $closure {$FileName eq $f}] DepFile]]
+ 
+ # We could choose to put this out in "make" syntax, but a simple listing
+ # will do.
+ puts "$f depends upon:"
+ foreach depFile [lsort $depList] {
+     puts "\t$depFile"
+ }

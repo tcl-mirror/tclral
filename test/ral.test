@@ -50,12 +50,12 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.27 $
-# $Date: 2007/01/28 02:21:11 $
+# $Revision: 1.28 $
+# $Date: 2007/02/03 20:07:35 $
 #  *--
 
 set ::auto_path [linsert $::auto_path 0\
-    [file normalize [file join [info script] ..]]]
+    [file normalize [file join [file dirname [info script]] ..]]]
 
 package require tcltest 2.2
 package require ral
@@ -1246,7 +1246,7 @@ namespace eval ::ral::test {
     test relation-foreach-1.0 {simple visit of suppliers} -body {
 	set nameList [list]
 	relation foreach sup $S {
-	    lappend nameList [tuple extract [relation tuple $sup] SNAME]
+	    lappend nameList [relation extract $sup SNAME]
 	}
 	lsort $nameList
     } -result {Adams Blake Clark Jones Smith}
@@ -1254,7 +1254,7 @@ namespace eval ::ral::test {
     test relation-foreach-2.0 {visit of suppliers ascending order} -body {
 	set nameList [list]
 	relation foreach sup $S -ascending SNAME {
-	    lappend nameList [tuple extract [relation tuple $sup] SNAME]
+	    lappend nameList [relation extract $sup SNAME]
 	}
 	set nameList
     } -result {Adams Blake Clark Jones Smith}
@@ -1262,7 +1262,7 @@ namespace eval ::ral::test {
     test relation-foreach-3.0 {visit of suppliers descending order} -body {
 	set nameList [list]
 	relation foreach sup $S -descending SNAME {
-	    lappend nameList [tuple extract [relation tuple $sup] SNAME]
+	    lappend nameList [relation extract $sup SNAME]
 	}
 	set nameList
     } -result {Smith Jones Clark Blake Adams}
@@ -1270,7 +1270,7 @@ namespace eval ::ral::test {
     test relation-foreach-4.0 {visit of suppliers ordered by multiple} -body {
 	set nameList [list]
 	relation foreach sup $S -ascending {CITY SNAME} {
-	    lappend nameList [tuple extract [relation tuple $sup] SNAME]
+	    lappend nameList [relation extract $sup SNAME]
 	}
 	set nameList
     } -result {Adams Clark Smith Blake Jones}
