@@ -48,8 +48,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: serialize.test,v $
-# $Revision: 1.1 $
-# $Date: 2007/02/03 20:07:35 $
+# $Revision: 1.2 $
+# $Date: 2007/02/04 18:50:53 $
 #  *--
 
 set ::auto_path [linsert $::auto_path 0\
@@ -97,7 +97,7 @@ namespace eval ::ral::test {
     # example relvar data to use
     source [file join [file dirname [info script]] testdata.tcl]
  
-    test relvar-serialize-1.0 {
+    test serialize-1.0 {
 	serialize relvar data
     } -setup {
     } -cleanup {
@@ -106,24 +106,55 @@ namespace eval ::ral::test {
 	llength $s
     } -result {4}
  
-    test relvar-deserialize-1.0 {
+    test deserialize-1.0 {
 	deserialize relvar data
     } -setup {
+	set dstNs ::ral::deserial
     } -cleanup {
 	eval relvar constraint delete\
-	    [relvar constraint names ::ral::deserial::*]
-	eval relvar unset [relvar names ::ral::deserial::*]
-	namespace delete ::ral::deserial
+	    [relvar constraint names ${dstNs}::*]
+	eval relvar unset [relvar names ${dstNs}::*]
+	namespace delete $dstNs
     } -body {
 	set s [serialize [namespace current]]
-	namespace eval ::ral::deserial {}
-	deserialize $s ::ral::deserial
-	cmpRelvars [namespace current] ::ral::deserial
+	deserialize $s $dstNs
+	cmpRelvars [namespace current] $dstNs
     } -result {1}
 
+    test storeToMk-1.0 {
+	metakit persistence for relvars
+    } -setup {
+	set dstNs ::ral::deserial
+	set mkFile [file join [temporaryDirectory] storeToMk-1.0.mk]
+    } -cleanup {
+	eval relvar constraint delete\
+	    [relvar constraint names ${dstNs}::*]
+	eval relvar unset [relvar names ${dstNs}::*]
+	namespace delete $dstNs
+	file delete $mkFile
+    } -body {
+	storeToMk $mkFile [namespace current]
+	loadFromMk $mkFile $dstNs
+	cmpRelvars [namespace current] $dstNs
+    } -result {1}
+
+    test dump-1.0 {
+	serialize relvars as a Tcl script
+    } -setup {
+	set dstNs ::ral::deserial
+    } -cleanup {
+	eval relvar constraint delete\
+	    [relvar constraint names ${dstNs}::*]
+	eval relvar unset [relvar names ${dstNs}::*]
+	namespace delete $dstNs
+    } -body {
+	set d [dump [namespace current]]
+	namespace eval $dstNs $d
+	cmpRelvars [namespace current] $dstNs
+    } -result {1}
 
 if 0 {
-    test relvar-update-X.0 {
+    test -1.0 {
     } -setup {
     } -cleanup {
     } -body {
