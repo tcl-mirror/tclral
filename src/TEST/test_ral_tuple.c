@@ -20,17 +20,18 @@ main(
     Ral_Tuple t2 ;
     Tcl_Obj *v1 ;
     int s1 ;
+    Ral_ErrorInfo errInfo ;
 
     interp = Tcl_CreateInterp() ;
     Tcl_InitMemory(interp) ;
 
     strType = Tcl_GetObjType("string") ;
     logInfo("creating \"attr1\"") ;
-    a1 = Ral_AttributeNewTclType("attr1", strType) ;
+    a1 = Ral_AttributeNewTclType("attr1", strType->name) ;
     logInfo("creating \"attr2\"") ;
-    a2 = Ral_AttributeNewTclType("attr2", strType) ;
+    a2 = Ral_AttributeNewTclType("attr2", strType->name) ;
     logInfo("creating \"attr3\"") ;
-    a3 = Ral_AttributeNewTclType("attr3", strType) ;
+    a3 = Ral_AttributeNewTclType("attr3", strType->name) ;
 
     logInfo("creating tuple heading") ;
     h1 = Ral_TupleHeadingNew(3) ;
@@ -45,7 +46,8 @@ main(
     logTest(Ral_TupleDegree(t1), 3) ;
 
     logInfo("setting value of \"attr1\"") ;
-    s1 = Ral_TupleUpdateAttrValue(t1, "attr1", Tcl_NewStringObj("a1", -1)) ;
+    s1 = Ral_TupleUpdateAttrValue(t1, "attr1", Tcl_NewStringObj("a1", -1),
+	&errInfo) ;
     logTest(s1, 1) ;
 
     logInfo("getting value of \"attr1\"") ;
@@ -53,11 +55,13 @@ main(
     logTest(strcmp(Tcl_GetString(v1), "a1"), 0) ;
 
     logInfo("setting value of \"attr2\"") ;
-    s1 = Ral_TupleUpdateAttrValue(t1, "attr2", Tcl_NewStringObj("a2", -1)) ;
+    s1 = Ral_TupleUpdateAttrValue(t1, "attr2", Tcl_NewStringObj("a2", -1),
+	&errInfo) ;
     logTest(s1, 1) ;
 
     logInfo("setting value of \"attr3\"") ;
-    s1 = Ral_TupleUpdateAttrValue(t1, "attr3", Tcl_NewStringObj("a3", -1)) ;
+    s1 = Ral_TupleUpdateAttrValue(t1, "attr3", Tcl_NewStringObj("a3", -1),
+	&errInfo) ;
     logTest(s1, 1) ;
 
     logInfo("printing tuple") ;
@@ -65,9 +69,8 @@ main(
 
     logInfo("setting value of \"attr4\"") ;
     v1 = Tcl_NewStringObj("a4", -1) ;
-    s1 = Ral_TupleUpdateAttrValue(t1, "attr4", v1) ;
+    s1 = Ral_TupleUpdateAttrValue(t1, "attr4", v1, &errInfo) ;
     logTest(s1, 0) ;
-    logTest(Ral_TupleLastError, TUP_UNKNOWN_ATTR) ;
 
     logInfo("printing tuple") ;
     Ral_TuplePrint(t1, "%s\n", stdout) ;

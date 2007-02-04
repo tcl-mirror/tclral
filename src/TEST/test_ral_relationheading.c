@@ -32,9 +32,12 @@ main(
 
     logInfo("creating first relation heading") ;
     t1 = Ral_TupleHeadingNew(3) ;
-    Ral_TupleHeadingPushBack(t1, Ral_AttributeNewTclType("attr1", strType)) ;
-    Ral_TupleHeadingPushBack(t1, Ral_AttributeNewTclType("attr2", strType)) ;
-    Ral_TupleHeadingPushBack(t1, Ral_AttributeNewTclType("attr3", strType)) ;
+    Ral_TupleHeadingPushBack(t1, Ral_AttributeNewTclType("attr1",
+	strType->name)) ;
+    Ral_TupleHeadingPushBack(t1, Ral_AttributeNewTclType("attr2",
+	strType->name)) ;
+    Ral_TupleHeadingPushBack(t1, Ral_AttributeNewTclType("attr3",
+	strType->name)) ;
     r1 = Ral_RelationHeadingNew(t1, 1) ;
     v1 = Ral_IntVectorNew(1, -1) ;
     Ral_IntVectorStore(v1, 0, Ral_TupleHeadingIndexOf(t1, "attr1")) ;
@@ -45,9 +48,12 @@ main(
 
     logInfo("creating second relation heading") ;
     t2 = Ral_TupleHeadingNew(3) ;
-    Ral_TupleHeadingPushBack(t2, Ral_AttributeNewTclType("attr2", strType)) ;
-    Ral_TupleHeadingPushBack(t2, Ral_AttributeNewTclType("attr3", strType)) ;
-    Ral_TupleHeadingPushBack(t2, Ral_AttributeNewTclType("attr1", strType)) ;
+    Ral_TupleHeadingPushBack(t2, Ral_AttributeNewTclType("attr2",
+	strType->name)) ;
+    Ral_TupleHeadingPushBack(t2, Ral_AttributeNewTclType("attr3",
+	strType->name)) ;
+    Ral_TupleHeadingPushBack(t2, Ral_AttributeNewTclType("attr1",
+	strType->name)) ;
     r2 = Ral_RelationHeadingNew(t2, 1) ;
     v2 = Ral_IntVectorNew(1, -1) ;
     Ral_IntVectorStore(v2, 0, Ral_TupleHeadingIndexOf(t2, "attr1")) ;
@@ -60,9 +66,12 @@ main(
 
     logInfo("creating third relation heading") ;
     t3 = Ral_TupleHeadingNew(3) ;
-    Ral_TupleHeadingPushBack(t3, Ral_AttributeNewTclType("attr3", strType)) ;
-    Ral_TupleHeadingPushBack(t3, Ral_AttributeNewTclType("attr1", strType)) ;
-    Ral_TupleHeadingPushBack(t3, Ral_AttributeNewTclType("attr2", strType)) ;
+    Ral_TupleHeadingPushBack(t3, Ral_AttributeNewTclType("attr3",
+	strType->name)) ;
+    Ral_TupleHeadingPushBack(t3, Ral_AttributeNewTclType("attr1",
+	strType->name)) ;
+    Ral_TupleHeadingPushBack(t3, Ral_AttributeNewTclType("attr2",
+	strType->name)) ;
     r3 = Ral_RelationHeadingNew(t3, 1) ;
 
     v3 = Ral_IntVectorNew(2, -1) ;

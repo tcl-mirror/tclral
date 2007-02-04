@@ -32,11 +32,11 @@ main(
 
     logInfo("version: %s", Ral_TupleHeadingVersion()) ;
     logInfo("creating \"attr1\"") ;
-    a1 = Ral_AttributeNewTclType("attr1", strType) ;
+    a1 = Ral_AttributeNewTclType("attr1", strType->name) ;
     logInfo("creating \"attr2\"") ;
-    a2 = Ral_AttributeNewTclType("attr2", strType) ;
+    a2 = Ral_AttributeNewTclType("attr2", strType->name) ;
     logInfo("creating \"attr3\"") ;
-    a3 = Ral_AttributeNewTclType("attr3", strType) ;
+    a3 = Ral_AttributeNewTclType("attr3", strType->name) ;
 
     logInfo("creating attribute vector") ;
     v1 = Ral_TupleHeadingNew(vcapacity) ;
@@ -61,7 +61,7 @@ main(
     Ral_TupleHeadingPrint(v1, "%s\n", stdout) ;
 
     logInfo("creating \"attr1\"") ;
-    a4 = Ral_AttributeNewTclType("attr1", strType) ;
+    a4 = Ral_AttributeNewTclType("attr1", strType->name) ;
     i1 = Ral_TupleHeadingStore(v1, Ral_TupleHeadingBegin(v1) + 1, a4) ;
     logTest(i1 == Ral_TupleHeadingEnd(v1), 1)
 
@@ -69,9 +69,9 @@ main(
      * Test union.
      */
     v2 = Ral_TupleHeadingNew(3) ;
-    Ral_TupleHeadingPushBack(v2, Ral_AttributeNewTclType("b1", strType)) ;
-    Ral_TupleHeadingPushBack(v2, Ral_AttributeNewTclType("b2", strType)) ;
-    Ral_TupleHeadingPushBack(v2, Ral_AttributeNewTclType("b3", strType)) ;
+    Ral_TupleHeadingPushBack(v2, Ral_AttributeNewTclType("b1", strType->name)) ;
+    Ral_TupleHeadingPushBack(v2, Ral_AttributeNewTclType("b2", strType->name)) ;
+    Ral_TupleHeadingPushBack(v2, Ral_AttributeNewTclType("b3", strType->name)) ;
     logTest(Ral_TupleHeadingSize(v2), 3) ;
 
     v3 = Ral_TupleHeadingUnion(v1, v2) ;
@@ -85,9 +85,9 @@ main(
      * Test intersect.
      */
     v4 = Ral_TupleHeadingNew(3) ;
-    Ral_TupleHeadingPushBack(v4, Ral_AttributeNewTclType("a1", strType)) ;
-    Ral_TupleHeadingPushBack(v4, Ral_AttributeNewTclType("b1", strType)) ;
-    Ral_TupleHeadingPushBack(v4, Ral_AttributeNewTclType("b3", strType)) ;
+    Ral_TupleHeadingPushBack(v4, Ral_AttributeNewTclType("a1", strType->name)) ;
+    Ral_TupleHeadingPushBack(v4, Ral_AttributeNewTclType("b1", strType->name)) ;
+    Ral_TupleHeadingPushBack(v4, Ral_AttributeNewTclType("b3", strType->name)) ;
     logTest(Ral_TupleHeadingSize(v4), 3) ;
 
     v5 = Ral_TupleHeadingIntersect(v2, v4) ;

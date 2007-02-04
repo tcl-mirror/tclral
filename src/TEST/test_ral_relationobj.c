@@ -21,6 +21,7 @@ main(
     Tcl_Obj *r1Obj ;
     Tcl_Obj *r2Obj ;
     Tcl_Obj *r3Obj ;
+    Ral_ErrorInfo errInfo ;
 
     logInfo("version = %s", Ral_RelationObjVersion()) ;
 
@@ -34,11 +35,11 @@ main(
     logInfo("creating tuple heading") ;
     th1 = Ral_TupleHeadingNew(3) ;
     Ral_TupleHeadingPushBack(th1,
-	Ral_AttributeNewTclType("attr1", &tclStringType)) ;
+	Ral_AttributeNewTclType("attr1", tclStringType.name)) ;
     Ral_TupleHeadingPushBack(th1,
-	Ral_AttributeNewTclType("attr2", &tclStringType)) ;
+	Ral_AttributeNewTclType("attr2", tclStringType.name)) ;
     Ral_TupleHeadingPushBack(th1,
-	Ral_AttributeNewTclType("attr3", &tclStringType)) ;
+	Ral_AttributeNewTclType("attr3", tclStringType.name)) ;
 
     logInfo("creating relation heading") ;
     rh1 = Ral_RelationHeadingNew(th1, 1) ;
@@ -54,23 +55,32 @@ main(
 
     logInfo("adding first tuple") ;
     t1 = Ral_TupleNew(th1) ;
-    Ral_TupleUpdateAttrValue(t1, "attr1", Tcl_NewStringObj("a1", -1)) ;
-    Ral_TupleUpdateAttrValue(t1, "attr2", Tcl_NewStringObj("a2", -1)) ;
-    Ral_TupleUpdateAttrValue(t1, "attr3", Tcl_NewStringObj("a3", -1)) ;
+    Ral_TupleUpdateAttrValue(t1, "attr1", Tcl_NewStringObj("a1", -1),
+	&errInfo) ;
+    Ral_TupleUpdateAttrValue(t1, "attr2", Tcl_NewStringObj("a2", -1),
+	&errInfo) ;
+    Ral_TupleUpdateAttrValue(t1, "attr3", Tcl_NewStringObj("a3", -1),
+	&errInfo) ;
     logTest(Ral_RelationPushBack(r1, t1, NULL), 1) ;
 
     logInfo("adding second tuple") ;
     t1 = Ral_TupleNew(th1) ;
-    Ral_TupleUpdateAttrValue(t1, "attr1", Tcl_NewStringObj("b1", -1)) ;
-    Ral_TupleUpdateAttrValue(t1, "attr2", Tcl_NewStringObj("b2", -1)) ;
-    Ral_TupleUpdateAttrValue(t1, "attr3", Tcl_NewStringObj("b3", -1)) ;
+    Ral_TupleUpdateAttrValue(t1, "attr1", Tcl_NewStringObj("b1", -1),
+	&errInfo) ;
+    Ral_TupleUpdateAttrValue(t1, "attr2", Tcl_NewStringObj("b2", -1),
+	&errInfo) ;
+    Ral_TupleUpdateAttrValue(t1, "attr3", Tcl_NewStringObj("b3", -1),
+	&errInfo) ;
     logTest(Ral_RelationPushBack(r1, t1, NULL), 1) ;
 
     logInfo("adding third tuple") ;
     t1 = Ral_TupleNew(th1) ;
-    Ral_TupleUpdateAttrValue(t1, "attr1", Tcl_NewStringObj("c1", -1)) ;
-    Ral_TupleUpdateAttrValue(t1, "attr2", Tcl_NewStringObj("c2", -1)) ;
-    Ral_TupleUpdateAttrValue(t1, "attr3", Tcl_NewStringObj("c3", -1)) ;
+    Ral_TupleUpdateAttrValue(t1, "attr1", Tcl_NewStringObj("c1", -1),
+	&errInfo) ;
+    Ral_TupleUpdateAttrValue(t1, "attr2", Tcl_NewStringObj("c2", -1),
+	&errInfo) ;
+    Ral_TupleUpdateAttrValue(t1, "attr3", Tcl_NewStringObj("c3", -1),
+	&errInfo) ;
     logTest(Ral_RelationPushBack(r1, t1, NULL), 1) ;
 
     logInfo("creating object from tuple") ;
@@ -95,12 +105,12 @@ main(
     logInfo("recreating string representation") ;
     Tcl_InvalidateStringRep(r2Obj) ;
     logInfo("relation 2 = \"%s\"", Tcl_GetString(r2Obj)) ;
-    logInfo("deleting relation obj") ;
-    Tcl_DecrRefCount(r2Obj) ;
 
     logInfo("copying relation obj") ;
     r3Obj = Tcl_DuplicateObj(r2Obj) ;
     logInfo("copied tuple = \"%s\"", Tcl_GetString(r3Obj)) ;
+    logInfo("deleting relation obj") ;
+    Tcl_DecrRefCount(r2Obj) ;
     logInfo("deleting relation obj") ;
     Tcl_DecrRefCount(r3Obj) ;
 

@@ -22,6 +22,7 @@ main(
     Ral_AttributeTypeScanFlags typeFlags ;
     Ral_AttributeValueScanFlags valueFlags ;
     char * aValueStr ;
+    Ral_ErrorInfo errInfo ;
 
     interp = Tcl_CreateInterp() ;
     Tcl_InitMemory(interp) ;
@@ -29,13 +30,13 @@ main(
 
     logInfo("testing ral_attribute version: %s", Ral_AttributeVersion()) ;
     logInfo("creating \"attr1\"") ;
-    a1 = Ral_AttributeNewTclType("attr1", strType) ;
+    a1 = Ral_AttributeNewTclType("attr1", strType->name) ;
     logTest(a1->attrType, Tcl_Type) ;
 
     attrName = Tcl_NewStringObj("a2", -1) ;
     attrType = Tcl_NewStringObj("string", -1) ;
     attrValue = Tcl_NewStringObj("This is a value", -1) ;
-    a2 = Ral_AttributeNewFromObjs(interp, attrName, attrType) ;
+    a2 = Ral_AttributeNewFromObjs(interp, attrName, attrType, &errInfo) ;
     a2Str = Ral_AttributeToString(a2) ;
     logInfo("attribute created from objs = \"%s\"", a2Str) ;
     ckfree(a2Str) ;

@@ -17,6 +17,7 @@ main(
     Ral_Relation r1 ;
     Ral_Tuple t1 ;
     Ral_IntVector v1 ;
+    Ral_ErrorInfo errInfo ;
 
     interp = Tcl_CreateInterp() ;
     Tcl_InitMemory(interp) ;
@@ -24,9 +25,12 @@ main(
 
     logInfo("creating relation") ;
     th1 = Ral_TupleHeadingNew(3) ;
-    Ral_TupleHeadingPushBack(th1, Ral_AttributeNewTclType("attr1", strType)) ;
-    Ral_TupleHeadingPushBack(th1, Ral_AttributeNewTclType("attr2", strType)) ;
-    Ral_TupleHeadingPushBack(th1, Ral_AttributeNewTclType("attr3", strType)) ;
+    Ral_TupleHeadingPushBack(th1,
+	Ral_AttributeNewTclType("attr1", strType->name)) ;
+    Ral_TupleHeadingPushBack(th1,
+	Ral_AttributeNewTclType("attr2", strType->name)) ;
+    Ral_TupleHeadingPushBack(th1,
+	Ral_AttributeNewTclType("attr3", strType->name)) ;
     rh1 = Ral_RelationHeadingNew(th1, 1) ;
     v1 = Ral_IntVectorNew(1, -1) ;
     Ral_IntVectorStore(v1, 0, Ral_TupleHeadingIndexOf(th1, "attr1")) ;
@@ -38,9 +42,12 @@ main(
 
     logInfo("adding a tuple") ;
     t1 = Ral_TupleNew(th1) ;
-    Ral_TupleUpdateAttrValue(t1, "attr1", Tcl_NewStringObj("foo1", -1)) ;
-    Ral_TupleUpdateAttrValue(t1, "attr2", Tcl_NewStringObj("foo2", -1)) ;
-    Ral_TupleUpdateAttrValue(t1, "attr3", Tcl_NewStringObj("foo3", -1)) ;
+    Ral_TupleUpdateAttrValue(t1, "attr1", Tcl_NewStringObj("foo1", -1),
+	&errInfo) ;
+    Ral_TupleUpdateAttrValue(t1, "attr2", Tcl_NewStringObj("foo2", -1),
+	&errInfo) ;
+    Ral_TupleUpdateAttrValue(t1, "attr3", Tcl_NewStringObj("foo3", -1),
+	&errInfo) ;
 
     logTest(Ral_RelationPushBack(r1, t1, NULL), 1) ;
     logInfo("printing relation") ;

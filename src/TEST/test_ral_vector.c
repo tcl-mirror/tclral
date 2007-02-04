@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include "tcl.h"
 #include "ral_vector.h"
 #include "log.h"
 
@@ -8,6 +9,8 @@ main(
     int argc,
     char **argv)
 {
+    Tcl_Interp *interp ;
+
     const unsigned v1Size = 10 ;
     const unsigned v1Fill = 0 ;
     const unsigned v1FillOther = 3 ;
@@ -16,6 +19,9 @@ main(
     Ral_IntVector v2 ;
     Ral_IntVector v3 ;
     Ral_IntVectorIter i ;
+
+    interp = Tcl_CreateInterp() ;
+    Tcl_InitMemory(interp) ;
 
     logInfo("testing ral_vector version %s", Ral_VectorVersion()) ;
 

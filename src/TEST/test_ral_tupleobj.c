@@ -22,6 +22,7 @@ main(
     Tcl_Obj *t2obj ;
     Tcl_Obj *t3obj ;
     int err ;
+    Ral_ErrorInfo errInfo ;
 
     logInfo("version = %s", Ral_TupleObjVersion()) ;
 
@@ -33,11 +34,11 @@ main(
     Tcl_RegisterObjType(&Ral_TupleObjType) ;
 
     logInfo("creating \"attr1\"") ;
-    a1 = Ral_AttributeNewTclType("attr1", &tclStringType) ;
+    a1 = Ral_AttributeNewTclType("attr1", tclStringType.name) ;
     logInfo("creating \"attr2\"") ;
-    a2 = Ral_AttributeNewTclType("attr2", &tclStringType) ;
+    a2 = Ral_AttributeNewTclType("attr2", tclStringType.name) ;
     logInfo("creating \"attr3\"") ;
-    a3 = Ral_AttributeNewTclType("attr3", &tclStringType) ;
+    a3 = Ral_AttributeNewTclType("attr3", tclStringType.name) ;
     logInfo("creating tuple heading") ;
     h1 = Ral_TupleHeadingNew(3) ;
 
@@ -48,11 +49,14 @@ main(
     logInfo("creating tuple") ;
     t1 = Ral_TupleNew(h1) ;
     logInfo("setting value of \"attr1\"") ;
-    Ral_TupleUpdateAttrValue(t1, "attr1", Tcl_NewStringObj("a1", -1)) ;
+    Ral_TupleUpdateAttrValue(t1, "attr1", Tcl_NewStringObj("a1", -1),
+	&errInfo) ;
     logInfo("setting value of \"attr2\"") ;
-    Ral_TupleUpdateAttrValue(t1, "attr2", Tcl_NewStringObj("a2", -1)) ;
+    Ral_TupleUpdateAttrValue(t1, "attr2", Tcl_NewStringObj("a2", -1),
+	&errInfo) ;
     logInfo("setting value of \"attr3\"") ;
-    Ral_TupleUpdateAttrValue(t1, "attr3", Tcl_NewStringObj("a3", -1)) ;
+    Ral_TupleUpdateAttrValue(t1, "attr3", Tcl_NewStringObj("a3", -1),
+	&errInfo) ;
 
     logInfo("creating object from tuple") ;
     t1obj = Ral_TupleObjNew(t1) ;

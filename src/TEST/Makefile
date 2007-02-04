@@ -43,8 +43,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: Makefile,v $
-# $Revision: 1.5 $
-# $Date: 2006/03/01 02:28:40 $
+# $Revision: 1.6 $
+# $Date: 2007/02/04 18:47:46 $
 #  *--
 
 PROGS = \
@@ -85,14 +85,13 @@ CLEANFILES=\
 
 .PHONY : runtests testprogs
 
-runtests : testprogs ral.test
+runtests : testprogs
 	@for p in $(PROGS) ; do echo $$p ; $$p | grep '^SUMMARY' ; done
-	ral.test
 
 testprogs : $(PROGS)
 
-% : %.c libraltest.a ../libral0.8.so
-	$(CC) $(CFLAGS) $(CPPFLAGS) $(LOADLIBES) $< -lral0.8 -ltcl8.5 libraltest.a -o $@
+% : %.c libraltest.a ../libral0.8.1.so
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(LOADLIBES) $< -lral0.8.1 -ltcl8.5 libraltest.a -o $@
 
 .%.d:%.c
 	set -e; $(CC) -MM $(CPPFLAGS) $< \
