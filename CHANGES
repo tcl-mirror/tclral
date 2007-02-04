@@ -1,0 +1,62 @@
+========= ral 0.8.1 =========
+
+Version 0.8.1 is an incremental release that is backward compatible at the
+script level. There have been a number of code base improvements.  Several new
+commands were added that experience indicated were useful. Several commands
+have new optional arguments. The biggest new feature is relvar tracing. It is
+now possible to define a trace on a relvar and intercede in some of the relvar
+operations.  A new package called "ralutil" is included that contains some
+useful procs. The "ralutil" package is, in places, quite experimental as
+subject to interface changes. There is no documentation yet for the "ralutil"
+package, but that will come later as the interfaces stabilize.  However, I
+wanted a place to try out new things without cluttering the main "ral" package.
+
+Overview of the script visible changes from Version 0.8 to Version 0.8.1
+
+1. Added "relvar trace" command. This allows setting traces on relvar
+    operations.
+
+2. Added the commands "relvar union", "relvar intersect", "relvar
+    minus". These are shorthands for performing the indicated operation
+    and assigning the result back into the relvar.
+
+3. Added the "relation create" command so that relation values can be
+    created without reference to the string representation of the relation.
+    Compare with "tuple create"
+
+4. Added the command "relation body" to return the body of a relation. The
+    body is a list of tuple values, each of which is a dictionary of
+    attribute name / attribute value pairs.
+
+5. Added "relation reidentify" to change the identifiers of a relation
+    value.  Occasionally it is desirable to change identifiers when by
+    context other information is known about a relation value.
+
+6. Modified "relation array" and "relation dict" to accept optional
+    arguments for the key attribute name and value attribute name. This
+    makes it more convenient so that projecting out a binary relation
+    is not strictly required now.
+
+7. Create a "ralutil" package as part of the release to hold utility procs
+    and other experimental script code.
+
+========= ral 0.8 =========
+Version 0.8 is a complete refactoring and rewrite of the extension.
+The source has been split among many files and there was a concerted
+attempt to have an internal "C" API separated from the Tcl portions.
+The biggest new feature is support for referential integrity constraints.
+Support for virtual relvars (i.e. views) has been removed, but may come
+back later when whole area is better understood.
+
+========= ral 0.7 =========
+Organization of the source code did not change in this version. It is still a
+single (albeit rather large) "C" file. The "relformat" utility is also still
+implemented as script. However, the build procedure is now TEA compliant.
+
+========= ral 0.6 =========
+TCLRAL is contained in a single "C" source file. My apologies that the build
+mechanisms are so primative. I'll improve then in future releases. As it stands
+now, you need only compile the single source file to produce a shared
+library.  A utility procedure, "relformat", is included as Tcl script. The
+"pkgIndex.tcl" file handles the load and source necessary to get everything
+loaded.
