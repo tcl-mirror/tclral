@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.28 $
-$Date: 2007/01/28 02:21:11 $
+$Revision: 1.29 $
+$Date: 2007/02/17 18:06:46 $
  *--
  */
 
@@ -151,7 +151,7 @@ static const struct traceOpsMap {
 } ;
 static const char specErrMsg[] = "multiplicity specification" ;
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.28 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.29 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -379,6 +379,7 @@ Ral_RelvarObjInsertTuple(
 	 * Objects returned have already been converted to tuples.
 	 * Insert the tuple into the relation.
 	 */
+	Tcl_IncrRefCount(resultObj) ;
 	tuple = resultObj->internalRep.otherValuePtr ;
 	if (!Ral_RelationPushBack(relation, tuple, NULL)) {
 	    Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_DUPLICATE_TUPLE,
@@ -386,6 +387,7 @@ Ral_RelvarObjInsertTuple(
 	    Ral_InterpSetError(interp, errInfo) ;
 	    result = TCL_ERROR ;
 	}
+	Tcl_DecrRefCount(resultObj) ;
     } else {
 	result = TCL_ERROR ;
     }
