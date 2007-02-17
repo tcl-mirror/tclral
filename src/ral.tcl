@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.30 $
-# $Date: 2007/02/03 20:07:35 $
+# $Revision: 1.31 $
+# $Date: 2007/02/17 18:07:55 $
 #  *--
 
 namespace eval ::ral {
@@ -884,39 +884,6 @@ proc ::ral::mkLoadRelation {cursor heading} {
 	lappend value [mkLoadTuple $rCursor $heading]
     }
     return $value
-}
-
-proc ::ral::matchValueType {relVal relvarName} {
-    set rv [::ral::relation emptyof $relVal]
-    set sv [::ral::relation emptyof [::ral::relvar set $relvarName]]
-    catch {::ral::relation is $rv == $sv} result
-    return [expr {$result == 1}]
-}
-
-proc ::ral::mergeJoinAttrs {attrs1 attrs2} {
-    set joinAttrs [list]
-    foreach a1 $attrs1 a2 $attrs2 {
-	lappend joinAttrs $a1 $a2
-    }
-    return $joinAttrs
-}
-
-proc ::ral::findSubSetType {relValue subSets} {
-    foreach {ssName ssAttrs} $subSets {
-	if {[matchValueType $relValue $ssName]} {
-	    return $ssAttrs
-	}
-    }
-    error "did not find type of \"$relVal\" among the subsets types"
-}
-
-proc ::ral::findSubSetRef {name subSets} {
-    foreach {ssName ssAttrs} $subSets {
-	if {$ssName eq $name} {
-	    return $ssAttrs
-	}
-    }
-    error "did not find \"$name\" among the subsets names"
 }
 
 package provide ral 0.8.1

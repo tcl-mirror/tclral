@@ -49,8 +49,8 @@
 # without cluttering the TclRAL package proper.
 # 
 # $RCSfile: ralutil.tcl,v $
-# $Revision: 1.1 $
-# $Date: 2007/02/03 20:07:35 $
+# $Revision: 1.2 $
+# $Date: 2007/02/17 18:07:55 $
 #  *--
 
 package provide ralutil 0.8.1
@@ -107,7 +107,7 @@ proc ::ralutil::nestcmds {cmdList p} {
 # in "srcRelvar" and presumably contains a subset of the tuples of "srcRelvar"
 #
 # This is very experimental and rather complicated for what it accomplishes.
-proc ::ral::navigate {relValue constraintName relvarName {dir {}}} {
+proc ::ralutil::navigate {relValue constraintName relvarName {dir {}}} {
     set relvarName [uplevel ::ral::relvar path $relvarName]
     set constraintName [uplevel ::ral::relvar constraint path $constraintName]
     set cmd [list ::ral::relation semijoin $relValue [relvar set $relvarName]\
@@ -283,7 +283,40 @@ proc ::ral::navigate {relValue constraintName relvarName {dir {}}} {
     return [eval $cmd]
 }
 
-# ::ral::alter <relvarName> <varName> <script>
+proc ::ralutil::matchValueType {relVal relvarName} {
+    set rv [::ral::relation emptyof $relVal]
+    set sv [::ral::relation emptyof [::ral::relvar set $relvarName]]
+    catch {::ral::relation is $rv == $sv} result
+    return [expr {$result == 1}]
+}
+
+proc ::ralutil::mergeJoinAttrs {attrs1 attrs2} {
+    set joinAttrs [list]
+    foreach a1 $attrs1 a2 $attrs2 {
+	lappend joinAttrs $a1 $a2
+    }
+    return $joinAttrs
+}
+
+proc ::ralutil::findSubSetType {relValue subSets} {
+    foreach {ssName ssAttrs} $subSets {
+	if {[matchValueType $relValue $ssName]} {
+	    return $ssAttrs
+	}
+    }
+    error "did not find type of \"$relVal\" among the subsets types"
+}
+
+proc ::ralutil::findSubSetRef {name subSets} {
+    foreach {ssName ssAttrs} $subSets {
+	if {$ssName eq $name} {
+	    return $ssAttrs
+	}
+    }
+    error "did not find \"$name\" among the subsets names"
+}
+
+# ::ralutil::alter <relvarName> <varName> <script>
 # Alter a relvar's structure.
 # "relvarName" is the name of the relvar.
 # "varName" is the name of a Tcl variable that is assigned
@@ -298,7 +331,7 @@ proc ::ral::navigate {relValue constraintName relvarName {dir {}}} {
 # N.B. very experimental and mildly dangerous as it must delete the
 # relvar and recreate it along with the constraints.
 #
-proc ::ral::alter {relvarName varName script} {
+proc ::ralutil::alter {relvarName varName script} {
     # Get the resolved name
     set relvarName [relvar names $relvarName]
     # Store all the constraint info to restore later. In order to delete
