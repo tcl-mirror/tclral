@@ -49,8 +49,8 @@ ABSTRACT:
     Algebra.
 
 $RCSfile: ral.c,v $
-$Revision: 1.35 $
-$Date: 2007/02/02 01:52:34 $
+$Revision: 1.36 $
+$Date: 2007/02/17 18:05:06 $
  *--
  */
 
@@ -105,7 +105,7 @@ STATIC DATA ALLOCATION
 static char const ral_pkgname[] = PACKAGE_NAME ;
 static char const ral_version[] = PACKAGE_VERSION ;
 static char const ral_rcsid[] =
-    "$Id: ral.c,v 1.35 2007/02/02 01:52:34 mangoa01 Exp $" ;
+    "$Id: ral.c,v 1.36 2007/02/17 18:05:06 mangoa01 Exp $" ;
 static char const ral_copyright[] =
     "This software is copyrighted 2004, 2005, 2006 by G. Andrew Mangogna."
     " Terms and conditions for use are distributed with the source code." ;
@@ -148,6 +148,9 @@ Ral_Init(
 
     Tcl_InitStubs(interp, TCL_VERSION, 0) ;
 
+    /*
+     * Register the new data types that this package defines.
+     */
     Tcl_RegisterObjType(&Ral_TupleObjType) ;
     Tcl_RegisterObjType(&Ral_RelationObjType) ;
 
@@ -197,3 +200,24 @@ Ral_SafeInit(
 {
     return Ral_Init(interp) ;
 }
+
+#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
+/*
+ * If we have the "unload" command we can provide the functions it likes to
+ * have.  Nothing really to do here. All the data will be cleaned up when the
+ * interpreter is deleted.
+ */
+int
+Ral_Unload(
+    Tcl_Interp *interp)
+{
+    return TCL_OK ;
+}
+
+int
+Ral_SafeUnload(
+    Tcl_Interp *interp)
+{
+    return Ral_Unload(interp) ;
+}
+#endif
