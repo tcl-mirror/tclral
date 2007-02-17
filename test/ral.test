@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.28 $
-# $Date: 2007/02/03 20:07:35 $
+# $Revision: 1.29 $
+# $Date: 2007/02/17 18:08:33 $
 #  *--
 
 set ::auto_path [linsert $::auto_path 0\
@@ -4417,6 +4417,29 @@ tuple {A1 c} is not referred to by any tuple
 	}
     } -match relation
 
+    test relvar-set-3.0 {Tcl variable is also modified} -body {
+	relvar create SV {
+	    Relation
+	    {S# string SNAME string STATUS int CITY string}
+	    S#
+	}
+	relvar set SV $S
+	set SV
+    } -cleanup {
+	relvar unset SV
+    } -result {
+	Relation
+	{S# string SNAME string STATUS int CITY string}
+	S#
+	{
+	    {S# S1 SNAME Smith STATUS 20 CITY London}
+	    {S# S2 SNAME Jones STATUS 10 CITY Paris}
+	    {S# S3 SNAME Blake STATUS 30 CITY Paris}
+	    {S# S4 SNAME Clark STATUS 20 CITY London}
+	    {S# S5 SNAME Adams STATUS 30 CITY Athens}
+	}
+    } -match relation
+
     # relvar eval subcommand
     test relvar-eval-1.0 {simple body} -setup {
 	relvar create SV {
@@ -4641,6 +4664,38 @@ tuple {A1 c} is not referred to by any tuple
 	    {Name Allen Status 95}\
 	]
 	relvar union X $x
+    } -result {
+	Relation
+	{Name string Status int}
+	Name
+	{
+	    {Name George Status 20}
+	    {Name Fred Status 30}
+	    {Status 40 Name Alice}
+	    {Name Allen Status 95}
+	}
+    } -match relation
+
+    test relvar-union-1.1 {check Tcl variable} -setup {
+	relvar create X {
+	    Relation
+	    {Name string Status int}
+	    Name
+	}
+	relvar insert X\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar unset X
+    } -body {
+	set x [relation create {Name string Status int} Name\
+	    {Name George Status 20}\
+	    {Status 40 Name Alice}\
+	    {Name Allen Status 95}\
+	]
+	relvar union X $x
+	set X
     } -result {
 	Relation
 	{Name string Status int}
