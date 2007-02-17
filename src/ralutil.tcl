@@ -49,8 +49,8 @@
 # without cluttering the TclRAL package proper.
 # 
 # $RCSfile: ralutil.tcl,v $
-# $Revision: 1.2 $
-# $Date: 2007/02/17 18:07:55 $
+# $Revision: 1.3 $
+# $Date: 2007/02/17 18:13:00 $
 #  *--
 
 package provide ralutil 0.8.1
@@ -455,4 +455,38 @@ proc ::ralutil::findMaxAttrValue {relvarName attrName} {
 	    relation extract ~ maxValue}]
     }
     return $idValue
+}
+
+# crosstab relValue crossAttr ?attr1 attr2 ...?
+#
+# Generate a cross tabulation of "relValue" for the "crossAttr" against the
+# variable number of attributes given. The "crossAttr" argument is the name of
+# an attribute of "relValue". The idea is to create new relation that contains
+# all the attributes in "args" plus a new attribute for each distinct value of
+# "crossAttr". The value of the new attributes is count of tuples that have the
+# corresponding value of "crossAttr".  Relationally, the "summarize" command is
+# used when computations are required across groups of tuples.
+proc ::ral::crosstab {relValue crossAttr args} {
+    # We start by projecting the attributes that will be retained
+    # in the resulting relation.
+    set subproj [relation project $relValue {expand}$args]
+    # The strategy is to build up a summarize command on the fly, adding new
+    # attributes. So we start with the constant part of the command.
+    set sumCmd [list relation summarize $relValue $subproj r]
+
+    # By projecting on the "crossAttr" we get the unique set of values
+    # for that attribute since there are no duplicates in relations.
+    set crossproj [relation project $relValue $crossAttr]
+    # For each distince value of the "crossAttr" extend the relation with
+    # a new attribute by the same name as the value and whose value is
+    # the number of tuples which match the value.
+    foreach val [lsort [relation list $crossproj]] {
+	 set sumexpr [format\
+	     {[relation cardinality [relation restrictwith $r {$%s == "%s"}]]}\
+	     $crossAttr $val]
+	 lappend sumCmd $val int $sumexpr
+    }
+    # Finally we want the total for all the "crossAttr" matches.
+    lappend sumCmd Total int {[relation cardinality $r]}
+    return [eval $sumCmd]
 }
