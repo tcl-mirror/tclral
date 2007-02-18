@@ -1,6 +1,6 @@
-[manpage_begin relvar n 0.8.1]
+[manpage_begin relvar n 0.8.2]
 [comment {
-# This software is copyrighted 2004, 2005, 2006 by G. Andrew Mangogna.
+# This software is copyrighted 2004, 2005, 2006, 2007 by G. Andrew Mangogna.
 # The following terms apply to all files associated with the software unless
 # explicitly disclaimed in individual files.
 # 
@@ -47,8 +47,8 @@
 #   This command is part of TclRAL. This file is in Tcl Markup Language
 #   format.
 # $RCSfile: relvar.man,v $
-# $Revision: 1.14 $
-# $Date: 2007/01/28 02:21:11 $
+# $Revision: 1.15 $
+# $Date: 2007/02/18 18:32:52 $
 #  *--
 }]
 [moddesc "Relvar Operators"]
@@ -608,6 +608,41 @@ tuple {OwnerName Tom Age 22 City Tulsa} is not referenced by any tuple
 
 }]
 
+[call [cmd "::ral::relvar intersect"] [arg relvarName]\
+    [opt "relationValue1 relationValue2 ..."]]
+
+The [cmd intersect] subcommand performs the relation intersection of the
+relation value contained in [arg relvarName] with the given
+[arg relationValueN] arguments and assigns the result back into
+[arg relvarName].
+This command is shorthand for:
+[nl]
+relvar set <relvarName> [lb]relation intersect [lb]relvar set <relvarName>[rb]
+<relationValue1> ...[rb]
+[nl]
+The headings of each [arg relationValueN] must match that of the value
+contained in [arg relvarName].
+Since the intersect operation is commutative, the order of the
+[arg relationValueN] arguments does not affect the result.
+The return value of the command is the new relation value stored in
+[arg relvarName].
+
+[call [cmd "::ral::relvar minus"] [arg relvarName] [arg relationValue]]
+
+The [cmd minus] subcommand performs the relation difference of the
+relation value contained in [arg relvarName] with
+the [arg relationValue] argument and assigns the result back into
+[arg relvarName].
+This command is shorthand for:
+[nl]
+relvar set <relvarName> [lb]relation minus [lb]relvar set <relvarName>[rb]
+<relationValue1>[rb]
+[nl]
+The headings of [arg relationValue] must match that of the value
+contained in [arg relvarName].
+Note that this operation is not commutative.
+The return value of the command is the new relation value stored in
+[arg relvarName].
 
 [call [cmd "::ral::relvar names"] [opt pattern]]
 
@@ -766,6 +801,52 @@ The [cmd "trace add eval"], [cmd "trace remove eval"] and
 operation for tracing transactions via the [cmd "relvar eval"] command.
 
 See the [emph "RELVAR TRACES"] section below for further details.
+
+[call [cmd "::ral::relvar transaction"] [arg option]]
+[list_begin definitions]
+[lst_item "[cmd {::ral::relvar transaction begin}]"]
+[lst_item "[cmd {::ral::relvar transaction end}]"]
+[lst_item "[cmd {::ral::relvar transaction rollback}]"]
+[list_end]
+The [cmd transaction] subcommand controls the evaluation of relvar
+constraints.
+Like [cmd "relvar eval"], [cmd "relvar transaction"] demarcates the
+boundaries of when relvar constraints are evaluated.
+[cmd "relvar transaction begin"] signals the beginning of a constraint
+transaction.
+When the matching [cmd "relvar transaction end"] is executed,
+all contraints for all relvars modified since the corresponding
+[cmd "relvar transaction begin"] command are evaluated.
+Executing the [cmd "relvar transaction rollback"] command, halts the
+transaction and discards all the modifications, restoring the relvar
+state to that which existed before the execution of
+[cmd "relvar transaction begin"].
+This command is complementary to [cmd "relvar eval"] in that it provides
+the same behavior but for those circumstances where accumulating the
+relvar modifications into a single script is not convenient or possible.
+The command returns the empty string.
+If relvar modifications are such that the constraints are violated,
+then [cmd "relvar transaction end"] will throw an error.
+
+
+[call [cmd "::ral::relvar union"] [arg relvarName]\
+    [opt "relationValue1 relationValue2 ..."]]
+
+The [cmd union] subcommand performs the relation union of the
+relation value contained in [arg relvarName] with the given
+[arg relationValueN] arguments and assigns the result back into
+[arg relvarName].
+This command is shorthand for:
+[nl]
+relvar set <relvarName> [lb]relation union [lb]relvar set <relvarName>[rb]
+<relationValue1> ...[rb]
+[nl]
+The headings of each [arg relationValueN] must match that of the value
+contained in [arg relvarName].
+Since the union operation is commutative, the order of the
+[arg relationValueN] arguments does not affect the result.
+The return value of the command is the new relation value stored in
+[arg relvarName].
 
 [call [cmd "::ral::relvar unset"] [opt "relvarName ..."]]
 

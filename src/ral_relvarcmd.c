@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.26 $
-$Date: 2007/01/28 02:21:11 $
+$Revision: 1.27 $
+$Date: 2007/02/18 18:32:52 $
  *--
  */
 
@@ -101,6 +101,8 @@ static int RelvarPartitionCmd(Tcl_Interp *, int, Tcl_Obj *const*,
 static int RelvarPathCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarSetCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarTraceCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
+static int RelvarTransactionCmd(Tcl_Interp *, int, Tcl_Obj *const*,
+    Ral_RelvarInfo) ;
 static int RelvarUnionCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarUnsetCmd(Tcl_Interp *, int, Tcl_Obj *const*,
     Ral_RelvarInfo) ;
@@ -119,7 +121,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.26 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.27 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -151,6 +153,7 @@ relvarCmd(
 	{"path", RelvarPathCmd},
 	{"set", RelvarSetCmd},
 	{"trace", RelvarTraceCmd},
+	{"transaction", RelvarTransactionCmd},
 	{"union", RelvarUnionCmd},
 	{"unset", RelvarUnsetCmd},
 	{"update", RelvarUpdateCmd},
@@ -1100,6 +1103,69 @@ RelvarTraceCmd(
 	}
     } else {
 	Tcl_Panic("Unknown trace type, %d", type) ;
+    }
+
+    return result ;
+}
+
+static int
+RelvarTransactionCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv,
+    Ral_RelvarInfo rInfo)
+{
+    enum TransactionOption {
+	TransactionBegin,
+	TransactionEnd,
+	TransactionRollback,
+    } ;
+    static char const *transactionOptions[] = {
+	"begin",
+	"end",
+	"rollback",
+	NULL
+    } ;
+
+    int option ;
+    int result = TCL_OK ;
+
+    /* relvar transaction begin | end | rollback */
+
+    if (objc != 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "transaction option") ;
+	return TCL_ERROR ;
+    }
+
+    /*
+     * Look up the option that indicates the transaction operation.
+     */
+    if (Tcl_GetIndexFromObj(interp, objv[2], transactionOptions,
+	"transaction option", 0, &option) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    switch ((enum TransactionOption)option) {
+    case TransactionBegin:
+	Ral_RelvarStartTransaction(rInfo, 0) ;
+
+	Ral_RelvarObjExecEvalTraces(interp, rInfo, 1,
+	    Ral_PtrVectorSize(rInfo->transactions)) ;
+	break ;
+
+    case TransactionEnd:
+	Ral_RelvarObjExecEvalTraces(interp, rInfo, 0,
+	    Ral_PtrVectorSize(rInfo->transactions)) ;
+	result =  Ral_RelvarObjEndTrans(interp, rInfo, 0) ;
+	break ;
+
+    case TransactionRollback:
+	Ral_RelvarObjExecEvalTraces(interp, rInfo, 0,
+	    Ral_PtrVectorSize(rInfo->transactions)) ;
+	Ral_RelvarObjEndTrans(interp, rInfo, 1) ;
+	break ;
+
+    default:
+	Tcl_Panic("Unknown transaction option, %d", option) ;
     }
 
     return result ;
