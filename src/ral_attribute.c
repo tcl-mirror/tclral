@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.c,v $
-$Revision: 1.15 $
-$Date: 2006/11/05 00:15:59 $
+$Revision: 1.16 $
+$Date: 2007/02/19 23:12:26 $
  *--
  */
 
@@ -98,7 +98,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.15 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.16 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -287,10 +287,12 @@ Ral_AttributeValueEqual(
 {
     switch (a->attrType) {
     case Tcl_Type:
+	if (strlen(Tcl_GetString(v1)) == 0 && strlen(Tcl_GetString(v2)) == 0) {
+	    return 1 ;
+	}
 	if (Tcl_ConvertToType(NULL, v1, a->tclType) != TCL_OK ||
 	    Tcl_ConvertToType(NULL, v2, a->tclType) != TCL_OK) {
-	    Tcl_Panic("Ral_TupleCompare: cannot convert to %s",
-		a->typeName) ;
+	    return 0 ;
 	}
 	if (strcmp(a->typeName, "int") == 0 ||
 	    strcmp(a->typeName, "boolean") == 0 ||
@@ -298,8 +300,6 @@ Ral_AttributeValueEqual(
 	    return v1->internalRep.longValue == v2->internalRep.longValue ;
 	} else if (strcmp(a->typeName, "double") == 0) {
 	    return v1->internalRep.doubleValue == v2->internalRep.doubleValue ;
-	} else if (strcmp(a->typeName, "boolean") == 0) {
-	    return v1->internalRep.longValue == v2->internalRep.longValue ;
 	} 
 
 #	ifndef NO_WIDE_TYPE

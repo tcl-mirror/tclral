@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.29 $
-# $Date: 2007/02/17 18:08:33 $
+# $Revision: 1.30 $
+# $Date: 2007/02/19 23:12:26 $
 #  *--
 
 set ::auto_path [linsert $::auto_path 0\
@@ -4619,6 +4619,23 @@ tuple {A1 c} is not referred to by any tuple
 	    {Name Andrew Age 20 City Sunnyvale}
 	    {Name George Age 20 City {San Jose}}
 	    {Name Fred Age 20 City Saratoga}
+	}
+    } -match relation
+
+    test relvar-insert-5.0 {
+	    bad value for type
+    } -setup {
+	relvar create N {Relation {Name string Age int City string} Name}
+    } -cleanup {
+	relvar unset N
+    } -body {
+	relvar insert N {Name Andrew Age {} City Sunnyvale}
+    } -result {
+	Relation
+	{Name string Age int City string}
+	Name
+	{
+	    {Name Andrew Age {} City Sunnyvale}
 	}
     } -match relation
 
