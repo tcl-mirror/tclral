@@ -47,14 +47,14 @@
 #   Relformat is part of the TCLRAL package.
 # 
 # $RCSfile: relformat.man,v $
-# $Revision: 1.7 $
-# $Date: 2007/02/18 18:32:52 $
+# $Revision: 1.8 $
+# $Date: 2007/02/19 23:10:38 $
 #  *--
 }]
 [moddesc "Relation formatting"]
 [titledesc "Text formatting for relations"]
 [copyright "2004, 2005, 2006 by G. Andrew Mangogna"]
-[require ral [opt 0.8.1]]
+[require ral [opt 0.8.2]]
 [description]
 This manpage describes a set of commands that are used for
 generating text output of relation and tuple values.

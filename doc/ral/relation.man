@@ -45,14 +45,14 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.19 $
-# $Date: 2007/02/18 18:32:52 $
+# $Revision: 1.20 $
+# $Date: 2007/02/19 23:10:38 $
 #  *--
 }]
 [moddesc "Relation Operators"]
 [titledesc "Operators for Relation Values"]
 [copyright "2004, 2005, 2006 by G. Andrew Mangogna"]
-[require ral [opt 0.8.1]]
+[require ral [opt 0.8.2]]
 [description]
 This manpage describes the [cmd relation] command.
 The [cmd relation]
