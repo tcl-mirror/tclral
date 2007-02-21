@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.27 $
-$Date: 2007/02/18 18:32:52 $
+$Revision: 1.28 $
+$Date: 2007/02/21 02:56:50 $
  *--
  */
 
@@ -58,6 +58,7 @@ PRAGMAS
 INCLUDE FILES
 */
 #include <string.h>
+#include <assert.h>
 #include "tcl.h"
 #include "ral_relvarcmd.h"
 #include "ral_relvarobj.h"
@@ -121,7 +122,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.27 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.28 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -575,8 +576,10 @@ RelvarInsertCmd(
 {
     Ral_Relvar relvar ;
     int inserted = 0 ;
-    int result ;
+    int result = TCL_OK ;
     Ral_ErrorInfo errInfo ;
+    Ral_Relation relation ;
+    Ral_Relation resultRel ;
 
     /* relvar insert relvarName ?name-value-list ...? */
     if (objc < 3) {
@@ -587,6 +590,10 @@ RelvarInsertCmd(
     relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2]),
 	NULL) ;
     if (relvar == NULL) {
+	return TCL_ERROR ;
+    }
+    if (Tcl_ConvertToType(interp, relvar->relObj, &Ral_RelationObjType)
+	!= TCL_OK) {
 	return TCL_ERROR ;
     }
 
@@ -600,22 +607,42 @@ RelvarInsertCmd(
     objc -= 3 ;
     objv += 3 ;
 
+    relation = relvar->relObj->internalRep.otherValuePtr ;
+    resultRel = Ral_RelationNew(relation->heading) ;
+
     while (objc-- > 0) {
-	if (Ral_RelvarObjInsertTuple(interp, relvar, *objv++, &errInfo)
-	    != TCL_OK) {
-	    return Ral_RelvarObjEndCmd(interp, rInfo, 1) ;
+	Tcl_Obj *insertedTuple =
+	    Ral_RelvarObjInsertTuple(interp, relvar, *objv++, &errInfo) ;
+	if (insertedTuple) {
+	    Ral_Tuple tuple ;
+
+	    Tcl_IncrRefCount(insertedTuple) ;
+	    assert(insertedTuple->typePtr == &Ral_TupleObjType) ;
+	    tuple = insertedTuple->internalRep.otherValuePtr ;
+	    if (!Ral_RelationPushBack(resultRel, tuple, NULL)) {
+		Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_DUPLICATE_TUPLE,
+		    insertedTuple) ;
+		Ral_InterpSetError(interp, &errInfo) ;
+		result = TCL_ERROR ;
+		break ;
+	    }
+	    Tcl_DecrRefCount(insertedTuple) ;
+	} else {
+	    result = TCL_ERROR ;
+	    break ;
 	}
 	++inserted ;
     }
 
-    if (inserted) {
-	Tcl_InvalidateStringRep(relvar->relObj) ;
-	relvar->relObj->length = 0 ;
-    }
-
-    result = Ral_RelvarObjEndCmd(interp, rInfo, 0) ;
+    result = Ral_RelvarObjEndCmd(interp, rInfo, result != TCL_OK) ;
     if (result == TCL_OK) {
-	Tcl_SetObjResult(interp, relvar->relObj) ;
+	if (inserted) {
+	    Tcl_InvalidateStringRep(relvar->relObj) ;
+	    relvar->relObj->length = 0 ;
+	}
+	Tcl_SetObjResult(interp, Ral_RelationObjNew(resultRel)) ;
+    } else {
+	Ral_RelationDelete(resultRel) ;
     }
     return result ;
 }

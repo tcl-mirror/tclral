@@ -48,8 +48,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: trace.test,v $
-# $Revision: 1.9 $
-# $Date: 2007/02/17 18:08:33 $
+# $Revision: 1.10 $
+# $Date: 2007/02/21 02:56:50 $
 #  *--
 
 set ::auto_path [linsert $::auto_path 0\
@@ -211,12 +211,12 @@ namespace eval ::ral::test {
     } -body {
 	relvar trace add variable SV insert [list modTuple SNAME Baz]
 	relvar insert SV {S# S6 SNAME Foo STATUS 40 CITY Bar}
-	relation tuple [relation choose $SV S# S6]
     } -result {
-	Tuple
+	Relation
 	{S# string SNAME string STATUS int CITY string}
-	{S# S6 SNAME Baz STATUS 40 CITY Bar}
-    } -match tuple
+	S#
+	{{S# S6 SNAME Baz STATUS 40 CITY Bar}}
+    } -match relation
 
     test relvar-trace-4.2 {modify inserted tuple several times} -setup {
 	relvar create SV {
@@ -232,12 +232,12 @@ namespace eval ::ral::test {
 	relvar trace add variable SV insert [list incrAttr STATUS]
 	relvar trace add variable SV insert [list incrAttr STATUS]
 	relvar insert SV {S# S6 SNAME Foo STATUS 40 CITY Bar}
-	relation tuple [relation choose $SV S# S6]
     } -result {
-	Tuple
+	Relation
 	{S# string SNAME string STATUS int CITY string}
-	{S# S6 SNAME Foo STATUS 43 CITY Bar}
-    } -match tuple
+	S#
+	{{S# S6 SNAME Foo STATUS 43 CITY Bar}}
+    } -match relation
 
     test relvar-trace-4.3 {
 	use tracing to create unique identifiers
@@ -253,13 +253,11 @@ namespace eval ::ral::test {
 	relvar trace add variable SV insert {::ralutil::sysIdsCreateIdFor S#}
 	relvar insert SV {S# {} SNAME John STATUS 40 CITY Bar}
 	relvar insert SV {S# {} SNAME John STATUS 40 CITY Bar}
-	relvar set SV
     } -result {
 	Relation
 	{S# int SNAME string STATUS int CITY string}
 	S#
 	{
-	    {S# 1 SNAME John STATUS 40 CITY Bar}
 	    {S# 2 SNAME John STATUS 40 CITY Bar}
 	}
     } -match relation

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.29 $
-$Date: 2007/02/17 18:06:46 $
+$Revision: 1.30 $
+$Date: 2007/02/21 02:56:50 $
  *--
  */
 
@@ -151,7 +151,7 @@ static const struct traceOpsMap {
 } ;
 static const char specErrMsg[] = "multiplicity specification" ;
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.29 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.30 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -339,7 +339,11 @@ Ral_RelvarObjFindRelvar(
     return relvar ;
 }
 
-int
+/*
+ * Returns a tuple object. This tuple object will be the final result
+ * of any trace operations.
+ */
+Tcl_Obj *
 Ral_RelvarObjInsertTuple(
     Tcl_Interp *interp,
     Ral_Relvar relvar,
@@ -348,13 +352,9 @@ Ral_RelvarObjInsertTuple(
 {
     Ral_Relation relation ;
     Ral_Tuple tuple ;
-    int result = TCL_OK ;
     Tcl_Obj *resultObj ;
 
-    if (Tcl_ConvertToType(interp, relvar->relObj, &Ral_RelationObjType)
-	!= TCL_OK) {
-	return TCL_ERROR ;
-    }
+    assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
     relation = relvar->relObj->internalRep.otherValuePtr ;
 
     /*
@@ -367,7 +367,7 @@ Ral_RelvarObjInsertTuple(
      */
     if (Ral_TupleSetFromObj(tuple, interp, nameValueObj, errInfo) != TCL_OK) {
 	Ral_TupleDelete(tuple) ;
-	return TCL_ERROR ;
+	return NULL ;
     }
     /*
      * Run the traces and get the result back.
@@ -379,20 +379,25 @@ Ral_RelvarObjInsertTuple(
 	 * Objects returned have already been converted to tuples.
 	 * Insert the tuple into the relation.
 	 */
-	Tcl_IncrRefCount(resultObj) ;
+	assert(resultObj->typePtr == &Ral_TupleObjType) ;
 	tuple = resultObj->internalRep.otherValuePtr ;
 	if (!Ral_RelationPushBack(relation, tuple, NULL)) {
 	    Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_DUPLICATE_TUPLE,
 		resultObj) ;
 	    Ral_InterpSetError(interp, errInfo) ;
-	    result = TCL_ERROR ;
+	    /*
+	     * HERE
+	     * Somethings not quite right here.
+	     * We get a memory crash if we don't increment the ref count
+	     * first.
+	     */
+	    Tcl_IncrRefCount(resultObj) ;
+	    Tcl_DecrRefCount(resultObj) ;
+	    resultObj = NULL ;
 	}
-	Tcl_DecrRefCount(resultObj) ;
-    } else {
-	result = TCL_ERROR ;
     }
 
-    return result ;
+    return resultObj ;
 }
 
 int

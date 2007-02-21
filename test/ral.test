@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.30 $
-# $Date: 2007/02/19 23:12:26 $
+# $Revision: 1.31 $
+# $Date: 2007/02/21 02:56:50 $
 #  *--
 
 set ::auto_path [linsert $::auto_path 0\
@@ -3758,7 +3758,7 @@ tuple {C1 c C2 42} references no tuple
 	    relvar insert B {B1 a B2 foo}
 	    relvar insert B {B1 b B2 foo}
 	}
-    } -result {Relation {B1 string B2 string} B1 {{B1 a B2 foo} {B1 b B2 foo}}}
+    } -result {Relation {B1 string B2 string} B1 {{B1 b B2 foo}}}
 
     test relvar-association-4.2 {many to one -- fail referring} -setup {
 	relvar create A {Relation {A1 string BID string} A1}
@@ -3859,7 +3859,7 @@ tuple {B1 c B2 foo} is not referenced by any tuple
 	    relvar insert B {B1 b B2 foo}
 	    relvar insert B {B1 c B2 foo}
 	}
-    } -result {Relation {B1 string B2 string} B1 {{B1 a B2 foo} {B1 b B2 foo} {B1 c B2 foo}}}
+    } -result {Relation {B1 string B2 string} B1 {{B1 c B2 foo}}}
 
     test relvar-association-5.4 {many to one conditional, empty one} -setup {
 	relvar create A {Relation {A1 string BID string} A1}
