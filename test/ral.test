@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.31 $
-# $Date: 2007/02/21 02:56:50 $
+# $Revision: 1.32 $
+# $Date: 2007/02/23 02:19:22 $
 #  *--
 
 set ::auto_path [linsert $::auto_path 0\
@@ -4367,6 +4367,26 @@ tuple {A1 b} is referred to by multiple tuples
     } -result {for partition ::ral::test::R1(::ral::test::A is partitioned [::ral::test::B | ::ral::test::C]), in relvar ::ral::test::A
 tuple {A1 c} is not referred to by any tuple
 } -returnCodes error
+
+    # This was a bug in 0.8.1 (and previous). If the partition attribute
+    # associations were declared in an order that did not match the
+    # identifier ordering of the relvar definitions, the constraint evaluation
+    # would fail.
+    test relvar-partition-3.2 {strange ordering} -setup {
+	relvar create A {Relation {A1 string A2 string A3 int} {{A1 A2}}}
+	relvar create B {Relation {A1 string A2 string B1 string} {{A1 A2}}}
+	relvar create C {Relation {A1 string A2 string C1 string} {{A1 A2}}}
+    } -cleanup {
+	relvar constraint delete R1
+	relvar unset A B C
+    } -body {
+	relvar partition R1 A {A2 A1} B {A2 A1} C {A2 A1}
+	relvar eval {
+	    relvar insert A {A1 a1 A2 a2 A3 1}
+	    relvar insert B {A1 a1 A2 a2 B1 b1}
+	}
+	return
+    } -result {}
 
     # relvar set subcommand
     test relvar-set-1.0 {simple assignment} -body {

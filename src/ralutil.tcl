@@ -49,8 +49,8 @@
 # without cluttering the TclRAL package proper.
 # 
 # $RCSfile: ralutil.tcl,v $
-# $Revision: 1.4 $
-# $Date: 2007/02/21 02:56:50 $
+# $Revision: 1.5 $
+# $Date: 2007/02/23 02:19:22 $
 #  *--
 
 package provide ralutil 0.8.2
@@ -437,8 +437,7 @@ proc ::ralutil::sysIdsCreateIdFor {attrName op relvarName tup} {
 		IdAttr $attrName IdNum [incr idValue]]
 	}
     }
-    tuple update tup $attrName $idValue
-    return $tup
+    return [tuple update tup $attrName $idValue]
 }
 
 # A helper procedure in finding the value for a system identifiers

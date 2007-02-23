@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationheading.c,v $
-$Revision: 1.19 $
-$Date: 2007/01/28 02:21:11 $
+$Revision: 1.20 $
+$Date: 2007/02/23 02:19:22 $
  *--
  */
 
@@ -94,7 +94,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.19 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.20 $" ;
 
 static char const openList = '{' ;
 static char const closeList = '}' ;
@@ -399,9 +399,6 @@ Ral_RelationHeadingEqual(
 	Ral_IntVector id2 ;
 	Ral_IntVectorIter end1Iter ;
 	Ral_IntVectorIter id1Iter ;
-	int id2Index = 0 ;
-	int id2Count ;
-	Ral_IntVector *id2Array ;
 	int found ;
 
 	id1 = *id1Array++ ;
@@ -411,7 +408,7 @@ Ral_RelationHeadingEqual(
 	 * names from the first heading to find its corresponding
 	 * index in the second heading.
 	 */
-	id2 = Ral_IntVectorNew(Ral_IntVectorSize(id1), -1) ;
+	id2 = Ral_IntVectorNewEmpty(Ral_IntVectorSize(id1)) ;
 	/*
 	 * Iterate through all the attribute indices of the identifier and
 	 * construct the vector to have a set of attribute indices that
@@ -434,29 +431,14 @@ Ral_RelationHeadingEqual(
 	     * have already determined that the two tuple headings are equal.
 	     */
 	    assert (attr2Index >= 0) ;
-	    Ral_IntVectorStore(id2, id2Index++, attr2Index) ;
+	    Ral_IntVectorPushBack(id2, attr2Index) ;
 	}
-	/*
-	 * Sort the identifier indices into canonical order.
-	 */
-	Ral_IntVectorSort(id2) ;
+
 	/*
 	 * Now we search the identifiers of the second heading to find
 	 * a match to the vector we just constructed.
 	 */
-	id2Array = h2->identifiers ;
-	found = 0 ;
-	for (id2Count = h2->idCount ; id2Count > 0 ; --id2Count) {
-	    Ral_IntVector heading2Id = *id2Array++ ;
-	    /*
-	     * All of the identifiers should have been added.
-	     */
-	    assert(heading2Id != NULL) ;
-	    if (Ral_IntVectorEqual(id2, heading2Id)) {
-		found = 1 ;
-		break ;
-	    }
-	}
+	found = Ral_RelationHeadingFindIdentifier(h2, id2) != -1 ;
 	/*
 	 * Discard the vector.
 	 */
@@ -523,23 +505,27 @@ Ral_RelationHeadingFindIdentifier(
 {
     int idCount = heading->idCount ;
     Ral_IntVector *idArray = heading->identifiers ;
+    int idSize = Ral_IntVectorSize(id) ;
+    int result = -1 ;
 
     /*
-     * Make sure the candidate identifier is in canonical order.
-     */
-    Ral_IntVectorSort(id) ;
-    /*
      * Iterate through the identifies in the heading looking for a match.
+     * Identifiers are sorted, however the "id" argument may not be.
+     * We don't want to sort it in place, so the comparison for equality
+     * means that we must go through the values in "id" and determine if
+     * all of them are contained in some identifier of the "heading".
      */
     assert(idCount >= 1) ;
     for (idArray = heading->identifiers ; idCount > 0 ; --idCount, ++idArray) {
 	Ral_IntVector headingId = *idArray ;
 
-	if (headingId && Ral_IntVectorEqual(id, headingId)) {
-	    return idArray - heading->identifiers ;
+	if (headingId && idSize == Ral_IntVectorSize(headingId) &&
+	    Ral_IntVectorSubsetOf(id, headingId)) {
+	    result = idArray - heading->identifiers ;
+	    break ;
 	}
     }
-    return -1 ;
+    return result ;
 }
 
 /*
