@@ -46,8 +46,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.32 $
-$Date: 2007/01/28 02:21:11 $
+$Revision: 1.33 $
+$Date: 2007/02/24 20:34:50 $
  *--
  */
 
@@ -147,7 +147,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.32 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.33 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -587,7 +587,7 @@ RelationCreateCmd(
      * Here duplicates matter as we deem creation to have "insert" semantics.
      */
     for ( ; objc > 0 ; --objc, ++objv) {
-	if (Ral_RelationInsertTupleObj(relation, interp, *objv, &errInfo)
+	if (Ral_RelationInsertTupleValue(relation, interp, *objv, &errInfo)
 	    != TCL_OK) {
 	    Ral_RelationDelete(relation) ;
 	    return TCL_ERROR ;
@@ -1399,7 +1399,7 @@ RelationIncludeCmd(
 	 * Enforce insert style semantics, i.e. we error out on duplicates
 	 * and other inconsistencies.
 	 */
-	if (Ral_RelationInsertTupleObj(newRel, interp, *objv++, &errInfo)
+	if (Ral_RelationInsertTupleValue(newRel, interp, *objv++, &errInfo)
 	    != TCL_OK) {
 	    Ral_RelationDelete(newRel) ;
 	    return TCL_ERROR ;

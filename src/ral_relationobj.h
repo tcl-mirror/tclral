@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationobj.h,v $
-$Revision: 1.14 $
-$Date: 2007/01/01 01:48:17 $
+$Revision: 1.15 $
+$Date: 2007/02/24 20:34:51 $
  *--
  */
 #ifndef _ral_relationobj_h_
@@ -94,6 +94,8 @@ extern Ral_RelationHeading Ral_RelationHeadingNewFromObjs(Tcl_Interp *,
 extern int Ral_RelationHeadingNewIdFromObj(Tcl_Interp *, Ral_RelationHeading,
     int, Tcl_Obj *, Ral_ErrorInfo *) ;
 extern int Ral_RelationSetFromObj(Ral_Relation, Tcl_Interp *, Tcl_Obj *) ;
+extern int Ral_RelationInsertTupleValue(Ral_Relation, Tcl_Interp *, Tcl_Obj *,
+    Ral_ErrorInfo *) ;
 extern int Ral_RelationInsertTupleObj(Ral_Relation, Tcl_Interp *, Tcl_Obj *,
     Ral_ErrorInfo *) ;
 extern int Ral_RelationUpdateTupleObj(Ral_Relation, Ral_RelationIter,

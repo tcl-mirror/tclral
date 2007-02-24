@@ -47,8 +47,8 @@
 #   This command is part of TclRAL. This file is in Tcl Markup Language
 #   format.
 # $RCSfile: relvar.man,v $
-# $Revision: 1.16 $
-# $Date: 2007/02/19 23:10:38 $
+# $Revision: 1.17 $
+# $Date: 2007/02/24 20:34:50 $
 #  *--
 }]
 [moddesc "Relvar Operators"]
@@ -593,11 +593,17 @@ tuple {OwnerName Tom DogName Skippy Acquired 2006} references no tuple
 The [cmd insert] subcommand inserts the tuples given by [arg name-value-list]
 arguments into the value of the relation stored in [arg relvarName].
 The value of [arg relvarName] is modified in place.
-The return value is the current relation value held in [arg relvarName].
+The return value is a relation value with the same heading as the
+value held in [arg relvarName] and whose body contains the tuples as they
+were actually inserted.
+This give the caller access to any attributes that might have been modified
+by a relvar trace.
 It is an error to attempt to insert a duplicate tuple or a tuple whose
-heading does not match the relation heading.
-All values of the tuple must be specfied with a valid value representation of
-the type associated with the attribute.
+heading does not match the heading of the value held in [arg relvarName].
+The values of all attributes of the inserted tuples must be specified
+with a valid value representation of the type associated with the attribute.
+However, because of relvar tracing, the tuple values given in
+[arg name-value-list] may not be the ones actually inserted into the relvar.
 
 [example {
 % relvar insert DOG {DogName Skippy Breed Dalmation}
@@ -872,7 +878,12 @@ The value of [arg tupleVarName] at the end of executing
 [arg script] is then updated into [arg relvarName].
 Typically, [arg script] will invoke [cmd "::ral::tuple update"]
 to modify the value of [arg tupleVarName].
-The return value of the subcommand is the number of tuples updated.
+The return value of the subcommand
+is a relation value with the same heading as the
+value held in [arg relvarName] and whose body contains the tuples as they
+were actually inserted.
+This give the caller access to any attributes that might have been modified
+by a relvar trace.
 If the [arg script] throws an error or the modified value of a tuple cannot
 be updated into [arg relvarName], all changes to [arg relvarName] are
 discarded and the value of [arg relvarName] is restored to its previous value.
@@ -950,8 +961,11 @@ If no matching tuple is found, then [arg relvarName] is unchanged.
 This subcommand is useful in those contexts where the attribute values of an
 identifier are known and evaluating an expression over all the tuples
 in [arg relvarName] is superfluous.
-The return value of the subcommand is the number of tuples updated
-which will necessarily be either 0 or 1.
+The return value is a relation value with the same heading as the
+value held in [arg relvarName] and whose body contains either the single
+tuple that was updated or is empty if no matching tuple was found.
+This give the caller access to any attributes that might have been modified
+by a relvar trace.
 
 [example {
 % puts [relformat $::OWNER]
@@ -988,7 +1002,7 @@ which will necessarily be either 0 or 1.
 
 By analogy to tracing ordinary variables in Tcl,
 relvars can also be traced.
-However, relvar tracing is more complicated to account for the
+However, relvar tracing must account for the
 operations that are applied to relvars.
 There are five operations that may be traced on the relation values
 held in relvars and one operation that allows tracing of transactions
@@ -1048,7 +1062,7 @@ The returned Tuple value is passed along to the next insert trace command.
 The returned Tuple from the last trace command in the chain is then
 inserted into the relvar.
 Insert trace commands may choose to modify the value of [arg tupleValue] but
-are required to return a value that can be cooerced into a Tuple type and the
+are required to return a value that can be coerced into a Tuple type and the
 heading of the returned Tuple of the last trace command in the chain
 must match that of the relvar if it is to be successfully inserted.
 If [cmd cmdPrefix] throws an error, then no other insert traces in the chain of
@@ -1058,7 +1072,12 @@ into the relvar value.
 [lst_item set]
 A set trace is invoked each time that the relation value held in a relvar
 is assigned.
-Relations values are assigned to relvars by invocation of the [cmd "relvar set"]
+Relations values are assigned to relvars by invocation of the
+[cmd "relvar set"],
+[cmd "relvar union"],
+[cmd "relvar intersect"]
+or
+[cmd "relvar minus"]
 command.
 The set trace command is invoked as:
 [nl]
@@ -1079,7 +1098,7 @@ The returned Relation value is passed along to the next set trace command.
 The returned Relation from the last trace command in the chain is then
 assigned to the relvar.
 Set trace commands may choose to modify the value of [arg relationValue] but
-are required to return a value that can be cooerced into a Relation type and the
+are required to return a value that can be coerced into a Relation type and the
 heading of the returned Relation of the last trace command in the chain
 must match that of the relvar if it is to be successfully assigned
 If [cmd cmdPrefix] throws an error, then no other set traces in the chain of
@@ -1090,7 +1109,7 @@ to the relvar.
 An unset trace is invoked each time a relvar is destroyed.
 Relvars are destroyed by the invocation of the [cmd "relvar unset"] command.
 Note that due to a limitation of Tcl,
-unset traces are not invoked when an interpreter is deleted.
+relvar unset traces are not invoked when an interpreter is deleted.
 The unset trace command is invoked as:
 [nl]
 [cmd cmdPrefix] [cmd unset] [arg relvarName]
@@ -1108,7 +1127,7 @@ Any errors thown by [cmd cmdPrefix] are ignored.
 [lst_item update]
 An update trace is invoked for each tuple in a relvar that is updated.
 Tuples are updated into relvars by invocations of [cmd "relvar update"]
-and [cmd "relvar updateone"].
+or [cmd "relvar updateone"].
 The update trace command is invoked as:
 [nl]
 [cmd cmdPrefix] [cmd update] [arg relvarName] [arg oldTupleValue]
@@ -1129,7 +1148,7 @@ The returned Tuple value is passed along to the next update trace command.
 The returned Tuple from the last trace command in the chain is then
 updated into the relvar.
 Update trace commands may choose to modify the value of [arg newTupleValue] but
-are required to return a value that can be cooerced into a Tuple type and the
+are required to return a value that can be coerced into a Tuple type and the
 heading of the returned Tuple of the last trace command in the chain
 must match that of the relvar if it is to be successfully updated.
 If [cmd cmdPrefix] throws an error, then no other update traces in the chain of
@@ -1138,7 +1157,7 @@ into the relvar value.
 
 [lst_item eval]
 An eval trace is invoked each time that a [cmd "relvar eval"] begins and
-ends.
+ends or when [cmd "relvar transaction"] commands are invoked.
 Eval traces are different from other relvar traces in that they provide a
 means of determining the boundaries of a transaction rather than specific
 operations on a relvar.

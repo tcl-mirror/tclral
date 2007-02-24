@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.28 $
-$Date: 2007/02/21 02:56:50 $
+$Revision: 1.29 $
+$Date: 2007/02/24 20:34:51 $
  *--
  */
 
@@ -122,7 +122,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.28 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.29 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -1328,7 +1328,7 @@ RelvarUpdateCmd(
     Tcl_Obj *tupleVarNameObj ;
     Tcl_Obj *exprObj ;
     Tcl_Obj *scriptObj ;
-    int updated = 0 ;
+    Ral_Relation updatedTuples ;
     Ral_RelationIter rEnd ;
     Ral_RelationIter rIter ;
     Ral_ErrorInfo errInfo ;
@@ -1365,6 +1365,8 @@ RelvarUpdateCmd(
     Tcl_IncrRefCount(exprObj = objv[4]) ;
     Tcl_IncrRefCount(scriptObj = objv[5]) ;
 
+    updatedTuples = Ral_RelationNew(relation->heading) ;
+
     rEnd = Ral_RelationEnd(relation) ;
     for (rIter = Ral_RelationBegin(relation) ; rIter != rEnd ; ++rIter) {
 	Tcl_Obj *tupleObj ;
@@ -1399,7 +1401,7 @@ RelvarUpdateCmd(
 	 * Evaluate the script, run the traces and update the relation.
 	 */
 	result = Ral_RelvarObjUpdateTuple(interp, relvar, relation, rIter,
-	    scriptObj, tupleVarNameObj, &errInfo) ;
+	    scriptObj, tupleVarNameObj, updatedTuples, &errInfo) ;
 
 	if (result != TCL_OK) {
 	    if (result == TCL_CONTINUE) {
@@ -1411,16 +1413,15 @@ RelvarUpdateCmd(
 		break ;
 	    }
 	}
-	++updated ;
-    }
-
-    if (updated) {
-	Tcl_InvalidateStringRep(relvar->relObj) ;
-	relvar->relObj->length = 0 ;
     }
 
     result = Ral_RelvarObjEndCmd(interp, rInfo, result == TCL_ERROR) == TCL_OK ?
 	result : TCL_ERROR ;
+
+    if (Ral_RelationCardinality(updatedTuples)) {
+	Tcl_InvalidateStringRep(relvar->relObj) ;
+	relvar->relObj->length = 0 ;
+    }
 
     Tcl_UnsetVar(interp, Tcl_GetString(tupleVarNameObj), 0) ;
     Tcl_DecrRefCount(scriptObj) ;
@@ -1428,7 +1429,9 @@ RelvarUpdateCmd(
     Tcl_DecrRefCount(exprObj) ;
 
     if (result == TCL_OK) {
-	Tcl_SetObjResult(interp, Tcl_NewIntObj(updated)) ;
+	Tcl_SetObjResult(interp, Ral_RelationObjNew(updatedTuples)) ;
+    } else {
+	Ral_RelationDelete(updatedTuples) ;
     }
 
     return result ;
@@ -1449,7 +1452,7 @@ RelvarUpdateOneCmd(
     int idNum ;
     Ral_RelationIter found ;
     int result = TCL_OK ;
-    int updated = 0 ;
+    Ral_Relation updatedTuples ;
     Ral_ErrorInfo errInfo ;
 
     /* relvar updateone relvarName tupleVarName idValueList script */
@@ -1475,6 +1478,7 @@ RelvarUpdateOneCmd(
 	return TCL_ERROR ;
     }
 
+
     /*
      * Find the tuple whose identifying attribute values are given.
      */
@@ -1485,6 +1489,7 @@ RelvarUpdateOneCmd(
     }
     found = Ral_RelationFindKey(relation, idNum, key, NULL) ;
     Ral_TupleDelete(key) ;
+    updatedTuples = Ral_RelationNew(relation->heading) ;
 
     if (found != Ral_RelationEnd(relation)) {
 	Tcl_Obj *tupleVarNameObj = objv[3] ;
@@ -1493,6 +1498,7 @@ RelvarUpdateOneCmd(
 	if (!Ral_RelvarStartCommand(rInfo, relvar)) {
 	    Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptUpdateone,
 		RAL_ERR_ONGOING_CMD, objv[2]) ;
+	    Ral_RelationDelete(updatedTuples) ;
 	    return TCL_ERROR ;
 	}
 
@@ -1504,13 +1510,14 @@ RelvarUpdateOneCmd(
 	if (Tcl_ObjSetVar2(interp, tupleVarNameObj, NULL, tupleObj,
 	    TCL_LEAVE_ERR_MSG) == NULL) {
 	    Tcl_DecrRefCount(tupleObj) ;
+	    Ral_RelationDelete(updatedTuples) ;
 	    return TCL_ERROR ;
 	}
 	/*
 	 * Evaluate the script, run the traces and update the relation.
 	 */
 	result = Ral_RelvarObjUpdateTuple(interp, relvar, relation, found,
-	    objv[5], tupleVarNameObj, &errInfo) ;
+	    objv[5], tupleVarNameObj, updatedTuples, &errInfo) ;
 	if (result == TCL_OK) {
 	    Tcl_InvalidateStringRep(relvar->relObj) ;
 	    relvar->relObj->length = 0 ;
@@ -1518,14 +1525,21 @@ RelvarUpdateOneCmd(
 
 	result = Ral_RelvarObjEndCmd(interp, rInfo, result == TCL_ERROR)
 	    == TCL_OK ? result : TCL_ERROR ;
-	updated = 1 ;
 	/*
 	 * Delete the variable.
 	 */
 	Tcl_UnsetVar(interp, Tcl_GetString(tupleVarNameObj), 0) ;
     }
+
+    if (Ral_RelationCardinality(updatedTuples)) {
+	Tcl_InvalidateStringRep(relvar->relObj) ;
+	relvar->relObj->length = 0 ;
+    }
+
     if (result == TCL_OK) {
-	Tcl_SetObjResult(interp, Tcl_NewIntObj(updated)) ;
+	Tcl_SetObjResult(interp, Ral_RelationObjNew(updatedTuples)) ;
+    } else {
+	Ral_RelationDelete(updatedTuples) ;
     }
     return result ;
 }

@@ -48,8 +48,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: update.test,v $
-# $Revision: 1.3 $
-# $Date: 2007/02/17 18:08:33 $
+# $Revision: 1.4 $
+# $Date: 2007/02/24 20:34:51 $
 #  *--
 
 set ::auto_path [linsert $::auto_path 0\
@@ -99,9 +99,11 @@ namespace eval ::ral::test {
     } -cleanup {
 	relvar unset X
     } -body {
-	relvar update X t {0} {
-	    tuple update t Status -1
-	}
+	relation cardinality [\
+	    relvar update X t {0} {
+		tuple update t Status -1
+	    }\
+	]
     } -result {0}
 
     test relvar-update-2.0 {
@@ -119,9 +121,11 @@ namespace eval ::ral::test {
     } -cleanup {
 	relvar unset X
     } -body {
-	relvar update X t {1} {
-	    tuple update t Status -1
-	}
+	relation cardinality [\
+	    relvar update X t {1} {
+		tuple update t Status -1
+	    }\
+	]
     } -result {3}
 
     test relvar-update-2.1 {
@@ -169,10 +173,41 @@ namespace eval ::ral::test {
     } -cleanup {
 	relvar unset X
     } -body {
+	relation cardinality [
+	    relvar update X t {[tuple extract $t Name] eq "George"} {
+		tuple update t Status -1
+	    }
+	]
+    } -result {1}
+
+    test relvar-update-3.1 {
+	subset is updated
+    } -setup {
+	relvar create X {
+	    Relation
+	    {Name string Status int}
+	    Name
+	}
+	relvar insert X\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+    } -cleanup {
+	relvar unset X
+    } -body {
 	relvar update X t {[tuple extract $t Name] eq "George"} {
 	    tuple update t Status -1
 	}
-    } -result {1}
+	relvar set X
+    } -result {
+	Relation {
+	    Name string Status int
+	} Name {
+	    {Name George Status -1}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}
+	}
+    } -match relation
 
     test relvar-update-4.0 {
 	update creates duplicate
@@ -283,17 +318,12 @@ namespace eval ::ral::test {
 	    incr cnt
 	    if {$cnt > 1} break
 	}
-	relvar set SX
     } -result {
 	Relation
 	{S# string SNAME string STATUS int CITY string}
 	S#
 	{
 	    {S# S1 SNAME Smith STATUS 21 CITY London}
-	    {S# S2 SNAME Jones STATUS 10 CITY Paris}
-	    {S# S3 SNAME Blake STATUS 31 CITY Paris}
-	    {S# S4 SNAME Clark STATUS 20 CITY London}
-	    {S# S5 SNAME Adams STATUS 30 CITY Athens}
 	}
     } -match relation
 
@@ -345,9 +375,11 @@ namespace eval ::ral::test {
     } -cleanup {
 	relvar unset X
     } -body {
-	relvar updateone X xTup {Name Jane} {
-	    tuple update xTup Status 10
-	}
+	relation cardinality [
+	    relvar updateone X xTup {Name Jane} {
+		tuple update xTup Status 10
+	    }
+	]
     } -result {0}
 
     test relvar-updateone-2.0 {match} -setup {
@@ -363,9 +395,11 @@ namespace eval ::ral::test {
     } -cleanup {
 	relvar unset X
     } -body {
-	relvar updateone X xTup {Name Fred} {
-	    tuple update xTup Status 10
-	}
+	relation cardinality [
+	    relvar updateone X xTup {Name Fred} {
+		tuple update xTup Status 10
+	    }
+	]
     } -result {1}
 
     test relvar-updateone-2.1 {match, compare result} -setup {
@@ -384,15 +418,12 @@ namespace eval ::ral::test {
 	relvar updateone X xTup {Name Fred} {
 	    tuple update xTup Status 10
 	}
-	relvar set X
     } -result {
 	Relation
 	{Name string Status int}
 	Name
 	{
-	    {Name George Status 20}
 	    {Name Fred Status 10}
-	    {Name Alice Status 40}
 	}
     } -match relation
 
@@ -445,7 +476,6 @@ namespace eval ::ral::test {
 	    break
 	}
     } -result {} -returnCodes break
-
 
 
 

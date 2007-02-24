@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationobj.c,v $
-$Revision: 1.21 $
-$Date: 2007/01/01 01:48:17 $
+$Revision: 1.22 $
+$Date: 2007/02/24 20:34:51 $
  *--
  */
 
@@ -108,7 +108,7 @@ Tcl_ObjType Ral_RelationObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.21 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.22 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -154,7 +154,7 @@ Ral_RelationObjConvert(
     Ral_RelationReserve(relation, elemc) ;
 
     while (elemc-- > 0) {
-	if (Ral_RelationInsertTupleObj(relation, interp, *elemv++, errInfo)
+	if (Ral_RelationInsertTupleValue(relation, interp, *elemv++, errInfo)
 	    != TCL_OK) {
 	    Ral_RelationDelete(relation) ;
 	    return TCL_ERROR ;
@@ -300,11 +300,16 @@ Ral_RelationHeadingNewIdFromObj(
     return TCL_OK ;
 }
 
+/*
+ * Insert a tuple value body consisting of a list of attribute name / attribute
+ * value into a relation.
+ */
+
 int
-Ral_RelationInsertTupleObj(
+Ral_RelationInsertTupleValue(
     Ral_Relation relation,
     Tcl_Interp *interp,
-    Tcl_Obj *tupleObj,
+    Tcl_Obj *tupleValue,
     Ral_ErrorInfo *errInfo)
 {
     Ral_Tuple tuple ;
@@ -317,7 +322,7 @@ Ral_RelationInsertTupleObj(
      * Set the values of the attributes from the list of attribute / value
      * pairs.
      */
-    if (Ral_TupleSetFromObj(tuple, interp, tupleObj, errInfo) != TCL_OK) {
+    if (Ral_TupleSetFromObj(tuple, interp, tupleValue, errInfo) != TCL_OK) {
 	Ral_TupleDelete(tuple) ;
 	return TCL_ERROR ;
     }
@@ -325,12 +330,46 @@ Ral_RelationInsertTupleObj(
      * Insert the tuple into the relation.
      */
     if (!Ral_RelationPushBack(relation, tuple, NULL)) {
-	Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_DUPLICATE_TUPLE, tupleObj) ;
+	Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_DUPLICATE_TUPLE, tupleValue) ;
 	Ral_InterpSetError(interp, errInfo) ;
 	return TCL_ERROR ;
     }
 
     return TCL_OK ;
+}
+
+/*
+ * Insert a tuple contained in a Tcl object into a relation.
+ */
+int
+Ral_RelationInsertTupleObj(
+    Ral_Relation relation,
+    Tcl_Interp *interp,
+    Tcl_Obj *tupleObj,
+    Ral_ErrorInfo *errInfo)
+{
+    Ral_Tuple tuple ;
+    Ral_IntVector orderMap ;
+    int result = TCL_OK ;
+
+    /*
+     * Convert to a tuple type.
+     */
+    if (Tcl_ConvertToType(interp, tupleObj, &Ral_TupleObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    assert(tupleObj->typePtr == &Ral_TupleObjType) ;
+    tuple = tupleObj->internalRep.otherValuePtr ;
+    orderMap = Ral_TupleHeadingNewOrderMap(relation->heading->tupleHeading,
+	tuple->heading) ;
+    if (!Ral_RelationPushBack(relation, tuple, orderMap)) {
+	Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_DUPLICATE_TUPLE, tupleObj) ;
+	Ral_InterpSetError(interp, errInfo) ;
+	result = TCL_ERROR ;
+    }
+    Ral_IntVectorDelete(orderMap) ;
+
+    return result ;
 }
 
 /*
@@ -345,6 +384,8 @@ Ral_RelationUpdateTupleObj(
     Ral_ErrorInfo *errInfo)
 {
     Ral_Tuple tuple ;
+    Ral_IntVector orderMap ;
+    int result = TCL_OK ;
 
     /*
      * Convert to a tuple type.
@@ -354,13 +395,16 @@ Ral_RelationUpdateTupleObj(
     }
     assert(tupleObj->typePtr == &Ral_TupleObjType) ;
     tuple = tupleObj->internalRep.otherValuePtr ;
-    if (!Ral_RelationUpdate(relation, where, tuple, NULL)) {
+    orderMap = Ral_TupleHeadingNewOrderMap(relation->heading->tupleHeading,
+	tuple->heading) ;
+    if (!Ral_RelationUpdate(relation, where, tuple, orderMap)) {
 	Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_DUPLICATE_TUPLE, tupleObj) ;
 	Ral_InterpSetError(interp, errInfo) ;
-	return TCL_ERROR ;
+	result = TCL_ERROR ;
     }
+    Ral_IntVectorDelete(orderMap) ;
 
-    return TCL_OK ;
+    return result ;
 }
 
 int

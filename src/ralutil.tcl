@@ -49,8 +49,8 @@
 # without cluttering the TclRAL package proper.
 # 
 # $RCSfile: ralutil.tcl,v $
-# $Revision: 1.5 $
-# $Date: 2007/02/23 02:19:22 $
+# $Revision: 1.6 $
+# $Date: 2007/02/24 20:34:51 $
 #  *--
 
 package provide ralutil 0.8.2
@@ -427,7 +427,7 @@ proc ::ralutil::sysIdsCreateIdFor {attrName op relvarName tup} {
 		set idValue [tuple extract $sysid IdNum]
 		tuple update sysid IdNum [incr idValue]
 	    }]
-	if {!$updated} {
+	if {[relation isempty $updated]} {
 	    # If we don't update then we need to 
 	    # find the maximum value of the atttribute in any tuple
 	    # to use as our counter value.

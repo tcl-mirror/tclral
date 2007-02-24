@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.30 $
-$Date: 2007/02/21 02:56:50 $
+$Revision: 1.31 $
+$Date: 2007/02/24 20:34:51 $
  *--
  */
 
@@ -151,7 +151,7 @@ static const struct traceOpsMap {
 } ;
 static const char specErrMsg[] = "multiplicity specification" ;
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.30 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.31 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -408,6 +408,7 @@ Ral_RelvarObjUpdateTuple(
     Ral_RelationIter tupleIter,
     Tcl_Obj *scriptObj,
     Tcl_Obj *tupleVarNameObj,
+    Ral_Relation updated,
     Ral_ErrorInfo *errInfo)
 {
     int result ;
@@ -427,7 +428,7 @@ Ral_RelvarObjUpdateTuple(
 	    Ral_ErrorInfoGetOption(errInfo), interp->errorLine) ;
 	Tcl_AddObjErrorInfo(interp, msg, -1) ;
 	return TCL_ERROR ;
-    } else if (result > TCL_CONTINUE) {
+    } else if (result != TCL_OK) {
 	return result ;
     }
     /*
@@ -441,6 +442,7 @@ Ral_RelvarObjUpdateTuple(
 	return TCL_ERROR ;
     }
     if (Tcl_ConvertToType(interp, newTupleObj, &Ral_TupleObjType) != TCL_OK) {
+	Tcl_DecrRefCount(newTupleObj) ;
 	return TCL_ERROR ;
     }
     assert(newTupleObj->typePtr == &Ral_TupleObjType) ;
@@ -457,11 +459,21 @@ Ral_RelvarObjUpdateTuple(
     resultTupleObj = Ral_RelvarObjExecUpdateTraces(interp, relvar, oldTupleObj,
 	newTupleObj) ;
     if (resultTupleObj == NULL) {
+	Tcl_DecrRefCount(oldTupleObj) ;
+	Tcl_DecrRefCount(newTupleObj) ;
 	return TCL_ERROR ;
     }
-    result = Ral_RelationUpdateTupleObj(relation, tupleIter, interp,
-	    resultTupleObj, errInfo) != TCL_OK ? TCL_ERROR : result ;
+    Tcl_IncrRefCount(resultTupleObj) ;
 
+    result = Ral_RelationUpdateTupleObj(relation, tupleIter, interp,
+	    resultTupleObj, errInfo) ;
+    if (result == TCL_OK) {
+	assert(resultTupleObj->typePtr == &Ral_TupleObjType) ;
+	result = Ral_RelationInsertTupleObj(updated, interp, resultTupleObj,
+	    errInfo) ;
+    }
+
+    Tcl_DecrRefCount(resultTupleObj) ;
     Tcl_DecrRefCount(oldTupleObj) ;
     Tcl_DecrRefCount(newTupleObj) ;
     return result ;
