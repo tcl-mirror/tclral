@@ -1,0 +1,219 @@
+#!/bin/sh
+# \
+exec tclsh "$0" "$@"
+
+source ../src/raloo.tcl
+
+namespace import ::raloo::*
+
+###################
+
+RelvarClass create foo {
+    my Attribute {
+	*Id int
+	Name string
+    }
+}
+puts "methods: [info class foo methods]"
+puts "superclasses: [info class foo superclasses]"
+
+set a [foo new Id 1 Name A]
+set b [foo new Id 2 Name B]
+set c [foo new Id 3 Name C]
+set d [foo new Id 4 Name D]
+puts "d = $d"
+puts [foo format]
+
+foo create baz
+baz selectOne Id 2
+puts [baz Id]
+puts [baz Name]
+
+$b Name Z
+puts [$b format]
+
+foo create bar
+bar selectWhere {$Id > 1}
+puts [bar format]
+
+puts [foo format]
+bar delete
+puts [foo format]
+
+foo destroy
+
+RelvarClass create bar {
+    my Attribute {
+	*Id unique
+	Name string
+	Value string
+    }
+
+    my State s1 {a} {
+	puts "[self]: s1: $a"
+    }
+    my State s2 {b} {
+	puts "[self]: s2: $b"
+    }
+    my State s3 {c} {
+	puts "[self]: s3: $c"
+    }
+
+    my DefaultTransition ignore
+
+    my Transition < e0 s1
+    my Transition s1 e1 s2
+    my Transition s2 e2 >s3
+
+    my InstOp incrValue {{amount 1}} {
+	my Value [expr {[[self] Value] + $amount}]
+    }
+    my ClassOp countOf {} {
+	my cardinality
+    }
+}
+
+puts "methods: [info class bar methods]"
+puts "mixins: [info class bar mixins]"
+
+puts [ral::relformat $::bar]
+
+set aa1 [bar new Id 1 Name aa Value 1]
+puts [$aa1 format]
+$aa1 incrValue 10
+puts [$aa1 format]
+
+
+set aa2 [bar new Id 2 Name aa Value 2]
+puts [bar format]
+
+$aa2 deliver e1 foo
+$aa2 deliver e1 baz
+$aa2 deliver e2 bar
+
+puts [bar countOf]
+puts [bar cardinality]
+puts [$aa1 cardinality]
+
+set aa3 [bar new Id 3 Name aa Value 1]
+set aa4 [bar new Id 4 Name aa Value 2 CurrentState s2]
+
+$aa3 generate e1 "generation test 3"
+$aa4 generate e2 "generation test 4"
+bar generate {Id {} Name bb Value 3} e0 "async"
+
+puts [ral::relformat $::raloo::arch::Transition]
+puts [ral::relformat $::raloo::arch::NonSelfEventQueue]
+
+::raloo::arch dispatchAll
+
+RelvarClass create Lamp {
+    my Attribute {
+	*Model string
+	Price double
+	CatalogNo string
+    }
+}
+
+RelvarClass create TableLamp {
+    my Attribute {
+	*Model string
+	Height int
+    }
+}
+
+RelvarClass create FloorLamp {
+    my Attribute {
+	*Model string
+	Weight double
+    }
+}
+
+Generalization create R1 {
+    my SuperType Lamp
+    my SubTypes TableLamp FloorLamp
+}
+
+puts [R1 info]
+
+raloo::arch evalThread {
+    set fl1 [FloorLamp new Model A Weight 10.7]
+    set l1 [Lamp new Model A Price 29.95 CatalogNo CAT37]
+}
+
+puts [Lamp format]
+puts [FloorLamp format]
+
+RelvarClass create A {
+    my Attribute {
+	*Id int
+	Prop string
+    }
+}
+
+RelvarClass create B {
+    my Attribute {
+	*A_Id int
+	*B_Id int
+    }
+}
+
+Relationship create R2 {
+    my Relate B +-->1 A
+    my Formalize A_Id Id
+}
+
+puts [R2 info]
+
+
+RelvarClass create X {
+    my Attribute {
+	*X1_Id int
+	*X2_Id int
+	Prop string
+    }
+}
+
+RelvarClass create Y {
+    my Attribute {
+	*Y1_Id int
+	*Y2_Id int
+	Prop string
+    }
+}
+
+RelvarClass create Z {
+    my Attribute {
+	*X1_Id int
+	*X2_Id int
+	*Y1_Id int
+	*Y2_Id int
+    }
+}
+
+AssocRelationship create R3 {
+    my Relate X *-->+ Y by Z
+}
+puts [R3 info]
+
+RelvarClass create Z2 {
+    my Attribute {
+	*X1_Id int
+	*X2_Id int
+	*Prev_X1_Id int
+	*Prev_X2_Id int
+    }
+}
+
+AssocRelationship create R4 {
+    my Relate X *-->* X by Z2
+    my BackwardReference Prev_X1_Id X1_Id Prev_X2_Id X2_Id
+}
+puts [R4 info]
+
+
+puts [ral::relvar constraint names]
+
+R3 destroy
+
+puts [ral::relvar constraint names]
