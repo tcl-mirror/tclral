@@ -44,8 +44,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: raloo.tcl,v $
-# $Revision: 1.2 $
-# $Date: 2007/03/12 01:19:37 $
+# $Revision: 1.3 $
+# $Date: 2007/03/18 21:30:57 $
 #  *--
 
 package provide raloo 0.1
@@ -56,43 +56,506 @@ package require ralutil 0.8.2
 
 namespace eval ::raloo {
     namespace export Domain
-    namespace export RelvarClass
-    namespace export Generalization
-    namespace export Relationship
-    namespace export AssocRelationship
-
-    namespace import ::ral::*
-    ::ralutil::sysIdsInit
 }
 
-# This class encapsulates the basic relvar operations
-oo::class create ::raloo::RelvarOps {
-    method insert {idValList} {
-	relvar insert [self] $idValList
-    }
-    method delete {idValList} {
-	foreach attrValSet $idValList {
-	    relvar deleteone [self] {expand}$attrValSet
+# Domain class.
+# Instances of a Domain are encapsuled sets of classes and relationships.
+# Domain Functions provide the explicit interface to a domain.
+oo::class create ::raloo::Domain {
+    # We want all domains to be given a name
+    self.unexport new
+    constructor {definition} {
+	# Each domain also creates a namespace that is the same name as
+	# the domain. Make sure that it doesn't already exist.
+	if {[namespace exists [self]]} {
+	    error "A namespace called, \"[self]\", already exists"
 	}
+	namespace eval [self] namespace import ::ral::*
+	my eval namespace import ::ral::*
+
+	my eval [list namespace path [concat [my eval namespace path] [self]]]
+
+	# Each domain includes the necessary event queues to dispatch
+	# state machine events.
+	my variable selfEventQueue
+	set selfEventQueue [raloo::EventQueue new]
+	my variable nonSelfEventQueue
+	set nonSelfEventQueue [raloo::EventQueue new]
+
+	# Define a variables that are used to keep track of classes and
+	# relationships created in within this domain. These need to be
+	# cleaned up if the domain is deleted.
+	my variable domainClasses
+	set domainClasses [list]
+	my variable domainRelationships
+	set domainRelationships [list]
+
+	my eval $definition
     }
-    method update {idValList attrName value} {
-	foreach attrValSet $idValList {
-	    relvar updateone [self] t $attrValSet {
-		tuple update t $attrName $value
+
+    destructor {
+	my variable selfEventQueue
+	$selfEventQueue destroy
+	my variable nonSelfEventQueue
+	$nonSelfEventQueue destroy
+
+	my variable domainRelationships
+	foreach r $domainRelationships {
+	    $r destroy
+	}
+	my variable domainClasses
+	foreach c $domainClasses {
+	    $c destroy
+	}
+
+	namespace delete [self]
+    }
+
+    method Function {name argList body} {
+	oo::define [self] method $name $argList [list my ExecFunc $body]
+	oo::define [self] export $name
+    }
+    method Class {name definition} {
+	set fullName [namespace eval [self] [list raloo::PassiveClass create\
+		$name $definition]]
+	my variable domainClasses
+	lappend domainClasses $fullName
+	return
+    }
+    method ActiveClass {name definition} {
+	set fullName [namespace eval [self] [list raloo::ActiveClass create\
+		$name $definition]]
+	my variable domainClasses
+	lappend domainClasses $fullName
+	return
+    }
+    method Generalization {name definition} {
+	set fullName [namespace eval [self] [list raloo::Generalization create\
+		$name $definition]]
+	my variable domainRelationships
+	lappend domainRelationships $fullName
+	return
+    }
+    method Relationship {name definition} {
+	set fullName [namespace eval [self] [list raloo::Relationship create\
+		$name $definition]]
+	my variable domainRelationships
+	lappend domainRelationships $fullName
+	return
+    }
+    method AssocRelationship {name definition} {
+	set fullName [namespace eval [self] [list raloo::AssocRelationship\
+		create $name $definition]]
+	my variable domainRelationships
+	lappend domainRelationships $fullName
+	return
+    }
+    method queueNonSelf {class ref event args} {
+	my variable nonSelfEventQueue
+	$nonSelfEventQueue putNormal $class $ref $event $args
+    }
+    method queueSelf {class ref event args} {
+	my variable selfEventQueue
+	$selfEventQueue putNormal $class $ref $event $args
+    }
+    method queueCreation {class ref event args} {
+	my variable nonSelfEventQueue
+	$nonSelfEventQueue putCreation $class $ref $event $args
+    }
+    method ExecFunc {script} {
+	relvar eval {
+	    set ecode [catch {uplevel $script} scriptResult]
+	}
+	my variable selfEventQueue
+	my variable nonSelfEventQueue
+	if {$ecode != 0} {
+	    $selfEventQueue clear
+	    $nonSelfEventQueue clear
+	    return -code $ecode $scriptResult
+	}
+
+	set ecode [catch {my DispatchAllEvents} dispatchResult]
+	if {$ecode != 0} {
+	    $selfEventQueue clear
+	    $nonSelfEventQueue clear
+	    return -code $ecode $dispatchResult
+	}
+	return $scriptResult
+    }
+    method DispatchAllEvents {} {
+	my variable selfEventQueue
+	my variable nonSelfEventQueue
+	while {1} {
+	    if {[$selfEventQueue size]} {
+		my DeliverEvent [$selfEventQueue get]
+	    } elseif {[$nonSelfEventQueue size]} {
+		my DeliverEvent [$nonSelfEventQueue get]
+	    } else {
+		break ;
 	    }
 	}
     }
-    method set {args} {
-	relvar set [self] {expand}$args
+    method DeliverEvent {evt} {
+	set class [dict get $evt RelvarName]
+	switch -exact -- [dict get $evt EventType] {
+	    normal {
+		set obj [$class new]
+		$obj selectOne {expand}[dict get $evt Reference]
+	    }
+	    create {
+		set obj [$class new {expand}[dict get $evt Reference]\
+		    __currentstate__ __created__]
+	    }
+	    default {
+		error "unknown event type, \"[dict get $evt EventType]\""
+	    }
+	}
+	$obj deliver [dict get $evt Event] {expand}[dict get $evt Params]
+	$obj destroy
     }
-    method cardinality {} {
-	relation cardinality [my set]
+}
+
+# This is a meta-class for classes based on relvars.
+oo::class create ::raloo::RelvarClass {
+    superclass oo::class
+    self.unexport new
+    constructor {definition} {
+	my eval namespace import ::ral::*
+
+	my variable domain
+	set domain [namespace qualifiers [self]]
+	namespace path [concat [namespace path] $domain]
+
+	my variable relvarName
+	set relvarName [self]
+
+	oo::define [self] {
+	    constructor {args} {
+		my variable relvarName
+		set relvarName [self class]
+		my variable domain
+		set domain [namespace qualifiers $relvarName]
+		next {expand}$args
+	    }
+	    self.method insert {args} {
+		relvar insert [self] $args
+		return
+	    }
+	    self.method delete {idValList} {
+		foreach attrValSet $idValList {
+		    relvar deleteone [self] {expand}$attrValSet
+		}
+	    }
+	    self.method update {idValList attrName value} {
+		foreach attrValSet $idValList {
+		    relvar updateone [self] t $attrValSet {
+			tuple update t $attrName $value
+		    }
+		}
+	    }
+	    self.method cardinality {} {
+		relation cardinality [relvar set [self]]
+	    }
+	    self.method degree {} {
+		relation degree [relvar set [self]]
+	    }
+	    self.method format {args} {
+		relformat [relvar set [self]] [self] {expand}$args
+	    }
+	}
+	# Set up variables that are used by the methods that are
+	# invoked when evaluating the definition.
+	relvar create __attributes {
+	    Relation {
+		AttrName string
+		AttrType string
+	    } {
+		AttrName
+	    }
+	}
+	relvar create __ids {
+	    Relation {
+		IdNum int
+		AttrName string
+	    } {
+		{IdNum AttrName}
+	    }
+	}
+	my variable uniqueAttrList
+	set uniqueAttrList [list]
+
+	# Evaluate the definition. The definition make calls to the
+	# meta-class methods to specify the details of the newly minted class.
+	my eval $definition
     }
-    method degree {} {
-	relation degree [my set]
+    destructor {
+	my variable unsetOnDestroy
+	if {$unsetOnDestroy} {
+	    relvar unset [self]
+	}
     }
-    method format {args} {
-	relformat [my set] [self] {expand}$args
+    # Declare one or more attributes.
+    # "nameTypeList" is a list of alternating attribute name / attribute type
+    # values.
+    method Attribute {nameTypeList} {
+	if {[llength $nameTypeList] % 2 != 0} {
+	    error "bad list of pairs: \"$nameTypeList\""
+	}
+	my variable attributes
+	my variable ids
+	foreach {name type} $nameTypeList {
+	    if {[regexp {(\*([1-9])?)?(.+)} $name\
+		    match idMark idNum attrName]} {
+		if {$idMark ne ""} {
+		    if {$idNum eq ""} {
+			set idNum 0
+		    }
+		    relvar insert __ids [list\
+			IdNum $idNum\
+			AttrName $attrName]
+		}
+		if {[string match -nocase unique* $type]} {
+		    my variable uniqueAttrList
+		    lappend uniqueAttrList $attrName
+		    set type int
+		}
+		relvar insert __attributes [list\
+		    AttrName $attrName\
+		    AttrType $type]
+	    } else {
+		error "unrecognized attribute name syntax, \"$name\""
+	    }
+	}
+    }
+    method InstOp {name argList body} {
+	oo::define [self] method $name $argList $body
+	oo::define [self] export $name
+    }
+    method ClassOp {name argList body} {
+	oo::define [self] self.method $name $argList $body
+	oo::define [self] export $name
+    }
+    method MakeRelvar {} {
+	# If the evaluation of the definition yielded up any attribute
+	# definitions, then we will create the backing relvar. If not, then we
+	# assume the relvar already exists and was created by other means.  So
+	# we also remember if we created the relvar and unset it in the
+	# destructor if we created it.
+	my variable unsetOnDestroy
+	if {[relation isnotempty [relvar set __attributes]]} {
+	    set unsetOnDestroy 1
+	    # Generate the relvar from the attributes specified in the
+	    # defintion.
+	    set idList [list]
+	    relation foreach idrel [relation summarize [relvar set __ids]\
+		    [relation project [relvar set __ids] IdNum] r\
+		    AttrList list {[relation list $r AttrName]}]\
+		    -ascending IdNum {
+		lappend idList [relation extract $idrel AttrList]
+	    }
+	    if {[llength $idList] == 0} {
+		error "all relvar classes must have at least one identifer"
+	    }
+	    relvar create [self] [list Relation\
+		    [relation dict [relvar set __attributes]] $idList]
+
+	    # Put on relvar traces for any unique attributes.
+	    my variable uniqueAttrList
+	    foreach attr $uniqueAttrList {
+		# HERE
+	    }
+	} else {
+	    set unsetOnDestroy 0
+	    # Otherwise use relvar introspection to construct the attribute and
+	    # id relation values to be as if they were declared. These are then
+	    # fed into the next section of code to construct the methods for
+	    # the class.
+	    foreach {attrName attrType}\
+		    [lindex [relation heading [relvar set [self]]] 1] {
+		relvar insert __attributes [list\
+		    AttrName $attrName\
+		    AttrType $attrType]
+	    }
+	    set idNum 0
+	    foreach identifier [relation identifiers [relvar set [self]]] {
+		foreach idAttr $identifier {
+		    relvar include __ids\
+			[list IdNum $idNum AttrName $idAttr]]
+		}
+		incr idNum
+	    }
+	}
+
+	# Define a method for each attribute. If the attribute is an
+	# identifier, then updates are not allowed and the method
+	# interface will accept no additional argument.
+	# Make sure that there is no "currentstate" method. currentstate
+	# is strictly controlled internally.
+	set attributes [relation restrictwith [relvar set __attributes]\
+	    {$AttrName ne "__currentstate__"}]
+	set attrNotIds [relation semiminus [relvar set __ids] $attributes]
+	relation foreach attr $attrNotIds {
+	    relation assign $attr
+	    oo::define [self] method $AttrName {{val {}}} [format {
+		if {$val ne ""} {
+		    my __UpdateAttr %s $val
+		}
+		relation extract [my __DeReference] %s
+	    } $AttrName $AttrName]
+	    oo::define [self] export $AttrName
+	}
+	set attrAsIds [relation semijoin [relvar set __ids] $attributes]
+	relation foreach attr $attrAsIds {
+	    relation assign $attr
+	    oo::define [self] method $AttrName {} [format {
+		relation extract [my __DeReference] %s
+	    } $AttrName]
+	    oo::define [self] export $AttrName
+	}
+
+	relvar unset __attributes __ids
+	unset uniqueAttrList
+    }
+    method domain {} {
+	my variable domain
+	return $domain
+    }
+    method path {} {
+	return [self]
+    }
+}
+
+oo::class create ::raloo::PassiveClass {
+    superclass ::raloo::RelvarClass
+    constructor {definition} {
+	oo::define [self] superclass ::raloo::PassiveRef
+	next $definition
+	my MakeRelvar
+    }
+    destructor {
+	next
+    }
+}
+
+oo::class create ::raloo::ActiveClass {
+    superclass ::raloo::RelvarClass
+    constructor {definition} {
+	oo::define [self] superclass ::raloo::ActiveRef
+	my eval namespace import ::ral::*
+
+	relvar create State {
+	    Relation {
+		Name string
+	    } {
+		Name
+	    }
+	}
+	my variable defaultInitialState
+	my variable defaultTransition
+	my variable finalStates
+	relvar create Transition {
+	    Relation {
+		State string
+		Event string
+		NewState string
+	    } {
+		{State Event}
+	    }
+	}
+
+	#relvar association R1 Transition State + State Name ?
+
+	next $definition
+
+	if {![info exists defaultTransition]} {
+	    set defaultTransition __canthappen__
+	}
+
+	# Define a class method if there are any creation events.
+	if {[ralutil::pipe {
+	    relvar set Transition |
+	    relation project ~ State |
+	    relation choose ~ State __created__ |
+	    relation isnotempty}]} {
+	    oo::define [self] self.method signal {ref event args} {
+		my variable domain
+		$domain queueCreation [self] $ref $event $args
+	    }
+	}
+
+	# Add the current state attribute.
+	my Attribute {__currentstate__ string}
+	my MakeRelvar
+    }
+    destructor {
+	relvar unset State Transition
+	next
+    }
+    method State {name argList body} {
+	oo::define [self] method $name $argList $body
+	oo::define [self] unexport $name
+
+	relvar insert State [list Name $name]
+
+	my variable defaultInitialState
+	if {![info exists defaultInitialState]} {
+	    set defaultInitialState $name
+	}
+    }
+    method Transition {currState event newState} {
+	if {$currState eq "<"} {
+	    set currState __created__
+	}
+	if {$newState eq "ignore"} {
+	    set newState __ignore__
+	} elseif {$newState eq "canthappen"} {
+	    set newState __canthappen__
+	} elseif {[regexp {(>)?(.+)} $newState match endMark stateName]} {
+	    if {$endMark ne ""} {
+		set newState $stateName
+		my variable finalStates
+		lappend finalStates $newState
+	    }
+	} else {
+	    error "unrecognized new state name, \"$newState\""
+	}
+	relvar insert Transition [list\
+	    State $currState\
+	    Event $event\
+	    NewState $newState]
+    }
+    method DefaultInitialState {{defState {}}} {
+	my variable defaultInitialState
+	if {$defState ne ""} {
+	    set defaultInitialState $defState
+	}
+	return $defaultInitialState
+    }
+    method DefaultTransition {{trans {}}} {
+	my variable defaultTransition
+	if {$trans ne ""} {
+	    if {[string equal -nocase $trans "ignore"] ||\
+		[string equal -nocase $trans "canthappen"]} {
+		set defaultTransition $trans
+	    } else {
+		error "bad default transition name, \"$trans\""
+	    }
+	}
+	return $defaultTransition
+    }
+    method getNewState {currState event} {
+	set trans [relation choose [relvar set Transition]\
+		State $currState Event $event]
+	return [expr {[relation isempty $trans] ?\
+	    [my DefaultTransition] : [relation extract $trans NewState]}]
+    }
+    method getDefaultInitialState {currState event} {
+	my variable defaultInitialState
+	return $defaultInitialState
+    }
+    method isFinalState {state} {
+	my variable finalStates
+	return [expr {[lsearch $finalStates $state] >= 0}]
     }
 }
 
@@ -104,10 +567,10 @@ oo::class create ::raloo::PassiveRef {
 
 	my variable ref
 	my variable relvarName
-	set ref [relation emptyof [$relvarName set]]
+	set ref [relation emptyof [relvar set $relvarName]]
 	if {[llength $args] != 0} {
 	    # relvar insert returns just what was inserted.
-	    set ref [$relvarName insert $args]
+	    set ref [relvar insert $relvarName $args]
 	}
 	set ref [relation project $ref\
 	    {expand}[lindex [relation identifiers $ref] 0]]
@@ -116,19 +579,19 @@ oo::class create ::raloo::PassiveRef {
 	my variable relvarName
 	my variable ref
 	my toReference [::ralutil::pipe {
-	    $relvarName set | relation choose ~ {expand}$args
-	}]
+	    relvar set $relvarName |
+	    relation choose ~ {expand}$args}]
     }
     method selectWhere {expr} {
 	my variable relvarName
 	my toReference [::ralutil::pipe {
-	    $relvarName set | relation restrictwith ~ $expr
-	}]
+	    relvar set $relvarName |
+	    relation restrictwith ~ $expr}]
     }
     method selectAny {expr} {
 	my variable relvarName
 	my toReference [::ralutil::pipe {
-	    $relvarName set |
+	    relvar set $relvarName |
 	    relation restrictwith ~ $expr |
 	    relation tag ~ __Order__ |
 	    relation choose ~ __Order__ 0
@@ -137,6 +600,7 @@ oo::class create ::raloo::PassiveRef {
     method selectRelated {args} {
 	set r [my __DeReference]
 	my variable relvarName
+	my variable domain
 	set dstRelvar $relvarName
 	set sjCmd [list relation semijoin $r]
 	foreach rship $args {
@@ -146,9 +610,7 @@ oo::class create ::raloo::PassiveRef {
 	    }
 	    set cMark [string index $endMark 0]
 	    set endMark [string range $endMark 1 end]
-	    #puts "$dirMark $rName $cMark $endMark"
-	    set rInfo [relvar constraint info $rName]
-	    #puts $rInfo
+	    set rInfo [relvar constraint info ${domain}::$rName]
 	    set ctype [lindex $rInfo 0]
 	    switch -exact -- $dirMark$ctype$cMark {
 		association {
@@ -200,11 +662,11 @@ oo::class create ::raloo::PassiveRef {
 		    set jAttrs [raloo::PassiveRef mergeAttrs $srcAttrs\
 			[lindex $rInfo 3]]
 		}
-		~partition> {
+		partition> {
 		    set srcRelvar [lindex $rInfo 2]
-		    lassign [raloo::PassiveRef findSubType\
-			[namespace eval [my Domain] relvar path $endMark]\
-			$rInfo] targetRelvar targetAttrs
+		    set endPath [$endMark path]
+		    lassign [raloo::PassiveRef findSubType $endPath $rInfo]\
+			targetRelvar targetAttrs
 		    set jAttrs [raloo::PassiveRef mergeAttrs [lindex $rInfo 3]\
 			$targetAttrs]
 		}
@@ -229,7 +691,6 @@ oo::class create ::raloo::PassiveRef {
 	    set dstRelvar $targetRelvar
 	}
 	set selected [$dstRelvar new]
-	#puts $sjCmd
 	$selected toReference [eval $sjCmd]
 	return $selected
     }
@@ -254,7 +715,7 @@ oo::class create ::raloo::PassiveRef {
     method __DeReference {} {
 	my variable relvarName
 	my variable ref
-	relation semijoin $ref [$relvarName set]
+	relation semijoin $ref [relvar set $relvarName]
     }
     unexport __DeReference
     # Convert a relation value of the base relvar into a reference.
@@ -318,8 +779,7 @@ oo::class create ::raloo::ActiveRef {
 		{(?i)(?:__)?currentstate(?:__)?}]
 	    if {$csIndex == -1} {
 		my variable relvarName
-		lappend args __currentstate__\
-		    [[my Domain] defaultInitialState $relvarName]
+		lappend args __currentstate__ [my DefaultInitialState]
 	    } else {
 		# Make sure the exact form of the "current state" attribute
 		# is as the rest of the architecture expects it.
@@ -336,19 +796,17 @@ oo::class create ::raloo::ActiveRef {
 	    set queue queueNonSelf
 	} else {
 	    set queue [expr {[lindex $caller 1] eq [self] ?\
-		    "queueSelf" : "queueNonSelf"}]
+		    "QueueSelf" : "QueueNonSelf"}]
 	}
 	# This reference may be multi-valued. Generate an event to each one.
-	relation foreach r $ref {
-	    [my Domain] $queue $relvarName\
-		[tuple get [relation tuple $r]] $event $args
+	foreach tupValue [relation body $ref] {
+	    my $queue $relvarName $tupValue $event $args
 	}
     }
     method deliver {event args} {
 	my variable relvarName
 	set currentState [relation extract [my __DeReference] __currentstate__]
-	set newState [[my Domain] getTransition\
-	    $relvarName $currentState $event]
+	set newState [my GetNewState $currentState $event]
 	if {$newState ne "__ignore__"} {
 	    if {$newState eq "__canthappen__"} {
 		error "can't happen transition:\
@@ -358,320 +816,60 @@ oo::class create ::raloo::ActiveRef {
 		my __UpdateAttr __currentstate__ $newState
 		# Execute the state action. This must be done in a transaction.
 		# State actions must leave the relvar state consistent.
-		relvar eval {
-		    my $newState {expand}$args
-		}
+		relvar eval my $newState {expand}$args
 		# if we enter a final state, then delete the instance.
-		if {[[my Domain] isFinalState $relvarName $newState]} {
+		if {[my IsFinalState $newState]} {
 		    my delete
 		}
 	    }
 	}
     }
-}
-
-# This is a meta-class that constructs classes that correspond to relvars.
-oo::class create ::raloo::RelvarClass {
-    superclass oo::class
-    constructor {definition} {
-	puts "RelvarClass: [self]"
-	namespace import ::ral::*
-
-	my variable domain
-	set domain [uplevel namespace current]
-	namespace eval $domain namespace export [namespace tail [self]]
-
-	set currPath [my eval namespace path]
-	lappend currPath $domain
-	my eval namespace path [list $currPath]
-	#puts "[self namespace]: $currPath"
-
-	set me [self object]
-	set myClass [self class]
-	oo::define $me {
-	    self.mixin ::raloo::RelvarOps
-
-	    constructor {args} {
-		my variable relvarName
-		set relvarName [self class]
-		eval next $args
-	    }
-	}
-	oo::define $me method Domain {} [list return $domain]
-	# Set up variables that are used by the methods that are
-	# invoked when evaluating the definition.
-	my variable attributes
-	set attributes [relation create {
-		AttrName string
-		AttrType string
-	    } AttrName]
-	my variable ids
-	set ids [relation create {
-		IdNum int
-		AttrName string
-	    } {
-		{IdNum AttrName}
-	    }]
-	my variable uniqueAttrList
-	set uniqueAttrList [list]
-	my variable activeClass
-	set activeClass {Class {} DefaultInitialState {} DefaultTransition {}}
-	my variable finalState
-	set finalState [relation create {
-		Class string
-		State string
-	    } {
-		{Class State}
-	    }]
-	my variable transition
-	set transition [relation create {
-		Class string
-		State string
-		Event string
-		NewState string
-	    } {
-		{Class State Event}
-	    }
-	]
-
-	my variable relvarName
-	set relvarName $me
-
-	# Evaluate the definition. The definition make calls to the
-	# meta-class methods to specify the details of the newly minted class.
-	my eval $definition
-
-	#puts [relformat $attributes Attributes]
-	#puts [relformat $ids Ids]
-	#puts $activeClass
-	#puts [relformat $finalState FinalState]
-	#puts [relformat $transition Transition]
-
-	# Check if any state behavior was specified in the definition.
-	# If so, then the new class needs to be Active
-	if {[dict get $activeClass Class] ne ""} {
-	    set attributes [relation include $attributes\
-		{AttrName __currentstate__ AttrType string}]
-	    oo::define [self] self.method signal {ref event args} {
-		my variable domain
-		$domain queueCreation [self] $ref $event $args
-	    }
-	    set refClass ::raloo::ActiveRef
-	} else {
-	    set refClass ::raloo::PassiveRef
-	}
-	oo::define $me superclass $refClass
-
-	# If the evaluation of the definition yielded up any attribute
-	# definitions, then we will create the backing relvar. If not, then we
-	# assume the relvar already exists and was created by other means.  So
-	# we also remember if we created the relvar and unset it in the
-	# destructor if we created it.
-	my variable unsetOnDestroy
-	if {[relation isnotempty $attributes]} {
-	    set unsetOnDestroy 1
-	    # Generate the relvar from the attributes specified in the
-	    # defintion.
-	    set idList [list]
-	    relation foreach idrel [relation summarize $ids\
-		    [relation project $ids IdNum] r\
-		    AttrList list {[relation list $r AttrName]}]\
-		    -ascending IdNum {
-		lappend idList [relation extract $idrel AttrList]
-	    }
-	    if {[llength $idList] == 0} {
-		error "all relvar classes must have at least one identifer"
-	    }
-	    relvar create $relvarName [list Relation\
-		    [relation dict $attributes] $idList]
-
-	    # Put on relvar traces for any unique attributes.
-	    foreach attr $uniqueAttrList {
-		::ralutil::sysIdsGenSystemId $me $attr
-	    }
-	} else {
-	    set unsetOnDestroy 0
-	    # Otherwise use relvar introspection to construct the attribute and
-	    # id relation values to be as if they were declared. These are then
-	    # fed into the next section of code to construct the methods for
-	    # the class.
-	    foreach {attrName attrType}\
-		    [lindex [relation heading [relvar set $me]] 1] {
-		set attributes [relation include $attributes [list\
-		    AttrName $attrName\
-		    AttrType $attrType]]
-	    }
-	    set idNum 0
-	    foreach identifier [relation identifiers [relvar set $me]] {
-		foreach idAttr $identifier {
-		    set ids [relation include $ids\
-			[list IdNum $idNum AttrName $idAttr]]
-		}
-		incr idNum
-	    }
-	}
-
-	# Define a method for each attribute. If the attribute is an
-	# identifier, then updates are not allowed and the method
-	# interface will accept no additional argument.
-	# Make sure that there is no "currentstate" method. currentstate
-	# is strictly controlled internally.
-	set attributes [relation restrictwith $attributes\
-	    {$AttrName ne "__currentstate__"}]
-	relation foreach attr [relation semiminus $ids $attributes] {
-	    relation assign $attr
-	    oo::define $me method $AttrName {{val {}}} [format {
-		if {$val ne ""} {
-		    my __UpdateAttr %s $val
-		}
-		relation extract [my __DeReference] %s
-	    } $AttrName $AttrName]
-	    oo::define [self] export $AttrName
-	}
-	relation foreach attr [relation semijoin $ids $attributes] {
-	    relation assign $attr
-	    oo::define $me method $AttrName {} [format {
-		relation extract [my __DeReference] %s
-	    } $AttrName]
-	    oo::define [self] export $AttrName
-	}
-
-	# Add the state information to the architecture data.
-	$domain addActiveClassInfo $activeClass $finalState $transition
-
-	unset attributes ids uniqueAttrList activeClass finalState transition
-
-	#puts [self]
-	#puts [relvar names [self]]
+    method DefaultInitialState {} {
+	[self class] defaultInitialState
     }
-    destructor {
-	my variable unsetOnDestroy
-	if {$unsetOnDestroy} {
-	    relvar unset [self]
-	}
+    method GetNewState {currState event} {
+	[info object [self] class] getNewState $currState $event
     }
-    # Declare one or more attributes.
-    # "nameTypeList" is a list of alternating attribute name / attribute type
-    # values.
-    method Attribute {nameTypeList} {
-	if {[llength $nameTypeList] % 2 != 0} {
-	    error "bad list of pairs: \"$nameTypeList\""
-	}
-	my variable attributes
-	my variable ids
-	foreach {name type} $nameTypeList {
-	    if {[regexp {(\*([1-9])?)?(.+)} $name\
-		    match idMark idNum attrName]} {
-		if {$idMark ne ""} {
-		    if {$idNum eq ""} {
-			set idNum 0
-		    }
-		    set ids [relation include $ids [list\
-			IdNum $idNum\
-			AttrName $attrName]]
-		}
-		if {[string match -nocase unique* $type]} {
-		    my variable uniqueAttrList
-		    lappend uniqueAttrList $attrName
-		    set type int
-		}
-		set attributes [relation include $attributes [list\
-		    AttrName $attrName\
-		    AttrType $type]]
-	    } else {
-		error "unrecognized attribute name syntax, \"$name\""
-	    }
-	}
+    method IsFinalState {state} {
+	[info object [self] class] isFinalState $state
     }
-    method State {name argList body} {
-	oo::define [self] method $name $argList $body
-	oo::define [self] unexport $name
-	my variable activeClass
-	if {[dict get $activeClass Class] eq ""} {
-	    dict set activeClass Class [self]
-	    dict set activeClass DefaultInitialState $name
-	    dict set activeClass DefaultTransition __canthappen__
-	}
+    method QueueSelf {relvarName tupValue event argList} {
+	[[info object [self] class] domain] queueSelf $relvarName $tupValue\
+	    $event $argList
     }
-    method Transition {currState event newState} {
-	if {$currState eq "<"} {
-	    set currState __created__
-	}
-	if {$newState eq "ignore"} {
-	    set newState __ignore__
-	} elseif {$newState eq "canthappen"} {
-	    set newState __canthappen__
-	} elseif {[regexp {(>)?(.+)} $newState match endMark stateName]} {
-	    if {$endMark ne ""} {
-		set newState $stateName
-		my variable finalState
-		set finalState [relation include $finalState [list\
-		    Class [self]\
-		    State $newState]]
-	    }
-	} else {
-	    error "unrecognized new state name, \"$newState\""
-	}
-	my variable transition
-	set transition [relation include $transition [list\
-	    Class [self]\
-	    State $currState\
-	    Event $event\
-	    NewState $newState]]
-    }
-    method DefaultInitialState {{defState {}}} {
-	my variable activeClass
-	if {$defState ne ""} {
-	    my variable transition
-	    if {[relation isempty [relation choose\
-		[relation project $transition State] State $defState]]} {
-		error "unknown state, \"$defState"
-	    }
-	    dict set activeClass DefaultInitialState $defState
-	}
-	return [dict get $activeClass DefaultInitialState]
-    }
-    method DefaultTransition {{trans {}}} {
-	my variable activeClass
-	if {$trans ne ""} {
-	    if {[string equal -nocase $trans "ignore"] ||\
-		[string equal -nocase $trans "canthappen"]} {
-		my variable activeClass
-		dict set activeClass DefaultTransition __${trans}__
-	    } else {
-		error "bad default transition name, \"$trans\""
-	    }
-	}
-	return [dict get $activeClass DefaultTransition]
-    }
-    method InstOp {name argList body} {
-	oo::define [self] method $name $argList $body
-	oo::define [self] export $name
-    }
-    method ClassOp {name argList body} {
-	oo::define [self] self.method $name $argList $body
-	oo::define [self] export $name
+    method QueueNonSelf {relvarName tupValue event argList} {
+	[[info object [self] class] domain] queueNonSelf $relvarName $tupValue\
+	    $event $argList
     }
 }
 
 # This is a class that constructs relationships that correspond to
 # relvar constraints.
 oo::class create ::raloo::Association {
-    unexport create
-    unexport new
-    method info {} {
-	relvar constraint info [self]
+    self.unexport create
+    self.unexport new
+    constructor {} {
+	namespace import ::ral::*
+	my variable domain
+	set domain [namespace qualifiers [self]]
+	namespace path [concat [namespace path] $domain]
     }
     destructor {
 	relvar constraint delete [self]
+    }
+    method path {} {
+	my variable domain
+	return ${domain}::[self]
+    }
+    method info {} {
+	relvar constraint info [my path]
     }
 }
 
 oo::class create ::raloo::Relationship {
     superclass ::raloo::Association
     constructor {definition} {
-	namespace import ::ral::*
-
+	next
 	my eval $definition
 
 	my variable rshipInfo
@@ -708,9 +906,10 @@ oo::class create ::raloo::Relationship {
 	    error "unrecognized relationship specification, \"$spec\""
 	}
 	my variable rshipInfo
-	dict set rshipInfo refrngRelvar [relvar path $formClass]
+	my variable domain
+	dict set rshipInfo refrngRelvar [$formClass path]
 	dict set rshipInfo refrngSpec $refrngSpec
-	dict set rshipInfo refToRelvar [relvar path $partClass]
+	dict set rshipInfo refToRelvar [$partClass path]
 	dict set rshipInfo refToSpec $refToSpec
     }
     method Formalize {args} {
@@ -729,6 +928,7 @@ oo::class create ::raloo::AssocRelationship {
     superclass ::raloo::Association
     constructor {definition} {
 	namespace import ::ral::*
+	next
 
 	my eval $definition
 
@@ -777,10 +977,10 @@ oo::class create ::raloo::AssocRelationship {
 	    error "unrecognized relationship specification, \"$spec\""
 	}
 	my variable rshipInfo
-	dict set rshipInfo assocRelvar [relvar path $assocClass]
-	dict set rshipInfo oneRelvar [relvar path $oneClass]
+	dict set rshipInfo assocRelvar [$assocClass path]
+	dict set rshipInfo oneRelvar [$oneClass path]
 	dict set rshipInfo oneSpec $oneSpec
-	dict set rshipInfo otherRelvar [relvar path $otherClass]
+	dict set rshipInfo otherRelvar [$otherClass path]
 	dict set rshipInfo otherSpec $otherSpec
     }
     method ForwardReference {args} {
@@ -810,10 +1010,7 @@ oo::class create ::raloo::Generalization {
     superclass ::raloo::Association
     constructor {definition} {
 	namespace import ::ral::*
-
-	my variable domain
-	set domain [uplevel namespace current]
-	namespace eval $domain namespace export [namespace tail [self]]
+	next
 
 	my variable refToRelvar
 	my variable refToAttrs
@@ -845,7 +1042,6 @@ oo::class create ::raloo::Generalization {
 	    lappend constrCmd $RelvarName $RefngAttrs
 	}
 
-	#puts $constrCmd
 	eval $constrCmd
 
 	unset refToRelvar refToAttrs
@@ -860,8 +1056,7 @@ oo::class create ::raloo::Generalization {
 	    error "super type relvar has already been defined as,\
 		\"$refToRelvar\""
 	}
-	my variable domain
-	set refToRelvar [namespace eval $domain relvar path $superRel]
+	set refToRelvar [$superRel path]
 	set superIds [relation identifiers [relvar set $refToRelvar]]
 	if {$id >= [llength $superIds]} {
 	    error "requested identifier, \"$id\", but $refToRelvar has only\
@@ -871,27 +1066,25 @@ oo::class create ::raloo::Generalization {
 	set refToAttrs [lsort [lindex $superIds $id]]
     }
     method SubTypes {args} {
-	my variable subType
-	my variable domain
 	foreach st $args {
 	    relvar insert subType [list\
-		RelvarName [namespace eval $domain relvar path $st]\
+		RelvarName [$st path]\
 		RefngAttrs {}\
 	    ]
 	}
     }
     method ReferenceById {subtype idNum} {
-	set subIdSet [relation identifiers [relvar set $subtype]]
+	set subtypeRelvar [$subtype path]
+	set subIdSet [relation identifiers [relvar set $subtypeRelvar]]
 	if {[llength $subIdSet] <= $idNum} {
 	    error "requested reference by identifier, \"$idNum\", but
-		$subtype only has [llength $subIdSet] identifiers"
+		$subtypeRelvar only has [llength $subIdSet] identifiers"
 	}
 	my Reference $subtype [lsort [lindex $subIdSet $idNum]]
     }
     method Reference {subtype attrList} {
-	my variable domain
-	relvar updateone subType st\
-		[list RelvarName [namespace eval $domain relvar path $subtype] {
+	set subtypeRelvar [$subtype path]
+	relvar updateone subType st [list RelvarName $subtypeRelvar] {
 	    tuple update st RefngAttrs $attrList
 	}
     }
@@ -914,7 +1107,9 @@ oo::class create ::raloo::EventQueue {
 		Id
 	    }
 	}
-	::ralutil::sysIdsGenSystemId [relvar path [self]] Id
+    }
+    destructor {
+	relvar unset [self]
     }
     method putNormal {rname ref event params} {
 	relvar insert [self] [list Id {} RelvarName $rname\
@@ -941,215 +1136,6 @@ oo::class create ::raloo::EventQueue {
 	relation cardinality [relvar set [self]]
     }
     method clear {} {
-	set me [self]
-	relvar set $me [relation emptyof [relvar set $me]]
-    }
-}
-
-# HERE
-# Make a "Domain" class and allow domain functions to be defined.
-# They then implement the thread of control.
-# Domain Methods:
-#	Function -- define domain function
-#	DataTransaction -- mask "relvar eval"
-#	class and relationship definitions
-#	all architecture stuff, including unique id stuff
-#	Delayed events stuff ???
-oo::class create ::raloo::Domain {
-    # We want all domains to be given a name
-    self.unexport new
-    constructor {definition} {
-	namespace eval [self] namespace import ::ral::*
-
-	my variable selfEventQueue
-	set selfEventQueue [raloo::EventQueue new]
-	my variable nonSelfEventQueue
-	set nonSelfEventQueue [raloo::EventQueue new]
-
-	my eval {
-	    namespace import ::ral::*
-	    relvar create ActiveClass {
-		Relation {
-		    Class string
-		    DefaultInitialState string
-		    DefaultTransition string
-		} {
-		    Class
-		}
-	    }
-	    relvar create FinalState {
-		Relation {
-		    Class string
-		    State string
-		} {
-		    {Class State}
-		}
-	    }
-	    relvar create Transition {
-		Relation {
-		    Class string
-		    State string
-		    Event string
-		    NewState string
-		} {
-		    {Class State Event}
-		}
-	    }
-
-	    relvar association R1\
-		Transition Class *\
-		ActiveClass Class 1
-	    relvar association R2\
-		Transition {Class NewState} 1\
-		FinalState {Class State} ?
-	}
-
-	my eval $definition
-    }
-
-    destructor {
-	my variable selfEventQueue
-	$selfEventQueue destroy
-	my variable nonSelfEventQueue
-	$nonSelfEventQueue destroy
-    }
-
-    method Function {name argList body} {
-	oo::define [self] method $name $argList [list my control $body]
-	oo::define [self] export $name
-    }
-
-    method Class {name definition} {
-	return [namespace eval [self] [list raloo::RelvarClass create\
-	    $name $definition]]
-    }
-
-    method Generalization {name definition} {
-	return [namespace eval [self] [list raloo::Generalization create\
-	    $name $definition]]
-    }
-
-    method queueNonSelf {class ref event args} {
-	my variable nonSelfEventQueue
-	$nonSelfEventQueue putNormal $class $ref $event $args
-    }
-
-    method queueSelf {class ref event args} {
-	my variable selfEventQueue
-	$selfEventQueue putNormal $class $ref $event $args
-    }
-
-    method queueCreation {class ref event args} {
-	my variable nonSelfEventQueue
-	$nonSelfEventQueue putCreation $class $ref $event $args
-    }
-
-    method control {script} {
-	relvar eval {
-	    set ecode [catch {uplevel $script} scriptResult]
-	}
-	my variable selfEventQueue
-	my variable nonSelfEventQueue
-	if {$ecode != 0} {
-	    $selfEventQueue clear
-	    $nonSelfEventQueue clear
-	    return -code $ecode $scriptResult
-	}
-
-	set ecode [catch {my dispatchAll} dispatchResult]
-	if {$ecode != 0} {
-	    $selfEventQueue clear
-	    $nonSelfEventQueue clear
-	    return -code $ecode $dispatchResult
-	}
-	return $scriptResult
-    }
-
-    method dispatchAll {} {
-	while {[my dispatchOne]} {
-	    #empty
-	}
-    }
-
-    method dispatchOne {} {
-	my variable selfEventQueue
-	my variable nonSelfEventQueue
-	set didEvent 1
-	if {[$selfEventQueue size]} {
-	    my DeliverEvent [$selfEventQueue get]
-	} elseif {[$nonSelfEventQueue size]} {
-	    my DeliverEvent [$nonSelfEventQueue get]
-	} else {
-	    set didEvent 0
-	}
-	return $didEvent
-    }
-
-    method addActiveClassInfo {activeClass finalState transition} {
-	relvar eval {
-	    relvar union ActiveClass\
-		[relation create {Class string DefaultInitialState string\
-		    DefaultTransition string} Class $activeClass]
-	    relvar union FinalState $finalState
-	    relvar union Transition $transition
-	}
-	#puts [ral::relformat [set [self namespace]::ActiveClass] ActiveClass]
-	#puts [ral::relformat [set [self namespace]::FinalState] FinalState]
-	#puts [ral::relformat [set [self namespace]::Transition] Transition]
-    }
-
-    method defaultTransition {class {defTrans {}}} {
-	if {$defTrans ne ""} {
-	    relvar updateone [self] ac [list Class $class] {
-		tuple update ac DefaultTransition __${defTrans}__
-	    }
-	}
-	::ralutil::pipe {
-	    relvar set ActiveClass |
-	    relation choose ~ Class $class |
-	    relation extract ~ DefaultTransition
-	}
-    }
-    method defaultInitialState {class} {
-	::ralutil::pipe {
-	    relvar set ActiveClass |
-	    relation choose ~ Class $class |
-	    relation extract ~ DefaultInitialState
-	}
-    }
-    method isFinalState {class state} {
-	::ralutil::pipe {
-	    relvar set FinalState |
-	    relation choose ~ Class $class State $state |
-	    relation isnotempty
-	}
-    }
-    method getTransition {class state event} {
-	set trans [::ralutil::pipe {
-	    relvar set Transition |
-	    relation choose ~ Class $class State $state Event $event
-	}]
-	return [expr {[relation isnotempty $trans] ?\
-	    [relation extract $trans NewState] :\
-	    [my defaultTransition $class]}]
-    }
-
-    method DeliverEvent {evt} {
-	set class [dict get $evt RelvarName]
-	switch -exact -- [dict get $evt EventType] {
-	    normal {
-		set obj [$class new]
-		$obj selectOne {expand}[dict get $evt Reference]
-	    }
-	    create {
-		set obj [$class new {expand}[dict get $evt Reference]\
-		    __currentstate__ __created__]
-	    }
-	    default {
-		error "unknown event type, \"[dict get $evt EventType]\""
-	    }
-	}
-	$obj deliver [dict get $evt Event] {expand}[dict get $evt Params]
-	$obj destroy
+	relvar set [self] [relation emptyof [relvar set [self]]]
     }
 }
