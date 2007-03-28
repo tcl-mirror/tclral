@@ -1,219 +1,542 @@
 #!/bin/sh
 # \
 exec tclsh "$0" "$@"
+# This software is copyrighted 2007 by G. Andrew Mangogna.
+# The following terms apply to all files associated with the software unless
+# explicitly disclaimed in individual files.
+# 
+# The authors hereby grant permission to use, copy, modify, distribute,
+# and license this software and its documentation for any purpose, provided
+# that existing copyright notices are retained in all copies and that this
+# notice is included verbatim in any distributions. No written agreement,
+# license, or royalty fee is required for any of the authorized uses.
+# Modifications to this software may be copyrighted by their authors and
+# need not follow the licensing terms described here, provided that the
+# new terms are clearly indicated on the first page of each file where
+# they apply.
+# 
+# IN NO EVENT SHALL THE AUTHORS OR DISTRIBUTORS BE LIABLE TO ANY PARTY FOR
+# DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING
+# OUT OF THE USE OF THIS SOFTWARE, ITS DOCUMENTATION, OR ANY DERIVATIVES
+# THEREOF, EVEN IF THE AUTHORS HAVE BEEN ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
+# 
+# THE AUTHORS AND DISTRIBUTORS SPECIFICALLY DISCLAIM ANY WARRANTIES,
+# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.  THIS SOFTWARE
+# IS PROVIDED ON AN "AS IS" BASIS, AND THE AUTHORS AND DISTRIBUTORS HAVE
+# NO OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS,
+# OR MODIFICATIONS.
+# 
+# GOVERNMENT USE: If you are acquiring this software on behalf of the
+# U.S. government, the Government shall have only "Restricted Rights"
+# in the software and related documentation as defined in the Federal
+# Acquisition Regulations (FARs) in Clause 52.227.19 (c) (2).  If you
+# are acquiring the software on behalf of the Department of Defense,
+# the software shall be classified as "Commercial Computer Software"
+# and the Government shall have only "Restricted Rights" as defined in
+# Clause 252.227-7013 (c) (1) of DFARs.  Notwithstanding the foregoing,
+# the authors grant the U.S. Government and others acting in its behalf
+# permission to use and distribute the software in accordance with the
+# terms specified in this license.
+# 
+#  *++
+# MODULE:
+#   raloo.test -- test cases for Relation Oriented Programming package
+# 
+# ABSTRACT:
+# 
+# $RCSfile: raloo.test,v $
+# $Revision: 1.2 $
+# $Date: 2007/03/28 16:05:54 $
+#  *--
+
+package require tcltest 2.2
+
+eval tcltest::configure $argv
 
 source ../src/raloo.tcl
 
-namespace import ::raloo::*
-
-###################
-
-RelvarClass create foo {
-    my Attribute {
-	*Id int
-	Name string
-    }
-}
-puts "methods: [info class foo methods]"
-puts "superclasses: [info class foo superclasses]"
-
-set a [foo new Id 1 Name A]
-set b [foo new Id 2 Name B]
-set c [foo new Id 3 Name C]
-set d [foo new Id 4 Name D]
-puts "d = $d"
-puts [foo format]
-
-foo create baz
-baz selectOne Id 2
-puts [baz Id]
-puts [baz Name]
-
-$b Name Z
-puts [$b format]
-
-foo create bar
-bar selectWhere {$Id > 1}
-puts [bar format]
-
-puts [foo format]
-bar delete
-puts [foo format]
-
-foo destroy
-
-RelvarClass create bar {
-    my Attribute {
-	*Id unique
-	Name string
-	Value string
-    }
-
-    my State s1 {a} {
-	puts "[self]: s1: $a"
-    }
-    my State s2 {b} {
-	puts "[self]: s2: $b"
-    }
-    my State s3 {c} {
-	puts "[self]: s3: $c"
-    }
-
-    my DefaultTransition ignore
-
-    my Transition < e0 s1
-    my Transition s1 e1 s2
-    my Transition s2 e2 >s3
-
-    my InstOp incrValue {{amount 1}} {
-	my Value [expr {[[self] Value] + $amount}]
-    }
-    my ClassOp countOf {} {
-	my cardinality
-    }
+proc tupleMatch {expected actual} {
+    return [::ral::tuple equal $expected $actual]
 }
 
-puts "methods: [info class bar methods]"
-puts "mixins: [info class bar mixins]"
-
-puts [ral::relformat $::bar]
-
-set aa1 [bar new Id 1 Name aa Value 1]
-puts [$aa1 format]
-$aa1 incrValue 10
-puts [$aa1 format]
-
-
-set aa2 [bar new Id 2 Name aa Value 2]
-puts [bar format]
-
-$aa2 deliver e1 foo
-$aa2 deliver e1 baz
-$aa2 deliver e2 bar
-
-puts [bar countOf]
-puts [bar cardinality]
-puts [$aa1 cardinality]
-
-set aa3 [bar new Id 3 Name aa Value 1]
-set aa4 [bar new Id 4 Name aa Value 2 CurrentState s2]
-
-$aa3 generate e1 "generation test 3"
-$aa4 generate e2 "generation test 4"
-bar generate {Id {} Name bb Value 3} e0 "async"
-
-puts [ral::relformat $::raloo::arch::Transition]
-puts [ral::relformat $::raloo::arch::NonSelfEventQueue]
-
-::raloo::arch dispatchAll
-
-RelvarClass create Lamp {
-    my Attribute {
-	*Model string
-	Price double
-	CatalogNo string
-    }
+proc relationMatch {expected actual} {
+    return [::ral::relation is $expected == $actual]
 }
 
-RelvarClass create TableLamp {
-    my Attribute {
-	*Model string
-	Height int
-    }
+namespace eval ::raloo::test {
+    namespace import ::tcltest::*
+    namespace import ::ral::*
+    namespace import ::raloo::*
+
+    customMatch tuple tupleMatch
+    customMatch relation relationMatch
+
+    test Domain-1.0 {
+	domain creates its own namespace
+    } -setup {
+	Domain create A {}
+    } -cleanup {
+	A destroy
+    } -body {
+	namespace exists A
+    } -result {1}
+
+    test Domain-2.0 {
+	domain with domain function
+    } -setup {
+	Domain create A {
+	    my Function echo {a} {
+		return $a
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	A echo a
+    } -result {a}
+
+    test Domain-2.1 {
+	failed domain function invocation
+    } -setup {
+	Domain create A {
+	    my Function echo {a} {
+		return [$a]
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	A echo a
+    } -result {invalid command name "a"} -returnCodes error
+
+    test Domain-3.0 {
+	domain with a passive class
+    } -setup {
+	Domain create A {
+	    my Class Dog {
+		my Attribute {
+		    *Name string
+		    Breed string
+		}
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	relvar name ::raloo::test::A::Dog
+    } -result {::raloo::test::A::Dog}
+
+    test Class-1.0 {
+	passive class with class operation
+    } -setup {
+	Domain create A {
+	    my Class Dog {
+		my Attribute {
+		    *Name string
+		    Breed string
+		}
+		my ClassOp howMany {} {
+		    my cardinality
+		}
+	    }
+	    my Function howManyDogs {} {
+		Dog howMany
+	    }
+	    Dog insert Name Fred Breed Poodle
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	A howManyDogs
+    } -result {1}
+
+    test Instance-1.0 {
+	instance of a passive class
+    } -setup {
+	Domain create A {
+	    my Class Dog {
+		my Attribute {
+		    *Name string
+		    Breed string
+		}
+	    }
+	    my Function newDog {name breed} {
+		Dog new Name $name Breed $breed
+	    }
+	}
+    } -cleanup {
+	$nd destroy
+	A destroy
+    } -body {
+	set nd [A newDog Fred Poodle]
+	$nd Name
+    } -result {Fred}
+
+    test Instance-2.0 {
+	instance of an active class
+    } -setup {
+	Domain create A {
+	    my ActiveClass Dog {
+		my Attribute {
+		    *Name string
+		    Breed string
+		    Age int
+		}
+		my State born {} {
+		    puts "[self method] : [my Name], [my Breed], [my Age]"
+		}
+		my State growup {} {
+		    set currAge [my Age [expr {[my Age] + 1}]]
+		    puts "[self method] : [my Name], [my Breed], [my Age]"
+		    if {$currAge > 2} {
+			my signal old
+		    }
+		}
+		my State die {} {
+		    puts "[self method] : [my Name], [my Breed], [my Age]"
+		}
+		my Transition < deliver born
+		my Transition born age growup
+		my Transition growup age growup
+		my Transition growup old >die
+	    }
+	    my Function newDog {name breed} {
+		Dog signal [list Name $name Breed $breed Age 0] deliver
+	    }
+	    my Function dogYear {name} {
+		set dog [Dog new]
+		$dog selectOne Name $name
+		$dog signal age
+		$dog destroy
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	A newDog Fred Poodle
+	A dogYear Fred
+	A dogYear Fred
+	A dogYear Fred
+    } -result {}
+
+    test Instance-3.0 {
+	passive classes with simple relationship
+    } -setup {
+	Domain create DogManagement {
+	    my Class Dog {
+		my Attribute {
+		    *DogName string
+		    OwnerName string
+		    Breed string
+		}
+	    }
+	    my Class Owner {
+		my Attribute {
+		    *OwnerName string
+		    Address string
+		    Age int
+		}
+	    }
+	    my Relationship R1 {
+		my Relate Dog *-->? Owner
+	    }
+	    my Function newDog {name breed} {
+		Dog insert DogName $name Breed $breed OwnerName {}
+	    }
+	    my Function newOwner {name address age} {
+		Owner insert OwnerName $name Address $address Age $age
+	    }
+	    my Function buyDog {ownername dogname} {
+		set dog [Dog new]
+		$dog selectOne DogName $dogname
+		set owner [Owner new]
+		$owner selectOne OwnerName $ownername
+		$dog relate R1 $owner
+		$dog destroy
+		$owner destroy
+	    }
+	    my Function howManyOwned {owner} {
+		set o [Owner new]
+		$o selectOne OwnerName $owner
+		$o selectRelated ~R1
+		$o cardinality
+	    }
+	}
+    } -cleanup {
+	DogManagement destroy
+    } -body {
+	DogManagement newDog Buttons Poodle
+	DogManagement newOwner Jane {100 Maple St} 24
+	DogManagement buyDog Jane Buttons
+	DogManagement howManyOwned Jane
+    } -result {1}
+
+    test Instance-4.0 {
+	passive classes with generalization relationship
+    } -setup {
+	Domain create DogManagement {
+	    my Class Dog {
+		my Attribute {
+		    *DogName string
+		    Breed string
+		}
+	    }
+	    my Class SmallDog {
+		my Attribute {
+		    *DogName string
+		    Weight int
+		}
+	    }
+	    my Class TallDog {
+		my Attribute {
+		    *DogName string
+		    Height int
+		}
+	    }
+	    my Generalization R1 {
+		my SuperType Dog
+		my SubTypes SmallDog TallDog
+	    }
+	    my Function newSmallDog {name breed weight} {
+		set dog [Dog new DogName $name Breed $breed]
+		set sdog [SmallDog new DogName $name Weight $weight]
+		$sdog relate R1 $dog
+	    }
+	    my Function newTallDog {name breed height} {
+		set dog [Dog new DogName $name Breed $breed]
+		set tdog [TallDog new DogName $name Height $height]
+		$dog relate R1> $tdog
+	    }
+	    my Function howMany {type} {
+		$type cardinality
+	    }
+	}
+    } -cleanup {
+	DogManagement destroy
+    } -body {
+	DogManagement newSmallDog Buttons Poodle 5
+	DogManagement newTallDog Rover Retriever 20
+	expr {[DogManagement howMany SmallDog] +\
+	   [DogManagement howMany TallDog]}
+    } -result {2}
+
+    test Instance-5.0 {
+	passive classes with associative relationship
+    } -setup {
+	Domain create DogManagement {
+	    my Class Dog {
+		my Attribute {
+		    *DogName string
+		    OwnerName string
+		    Breed string
+		}
+	    }
+	    my Class Owner {
+		my Attribute {
+		    *OwnerName string
+		    Address string
+		    Age int
+		}
+	    }
+	    my Class Ownership {
+		my Attribute {
+		    *OwnerName string
+		    *DogName string
+		}
+	    }
+	    my AssocRelationship R1 {
+		my Relate Owner *-->* Dog by Ownership
+	    }
+	    my Function newDog {name breed} {
+		Dog insert DogName $name Breed $breed OwnerName {}
+	    }
+	    my Function newOwner {name address age} {
+		Owner insert OwnerName $name Address $address Age $age
+	    }
+	    my Function buyDog {ownername dogname} {
+		set owner [Owner new]
+		$owner selectOne OwnerName $ownername
+		set dog [Dog new]
+		$dog selectOne DogName $dogname
+		set ownership [$owner relateUsing R1 $dog]
+
+		$owner destroy
+		$dog destroy
+		$ownership destroy
+	    }
+	    my Function howManyOwned {owner} {
+		set o [Owner new]
+		$o selectOne OwnerName $owner
+		$o selectRelated R1
+		$o cardinality
+	    }
+	}
+    } -cleanup {
+	DogManagement destroy
+    } -body {
+	DogManagement newDog Buttons Poodle
+	DogManagement newOwner Jane {100 Maple St} 24
+	DogManagement buyDog Jane Buttons
+	DogManagement howManyOwned Jane
+    } -result {1}
+
+    test Instance-6.0 {
+	class with unique Id attribute type
+    } -setup {
+	Domain create A {
+	    my Class Dog {
+		my Attribute {
+		    *Id unique
+		    Name string
+		    Breed string
+		}
+	    }
+	    Dog insert Id {} Name Fred Breed Poodle
+	    Dog insert Id {} Name Fred Breed Retriever
+	    my Function howMany {name} {
+		set d [Dog new]
+		$d selectWhere {$Name eq $name}
+		set count [$d cardinality]
+		$d destroy
+		return $count
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	A howMany Fred
+    } -result {2}
+
+    test Instance-7.0 {
+	subtype migration
+    } -setup {
+	Domain create DogManagement {
+	    my Class Dog {
+		my Attribute {
+		    *DogName string
+		    Breed string
+		}
+	    }
+	    my Class SmallDog {
+		my Attribute {
+		    *DogName string
+		    Weight int
+		}
+	    }
+	    my Class TallDog {
+		my Attribute {
+		    *DogName string
+		    Height int
+		}
+	    }
+	    my Generalization R1 {
+		my SuperType Dog
+		my SubTypes SmallDog TallDog
+	    }
+	    my Function newSmallDog {name breed weight} {
+		set dog [Dog new DogName $name Breed $breed]
+		set sdog [SmallDog new DogName $name Weight $weight]
+		$sdog relate R1 $dog
+	    }
+	    my Function newTallDog {name breed height} {
+		set dog [Dog new DogName $name Breed $breed]
+		set tdog [TallDog new DogName $name Height $height]
+		$dog relate R1> $tdog
+	    }
+	    my Function dogGrowsUp {dogname height} {
+		set sdog [SmallDog new]
+		$sdog selectOne DogName $dogname
+		set dog [$sdog selectRelated R1]
+		$sdog unrelate R1
+		set tdog [TallDog new DogName {} Height $height]
+		$tdog relate R1 $dog
+		$sdog delete
+
+		$sdog destroy
+		$tdog destroy
+		$dog destroy
+	    }
+	    my Function howMany {type} {
+		$type cardinality
+	    }
+	}
+    } -cleanup {
+	DogManagement destroy
+    } -body {
+	DogManagement newSmallDog Buttons Poodle 5
+	DogManagement newTallDog Rover Retriever 20
+	DogManagement dogGrowsUp Buttons 10
+	DogManagement howMany TallDog
+    } -result {2}
+
+    test Instance-7.1 {
+	subtype migration using "migrate"
+    } -setup {
+	Domain create DogManagement {
+	    my Class Dog {
+		my Attribute {
+		    *DogName string
+		    Breed string
+		}
+	    }
+	    my Class SmallDog {
+		my Attribute {
+		    *DogName string
+		    Weight int
+		}
+	    }
+	    my Class TallDog {
+		my Attribute {
+		    *DogName string
+		    Height int
+		}
+	    }
+	    my Generalization R1 {
+		my SuperType Dog
+		my SubTypes SmallDog TallDog
+	    }
+	    my Function newSmallDog {name breed weight} {
+		set dog [Dog new DogName $name Breed $breed]
+		set sdog [SmallDog new DogName $name Weight $weight]
+		$sdog relate R1 $dog
+	    }
+	    my Function newTallDog {name breed height} {
+		set dog [Dog new DogName $name Breed $breed]
+		set tdog [TallDog new DogName $name Height $height]
+		$dog relate R1> $tdog
+	    }
+	    my Function dogGrowsUp {dogname height} {
+		set sdog [SmallDog new]
+		$sdog selectOne DogName $dogname
+		set tdog [$sdog migrate R1 TallDog Height $height]
+
+		$sdog destroy
+		$tdog destroy
+	    }
+	    my Function howMany {type} {
+		$type cardinality
+	    }
+	}
+    } -cleanup {
+	DogManagement destroy
+    } -body {
+	DogManagement newSmallDog Buttons Poodle 5
+	DogManagement newTallDog Rover Retriever 20
+	DogManagement dogGrowsUp Buttons 10
+	DogManagement howMany TallDog
+    } -result {2}
+
+    cleanupTests
 }
 
-RelvarClass create FloorLamp {
-    my Attribute {
-	*Model string
-	Weight double
-    }
+namespace delete ::raloo::test
+
+if 0 {
+    test X.0 {
+    } -setup {
+    } -cleanup {
+    } -body {
+    } -result {}
 }
-
-Generalization create R1 {
-    my SuperType Lamp
-    my SubTypes TableLamp FloorLamp
-}
-
-puts [R1 info]
-
-raloo::arch evalThread {
-    set fl1 [FloorLamp new Model A Weight 10.7]
-    set l1 [Lamp new Model A Price 29.95 CatalogNo CAT37]
-}
-
-puts [Lamp format]
-puts [FloorLamp format]
-
-RelvarClass create A {
-    my Attribute {
-	*Id int
-	Prop string
-    }
-}
-
-RelvarClass create B {
-    my Attribute {
-	*A_Id int
-	*B_Id int
-    }
-}
-
-Relationship create R2 {
-    my Relate B +-->1 A
-    my Formalize A_Id Id
-}
-
-puts [R2 info]
-
-
-RelvarClass create X {
-    my Attribute {
-	*X1_Id int
-	*X2_Id int
-	Prop string
-    }
-}
-
-RelvarClass create Y {
-    my Attribute {
-	*Y1_Id int
-	*Y2_Id int
-	Prop string
-    }
-}
-
-RelvarClass create Z {
-    my Attribute {
-	*X1_Id int
-	*X2_Id int
-	*Y1_Id int
-	*Y2_Id int
-    }
-}
-
-AssocRelationship create R3 {
-    my Relate X *-->+ Y by Z
-}
-puts [R3 info]
-
-RelvarClass create Z2 {
-    my Attribute {
-	*X1_Id int
-	*X2_Id int
-	*Prev_X1_Id int
-	*Prev_X2_Id int
-    }
-}
-
-AssocRelationship create R4 {
-    my Relate X *-->* X by Z2
-    my BackwardReference Prev_X1_Id X1_Id Prev_X2_Id X2_Id
-}
-puts [R4 info]
-
-
-puts [ral::relvar constraint names]
-
-R3 destroy
-
-puts [ral::relvar constraint names]

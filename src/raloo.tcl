@@ -44,8 +44,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: raloo.tcl,v $
-# $Revision: 1.3 $
-# $Date: 2007/03/18 21:30:57 $
+# $Revision: 1.4 $
+# $Date: 2007/03/28 16:05:54 $
 #  *--
 
 package provide raloo 0.1
@@ -111,6 +111,8 @@ oo::class create ::raloo::Domain {
 	namespace delete [self]
     }
 
+    # Unexported methods that are used in the definition of a domain
+    # during construction.
     method Function {name argList body} {
 	oo::define [self] method $name $argList [list my ExecFunc $body]
 	oo::define [self] export $name
@@ -150,18 +152,24 @@ oo::class create ::raloo::Domain {
 	lappend domainRelationships $fullName
 	return
     }
-    method queueNonSelf {class ref event args} {
+    # Exported methods used by other components but not intended to be called
+    # by general Domain users.
+    method __queueNonSelf {class ref event args} {
 	my variable nonSelfEventQueue
 	$nonSelfEventQueue putNormal $class $ref $event $args
     }
-    method queueSelf {class ref event args} {
+    export __queueNonSelf
+    method __queueSelf {class ref event args} {
 	my variable selfEventQueue
 	$selfEventQueue putNormal $class $ref $event $args
     }
-    method queueCreation {class ref event args} {
+    export __queueSelf
+    method __queueCreation {class ref event args} {
 	my variable nonSelfEventQueue
 	$nonSelfEventQueue putCreation $class $ref $event $args
     }
+    export __queueCreation
+    # Unexported method used internal to the Domain class.
     method ExecFunc {script} {
 	relvar eval {
 	    set ecode [catch {uplevel $script} scriptResult]
@@ -202,9 +210,20 @@ oo::class create ::raloo::Domain {
 		set obj [$class new]
 		$obj selectOne {expand}[dict get $evt Reference]
 	    }
-	    create {
+	    creation {
 		set obj [$class new {expand}[dict get $evt Reference]\
 		    __currentstate__ __created__]
+	    }
+	    polymorphic {
+		# Find all the partition constraints where "class" is
+		# a supertype.
+		# If there are none ==> error, polymorphic event sent to
+		# subtype leaf.
+		# Foreach of those constraints, search the list of subtypes
+		# to find the related one.
+		# For the found subtype, determine if the event is consumed
+		# in the subtype or passed along as a polymorphic event.
+		# Generate the appropropriate type of event to the subtype.
 	    }
 	    default {
 		error "unknown event type, \"[dict get $evt EventType]\""
@@ -262,6 +281,11 @@ oo::class create ::raloo::RelvarClass {
 	    self.method format {args} {
 		relformat [relvar set [self]] [self] {expand}$args
 	    }
+	    self.method setUniqueAttrValue {attr op relvar tupValue} {
+		my variable uniqueAttrMap
+		dict incr uniqueAttrMap $attr
+		tuple update tupValue $attr [dict get $uniqueAttrMap $attr]
+	    }
 	}
 	# Set up variables that are used by the methods that are
 	# invoked when evaluating the definition.
@@ -281,18 +305,15 @@ oo::class create ::raloo::RelvarClass {
 		{IdNum AttrName}
 	    }
 	}
-	my variable uniqueAttrList
-	set uniqueAttrList [list]
+	my variable uniqueAttrMap
+	set uniqueAttrMap [dict create]
 
 	# Evaluate the definition. The definition make calls to the
 	# meta-class methods to specify the details of the newly minted class.
 	my eval $definition
     }
     destructor {
-	my variable unsetOnDestroy
-	if {$unsetOnDestroy} {
-	    relvar unset [self]
-	}
+	relvar unset [self]
     }
     # Declare one or more attributes.
     # "nameTypeList" is a list of alternating attribute name / attribute type
@@ -315,8 +336,8 @@ oo::class create ::raloo::RelvarClass {
 			AttrName $attrName]
 		}
 		if {[string match -nocase unique* $type]} {
-		    my variable uniqueAttrList
-		    lappend uniqueAttrList $attrName
+		    my variable uniqueAttrMap
+		    dict set uniqueAttrMap $attrName 0
 		    set type int
 		}
 		relvar insert __attributes [list\
@@ -336,54 +357,26 @@ oo::class create ::raloo::RelvarClass {
 	oo::define [self] export $name
     }
     method MakeRelvar {} {
-	# If the evaluation of the definition yielded up any attribute
-	# definitions, then we will create the backing relvar. If not, then we
-	# assume the relvar already exists and was created by other means.  So
-	# we also remember if we created the relvar and unset it in the
-	# destructor if we created it.
-	my variable unsetOnDestroy
-	if {[relation isnotempty [relvar set __attributes]]} {
-	    set unsetOnDestroy 1
-	    # Generate the relvar from the attributes specified in the
-	    # defintion.
-	    set idList [list]
-	    relation foreach idrel [relation summarize [relvar set __ids]\
-		    [relation project [relvar set __ids] IdNum] r\
-		    AttrList list {[relation list $r AttrName]}]\
-		    -ascending IdNum {
-		lappend idList [relation extract $idrel AttrList]
-	    }
-	    if {[llength $idList] == 0} {
-		error "all relvar classes must have at least one identifer"
-	    }
-	    relvar create [self] [list Relation\
-		    [relation dict [relvar set __attributes]] $idList]
+	# Generate the relvar from the attributes specified in the
+	# defintion.
+	set idList [list]
+	relation foreach idrel [relation summarize [relvar set __ids]\
+		[relation project [relvar set __ids] IdNum] r\
+		AttrList list {[relation list $r AttrName]}]\
+		-ascending IdNum {
+	    lappend idList [relation extract $idrel AttrList]
+	}
+	if {[llength $idList] == 0} {
+	    error "all relvar classes must have at least one identifer"
+	}
+	relvar create [self] [list Relation\
+		[relation dict [relvar set __attributes]] $idList]
 
-	    # Put on relvar traces for any unique attributes.
-	    my variable uniqueAttrList
-	    foreach attr $uniqueAttrList {
-		# HERE
-	    }
-	} else {
-	    set unsetOnDestroy 0
-	    # Otherwise use relvar introspection to construct the attribute and
-	    # id relation values to be as if they were declared. These are then
-	    # fed into the next section of code to construct the methods for
-	    # the class.
-	    foreach {attrName attrType}\
-		    [lindex [relation heading [relvar set [self]]] 1] {
-		relvar insert __attributes [list\
-		    AttrName $attrName\
-		    AttrType $attrType]
-	    }
-	    set idNum 0
-	    foreach identifier [relation identifiers [relvar set [self]]] {
-		foreach idAttr $identifier {
-		    relvar include __ids\
-			[list IdNum $idNum AttrName $idAttr]]
-		}
-		incr idNum
-	    }
+	# Put on relvar traces for any unique attributes.
+	my variable uniqueAttrMap
+	dict for {attr value} $uniqueAttrMap {
+	    relvar trace add variable [self] insert\
+		[list [self] setUniqueAttrValue $attr]
 	}
 
 	# Define a method for each attribute. If the attribute is an
@@ -414,7 +407,6 @@ oo::class create ::raloo::RelvarClass {
 	}
 
 	relvar unset __attributes __ids
-	unset uniqueAttrList
     }
     method domain {} {
 	my variable domain
@@ -479,7 +471,7 @@ oo::class create ::raloo::ActiveClass {
 	    relation isnotempty}]} {
 	    oo::define [self] self.method signal {ref event args} {
 		my variable domain
-		$domain queueCreation [self] $ref $event $args
+		$domain __queueCreation [self] $ref $event $args
 	    }
 	}
 
@@ -574,28 +566,35 @@ oo::class create ::raloo::PassiveRef {
 	}
 	set ref [relation project $ref\
 	    {expand}[lindex [relation identifiers $ref] 0]]
+
+	set domain [namespace qualifiers $relvarName]
+	namespace path [concat [namespace path] $domain]
+    }
+    method myClass {} {
+	info object [self] class
     }
     method selectOne {args} {
 	my variable relvarName
 	my variable ref
-	my toReference [::ralutil::pipe {
+	my __ToReference [::ralutil::pipe {
 	    relvar set $relvarName |
 	    relation choose ~ {expand}$args}]
     }
     method selectWhere {expr} {
 	my variable relvarName
-	my toReference [::ralutil::pipe {
+	::ralutil::pipe "
 	    relvar set $relvarName |
-	    relation restrictwith ~ $expr}]
+	    relation restrictwith ~ [list $expr]" cmd
+	my __ToReference [uplevel $cmd]
     }
     method selectAny {expr} {
 	my variable relvarName
-	my toReference [::ralutil::pipe {
+	::ralutil::pipe "
 	    relvar set $relvarName |
-	    relation restrictwith ~ $expr |
+	    relation restrictwith ~ [list $expr] |
 	    relation tag ~ __Order__ |
-	    relation choose ~ __Order__ 0
-	}]
+	    relation choose ~ __Order__ 0" cmd
+	my __ToReference [uplevel $cmd]
     }
     method selectRelated {args} {
 	set r [my __DeReference]
@@ -604,12 +603,8 @@ oo::class create ::raloo::PassiveRef {
 	set dstRelvar $relvarName
 	set sjCmd [list relation semijoin $r]
 	foreach rship $args {
-	    if {![regexp {\A(~)?([^>]+)(>.*)?\Z} $rship\
-		    match dirMark rName endMark]} {
-		error "bad relationship syntax, \"$rship\""
-	    }
-	    set cMark [string index $endMark 0]
-	    set endMark [string range $endMark 1 end]
+	    lassign [raloo::PassiveRef parseTraversal $rship]\
+		    dirMark rName cMark endMark
 	    set rInfo [relvar constraint info ${domain}::$rName]
 	    set ctype [lindex $rInfo 0]
 	    switch -exact -- $dirMark$ctype$cMark {
@@ -691,8 +686,260 @@ oo::class create ::raloo::PassiveRef {
 	    set dstRelvar $targetRelvar
 	}
 	set selected [$dstRelvar new]
-	$selected toReference [eval $sjCmd]
+	$selected __ToReference [eval $sjCmd]
 	return $selected
+    }
+    method relate {rship target} {
+	my variable ref
+	my variable relvarName
+	my variable domain
+	lassign [raloo::PassiveRef parseTraversal $rship]\
+		dirMark rName cMark endMark
+	set rInfo [relvar constraint info ${domain}::$rName]
+	set ctype [lindex $rInfo 0]
+	switch -exact -- $dirMark$ctype$cMark {
+	    association {
+		# Traversal in the forward direction
+		set refrngRelvar [lindex $rInfo 2]
+		set refrngAttrs [lindex $rInfo 3]
+		set refrngRef [my __RefBody]
+		set refToRelvar [lindex $rInfo 5]
+		set refToAttrs [lindex $rInfo 6]
+		set refToRef [$target __RefValue]
+		set srcRelvar $refrngRelvar
+		set targetRelvar $refToRelvar
+	    }
+	    
+	    ~association {
+		set refrngRelvar [lindex $rInfo 5]
+		set refrngAttrs [lindex $rInfo 6]
+		set refrngRef [$target __RefBody]
+		set refToRelvar [lindex $rInfo 2]
+		set refToAttrs [lindex $rInfo 3]
+		set refToRef [my __RefValue]
+		set srcRelvar $refToRelvar
+		set targetRelvar $refrngRelvar
+	    }
+	    partition {
+		lassign [raloo::PassiveRef findSubType $relvarName $rInfo]\
+		    refrngRelvar refrngAttrs
+		set refrngRef [my __RefBody]
+		set refToRelvar [lindex $rInfo 2]
+		set refToAttrs [lindex $rInfo 3]
+		set refToRef [$target __RefValue]
+		set srcRelvar $refrngRelvar
+		set targetRelvar $refToRelvar
+	    }
+	    partition> {
+		set refToRelvar [lindex $rInfo 2]
+		set refToAttrs [lindex $rInfo 3]
+		set refToRef [my __RefValue]
+		lassign [raloo::PassiveRef findSubType [$target myClass]\
+		    $rInfo] refrngRelvar refrngAttrs
+		set refrngRef [$target __RefBody]
+		set srcRelvar $refToRelvar
+		set targetRelvar $refrngRelvar
+	    }
+	    default {
+		error "the \"relate\" method cannot be use for the given\
+		    type of relationship traversal, \"$rship\""
+	    }
+	}
+	if {$relvarName ne $srcRelvar} {
+	    error "traversal of $rship begins at $srcRelvar,\
+		not $relvarName"
+	}
+	if {$targetRelvar ne [$target myClass]} {
+	    error "traversal of $rship ends at $targetRelvar, not at\
+		[$target myClass]"
+	}
+	# Update the referential attributes in the relvar to have the same
+	# values as the referred to attributes in the target.  The update can
+	# change the values that are held in the "ref" if we are changing
+	# identifiers. Need to make sure the "ref" is updated also.
+	# Cf.  __UpdateAttr.
+	set updated [list]
+	foreach refTuple $refrngRef {
+	    lappend updated [relvar updateone $refrngRelvar tup $refTuple {
+		set avList [list]
+		foreach sAttr $refrngAttrs tAttr $refToAttrs {
+		    lappend avList $sAttr [dict get $refToRef $tAttr]
+		}
+		tuple update tup {expand}$avList
+	    }]
+	}
+	if {$relvarName eq $refrngRelvar} {
+	    my __ToReference [relation union\
+		[relation emptyof [relvar set $relvarName]]\
+		{expand}$updated]
+	}
+	return
+    }
+    method relateUsing {rship target args} {
+	my variable ref
+	my variable relvarName
+	my variable domain
+	lassign [raloo::PassiveRef parseTraversal $rship]\
+		dirMark rName cMark endMark
+	set rInfo [relvar constraint info ${domain}::$rName]
+	set ctype [lindex $rInfo 0]
+	switch -exact -- $dirMark$ctype$cMark {
+	    correlation {
+		set oneRelvar [lindex $rInfo 5]
+		set oneRefToAttrs [lindex $rInfo 6]
+		set oneRef [my __RefValue]
+		set oneRefrngAttrs [lindex $rInfo 3]
+		set otherRelvar [lindex $rInfo 9]
+		set otherRefToAttrs [lindex $rInfo 10]
+		set otherRef [$target __RefValue]
+		set otherRefrngAttrs [lindex $rInfo 7]
+		set srcRelvar $oneRelvar
+		set targetRelvar $otherRelvar
+	    }
+	    
+	    ~correlation {
+		set oneRelvar [lindex $rInfo 9]
+		set oneRefToAttrs [lindex $rInfo 10]
+		set oneRef [$target __RefValue]
+		set oneRefrngAttrs [lindex $rInfo 7]
+		set otherRelvar [lindex $rInfo 5]
+		set otherRefToAttrs [lindex $rInfo 6]
+		set otherRef [my __RefValue]
+		set otherRefrngAttrs [lindex $rInfo 3]
+		set srcRelvar $otherRelvar
+		set targetRelvar $oneRelvar
+	    }
+	    default {
+		error "the \"relateUsing\" method cannot be use for the given\
+		    type of relationship traversal, \"$rship\""
+	    }
+	}
+	if {$relvarName ne $srcRelvar} {
+	    error "traversal of $rship begins at $srcRelvar,\
+		not $relvarName"
+	}
+	if {$targetRelvar ne [$target myClass]} {
+	    error "traversal of $rship ends at $targetRelvar, not at\
+		[$target myClass]"
+	}
+	# Create an instance of the association class, containing the
+	# referential attribute values and the other attribute values
+	# supplied as arguments.
+	set assocTuple [list]
+	foreach refrng $oneRefrngAttrs refto $oneRefToAttrs {
+	    lappend assocTuple $refrng [dict get $oneRef $refto]
+	}
+	foreach refrng $otherRefrngAttrs refto $otherRefToAttrs {
+	    lappend assocTuple $refrng [dict get $otherRef $refto]
+	}
+	set assocClass [lindex $rInfo 2]
+	set assocInst [$assocClass new]
+	$assocInst __ToReference [relvar insert $assocClass\
+	    [concat $assocTuple $args]]
+	return $assocInst
+    }
+    method unrelate {rship} {
+	my variable ref
+	my variable relvarName
+	my variable domain
+	lassign [raloo::PassiveRef parseTraversal $rship]\
+		dirMark rName cMark endMark
+	set rInfo [relvar constraint info ${domain}::$rName]
+	set ctype [lindex $rInfo 0]
+	switch -exact -- $dirMark$ctype$cMark {
+	    association {
+		set refrngRelvar [lindex $rInfo 2]
+		set refrngAttrs [lindex $rInfo 3]
+		set refrngRef [my __RefBody]
+		set srcRelvar $refrngRelvar
+	    }
+	    
+	    ~association {
+		# When traversing the opposite direction, we have to find
+		# the referring references.
+		set refrngRelvar [lindex $rInfo 5]
+		set refrngAttrs [lindex $rInfo 6]
+		set refrngInsts [my selectedRelated $rship]
+		set refrngRef [$refrngInsts __RefBody]
+		$refrngInst destroy
+		set srcRelvar [lindex $rInfo 2]
+	    }
+	    partition {
+		lassign [raloo::PassiveRef findSubType $relvarName $rInfo]\
+		    refrngRelvar refrngAttrs
+		set refrngRef [my __RefBody]
+		set srcRelvar $refrngRelvar
+	    }
+	    partition> {
+		set refrngInst [my selectedRelated $rship]
+		if {[$refrngInst isempty]} {
+		    error "instance is not related to $endMark across $rship"
+		}
+		set refrngRef [$refrngInsts __RefBody]
+		lassign [raloo::PassiveRef findSubType $endMark $rInfo]\
+		    refrngRelvar refrngAttrs
+		set srcRelvar [lindex $rInfo 2]
+	    }
+	    default {
+		error "the \"relate\" method cannot be use for the given\
+		    type of relationship traversal, \"$rship\""
+	    }
+	}
+	if {$relvarName ne $srcRelvar} {
+	    error "traversal of $rship begins at $srcRelvar,\
+		not $relvarName"
+	}
+	# Update the referential attributes in the relvar to be the empty
+	# string.  The update can change the values that are held in the "ref"
+	# if we are changing identifiers. Need to make sure the "ref" is
+	# updated also.
+	set updated [list]
+	foreach refTuple $refrngRef {
+	    lappend updated [relvar updateone $refrngRelvar tup $refTuple {
+		set avList [list]
+		foreach sAttr $refrngAttrs {
+		    lappend avList $sAttr {}
+		}
+		tuple update tup {expand}$avList
+	    }]
+	}
+	if {$relvarName eq $refrngRelvar} {
+	    my __ToReference [relation union\
+		[relation emptyof [relvar set $relvarName]]\
+		{expand}$updated]
+	}
+	return
+    }
+    method migrate {rName target args} {
+	my variable ref
+	my variable relvarName
+	my variable domain
+	set rInfo [relvar constraint info ${domain}::$rName]
+	if {[lindex $rInfo 0] ne "partition"} {
+	    error "$rname is not a generalization relationship"
+	}
+	lassign [raloo::PassiveRef findSubType $relvarName $rInfo]\
+	    currRefrngRelvar currRefrngAttrs
+	set targetRelvar [$target path]
+	lassign [raloo::PassiveRef findSubType $targetRelvar $rInfo]\
+	    newRefrngRelvar newRefrngAttrs
+
+	set avList [list]
+	set myValue [my __RefValue]
+	foreach ca $currRefrngAttrs na $newRefrngAttrs {
+	    lappend avList $na [dict get $myValue $ca]
+	}
+
+	set avList [concat $avList $args]
+	relvar eval {
+	    relvar deleteone $relvarName {expand}[my __RefTuple]
+	    set newRel [relvar insert $targetRelvar $avList]
+	}
+	set ref [relation emptyof $ref]
+
+	set newRef [$target new]
+	$newRef __ToReference $newRel
+	return $newRef
     }
     method delete {} {
 	my variable relvarName
@@ -703,6 +950,14 @@ oo::class create ::raloo::PassiveRef {
     method cardinality {} {
 	my variable ref
 	relation cardinality $ref
+    }
+    method isempty {} {
+	my variable ref
+	relation isempty $ref
+    }
+    method isnotempty {} {
+	my variable ref
+	relation isnotempty $ref
     }
     method format {args} {
 	my variable ref
@@ -719,7 +974,7 @@ oo::class create ::raloo::PassiveRef {
     }
     unexport __DeReference
     # Convert a relation value of the base relvar into a reference.
-    method toReference {relValue} {
+    method __ToReference {relValue} {
 	my variable relvarName
 	if {[relation isnotempty $relValue] && [relation isempty\
 		[relation intersect [relvar set $relvarName] $relValue]]} {
@@ -728,23 +983,54 @@ oo::class create ::raloo::PassiveRef {
 	my variable ref
 	set ref [relation project $relValue {expand}[relation attributes $ref]]
     }
+    export __ToReference
     # Obtain a dictionary of the reference. This can be used to
     # reconstruct the reference later. This is only valid for singleton
     # references.
-    method __Value {} {
+    method __RefTuple {} {
 	my variable ref
 	return [tuple get [relation tuple $ref]]
     }
-    unexport __Value
+    export __RefTuple
+    method __RefBody {} {
+	my variable ref
+	relation body $ref
+    }
+    export __RefBody
+    method __RefValue {} {
+	my variable relvarName
+	my variable ref
+	tuple get\
+	    [relation tuple [relation semijoin $ref [relvar set $relvarName]]]
+    }
+    export __RefValue
     # Update an attribute in the base relvar to which this reference refers.
     method __UpdateAttr {attrName value} {
 	my variable relvarName
 	my variable ref
-	$relvarName update [relation body $ref] $attrName $value
+
+	set updates [list]
+	relation foreach r $ref {
+	    lappend updates [relvar updateone $relvarName tup\
+		    [tuple get [relation tuple $r]] {
+		    tuple update tup $attrName $value
+		}]
+	}
+	my __ToReference [relation union\
+	    [relation emptyof [relvar set $relvarName]]\
+	    {expand}$updates]
     }
     unexport __UpdateAttr
 
 
+    self.method parseTraversal {rship} {
+	if {![regexp {\A(~)?([^>]+)(>.*)?\Z} $rship\
+		match dirMark rName endMark]} {
+	    error "bad relationship syntax, \"$rship\""
+	}
+	return [list $dirMark $rName [string index $endMark 0]\
+	    [string range $endMark 1 end]]
+    }
     self.method mergeAttrs {alist1 alist2} {
 	set result [list]
 	foreach a1 $alist1 a2 $alist2 {
@@ -793,7 +1079,7 @@ oo::class create ::raloo::ActiveRef {
 	my variable relvarName
 	# Determine if this is a self-directed event or not.
 	if {[catch {self caller} caller]} {
-	    set queue queueNonSelf
+	    set queue QueueNonSelf
 	} else {
 	    set queue [expr {[lindex $caller 1] eq [self] ?\
 		    "QueueSelf" : "QueueNonSelf"}]
@@ -828,18 +1114,18 @@ oo::class create ::raloo::ActiveRef {
 	[self class] defaultInitialState
     }
     method GetNewState {currState event} {
-	[info object [self] class] getNewState $currState $event
+	[my myClass] getNewState $currState $event
     }
     method IsFinalState {state} {
-	[info object [self] class] isFinalState $state
+	[my myClass] isFinalState $state
     }
     method QueueSelf {relvarName tupValue event argList} {
-	[[info object [self] class] domain] queueSelf $relvarName $tupValue\
+	[[my myClass] domain] __queueSelf $relvarName $tupValue\
 	    $event $argList
     }
     method QueueNonSelf {relvarName tupValue event argList} {
-	[[info object [self] class] domain] queueNonSelf $relvarName $tupValue\
-	    $event $argList
+	[[my myClass] domain] __queueNonSelf $relvarName\
+	    $tupValue $event $argList
     }
 }
 
@@ -1117,7 +1403,11 @@ oo::class create ::raloo::EventQueue {
     }
     method putCreation {rname ref event params} {
 	relvar insert [self] [list Id {} RelvarName $rname\
-	    Reference $ref Event $event EventType create Params $params]
+	    Reference $ref Event $event EventType creation Params $params]
+    }
+    method putPolymorphic {rname ref event params} {
+	relvar insert [self] [list Id {} RelvarName $rname\
+	    Reference $ref Event $event EventType polymorphic Params $params]
     }
     method get {} {
        set rel [::ralutil::pipe {
