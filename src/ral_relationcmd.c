@@ -46,8 +46,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.33 $
-$Date: 2007/02/24 20:34:50 $
+$Revision: 1.34 $
+$Date: 2007/05/06 23:33:41 $
  *--
  */
 
@@ -147,7 +147,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.33 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.34 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -2112,7 +2112,7 @@ RelationRenameCmd(
 	return TCL_ERROR ;
     }
 
-    newRelation = Ral_RelationMediumCopy(relation) ;
+    newRelation = Ral_RelationDup(relation) ;
     for ( ; objc > 0 ; objc -= 2, objv += 2) {
 	if (!Ral_RelationRenameAttribute(newRelation, Tcl_GetString(objv[0]),
 	    Tcl_GetString(objv[1]), &errInfo)) {

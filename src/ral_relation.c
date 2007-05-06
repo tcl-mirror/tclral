@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.26 $
-$Date: 2007/05/06 22:12:27 $
+$Revision: 1.27 $
+$Date: 2007/05/06 23:33:41 $
  *--
  */
 
@@ -116,7 +116,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.26 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.27 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -197,35 +197,6 @@ Ral_RelationShallowCopy(
     Ral_RelationIter srcEnd = srcRelation->finish ;
 
     dupRelation = Ral_RelationNew(srcRelation->heading) ;
-    Ral_RelationReserve(dupRelation, Ral_RelationCardinality(srcRelation)) ;
-
-    for (srcIter = srcRelation->start ; srcIter != srcEnd ; ++srcIter) {
-	int appended ;
-
-	appended = Ral_RelationPushBack(dupRelation, *srcIter, NULL) ;
-	assert(appended != 0) ;
-    }
-
-    return dupRelation ;
-}
-
-/*
- * This function makes a new relation that includes a new tuple heading.
- * The tuple values are just reference counted. The copy is then suitable
- * for modifying the heading in place (e.g. a relation rename).
- */
-Ral_Relation
-Ral_RelationMediumCopy(
-    Ral_Relation srcRelation)
-{
-    Ral_RelationHeading srcHeading = srcRelation->heading ;
-    Ral_RelationHeading dupHeading ;
-    Ral_Relation dupRelation ;
-    Ral_RelationIter srcIter ;
-    Ral_RelationIter srcEnd = srcRelation->finish ;
-
-    dupHeading = Ral_RelationHeadingDup(srcHeading) ;
-    dupRelation = Ral_RelationNew(dupHeading) ;
     Ral_RelationReserve(dupRelation, Ral_RelationCardinality(srcRelation)) ;
 
     for (srcIter = srcRelation->start ; srcIter != srcEnd ; ++srcIter) {
