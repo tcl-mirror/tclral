@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.25 $
-$Date: 2007/01/28 02:21:11 $
+$Revision: 1.26 $
+$Date: 2007/05/06 22:12:27 $
  *--
  */
 
@@ -116,7 +116,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.25 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.26 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -701,7 +701,7 @@ Ral_RelationGroup(
 	attrHeading = Ral_RelationHeadingNew(attrTupleHeading, idCount) ;
 
 	/*
-	 * Go through the identifiers that contain at least on of the
+	 * Go through the identifiers that contain at least one of the
 	 * grouped attributes and form an identifier from those attributes
 	 * that appear in the relation identifier. We must of course remap
 	 * the attribute indices to the new order of the grouped attribute
@@ -796,9 +796,32 @@ Ral_RelationGroup(
 		 */
 		Ral_TupleHeadingMapIndices(tupleHeading, grpId,
 		    grpTupleHeading) ;
-		status = Ral_RelationHeadingAddIdentifier(grpHeading, idCount++,
+		/*
+		 * It is possible for the identifier to be a duplicate.
+		 * In the case where there are multiple identifiers and
+		 * the intersection of the attributes of the identifiers
+		 * is non-empty and the grouping is done on the basis
+		 * of the attributes that are _not_ part of the intersection
+		 * will yield up a duplicate identifier. E.G.
+		 *  {A1 A2 G1} and {A1 A2 G2} when grouped by {G1 G2} means
+		 * that result will have only one identifier.
+		 */
+		status = Ral_RelationHeadingAddIdentifier(grpHeading, idCount,
 		    grpId) ;
-		assert(status != 0) ;
+		/*
+		 * This is a bit of a hack. We have to reach in and
+		 * decrement the id count of the heading because we have
+		 * already had to state the number of identifers the
+		 * relation will have when we create the header. This
+		 * needs to be corrected in the relation heading data
+		 * structure to be more flexible.
+		 */
+		if (status == 0) {
+		    --grpHeading->idCount ;
+		    Ral_IntVectorDelete(grpId) ;
+		} else {
+		    ++idCount ;
+		}
 	    } else {
 		Ral_IntVectorDelete(grpId) ;
 	    }

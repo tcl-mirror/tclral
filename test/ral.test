@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.32 $
-# $Date: 2007/02/23 02:19:22 $
+# $Revision: 1.33 $
+# $Date: 2007/05/06 22:12:27 $
 #  *--
 
 set ::auto_path [linsert $::auto_path 0\
@@ -1444,6 +1444,49 @@ namespace eval ::ral::test {
 	}
     } -match relation
 
+    test relation-group-6.0 {grouping across identifiers} -setup {
+	set e {
+	    Relation {
+		DId int CId int EName string ENum int
+	    } {
+		{DId CId EName}
+		{DId CId ENum}
+	    } {
+		{DId 1 CId 1 EName a ENum 1}
+		{DId 1 CId 1 EName b ENum 2}
+		{DId 1 CId 1 EName c ENum 3}
+		{DId 1 CId 2 EName a ENum 1}
+		{DId 1 CId 2 EName b ENum 2}
+		{DId 1 CId 2 EName c ENum 3}
+	    }
+	}
+    } -body {
+	relation group $e ByC EName ENum
+    } -result {
+	Relation {
+	    DId int CId int ByC {
+		Relation {
+		    EName string ENum int
+		} {
+		    EName ENum
+		}
+	    }
+	} {
+	    {DId CId}
+	} {
+	    {DId 1 CId 1 ByC {
+		{EName a ENum 1}
+		{EName b ENum 2}
+		{EName c ENum 3}
+	    }}
+	    {DId 1 CId 2 ByC {
+		{EName a ENum 1}
+		{EName b ENum 2}
+		{EName c ENum 3}
+	    }}
+	}
+    } -match relation
+
     # relation heading subcommand
     test relation-heading-1.0 {dum relation} -body {
 	relation heading $DUM
@@ -2572,6 +2615,29 @@ namespace eval ::ral::test {
 	{{Name Andrew Status 30 Town Sunnyvale}\
 	 {Name George Status 20 Town {San Jose}}}}\
     -match relation
+
+    test relation-rename-3.0 {renaming identifying attributes} -body {
+	set r {
+	    Relation {
+		N1 string N2 string Age int City string
+	    } {
+		{N1 N2}
+	    } {
+		{N1 Andrew N2 A Age 30 City Sunnyvale}
+		{N1 George N2 G Age 20 City {San Jose}}
+	    }
+	}
+	relation rename $r N2 Name2
+    } -result {
+	Relation {
+	    N1 string Name2 string Age int City string
+	} {
+	    {N1 Name2}
+	} {
+	    {N1 Andrew Name2 A Age 30 City Sunnyvale}
+	    {N1 George Name2 G Age 20 City {San Jose}}
+	}
+    } -match relation
 
     # relation restrict subcommand
     test relation-restrict-1.0 {match on one attribute} -body {
