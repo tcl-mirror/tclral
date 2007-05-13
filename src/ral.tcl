@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.32 $
-# $Date: 2007/02/21 02:56:50 $
+# $Revision: 1.33 $
+# $Date: 2007/05/13 22:00:08 $
 #  *--
 
 namespace eval ::ral {
@@ -886,4 +886,4 @@ proc ::ral::mkLoadRelation {cursor heading} {
     return $value
 }
 
-package provide ral 0.8.2
+package provide ral 0.8.3

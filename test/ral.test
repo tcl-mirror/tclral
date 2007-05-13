@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.33 $
-# $Date: 2007/05/06 22:12:27 $
+# $Revision: 1.34 $
+# $Date: 2007/05/13 22:00:08 $
 #  *--
 
 set ::auto_path [linsert $::auto_path 0\
@@ -541,6 +541,80 @@ namespace eval ::ral::test {
 	set t {Tuple {Name string Age int} {Name Andrew Age 20}}
 	tuple project $t foo
     } -result {unknown attribute name, "foo"} -returnCodes error
+
+    # tuple relation subcommand
+    test tuple-relation-1.0 {single attribute} -setup {
+	set t [tuple create {Name string} {Name Andrew}]
+    } -body {
+	tuple relation $t
+    } -result {
+	Relation {
+	    Name string
+	} {
+	    Name
+	} {
+	    {Name Andrew}
+	}
+    } -match relation
+
+    test tuple-relation-1.1 {default identifier} -setup {
+	set t [tuple create {Name string Age int} {Name Fred Age 29}]
+    } -body {
+	tuple relation $t
+    } -result {
+	Relation {
+	    Name string
+	    Age int
+	} {
+	    {Name Age}
+	} {
+	    {Name Fred Age 29}
+	}
+    } -match relation
+
+    test tuple-relation-1.2 {specified  identifier} -setup {
+	set t [tuple create {Name string Age int} {Name Fred Age 29}]
+    } -body {
+	tuple relation $t Age
+    } -result {
+	Relation {
+	    Name string
+	    Age int
+	} {
+	    Age
+	} {
+	    {Name Fred Age 29}
+	}
+    } -match relation
+
+    test tuple-relation-1.3 {multiple  identifiers} -setup {
+	set t [tuple create {Name string Age int} {Name Fred Age 29}]
+    } -body {
+	tuple relation $t {Name Age}
+    } -result {
+	Relation {
+	    Name string
+	    Age int
+	} {
+	    Name
+	    Age
+	} {
+	    {Name Fred Age 29}
+	}
+    } -match relation
+
+    test tuple-relation-2.1 {unknown attribute in identifier} -setup {
+	set t [tuple create {Name string Age int} {Name Fred Age 29}]
+    } -body {
+	tuple relation $t Breed
+    } -result {unknown attribute name, "Breed"} -returnCodes error
+
+    test tuple-relation-2.2 {duplicate attribute in identifier} -setup {
+	set t [tuple create {Name string Age int} {Name Fred Age 29}]
+    } -body {
+	tuple relation $t {Name Name}
+    } -result {identifiers must not be subsets of other identifiers, "Name"}\
+    -returnCodes error
 
     # tuple rename subcommand
     test tuple-rename-1.0 {single attribute} -setup {
@@ -1266,6 +1340,14 @@ namespace eval ::ral::test {
 	}
 	set nameList
     } -result {Smith Jones Clark Blake Adams}
+
+    test relation-foreach-3.1 {visit parts order by weight} -body {
+	set nameList [list]
+	relation foreach part $P -descending WEIGHT {
+	    lappend weightList [relation extract $part WEIGHT]
+	}
+	set weightList
+    } -result {19.0 17.0 17.0 14.0 12.0 12.0}
 
     test relation-foreach-4.0 {visit of suppliers ordered by multiple} -body {
 	set nameList [list]
@@ -2821,6 +2903,128 @@ in expression "_@_< 20"} -returnCodes error
 	{{A1 A2}}
 	{
 	    {A1 b1 A2 a2 PrevA1 a1}
+	}
+    } -match relation
+
+    test relation-semijoin-5.1 {overlapping identifiers} -setup {
+	set C1 {
+	    Relation
+	    {A1 string A2 string A3 string}
+	    {{A1 A2}}
+	    {
+		{A1 a1 A2 a2 A3 a3}
+		{A1 b1 A2 b2 A3 b3}
+		{A1 c1 A2 c2 A3 c3}
+	    }
+	}
+	set C2 {
+	    Relation
+	    {A1 string A2 string C1 string C2 string}
+	    {{A1 A2 C1}}
+	    {
+		{A1 a1 A2 a2 C1 c1 C2 c2}
+		{A1 a1 A2 a2 C1 c2 C2 c2}
+	    }
+	}
+    } -cleanup {
+    } -body {
+	relation semijoin $C2 $C1
+    } -result {
+	Relation
+	{A1 string A2 string A3 string}
+	{{A1 A2}}
+	{
+	    {A1 a1 A2 a2 A3 a3}
+	}
+    } -match relation
+
+    test relation-semijoin-5.2 {overlapping identifiers} -setup {
+	set C1 {
+	    Relation
+	    {A1 string A2 string A3 string}
+	    {{A1 A2}}
+	    {
+		{A1 a1 A2 a2 A3 a3}
+		{A1 b1 A2 b2 A3 b3}
+		{A1 c1 A2 c2 A3 c3}
+	    }
+	}
+	set C2 {
+	    Relation
+	    {A1 string A2 string C1 string C2 string}
+	    {{A1 A2 C1}}
+	    {
+		{A1 a1 A2 a2 C1 c1 C2 c2}
+		{A1 a1 A2 a2 C1 c2 C2 c2}
+	    }
+	}
+    } -cleanup {
+    } -body {
+	relation semijoin $C1 $C2
+    } -result {
+	Relation
+	{A1 string A2 string C1 string C2 string}
+	{{A1 A2 C1}}
+	{
+	    {A1 a1 A2 a2 C1 c1 C2 c2}
+	    {A1 a1 A2 a2 C1 c2 C2 c2}
+	}
+    } -match relation
+
+    test relation-semijoin-5.3 {overlapping identifiers} -setup {
+	set class {
+	    Relation {
+		DomainId int
+		ClassId int
+		ClassName string
+		Line int
+		StorageSlots int
+		PolyEvents list
+	    } {
+		{DomainId ClassId}
+		{DomainId ClassName}
+	    } {
+		{DomainId 1 ClassId 1 ClassName foo Line 10 StorageSlots 0
+		    PolyEvents {}}
+		{DomainId 1 ClassId 2 ClassName bar Line 11 StorageSlots 0
+		    PolyEvents {}}
+	    }
+	}
+	set classref {
+	    Relation {
+		DomainId int
+		ClassId int
+		ElemId int
+		RefToClass string
+		Multiple boolean
+	    } {
+		{DomainId ClassId ElemId}
+	    } {
+		{DomainId 1 ClassId 1 ElemId 1 RefToClass bar Multiple 0}
+		{DomainId 1 ClassId 1 ElemId 2 RefToClass bar Multiple 0}
+		{DomainId 1 ClassId 1 ElemId 3 RefToClass bar Multiple 0}
+		{DomainId 1 ClassId 2 ElemId 4 RefToClass foo Multiple 0}
+		{DomainId 1 ClassId 2 ElemId 5 RefToClass foo Multiple 0}
+		{DomainId 1 ClassId 2 ElemId 6 RefToClass foo Multiple 0}
+	    }
+	}
+    } -cleanup {
+    } -body {
+	set class1 [relation restrictwith $class {$ClassId == 1}]
+	relation semijoin $class1 $classref
+    } -result {
+	Relation {
+	    DomainId int
+	    ClassId int
+	    ElemId int
+	    RefToClass string
+	    Multiple boolean
+	} {
+	    {DomainId ClassId ElemId}
+	} {
+	    {DomainId 1 ClassId 1 ElemId 1 RefToClass bar Multiple 0}
+	    {DomainId 1 ClassId 1 ElemId 2 RefToClass bar Multiple 0}
+	    {DomainId 1 ClassId 1 ElemId 3 RefToClass bar Multiple 0}
 	}
     } -match relation
 

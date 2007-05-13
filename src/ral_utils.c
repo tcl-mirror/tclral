@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_utils.c,v $
-$Revision: 1.14 $
-$Date: 2007/01/01 01:48:17 $
+$Revision: 1.15 $
+$Date: 2007/05/13 22:00:08 $
  *--
  */
 
@@ -87,7 +87,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_utils.c,v $ $Revision: 1.14 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_utils.c,v $ $Revision: 1.15 $" ;
 
 static char const * const cmdStrings[] = {
     "unknown command",
@@ -143,6 +143,7 @@ static char const * const optStrings[] = {
     "project",
     "rank",
     "reidentify",
+    "relation",
     "rename",
     "restrict",
     "restrictwith",

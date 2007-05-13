@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuplecmd.c,v $
-$Revision: 1.17 $
-$Date: 2007/01/07 23:32:42 $
+$Revision: 1.18 $
+$Date: 2007/05/13 22:00:08 $
  *--
  */
 
@@ -62,6 +62,9 @@ INCLUDE FILES
 #include "ral_vector.h"
 #include "ral_tuplecmd.h"
 #include "ral_tupleobj.h"
+#include "ral_relationheading.h"
+#include "ral_relation.h"
+#include "ral_relationobj.h"
 
 /*
 MACRO DEFINITIONS
@@ -89,6 +92,7 @@ static int TupleExtractCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int TupleGetCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int TupleHeadingCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int TupleProjectCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
+static int TupleRelationCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int TupleRenameCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int TupleUnwrapCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int TupleUpdateCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
@@ -105,7 +109,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tuplecmd.c,v $ $Revision: 1.17 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tuplecmd.c,v $ $Revision: 1.18 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -138,6 +142,7 @@ tupleCmd(
 	{"get", TupleGetCmd},
 	{"heading", TupleHeadingCmd},
 	{"project", TupleProjectCmd},
+	{"relation", TupleRelationCmd},
 	{"rename", TupleRenameCmd},
 	{"unwrap", TupleUnwrapCmd},
 	{"update", TupleUpdateCmd},
@@ -649,7 +654,7 @@ TupleProjectCmd(
 	return TCL_ERROR ;
     }
 
-    tupleObj = *(objv + 2) ;
+    tupleObj = objv[2] ;
     if (Tcl_ConvertToType(interp, tupleObj, &Ral_TupleObjType) != TCL_OK) {
 	return TCL_ERROR ;
     }
@@ -678,6 +683,83 @@ TupleProjectCmd(
     Ral_IntVectorDelete(attrList) ;
 
     Tcl_SetObjResult(interp, Ral_TupleObjNew(projTuple)) ;
+    return TCL_OK ;
+}
+
+/* tuple relation tupleValue ?id-list? */
+static int
+TupleRelationCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_Obj *tupleObj ;
+    Ral_Tuple tuple ;
+    Ral_TupleHeading tupHeading ;
+    Ral_RelationHeading relHeading ;
+    Ral_Relation rel ;
+    int elemc ;
+    Tcl_Obj **elemv ;
+
+    if (objc < 3 || objc > 4) {
+	Tcl_WrongNumArgs(interp, 2, objv, "tupleValue ?id-list?") ;
+	return TCL_ERROR ;
+    }
+
+    tupleObj = objv[2] ;
+    if (Tcl_ConvertToType(interp, tupleObj, &Ral_TupleObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    tuple = tupleObj->internalRep.otherValuePtr ;
+    tupHeading = tuple->heading ;
+
+    if (objc == 4) {
+	/*
+	 * Identifiers given in a list.
+	 */
+	Tcl_Obj *idListObj = objv[3] ;
+	if (Tcl_ListObjGetElements(interp, idListObj, &elemc, &elemv)
+		!= TCL_OK) {
+	    return TCL_ERROR ;
+	}
+    } else {
+	elemc = 0 ;
+    }
+    if (elemc == 0) {
+	/*
+	 * No identifiers given (or an empty list was given), so all attributes
+	 * are used for the identifier.
+	 */
+	Ral_IntVector idVect =
+	    Ral_IntVectorNew(Ral_TupleHeadingSize(tupHeading), 0) ;
+	Ral_IntVectorFillConsecutive(idVect, 0) ;
+	relHeading = Ral_RelationHeadingNew(tupHeading, 1) ;
+	int status = Ral_RelationHeadingAddIdentifier(relHeading, 0, idVect) ;
+	assert(status != 0) ;
+    } else {
+	/*
+	 * Iterate through the list of identifiers and add them to the
+	 * relation heading. Each identifier is in turn a list.
+	 */
+	int idNum = 0 ;
+	Ral_ErrorInfo errInfo ;
+
+	Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdTuple, Ral_OptRelation) ;
+	relHeading = Ral_RelationHeadingNew(tupHeading, elemc) ;
+	while (elemc-- > 0) {
+	    if (Ral_RelationHeadingNewIdFromObj(interp, relHeading, idNum++,
+		    *elemv++, &errInfo) != TCL_OK) {
+		Ral_RelationHeadingDelete(relHeading) ;
+		return TCL_ERROR ;
+	    }
+	}
+    }
+
+    rel = Ral_RelationNew(relHeading) ;
+    Ral_RelationReserve(rel, 1) ;
+    Ral_RelationPushBack(rel, tuple, NULL) ;
+
+    Tcl_SetObjResult(interp, Ral_RelationObjNew(rel)) ;
     return TCL_OK ;
 }
 

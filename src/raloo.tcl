@@ -44,15 +44,15 @@
 # ABSTRACT:
 # 
 # $RCSfile: raloo.tcl,v $
-# $Revision: 1.4 $
-# $Date: 2007/03/28 16:05:54 $
+# $Revision: 1.5 $
+# $Date: 2007/05/13 22:00:08 $
 #  *--
 
 package provide raloo 0.1
 
 package require Tcl 8.5
-package require ral 0.8.2
-package require ralutil 0.8.2
+package require ral 0.8.3
+package require ralutil 0.8.3
 
 namespace eval ::raloo {
     namespace export Domain

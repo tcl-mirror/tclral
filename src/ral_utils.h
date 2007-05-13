@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_utils.h,v $
-$Revision: 1.12 $
-$Date: 2007/01/01 01:48:17 $
+$Revision: 1.13 $
+$Date: 2007/05/13 22:00:08 $
  *--
  */
 #ifndef _ral_utils_h_
@@ -123,6 +123,7 @@ typedef enum {
     Ral_OptProject,
     Ral_OptRank,
     Ral_OptReidentify,
+    Ral_OptRelation,
     Ral_OptRename,
     Ral_OptRestrict,
     Ral_OptRestrictwith,
