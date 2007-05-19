@@ -49,17 +49,17 @@
 # without cluttering the TclRAL package proper.
 # 
 # $RCSfile: ralutil.tcl,v $
-# $Revision: 1.7 $
-# $Date: 2007/05/13 22:00:08 $
+# $Revision: 1.8 $
+# $Date: 2007/05/19 20:24:29 $
 #  *--
 
 package provide ralutil 0.8.3
 
 namespace eval ::ralutil {
     namespace export pipe
-    namespace export navigate
     namespace export sysIdsInit
     namespace export sysIdsGenSystemId
+    namespace export crosstab
 
     namespace import ::ral::*
 
@@ -465,7 +465,7 @@ proc ::ralutil::findMaxAttrValue {relvarName attrName} {
 # "crossAttr". The value of the new attributes is count of tuples that have the
 # corresponding value of "crossAttr".  Relationally, the "summarize" command is
 # used when computations are required across groups of tuples.
-proc ::ral::crosstab {relValue crossAttr args} {
+proc ::ralutil::crosstab {relValue crossAttr args} {
     # We start by projecting the attributes that will be retained
     # in the resulting relation.
     set subproj [relation project $relValue {expand}$args]
