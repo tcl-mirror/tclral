@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.34 $
-# $Date: 2007/05/13 22:00:08 $
+# $Revision: 1.35 $
+# $Date: 2007/05/19 20:18:25 $
 #  *--
 
 set ::auto_path [linsert $::auto_path 0\
@@ -1060,6 +1060,241 @@ namespace eval ::ral::test {
 	relation choose $r Age 30
     } -result {Relation {Name string Age int} {Name Age} {{Name Fred Age 30}}}\
     -match relation
+
+    # relation compose subcommand
+    test relation-compose-1.0 {
+	single common attribute
+    } -body {
+	set r1 {
+	    Relation {
+		XId string A2 int A3 string
+	    } {
+		XId
+	    } {
+		{A2 20 XId George A3 {San Jose}}
+		{A3 Saratoga A2 10 XId Fred}
+	    }
+	}
+	set r2 {
+	    Relation {
+		XId string A4 int
+	    } {
+		XId
+	    } {
+		{A4 30 XId George}
+		{XId Fred A4 10}
+	    }
+	}
+	relation compose $r1 $r2
+    } -result {
+	Relation {
+	    A2 int A3 string A4 int
+	} {
+	    {A2 A3 A4}
+	} {
+	    {A2 20 A3 {San Jose} A4 30}
+	    {A2 10 A3 Saratoga A4 10}
+	}
+    } -match relation
+
+    test relation-compose-2.0 {
+	composing across self
+    } -body {
+	set r1 {
+	    Relation {
+		Id int Next int
+	    } {
+		Id
+	    } {
+		{Id 1 Next 2}
+		{Id 2 Next 3}
+		{Id 3 Next 1}
+	    }
+	}
+	relation compose $r1 $r1 -using {Id Next}
+    } -result {
+	Relation {
+	    Id int Next int
+	} {
+	    Id
+	} {
+	    {Id 1 Next 3}
+	    {Id 2 Next 1}
+	    {Id 3 Next 2}
+	}
+    } -match relation
+
+    test relation-compose-2.3 {
+	composing across self -- twice get back to original
+    } -body {
+	set r1 {
+	    Relation {
+		Id int Next int
+	    } {
+		Id
+	    } {
+		{Id 1 Next 2}
+		{Id 2 Next 3}
+		{Id 3 Next 1}
+	    }
+	}
+	set r2 [relation compose $r1 $r1 -using {Id Next}]
+	relation compose $r2 $r2 -using {Id Next}
+    } -result {
+	Relation {
+	    Id int Next int
+	} {
+	    Id
+	} {
+	    {Id 1 Next 2}
+	    {Id 2 Next 3}
+	    {Id 3 Next 1}
+	}
+    } -match relation
+
+    test relation-compose-2.1 {
+	composing across self -- common attr
+    } -body {
+	set r1 {
+	    Relation {
+		Id int Next int
+	    } {
+		Id
+	    } {
+		{Id 1 Next 2}
+		{Id 2 Next 3}
+		{Id 3 Next 1}
+	    }
+	}
+	set r2 [relation rename $r1 Next NextNext]
+	relation compose $r1 $r2
+    } -result {
+	Relation {
+	    Next int NextNext int
+	} {
+	    {Next NextNext}
+	} {
+	    {Next 2 NextNext 2}
+	    {Next 3 NextNext 3}
+	    {Next 1 NextNext 1}
+	}
+    } -match relation
+
+    test relation-compose-2.2 {
+	multi-attribute identifiers
+    } -body {
+	set r1 {
+	    Relation {
+		X int Y int Z int
+	    } {
+		{X Y}
+	    } {
+		{X 1 Y 1 Z 2}
+		{X 3 Y 4 Z 7}
+		{X 4 Y 4 Z 8}
+	    }
+	}
+	set r2 [relation eliminate $r1 Z]
+	relation compose $r1 $r2
+    } -result {
+	Relation {
+	    Z int
+	} {
+	    Z
+	} {
+	    {Z 2}
+	    {Z 7}
+	    {Z 8}
+	}
+    } -match relation
+
+    test relation-compose-3.0 {
+	composing across self yielding DEE
+    } -body {
+	set r1 {
+	    Relation {
+		Id int
+	    } {
+		Id
+	    } {
+		{Id 1}
+		{Id 2}
+		{Id 3}
+	    }
+	}
+	relation compose $r1 $r1
+    } -result {
+	Relation {
+	} {
+	    {}
+	} {
+	    {}
+	}
+    } -match relation
+
+    test relation-compose-3.1 {
+	composing across self yielding DUM
+    } -body {
+	set r1 {
+	    Relation {
+		Id int
+	    } {
+		Id
+	    } {
+	    }
+	}
+	relation compose $r1 $r1
+    } -result {
+	Relation {
+	} {
+	    {}
+	} {
+	}
+    } -match relation
+
+    test relation-compose-3.2 {
+	compose degenerates to join
+    } -body {
+	set r1 {
+	    Relation {
+		Id int
+	    } {
+		Id
+	    } {
+		{Id 1}
+		{Id 2}
+		{Id 3}
+	    }
+	}
+	set r2 {
+	    Relation {
+		XId int
+	    } {
+		XId
+	    } {
+		{XId 1}
+		{XId 2}
+		{XId 3}
+	    }
+	}
+	relation compose $r1 $r2
+    } -result {
+	Relation {
+	    Id int XId int
+	} {
+	    {Id XId}
+	} {
+	    {Id 1 XId 1}
+	    {Id 1 XId 2}
+	    {Id 1 XId 3}
+	    {Id 2 XId 1}
+	    {Id 2 XId 2}
+	    {Id 2 XId 3}
+	    {Id 3 XId 1}
+	    {Id 3 XId 2}
+	    {Id 3 XId 3}
+	}
+    } -match relation
 
     # relation create subcommand
     test relation-create-1.0 {one id, one tuple} -body {
@@ -2457,6 +2692,47 @@ namespace eval ::ral::test {
 	{A1 string A2 string B1 string}
 	{A1 A2}
 	{
+	    {A1 aa A2 ab B1 ab}
+	    {A1 ba A2 bb B1 bb}
+	    {A1 ca A2 cb B1 cb}
+	}
+    } -match relation
+
+    test relation-join-8.2 {common identifiers} -setup {
+	set r1 {
+	    Relation {
+		A1 string
+		A2 string
+	    } {
+		{A1 A2}
+	    } {
+		{A1 aa A2 ab}
+		{A1 ba A2 bb}
+		{A1 ca A2 cb}
+	    }
+	}
+	set r2 {
+	    Relation {
+		A1 string B1 string
+	    } {
+		A1
+	    } {
+		{A1 aa B1 ab}
+		{A1 ba B1 bb}
+		{A1 ca B1 cb}
+		{A1 da B1 db}
+		{A1 ea B1 eb}
+		{A1 fa B1 fb}
+	    }
+	}
+    } -body {
+	relation join $r2 $r1
+    } -result {
+	Relation {
+	    A1 string A2 string B1 string
+	} {
+	    {A1 A2}
+	} {
 	    {A1 aa A2 ab B1 ab}
 	    {A1 ba A2 bb B1 bb}
 	    {A1 ca A2 cb B1 cb}

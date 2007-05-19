@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.h,v $
-$Revision: 1.19 $
-$Date: 2007/05/06 23:33:41 $
+$Revision: 1.20 $
+$Date: 2007/05/19 20:18:25 $
  *--
  */
 #ifndef _ral_relation_h_
@@ -186,6 +186,8 @@ extern Ral_Relation Ral_RelationGroup(Ral_Relation, const char *,
 extern Ral_Relation Ral_RelationUngroup(Ral_Relation, const char *,
     Ral_ErrorInfo *) ;
 extern Ral_Relation Ral_RelationJoin(Ral_Relation, Ral_Relation, Ral_JoinMap,
+    Ral_ErrorInfo *) ;
+extern Ral_Relation Ral_RelationCompose(Ral_Relation, Ral_Relation, Ral_JoinMap,
     Ral_ErrorInfo *) ;
 extern Ral_Relation Ral_RelationSemiJoin(Ral_Relation, Ral_Relation,
     Ral_JoinMap) ;

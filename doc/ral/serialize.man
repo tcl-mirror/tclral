@@ -45,13 +45,13 @@
 # ABSTRACT:
 # 
 # $RCSfile: serialize.man,v $
-# $Revision: 1.6 $
-# $Date: 2007/05/13 22:00:06 $
+# $Revision: 1.7 $
+# $Date: 2007/05/19 20:18:25 $
 #  *--
 }]
 [moddesc "Relation persistence"]
 [titledesc "Persistent storage for relations"]
-[copyright "2004, 2005, 2006 by G. Andrew Mangogna"]
+[copyright "2004, 2005, 2006, 2007 by G. Andrew Mangogna"]
 [require ral [opt 0.8.3]]
 [description]
 This manpage describes a set of commands that are used for

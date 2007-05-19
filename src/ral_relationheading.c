@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationheading.c,v $
-$Revision: 1.20 $
-$Date: 2007/02/23 02:19:22 $
+$Revision: 1.21 $
+$Date: 2007/05/19 20:18:25 $
  *--
  */
 
@@ -82,6 +82,7 @@ static int Ral_IsForeignIdASubsetOf(Ral_RelationHeading, Ral_RelationHeading,
     Ral_IntVector) ;
 static void Ral_AddJoinId( Ral_IntVector, Ral_IntVector, Ral_JoinMap,
     Ral_IntVector) ;
+static int Ral_IdContainsMappedAttr(Ral_IntVector, Ral_IntVector) ;
 
 /*
 EXTERNAL DATA REFERENCES
@@ -94,7 +95,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.20 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.21 $" ;
 
 static char const openList = '{' ;
 static char const closeList = '}' ;
@@ -754,6 +755,220 @@ Ral_RelationHeadingJoin(
     return joinHeading ;
 }
 
+/*
+ * Create a new relation heading that is the compose of two other headings.
+ * "map" contains the attribute mapping of what is to be joined.  Returns the
+ * new relation heading and two attribute maps.  An attribute map is a vector
+ * that is the same size as the degree of the corresponding heading.  Each
+ * element contains either -1 if that attribute of the heading is not included
+ * in the compose, or the index into the compose heading where that attribute
+ * of the heading is to be placed in the composed relation.  Caller must delete
+ * the returned attribute map vectors.
+ */
+Ral_RelationHeading
+Ral_RelationHeadingCompose(
+    Ral_RelationHeading h1,
+    Ral_RelationHeading h2,
+    Ral_JoinMap map,
+    Ral_IntVector *attrMap1,
+    Ral_IntVector *attrMap2,
+    Ral_ErrorInfo *errInfo)
+{
+    int status ;
+    Ral_TupleHeading composeTupleHeading ;
+    Ral_RelationHeading composeHeading ;
+    Ral_TupleHeading h1TupleHeading = h1->tupleHeading ;
+    Ral_TupleHeading h2TupleHeading = h2->tupleHeading ;
+    Ral_IntVector h1JoinAttrs ;
+    Ral_IntVector h2JoinAttrs ;
+    Ral_IntVectorIter attrMapIter ;
+    Ral_TupleHeadingIter tupleHeadingIter ;
+    Ral_TupleHeadingIter tupleHeadingEnd ;
+    int composeIndex = 0 ;
+
+    Ral_RelationIdIter id1Iter ;
+    Ral_RelationIdIter id1End = Ral_RelationHeadingIdEnd(h1) ;
+    Ral_RelationIdIter id2Iter ;
+    Ral_RelationIdIter id2End = Ral_RelationHeadingIdEnd(h2) ;
+    int idNum = 0 ;
+    /*
+     * Construct the tuple heading. The size of the heading is the
+     * sum of the degrees of the two relations being composeed minus
+     * twice the number of attributes participating in the compose.
+     * Twice because we are eliminating all the compose attributes.
+     */
+    composeTupleHeading = Ral_TupleHeadingNew(Ral_RelationHeadingDegree(h1) +
+	Ral_RelationHeadingDegree(h2) - 2 * Ral_JoinMapAttrSize(map)) ;
+    /*
+     * The tuple heading contains all the attributes of the first
+     * relation except those used in the join and all the attribute of the
+     * second heading except again all those used in the join.
+     * So create a vector that
+     * contains a boolean that indicates whether or not a given attribute
+     * index is contained in the compose map and use that determine which
+     * attributes are placed in the compose. As we iterate through the
+     * vector, we modify it in place to be the offset in the compose tuple
+     * heading where this attribute will be placed.
+     */
+    *attrMap1 = h1JoinAttrs = Ral_JoinMapAttrMap(map, 0,
+	Ral_TupleHeadingSize(h1TupleHeading)) ;
+    attrMapIter = Ral_IntVectorBegin(h1JoinAttrs) ;
+    tupleHeadingEnd = Ral_TupleHeadingEnd(h1TupleHeading) ;
+
+    for (tupleHeadingIter = Ral_TupleHeadingBegin(h1TupleHeading) ;
+	tupleHeadingIter != tupleHeadingEnd ; ++tupleHeadingIter) {
+	if (*attrMapIter) {
+	    status = Ral_TupleHeadingAppend(h1TupleHeading,
+		tupleHeadingIter, tupleHeadingIter + 1, composeTupleHeading) ;
+	    if (status == 0) {
+		Ral_ErrorInfoSetError(errInfo, RAL_ERR_DUPLICATE_ATTR,
+		    (*tupleHeadingIter)->name) ;
+		Ral_TupleHeadingDelete(composeTupleHeading) ;
+		Ral_IntVectorDelete(h1JoinAttrs) ;
+		*attrMap1 = NULL ;
+		return NULL ;
+	    }
+	    *attrMapIter++ = composeIndex++ ;
+	} else {
+	    /*
+	     * Attributes that don't appear in the result are given a final
+	     * index of -1
+	     */
+	    *attrMapIter++ = -1 ;
+	}
+    }
+    /*
+     * Now for the second relation.
+     */
+    *attrMap2 = h2JoinAttrs = Ral_JoinMapAttrMap(map, 1,
+	Ral_TupleHeadingSize(h2TupleHeading)) ;
+    attrMapIter = Ral_IntVectorBegin(h2JoinAttrs) ;
+    tupleHeadingEnd = Ral_TupleHeadingEnd(h2TupleHeading) ;
+
+    for (tupleHeadingIter = Ral_TupleHeadingBegin(h2TupleHeading) ;
+	tupleHeadingIter != tupleHeadingEnd ; ++tupleHeadingIter) {
+	if (*attrMapIter) {
+	    status = Ral_TupleHeadingAppend(h2TupleHeading,
+		tupleHeadingIter, tupleHeadingIter + 1, composeTupleHeading) ;
+	    if (status == 0) {
+		Ral_ErrorInfoSetError(errInfo, RAL_ERR_DUPLICATE_ATTR,
+		    (*tupleHeadingIter)->name) ;
+		Ral_TupleHeadingDelete(composeTupleHeading) ;
+		Ral_IntVectorDelete(h2JoinAttrs) ;
+		*attrMap2 = NULL ;
+		return NULL ;
+	    }
+	    *attrMapIter++ = composeIndex++ ;
+	} else {
+	    /*
+	     * Attributes that don't appear in the result are given a final
+	     * index of -1
+	     */
+	    *attrMapIter++ = -1 ;
+	}
+    }
+    /*
+     * Construct the relation heading -- infer the identifiers.
+     * The maximun number of identifiers is the product of the number
+     * of identifiers in the two relations.
+     * We adjust the "idCount" later to match what actually turned up.
+     */
+    composeHeading = Ral_RelationHeadingNew(composeTupleHeading,
+	h1->idCount * h2->idCount) ;
+    /*
+     * Loop through the identifiers for the two heading components
+     * and infer new identifiers for the compose.
+     * For compose we must eliminate any identifier that contains an attribute
+     * that is one of the composed attributes.
+     */
+    for (id1Iter = Ral_RelationHeadingIdBegin(h1) ;
+	id1Iter != id1End ; ++id1Iter) {
+	Ral_IntVector h1Id = *id1Iter ;
+
+	int id1Mapped = Ral_IdContainsMappedAttr(h1Id, h1JoinAttrs) ;
+
+	for (id2Iter = Ral_RelationHeadingIdBegin(h2) ;
+	    id2Iter != id2End ; ++id2Iter) {
+	    Ral_IntVector h2Id = *id2Iter ;
+	    Ral_IntVector composeId = Ral_IntVectorNewEmpty(
+		Ral_IntVectorSize(h1Id) + Ral_IntVectorSize(h2Id)) ;
+	    int added ;
+	    int id2Mapped = Ral_IdContainsMappedAttr(h2Id, h2JoinAttrs) ;
+
+	    /*
+	     * In general the identifiers of the compose are the cross product
+	     * of the identifiers of the two relations being composed.
+	     * However, if there is any intersection in those identifiers,
+	     * those intersecting identifiers must be eliminated from that
+	     * element of the cross product.
+	     */
+	    if (id1Mapped && id2Mapped) {
+		/*
+		 * Both id's contain composed attributes.
+		 */
+		continue ;
+	    } else if (id1Mapped) {
+		Ral_AddJoinId(composeId, h2Id, map, h2JoinAttrs) ;
+	    } else if (id2Mapped) {
+		Ral_IntVectorCopy(h1Id, Ral_IntVectorBegin(h1Id),
+		    Ral_IntVectorEnd(h1Id), composeId,
+		    Ral_IntVectorBegin(composeId)) ;
+	    } else {
+		/*
+		 * Neither id contains composed attributes.
+		 */
+		if (Ral_IsForeignIdASubsetOf(h1, h2, h2Id)) {
+		    Ral_IntVectorCopy(h1Id, Ral_IntVectorBegin(h1Id),
+			Ral_IntVectorEnd(h1Id), composeId,
+			Ral_IntVectorBegin(composeId)) ;
+		} else if (Ral_IdContainsMappedAttr(h1Id, h1JoinAttrs) ||
+			    Ral_IsForeignIdASubsetOf(h2, h1, h1Id)) {
+		    Ral_AddJoinId(composeId, h2Id, map, h2JoinAttrs) ;
+		} else {
+		    Ral_IntVectorCopy(h1Id, Ral_IntVectorBegin(h1Id),
+			Ral_IntVectorEnd(h1Id), composeId,
+			Ral_IntVectorBegin(composeId)) ;
+		    Ral_AddJoinId(composeId, h2Id, map, h2JoinAttrs) ;
+		}
+	    }
+	    /*
+	     * Add the newly formed identifier.
+	     * It is possible that that identifier will not add, e.g. when
+	     * the composed relations have an identifier subset in common.
+	     */
+	    added = Ral_RelationHeadingAddIdentifier(composeHeading, idNum,
+		composeId) ;
+	    if (added == 0) {
+		/*
+		 * If we didn't add, we need to clean up things.
+		 */
+		Ral_IntVectorDelete(composeId) ;
+	    } else {
+		++idNum ;
+	    }
+	}
+    }
+    if (idNum == 0) {
+	/*
+	 * In this case we didn't find any suitable identifiers and we must
+	 * create one that has all the attributes.
+	 */
+	Ral_IntVector allId = Ral_IntVectorNew(
+	    Ral_RelationHeadingDegree(composeHeading), 0) ;
+	Ral_IntVectorFillConsecutive(allId, 0) ;
+	int added = Ral_RelationHeadingAddIdentifier(composeHeading, idNum,
+	    allId) ;
+	assert(added != 0) ;
+	idNum = 1 ;
+    }
+    /*
+     * Patch up the actual number of identifiers generated.
+     */
+    composeHeading->idCount = idNum ;
+
+    return composeHeading ;
+}
+
 int
 Ral_RelationHeadingScan(
     Ral_RelationHeading h,
@@ -975,7 +1190,7 @@ Ral_IsIdASubsetOf(
 
 /*
  * Determine if the identifier from "h2" is a subset of any identifier
- * from "h2".
+ * from "h1".
  */
 static int
 Ral_IsForeignIdASubsetOf(
@@ -1056,4 +1271,27 @@ Ral_AddJoinId(
 	    Ral_IntVectorSetAdd(joinId, attrInr1) ;
 	}
     }
+}
+
+static int
+Ral_IdContainsMappedAttr(
+    Ral_IntVector id,
+    Ral_IntVector attrMap)
+{
+    Ral_IntVectorIter end = Ral_IntVectorEnd(id) ;
+    Ral_IntVectorIter iter ;
+
+    /*
+     * Look through the id vector and see if any of the attribute
+     * indices are part of the compose attributes. If so, then
+     * this identifier cannot be used an part of an identifier for
+     * the composition.
+     */
+    for (iter = Ral_IntVectorBegin(id) ; iter != end ; ++iter) {
+	if (Ral_IntVectorFetch(attrMap, *iter) != -1) {
+	    return 0 ;
+	}
+    }
+
+    return 1 ;
 }

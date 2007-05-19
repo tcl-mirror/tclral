@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.27 $
-$Date: 2007/05/06 23:33:41 $
+$Revision: 1.28 $
+$Date: 2007/05/19 20:18:25 $
  *--
  */
 
@@ -116,7 +116,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.27 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.28 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -1207,6 +1207,109 @@ Ral_RelationJoin(
     Ral_IntVectorDelete(r2JoinAttrs) ;
 
     return joinRel ;
+}
+
+/*
+ * Compose of two relations. Like compose, except all the compose attributes
+ * are elminated.
+ */
+Ral_Relation
+Ral_RelationCompose(
+    Ral_Relation r1,
+    Ral_Relation r2,
+    Ral_JoinMap map,
+    Ral_ErrorInfo *errInfo)
+{
+    Ral_RelationHeading r1Heading = r1->heading ;
+    Ral_RelationHeading r2Heading = r2->heading ;
+    Ral_RelationHeading composeHeading ;
+    Ral_TupleHeading composeTupleHeading ;
+    Ral_IntVector r1JoinAttrs ;
+    Ral_IntVector r2JoinAttrs ;
+    Ral_Relation composeRel ;
+    Ral_JoinMapIter tupleMapEnd ;
+    Ral_JoinMapIter tupleMapIter ;
+    Ral_RelationIter r1Begin = Ral_RelationBegin(r1) ;
+    Ral_RelationIter r2Begin = Ral_RelationBegin(r2) ;
+
+    /*
+     * Finish building the join map by finding which tuples are
+     * to be composeed.
+     */
+    Ral_RelationFindJoinTuples(r1, r2, map) ;
+    /*
+     * Construct the heading for the composeed relation.
+     */
+    composeHeading = Ral_RelationHeadingCompose(r1Heading, r2Heading, map,
+	&r1JoinAttrs, &r2JoinAttrs, errInfo) ;
+    if (composeHeading == NULL) {
+	return NULL ;
+    }
+    composeTupleHeading = composeHeading->tupleHeading ;
+    /*
+     * Construct the composeed relation.
+     */
+    composeRel = Ral_RelationNew(composeHeading) ;
+    /*
+     * Add in the tuples.
+     */
+    Ral_RelationReserve(composeRel, Ral_JoinMapTupleSize(map)) ;
+    /*
+     * Step through the matches found in the compose map and compose the
+     * indicated tuples.
+     */
+    tupleMapEnd = Ral_JoinMapTupleEnd(map) ;
+    for (tupleMapIter = Ral_JoinMapTupleBegin(map) ;
+	tupleMapIter != tupleMapEnd ; ++tupleMapIter) {
+	Ral_Tuple r1Tuple = *(r1Begin + tupleMapIter->m[0]) ;
+	Ral_Tuple r2Tuple = *(r2Begin + tupleMapIter->m[1]) ;
+	Ral_TupleIter tupleEnd ;
+	Ral_TupleIter tupleIter ;
+	Ral_Tuple composeTuple ;
+	Ral_TupleIter jtIter ;
+	Ral_IntVectorIter attrMapIter ;
+
+	composeTuple = Ral_TupleNew(composeTupleHeading) ;
+	jtIter = Ral_TupleBegin(composeTuple) ;
+	/*
+	 * Take the values from the first relation's tuple, eliminating
+	 * those that are part of the join attributes.
+	 */
+	tupleEnd = Ral_TupleEnd(r1Tuple) ;
+	attrMapIter = Ral_IntVectorBegin(r1JoinAttrs) ;
+	for (tupleIter = Ral_TupleBegin(r1Tuple) ;
+	    tupleIter != tupleEnd ; ++tupleIter) {
+	    int attrIndex = *attrMapIter++ ;
+	    if (attrIndex != -1) {
+		jtIter += Ral_TupleCopyValues(tupleIter,
+		    tupleIter + 1, jtIter) ;
+	    }
+	}
+	/*
+	 * Take the values from the second relation's tuple, eliminating
+	 * those that are part of the join attributes.
+	 */
+	tupleEnd = Ral_TupleEnd(r2Tuple) ;
+	attrMapIter = Ral_IntVectorBegin(r2JoinAttrs) ;
+	for (tupleIter = Ral_TupleBegin(r2Tuple) ;
+	    tupleIter != tupleEnd ; ++tupleIter) {
+	    int attrIndex = *attrMapIter++ ;
+	    if (attrIndex != -1) {
+		jtIter += Ral_TupleCopyValues(tupleIter,
+		    tupleIter + 1, jtIter) ;
+	    }
+	}
+
+	/*
+	 * Ignore any duplicates.
+	 */
+	Ral_RelationPushBack(composeRel, composeTuple, NULL) ;
+    }
+
+    Ral_IntVectorDelete(r1JoinAttrs) ;
+    Ral_IntVectorDelete(r2JoinAttrs) ;
+
+    return composeRel ;
 }
 
 /*

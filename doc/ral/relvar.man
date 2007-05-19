@@ -47,13 +47,13 @@
 #   This command is part of TclRAL. This file is in Tcl Markup Language
 #   format.
 # $RCSfile: relvar.man,v $
-# $Revision: 1.18 $
-# $Date: 2007/05/13 22:00:06 $
+# $Revision: 1.19 $
+# $Date: 2007/05/19 20:18:25 $
 #  *--
 }]
 [moddesc "Relvar Operators"]
 [titledesc "Operators for Relation Variables"]
-[copyright "2004, 2005, 2006 by G. Andrew Mangogna"]
+[copyright "2004, 2005, 2006, 2007 by G. Andrew Mangogna"]
 [require ral [opt 0.8.3]]
 [description]
 This manpage describes the [cmd relvar] command.

@@ -45,13 +45,13 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.21 $
-# $Date: 2007/05/13 22:00:06 $
+# $Revision: 1.22 $
+# $Date: 2007/05/19 20:18:25 $
 #  *--
 }]
 [moddesc "Relation Operators"]
 [titledesc "Operators for Relation Values"]
-[copyright "2004, 2005, 2006 by G. Andrew Mangogna"]
+[copyright "2004, 2005, 2006, 2007 by G. Andrew Mangogna"]
 [require ral [opt 0.8.3]]
 [description]
 This manpage describes the [cmd relation] command.
@@ -367,6 +367,24 @@ in [arg relationValue] is superfluous.
 +=======+------+
 +=======+------+
 }]
+
+[call [cmd "::ral::relation compose"] [arg relationValue1]\
+    [arg relationValue2] [opt "-using attrList"] [opt "relationValue3 ..."]]
+
+The [cmd compose] subcommand computes the join of [arg relationValue1]
+and [arg relationValue2] but eliminates all of the attributes used in the
+join.
+The returned relation has a heading the same as the union of the headings
+of [arg relationValue1] and [arg relationValue2] minus all of the
+join attributes from the two relations.
+The returned relation has a body that is the same as that of the
+[cmd join] minus any duplicated tuples that result when the join
+attributes are eliminated.
+As with [cmd join], if the [arg -using] argument are missing, the
+join is computed across the attributes in [arg relationValue1] and
+[arg relationValue2] that are named the same.
+Otherwise the [arg attrList] argument is treated the same as for the
+[cmd join] subcommand.
 
 [call [cmd "::ral::relation create"] [arg attrs] [arg ids]\
     [opt [arg "tuple1 tuple2 ..."]]]
@@ -1030,7 +1048,7 @@ The [cmd semijoin] subcommand computes the join of [arg relationValue1]
 and [arg relationValue2] but eliminates all of the attributes of
 [arg relationValue1]
 (or alternatively speaking, projecting all attributes of [arg relationValue2]).
-The returned relation has a heading the same a [arg relationValue2]
+The returned relation has a heading the same as [arg relationValue2]
 and a body consisting of those tuples in [arg relationValue2] that
 would have been included in the natural join with [arg relationValue1].
 As with [cmd join], if the [arg -using] argument are missing, the

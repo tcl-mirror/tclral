@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationheading.h,v $
-$Revision: 1.13 $
-$Date: 2006/09/24 16:49:00 $
+$Revision: 1.14 $
+$Date: 2007/05/19 20:18:25 $
  *--
  */
 #ifndef _ral_relationheading_h_
@@ -127,6 +127,9 @@ extern Ral_RelationHeading Ral_RelationHeadingUnion(Ral_RelationHeading,
     Ral_RelationHeading) ;
 extern Ral_RelationHeading Ral_RelationHeadingJoin(Ral_RelationHeading,
     Ral_RelationHeading, Ral_JoinMap, Ral_IntVector *, Ral_ErrorInfo *) ;
+extern Ral_RelationHeading Ral_RelationHeadingCompose(Ral_RelationHeading,
+    Ral_RelationHeading, Ral_JoinMap, Ral_IntVector *, Ral_IntVector *,
+    Ral_ErrorInfo *) ;
 extern int Ral_RelationHeadingScan(Ral_RelationHeading,
     Ral_AttributeTypeScanFlags *) ;
 extern int Ral_RelationHeadingConvert(Ral_RelationHeading, char *,

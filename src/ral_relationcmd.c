@@ -46,8 +46,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.34 $
-$Date: 2007/05/06 23:33:41 $
+$Revision: 1.35 $
+$Date: 2007/05/19 20:18:25 $
  *--
  */
 
@@ -98,6 +98,7 @@ static int RelationAttributesCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationBodyCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationCardinalityCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationChooseCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
+static int RelationComposeCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationCreateCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationDegreeCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 #if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
@@ -147,7 +148,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.34 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.35 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -176,6 +177,7 @@ relationCmd(
 	{"body", RelationBodyCmd},
 	{"cardinality", RelationCardinalityCmd},
 	{"choose", RelationChooseCmd},
+	{"compose", RelationComposeCmd},
 	{"create", RelationCreateCmd},
 	{"degree", RelationDegreeCmd},
 #	    if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
@@ -540,6 +542,86 @@ RelationChooseCmd(
     }
 
     Tcl_SetObjResult(interp, Ral_RelationObjNew(newRelation)) ;
+    return TCL_OK ;
+}
+
+static int
+RelationComposeCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_Obj *r1Obj ;
+    Ral_Relation r1 ;
+    Tcl_Obj *r2Obj ;
+    Ral_Relation r2 ;
+    Ral_Relation composeRel ;
+    Ral_JoinMap joinMap ;
+    Ral_ErrorInfo errInfo ;
+
+    /*
+     * relation compose relation1 relation2 ?-using joinAttrs relation3 ... ?
+     */
+    if (objc < 4) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+	    "relation1 relation2 ?-using joinAttrs?") ;
+	return TCL_ERROR ;
+    }
+    r1Obj = objv[2] ;
+    if (Tcl_ConvertToType(interp, r1Obj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    r1 = r1Obj->internalRep.otherValuePtr ;
+
+    r2Obj = objv[3] ;
+    if (Tcl_ConvertToType(interp, r2Obj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    r2 = r2Obj->internalRep.otherValuePtr ;
+    joinMap = Ral_JoinMapNew(0, 0) ;
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptCompose) ;
+
+    objc -= 4 ;
+    objv += 4 ;
+
+    if (Ral_RelationObjParseJoinArgs(interp, &objc, &objv, r1, r2, joinMap,
+	&errInfo) != TCL_OK) {
+	Ral_JoinMapDelete(joinMap) ;
+	return TCL_ERROR ;
+    }
+
+    composeRel = Ral_RelationCompose(r1, r2, joinMap, &errInfo) ;
+    Ral_JoinMapDelete(joinMap) ;
+    if (composeRel == NULL) {
+	Ral_InterpSetError(interp, &errInfo) ;
+	return TCL_ERROR ;
+    }
+
+    while (objc-- > 0) {
+	r1 = composeRel ;
+	r2Obj = *objv++ ;
+	if (Tcl_ConvertToType(interp, r2Obj, &Ral_RelationObjType) != TCL_OK) {
+	    Ral_RelationDelete(r1) ;
+	    return TCL_ERROR ;
+	}
+	r2 = r2Obj->internalRep.otherValuePtr ;
+	joinMap = Ral_JoinMapNew(0, 0) ;
+
+	if (Ral_RelationObjParseJoinArgs(interp, &objc, &objv, r1, r2, joinMap,
+	    &errInfo) != TCL_OK) {
+	    Ral_JoinMapDelete(joinMap) ;
+	    return TCL_ERROR ;
+	}
+	composeRel = Ral_RelationCompose(r1, r2, joinMap, &errInfo) ;
+	Ral_RelationDelete(r1) ;
+	Ral_JoinMapDelete(joinMap) ;
+	if (composeRel == NULL) {
+	    Ral_InterpSetError(interp, &errInfo) ;
+	    return TCL_ERROR ;
+	}
+    }
+
+    Tcl_SetObjResult(interp, Ral_RelationObjNew(composeRel)) ;
     return TCL_OK ;
 }
 
