@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.31 $
-$Date: 2007/02/24 20:34:51 $
+$Revision: 1.32 $
+$Date: 2007/06/03 00:38:20 $
  *--
  */
 
@@ -151,7 +151,7 @@ static const struct traceOpsMap {
 } ;
 static const char specErrMsg[] = "multiplicity specification" ;
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.31 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.32 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -196,8 +196,8 @@ Ral_RelvarObjNew(
      */
     if (Tcl_SetVar2Ex(interp, resolvedName, NULL, relvar->relObj,
 	TCL_LEAVE_ERR_MSG) == NULL) {
-	Tcl_DStringFree(&resolve) ;
 	Ral_RelvarDelete(info, resolvedName) ;
+	Tcl_DStringFree(&resolve) ;
 	return TCL_ERROR ;
     }
     /*

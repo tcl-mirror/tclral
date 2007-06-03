@@ -1,3 +1,23 @@
+========= ral 0.8.3 =========
+Version 0.8.3 is primarily a bug fix release, however, several new commands
+were added.
+
+1. Added "relation compose" command.
+2. Moved "crosstab" proc in "ralutil" into the proper namespace
+3.  Added "tuple relation" command.
+4. Corrected a problem with "relation group" when there are multiple
+identifiers and the grouping results in fewer identifiers in the grouped
+relation than in the original one.
+5. Corrected a problem with "relation rename". It was using a "medium" deep
+copy of the relation value in an attempt to save the deep copy. Unfortunately,
+this implied that the tuples pointed to a different tuple header than
+the relation that they were in. Then went "rename" modifies the header, the
+relation internals ended up corrupt -- the tuple in the relation were
+pointing to different header than the one in the relation where they resided.
+6. Corrected a problem when create relvars where the parent namespace does not
+exist. The clean up failed because the name of the relvar was deleted before it
+could be removed from the internal structures.
+
 ========= ral 0.8.2 =========
 Version 0.8.2 is primarily a bug fix release, however, several
 new commands have been added and there are three commands were the interface
