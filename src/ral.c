@@ -49,8 +49,8 @@ ABSTRACT:
     Algebra.
 
 $RCSfile: ral.c,v $
-$Revision: 1.36 $
-$Date: 2007/02/17 18:05:06 $
+$Revision: 1.37 $
+$Date: 2007/06/09 22:35:44 $
  *--
  */
 
@@ -105,9 +105,9 @@ STATIC DATA ALLOCATION
 static char const ral_pkgname[] = PACKAGE_NAME ;
 static char const ral_version[] = PACKAGE_VERSION ;
 static char const ral_rcsid[] =
-    "$Id: ral.c,v 1.36 2007/02/17 18:05:06 mangoa01 Exp $" ;
+    "$Id: ral.c,v 1.37 2007/06/09 22:35:44 mangoa01 Exp $" ;
 static char const ral_copyright[] =
-    "This software is copyrighted 2004, 2005, 2006 by G. Andrew Mangogna."
+    "This software is copyrighted 2004, 2005, 2006, 2007 by G. Andrew Mangogna."
     " Terms and conditions for use are distributed with the source code." ;
 
 #ifdef Tcl_RegisterConfig_TCL_DECLARED
