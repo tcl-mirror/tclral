@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.28 $
-$Date: 2007/05/19 20:18:25 $
+$Revision: 1.29 $
+$Date: 2007/06/09 22:15:00 $
  *--
  */
 
@@ -116,7 +116,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.28 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.29 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -651,7 +651,7 @@ Ral_RelationGroup(
 
     /*
      * Create the relation heading for the grouped attribute.  Examine each
-     * identifier of the old Heading to determine the set of attributes that
+     * identifiers of the old Heading to determine the set of attributes that
      * are both in the attribute map and in the identifier.  If that set is
      * non-empty, then look up the name of the attribute in the old heading and
      * map it to a new index in the tupleHeading.
@@ -693,11 +693,21 @@ Ral_RelationGroup(
 	    Ral_TupleHeadingMapIndices(tupleHeading, commonAttrs,
 		attrTupleHeading) ;
 	    /*
-	     * Install the new identifier.
+	     * Install the new identifier. It is possible for this to
+	     * fail if the grouped attributes are part of multiple
+	     * identifiers in the original relation.
 	     */
-	    status = Ral_RelationHeadingAddIdentifier(attrHeading, idCount++,
+	    status = Ral_RelationHeadingAddIdentifier(attrHeading, idCount,
 		commonAttrs) ;
-	    assert(status != 0) ;
+	    /*
+	     * This is a bit of a hack. See below.
+	     */
+	    if (status == 0) {
+		--attrHeading->idCount ;
+		Ral_IntVectorDelete(commonAttrs) ;
+	    } else {
+		++idCount ;
+	    }
 	}
     } else {
 	/*

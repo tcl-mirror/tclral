@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.36 $
-# $Date: 2007/06/03 00:38:20 $
+# $Revision: 1.37 $
+# $Date: 2007/06/09 22:15:00 $
 #  *--
 
 set ::auto_path [linsert $::auto_path 0\
@@ -1801,6 +1801,69 @@ namespace eval ::ral::test {
 		{EName b ENum 2}
 		{EName c ENum 3}
 	    }}
+	}
+    } -match relation
+
+    test relation-group-7.0 {grouped attributes in multiple identifers} -setup {
+	set e {
+	    Relation {
+		DomainId int
+		ClassId int
+		ElemId int
+		ElemName string
+		HierId int
+		SubName string
+		SubCode int
+	    } {
+		{DomainId ClassId ElemId SubName}
+		{DomainId ClassId ElemId SubCode}
+		{DomainId ClassId ElemName SubName}
+		{DomainId ClassId ElemName SubCode}
+		{DomainId ClassId HierId SubName}
+		{DomainId ClassId HierId SubCode}
+	    } {
+		{DomainId 1 ClassId 1 ElemId 17 ElemName R11 HierId 0
+		    SubName COM_SKS SubCode 0}
+		{DomainId 1 ClassId 1 ElemId 17 ElemName R11 HierId 0
+		    SubName COM_IQS SubCode 1}
+		{DomainId 1 ClassId 1 ElemId 17 ElemName R11 HierId 0
+		    SubName COM_SRS SubCode 2}
+		{DomainId 1 ClassId 9 ElemId 43 ElemName R3 HierId 0
+		    SubName COM_KAA SubCode 0}
+		{DomainId 1 ClassId 9 ElemId 43 ElemName R3 HierId 0
+		    SubName COM_DPA SubCode 1}
+		{DomainId 1 ClassId 12 ElemId 57 ElemName R5 HierId 0
+		    SubName COM_MSA SubCode 0}
+	    }
+	}
+    } -body {
+	relation group $e Subtypes SubName SubCode
+    } -result {
+	Relation {
+	    DomainId int
+	    ClassId int
+	    ElemId int
+	    ElemName string
+	    HierId int
+	    Subtypes {
+		Relation {SubName string SubCode int} {SubName SubCode}}
+	} {
+	    {DomainId ClassId ElemId}
+	    {DomainId ClassId ElemName}
+	    {DomainId ClassId HierId}
+	} {
+	    {DomainId 1 ClassId 1 ElemId 17 ElemName R11 HierId 0 Subtypes {
+		{SubName COM_SKS SubCode 0}
+		{SubName COM_IQS SubCode 1}
+		{SubName COM_SRS SubCode 2}}
+	    }
+	    {DomainId 1 ClassId 9 ElemId 43 ElemName R3 HierId 0 Subtypes {
+		{SubName COM_KAA SubCode 0}
+		{SubName COM_DPA SubCode 1}}
+	    }
+	    {DomainId 1 ClassId 12 ElemId 57 ElemName R5 HierId 0 Subtypes {
+		{SubName COM_MSA SubCode 0}}
+	    }
 	}
     } -match relation
 
