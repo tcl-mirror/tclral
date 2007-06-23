@@ -35,10 +35,38 @@ relvar insert People {
 	{Type Home Area 408 Number 555-1122}
     }
     Emails {
-	{Type Home Address alice@bitme.com}
+	{Type Home Address alice@biteme.com}
 	{Type Work Address alice@waytowork.com}
     }
 }
+
+relvar create A {
+    Relation {
+	AID1 string AID2 int A_ATTR1 string
+    } {
+	{AID1 AID2}
+    }
+}
+
+relvar create B {
+    Relation {
+	AID1 string B_ATTR1 string
+    } {
+	AID1
+    }
+}
+
+relvar association R15 A AID1 * B AID1 ?
+
+relvar insert A\
+    {AID1 A1 AID2 1 A_ATTR1 foo}\
+    {AID1 A2 AID2 2 A_ATTR1 bar}\
+    {AID1 A1 AID2 3 A_ATTR1 baz}\
+
+relvar insert B\
+    {AID1 A1 B_ATTR1 foo}\
+    {AID1 A2 B_ATTR1 bar}\
+    {AID1 A4 B_ATTR1 baz}\
 
 # The famous "Date" example database.
 relvar create S {

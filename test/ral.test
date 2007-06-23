@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.37 $
-# $Date: 2007/06/09 22:15:00 $
+# $Revision: 1.38 $
+# $Date: 2007/06/23 18:50:03 $
 #  *--
 
 set ::auto_path [linsert $::auto_path 0\
@@ -3364,6 +3364,69 @@ in expression "_@_< 20"} -returnCodes error
 	    {DomainId 1 ClassId 1 ElemId 1 RefToClass bar Multiple 0}
 	    {DomainId 1 ClassId 1 ElemId 2 RefToClass bar Multiple 0}
 	    {DomainId 1 ClassId 1 ElemId 3 RefToClass bar Multiple 0}
+	}
+    } -match relation
+
+    test relation-semijoin-5.4 {overlapping identifiers} -setup {
+	set domain {
+	    Relation {
+		DomainId int
+		DomainName string
+		IntfProlog string
+		IntfPrologLine int
+		IntfEpilog string
+		IntfEpilogLine int
+	    } {
+		{DomainId}
+		{DomainName}
+	    } {
+		{
+		    DomainId 1
+		    DomainName Foo
+		    IntfProlog prolog
+		    IntfPrologLine 22
+		    IntfEpilog epilog
+		    IntfEpilogLine 200
+		}
+	    }
+	}
+	set class {
+	    Relation {
+		DomainId int
+		ClassId int
+		ClassName string
+		Line int
+		StorageSlots int
+	    } {
+		{DomainId ClassId}
+		{DomainId ClassName}
+	    } {
+		{DomainId 1 ClassId 1 ClassName c1 Line 20 StorageSlots 0}
+		{DomainId 1 ClassId 2 ClassName c2 Line 21 StorageSlots 1}
+		{DomainId 1 ClassId 3 ClassName c3 Line 23 StorageSlots 2}
+		{DomainId 1 ClassId 4 ClassName c4 Line 24 StorageSlots 3}
+		{DomainId 1 ClassId 5 ClassName c5 Line 25 StorageSlots 4}
+	    }
+	}
+    } -cleanup {
+    } -body {
+	relation semijoin $domain $class
+    } -result {
+	Relation {
+	    DomainId int
+	    ClassId int
+	    ClassName string
+	    Line int
+	    StorageSlots int
+	} {
+	    {DomainId ClassId}
+	    {DomainId ClassName}
+	} {
+	    {DomainId 1 ClassId 1 ClassName c1 Line 20 StorageSlots 0}
+	    {DomainId 1 ClassId 2 ClassName c2 Line 21 StorageSlots 1}
+	    {DomainId 1 ClassId 3 ClassName c3 Line 23 StorageSlots 2}
+	    {DomainId 1 ClassId 4 ClassName c4 Line 24 StorageSlots 3}
+	    {DomainId 1 ClassId 5 ClassName c5 Line 25 StorageSlots 4}
 	}
     } -match relation
 
