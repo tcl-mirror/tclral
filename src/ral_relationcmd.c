@@ -46,8 +46,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.35 $
-$Date: 2007/05/19 20:18:25 $
+$Revision: 1.36 $
+$Date: 2008/01/10 16:43:11 $
  *--
  */
 
@@ -148,7 +148,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.35 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.36 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -1970,11 +1970,11 @@ RelationRankCmd(
 	Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptRank,
 	    RAL_ERR_BAD_RANK_TYPE, rankAttrName) ;
 	return TCL_ERROR ;
-    } else if (strcmp(rankAttr->tclType->name, "int") == 0) {
+    } else if (strcmp(rankAttr->heading.tclType->name, "int") == 0) {
 	rankType = RANK_INT ;
-    } else if (strcmp(rankAttr->tclType->name, "double") == 0) {
+    } else if (strcmp(rankAttr->heading.tclType->name, "double") == 0) {
 	rankType = RANK_DOUBLE ;
-    } else if (strcmp(rankAttr->tclType->name, "string") == 0) {
+    } else if (strcmp(rankAttr->heading.tclType->name, "string") == 0) {
 	rankType = RANK_STRING ;
     } else {
 	Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptRank,
@@ -2024,7 +2024,8 @@ RelationRankCmd(
 	Ral_TupleIter newIter ;
 	int status ;
 
-	if (Tcl_ConvertToType(interp, rankObj, rankAttr->tclType) != TCL_OK) {
+	if (Tcl_ConvertToType(interp, rankObj, rankAttr->heading.tclType)
+		!= TCL_OK) {
 	    Ral_RelationDelete(newRelation) ;
 	    return TCL_ERROR ;
 	}
@@ -2032,7 +2033,7 @@ RelationRankCmd(
 	for (tIter = Ral_RelationBegin(relation) ; tIter != rEnd ; ++tIter) {
 	    Tcl_Obj *cmpObj = *(Ral_TupleBegin(*tIter) + rankAttrIndex) ;
 
-	    if (Tcl_ConvertToType(interp, cmpObj, rankAttr->tclType)
+	    if (Tcl_ConvertToType(interp, cmpObj, rankAttr->heading.tclType)
 		!= TCL_OK) {
 		Ral_RelationDelete(newRelation) ;
 		return TCL_ERROR ;

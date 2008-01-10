@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.29 $
-$Date: 2007/06/09 22:15:00 $
+$Revision: 1.30 $
+$Date: 2008/01/10 16:43:11 $
  *--
  */
 
@@ -116,7 +116,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.29 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.30 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -953,7 +953,7 @@ Ral_RelationUngroup(
 	Ral_ErrorInfoSetError(errInfo, RAL_ERR_NOT_A_RELATION, attrName) ;
 	return NULL ;
     }
-    attrHeading = ungrpAttr->relationHeading ;
+    attrHeading = ungrpAttr->heading.relationHeading ;
     attrTupleHeading = attrHeading->tupleHeading ;
     /*
      * Create a new tuple heading for the ungrouped result.  The ungrouped
