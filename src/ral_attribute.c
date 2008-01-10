@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.c,v $
-$Revision: 1.16 $
-$Date: 2007/02/19 23:12:26 $
+$Revision: 1.17 $
+$Date: 2008/01/10 16:38:53 $
  *--
  */
 
@@ -98,7 +98,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.16 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.17 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -120,7 +120,7 @@ Ral_AttributeNewTclType(
     a->name = strcpy((char *)(a + 1), name) ;
     a->typeName = tclType->name ;
     a->attrType = Tcl_Type ;
-    a->tclType = tclType ;
+    a->heading.tclType = tclType ;
 
     return a ;
 }
@@ -136,7 +136,7 @@ Ral_AttributeNewTupleType(
     a->name = strcpy((char *)(a + 1), name) ;
     a->typeName = tupleKeyword ;
     a->attrType = Tuple_Type ;
-    Ral_TupleHeadingReference(a->tupleHeading = heading) ;
+    Ral_TupleHeadingReference(a->heading.tupleHeading = heading) ;
 
     return a ;
 }
@@ -152,7 +152,7 @@ Ral_AttributeNewRelationType(
     a->name = strcpy((char *)(a + 1), name) ;
     a->typeName = relationKeyword ;
     a->attrType = Relation_Type ;
-    Ral_RelationHeadingReference(a->relationHeading = heading) ;
+    Ral_RelationHeadingReference(a->heading.relationHeading = heading) ;
 
     return a ;
 }
@@ -166,11 +166,11 @@ Ral_AttributeDelete(
 	break ;
 
     case Tuple_Type:
-	Ral_TupleHeadingUnreference(a->tupleHeading) ;
+	Ral_TupleHeadingUnreference(a->heading.tupleHeading) ;
 	break ;
 
     case Relation_Type:
-	Ral_RelationHeadingUnreference(a->relationHeading) ;
+	Ral_RelationHeadingUnreference(a->heading.relationHeading) ;
 	break ;
 
     default:
@@ -194,11 +194,12 @@ Ral_AttributeDup(
 	break ;
 
     case Tuple_Type:
-	newAttr = Ral_AttributeNewTupleType(a->name, a->tupleHeading) ;
+	newAttr = Ral_AttributeNewTupleType(a->name, a->heading.tupleHeading) ;
 	break ;
 
     case Relation_Type:
-	newAttr = Ral_AttributeNewRelationType(a->name, a->relationHeading) ;
+	newAttr = Ral_AttributeNewRelationType(a->name,
+		a->heading.relationHeading) ;
 	break ;
 
     default:
@@ -218,10 +219,11 @@ Ral_AttributeRename(
 	return Ral_AttributeNewTclType(newName, a->typeName) ;
 
     case Tuple_Type:
-	return Ral_AttributeNewTupleType(newName, a->tupleHeading) ;
+	return Ral_AttributeNewTupleType(newName, a->heading.tupleHeading) ;
 
     case Relation_Type:
-	return Ral_AttributeNewRelationType(newName, a->relationHeading) ;
+	return Ral_AttributeNewRelationType(newName,
+		a->heading.relationHeading) ;
 
     default:
 	Tcl_Panic("Ral_AttributeRename: unknown attribute type: %d",
@@ -260,16 +262,17 @@ Ral_AttributeTypeEqual(
 
     switch (a1->attrType) {
     case Tcl_Type:
-	result = a1->tclType == a2->tclType ;
+	result = a1->heading.tclType == a2->heading.tclType ;
 	break ;
 
     case Tuple_Type:
-	result = Ral_TupleHeadingEqual(a1->tupleHeading, a2->tupleHeading) ;
+	result = Ral_TupleHeadingEqual(a1->heading.tupleHeading,
+		a2->heading.tupleHeading) ;
 	break ;
 
     case Relation_Type:
-	result = Ral_RelationHeadingEqual(a1->relationHeading,
-	    a2->relationHeading) ;
+	result = Ral_RelationHeadingEqual(a1->heading.relationHeading,
+	    a2->heading.relationHeading) ;
 	break ;
 
     default:
@@ -290,8 +293,8 @@ Ral_AttributeValueEqual(
 	if (strlen(Tcl_GetString(v1)) == 0 && strlen(Tcl_GetString(v2)) == 0) {
 	    return 1 ;
 	}
-	if (Tcl_ConvertToType(NULL, v1, a->tclType) != TCL_OK ||
-	    Tcl_ConvertToType(NULL, v2, a->tclType) != TCL_OK) {
+	if (Tcl_ConvertToType(NULL, v1, a->heading.tclType) != TCL_OK ||
+	    Tcl_ConvertToType(NULL, v2, a->heading.tclType) != TCL_OK) {
 	    return 0 ;
 	}
 	if (strcmp(a->typeName, "int") == 0 ||
@@ -350,8 +353,8 @@ Ral_AttributeValueCompare(
 
     switch (a->attrType) {
     case Tcl_Type:
-	if (Tcl_ConvertToType(NULL, v1, a->tclType) != TCL_OK ||
-	    Tcl_ConvertToType(NULL, v2, a->tclType) != TCL_OK) {
+	if (Tcl_ConvertToType(NULL, v1, a->heading.tclType) != TCL_OK ||
+	    Tcl_ConvertToType(NULL, v2, a->heading.tclType) != TCL_OK) {
 	    Tcl_Panic("Ral_AttributeValueCompare: cannot convert to %s",
 		a->typeName) ;
 	}
@@ -550,12 +553,12 @@ Ral_AttributeConvertValueToType(
 	 * type ends up being "int". This means that "0" and "1" are
 	 * NOT valid boolean values.
 	 */
-	result = Tcl_ConvertToType(interp, objPtr, attr->tclType) ;
-	if (result != TCL_OK || objPtr->typePtr != attr->tclType) {
+	result = Tcl_ConvertToType(interp, objPtr, attr->heading.tclType) ;
+	if (result != TCL_OK || objPtr->typePtr != attr->heading.tclType) {
 	    Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_BAD_VALUE, objPtr) ;
 	    Ral_InterpSetError(interp, errInfo) ;
-	} else if (strcmp(attr->tclType->name, "string") != 0 &&
-	    attr->tclType->updateStringProc != NULL) {
+	} else if (strcmp(attr->heading.tclType->name, "string") != 0 &&
+	    attr->heading.tclType->updateStringProc != NULL) {
 	    /*
 	     * We also want to generate the canonical form of the string
 	     * representation so that string hashes, etc work properly.
@@ -563,21 +566,21 @@ Ral_AttributeConvertValueToType(
 	     * that can actually regenerate a string rep once invalidated.
 	     */
 	    Tcl_InvalidateStringRep(objPtr) ;
-	    (*attr->tclType->updateStringProc)(objPtr) ;
+	    (*attr->heading.tclType->updateStringProc)(objPtr) ;
 	}
 	break ;
 
     case Tuple_Type:
 	if (objPtr->typePtr != &Ral_TupleObjType) {
-	    result = Ral_TupleObjConvert(attr->tupleHeading, interp, objPtr,
-		objPtr, errInfo) ;
+	    result = Ral_TupleObjConvert(attr->heading.tupleHeading, interp,
+		    objPtr, objPtr, errInfo) ;
 	}
 	break ;
 
     case Relation_Type:
 	if (objPtr->typePtr != &Ral_RelationObjType) {
-	    result = Ral_RelationObjConvert(attr->relationHeading, interp,
-		objPtr, objPtr, errInfo) ;
+	    result = Ral_RelationObjConvert(attr->heading.relationHeading,
+		    interp, objPtr, objPtr, errInfo) ;
 	}
 	break ;
 
@@ -618,16 +621,17 @@ Ral_AttributeScanType(
     flags->attrType = a->attrType ;
     switch (a->attrType) {
     case Tcl_Type:
-	length = Tcl_ScanElement(a->tclType->name, &flags->simpleFlags) ;
+	length = Tcl_ScanElement(a->heading.tclType->name,
+		&flags->simpleFlags) ;
 	break ;
 
     case Tuple_Type:
-	length = Ral_TupleHeadingScan(a->tupleHeading, flags) ;
+	length = Ral_TupleHeadingScan(a->heading.tupleHeading, flags) ;
 	length += sizeof(openList) + sizeof(closeList) ;
 	break ;
 
     case Relation_Type:
-	length = Ral_RelationHeadingScan(a->relationHeading, flags) ;
+	length = Ral_RelationHeadingScan(a->heading.relationHeading, flags) ;
 	length += sizeof(openList) + sizeof(closeList) ;
 	break ;
 
@@ -649,14 +653,15 @@ Ral_AttributeConvertType(
 
     switch (a->attrType) {
     case Tcl_Type:
-	length = Tcl_ConvertElement(a->tclType->name, dst, flags->simpleFlags) ;
+	length = Tcl_ConvertElement(a->heading.tclType->name, dst,
+		flags->simpleFlags) ;
 	break ;
 
     case Tuple_Type: {
 	char *p = dst ;
 
 	*p++ = openList ;
-	p += Ral_TupleHeadingConvert(a->tupleHeading, p, flags) ;
+	p += Ral_TupleHeadingConvert(a->heading.tupleHeading, p, flags) ;
 	*p++ = closeList ;
 	length = p - dst ;
     }
@@ -666,7 +671,7 @@ Ral_AttributeConvertType(
 	char *p = dst ;
 
 	*p++ = openList ;
-	p += Ral_RelationHeadingConvert(a->relationHeading, p, flags) ;
+	p += Ral_RelationHeadingConvert(a->heading.relationHeading, p, flags) ;
 	*p++ = closeList ;
 	length = p - dst ;
     }

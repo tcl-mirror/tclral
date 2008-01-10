@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.h,v $
-$Revision: 1.11 $
-$Date: 2006/11/05 00:15:59 $
+$Revision: 1.12 $
+$Date: 2008/01/10 16:38:53 $
  *--
  */
 #ifndef _ral_attribute_h_
@@ -102,7 +102,7 @@ typedef struct Ral_Attribute {
 	Tcl_ObjType *tclType ;
 	struct Ral_TupleHeading *tupleHeading ;
 	struct Ral_RelationHeading *relationHeading ;
-    } ;
+    } heading ;
 } *Ral_Attribute ;
 
 /*
