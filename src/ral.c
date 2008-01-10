@@ -49,8 +49,8 @@ ABSTRACT:
     Algebra.
 
 $RCSfile: ral.c,v $
-$Revision: 1.37 $
-$Date: 2007/06/09 22:35:44 $
+$Revision: 1.38 $
+$Date: 2008/01/10 16:41:55 $
  *--
  */
 
@@ -105,7 +105,7 @@ STATIC DATA ALLOCATION
 static char const ral_pkgname[] = PACKAGE_NAME ;
 static char const ral_version[] = PACKAGE_VERSION ;
 static char const ral_rcsid[] =
-    "$Id: ral.c,v 1.37 2007/06/09 22:35:44 mangoa01 Exp $" ;
+    "$Id: ral.c,v 1.38 2008/01/10 16:41:55 mangoa01 Exp $" ;
 static char const ral_copyright[] =
     "This software is copyrighted 2004, 2005, 2006, 2007 by G. Andrew Mangogna."
     " Terms and conditions for use are distributed with the source code." ;
@@ -134,15 +134,12 @@ int
 Ral_Init(
     Tcl_Interp *interp)
 {
-#   define NAMEBUFSIZE	32 /* nice power of 2, for no good reason */
+    static char const nsSep[] = "::" ;
+    static char const tupleCmdName[] = "tuple" ;
+    static char const relationCmdName[] = "relation" ;
+    static char const relvarCmdName[] = "relvar" ;
 
-    static const char nsSep[] = "::" ;
-    static const char tupleCmdName[] = "tuple" ;
-    static const char relationCmdName[] = "relation" ;
-    static const char relvarCmdName[] = "relvar" ;
-
-    char cmdName[NAMEBUFSIZE] ;
-    char *cmdSlot ;
+    Tcl_DString cmdName ;
     Tcl_Namespace *ralNs ;
     Ral_RelvarInfo rInfo ;
 
@@ -153,42 +150,50 @@ Ral_Init(
      */
     Tcl_RegisterObjType(&Ral_TupleObjType) ;
     Tcl_RegisterObjType(&Ral_RelationObjType) ;
-
-    strcpy(cmdName, nsSep) ;
-    strcat(cmdName, ral_pkgname) ;
-    ralNs = Tcl_CreateNamespace(interp, cmdName, NULL, NULL) ;
-
-    strcat(cmdName, nsSep) ;
-    cmdSlot = cmdName + strlen(cmdName) ;
-
-    strcpy(cmdSlot, tupleCmdName) ;
-    Tcl_CreateObjCommand(interp, cmdName, tupleCmd, NULL, NULL) ;
+    /*
+     * Create the namespace in which the package command reside.
+     */
+    Tcl_DStringInit(&cmdName) ;
+    Tcl_DStringAppend(&cmdName, nsSep, -1) ;
+    Tcl_DStringAppend(&cmdName, ral_pkgname, -1) ;
+    ralNs = Tcl_CreateNamespace(interp, Tcl_DStringValue(&cmdName),
+	    NULL, NULL) ;
+    /*
+     * Create the package commands.
+     */
+    Tcl_DStringAppend(&cmdName, nsSep, -1) ;
+    int baseLen = strlen(Tcl_DStringValue(&cmdName)) ;
+    Tcl_DStringAppend(&cmdName, tupleCmdName, -1) ;
+    Tcl_CreateObjCommand(interp, Tcl_DStringValue(&cmdName), tupleCmd,
+	    NULL, NULL) ;
     if (Tcl_Export(interp, ralNs, tupleCmdName, 0) != TCL_OK) {
 	return TCL_ERROR ;
     }
 
-    strcpy(cmdSlot, relationCmdName) ;
-    Tcl_CreateObjCommand(interp, cmdName, relationCmd, NULL, NULL) ;
+    Tcl_DStringSetLength(&cmdName, baseLen) ;
+    Tcl_DStringAppend(&cmdName, relationCmdName, -1) ;
+    Tcl_CreateObjCommand(interp, Tcl_DStringValue(&cmdName), relationCmd,
+	    NULL, NULL) ;
     if (Tcl_Export(interp, ralNs, relationCmdName, 0) != TCL_OK) {
 	return TCL_ERROR ;
     }
 
-    strcpy(cmdSlot, relvarCmdName) ;
+    Tcl_DStringSetLength(&cmdName, baseLen) ;
+    Tcl_DStringAppend(&cmdName, relvarCmdName, -1) ;
     rInfo = Ral_RelvarNewInfo(ral_pkgname, interp) ;
-    Tcl_CreateObjCommand(interp, cmdName, relvarCmd, rInfo, NULL) ;
+    Tcl_CreateObjCommand(interp, Tcl_DStringValue(&cmdName), relvarCmd, rInfo,
+	    NULL) ;
     if (Tcl_Export(interp, ralNs, relvarCmdName, 0) != TCL_OK) {
 	return TCL_ERROR ;
     }
 
 #   ifdef Tcl_RegisterConfig_TCL_DECLARED
-    Tcl_RegisterConfig(interp, ral_pkgname, ral_config, "UTF-8") ;
+    Tcl_RegisterConfig(interp, ral_pkgname, ral_config, "iso8859-1") ;
 #   endif
 
     Tcl_PkgProvide(interp, ral_pkgname, ral_version) ;
 
     return TCL_OK ;
-
-#   undef NAMEBUFSIZE
 }
 
 /*
