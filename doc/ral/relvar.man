@@ -47,8 +47,8 @@
 #   This command is part of TclRAL. This file is in Tcl Markup Language
 #   format.
 # $RCSfile: relvar.man,v $
-# $Revision: 1.20 $
-# $Date: 2007/06/09 22:22:31 $
+# $Revision: 1.21 $
+# $Date: 2008/01/10 16:44:45 $
 #  *--
 }]
 [moddesc "Relvar Operators"]
@@ -265,10 +265,10 @@ The return value is the empty string.
 The [cmd "constraint info"] subcommand returns the detailed information
 about the constraint named [arg name].
 The information returned is of the same format as the command used
-to create the partition minus the superfluous leading [cmd relvar] command
+to create the constraint minus the superfluous leading [cmd relvar] command
 word.
-Also, the relvar names and constraint names are returned in fully qualified
-form.
+Additionally,
+the relvar names and constraint names are returned in fully qualified form.
 
 [example {
 % relvar constraint info A1
@@ -367,8 +367,7 @@ as described for the [cmd ::ral::relation] commands or
 as returned from [cmd "::ral::relation heading"].
 If [arg relvarName] name begins with "::", then it is interpreted
 as a fully resolved name and will be created in the given namespace.
-Othersize [arg relvarName] is interpreted relative the to current
-namespace and will be created in the current namespace.
+Otherwize [arg relvarName] is interpreted as relative the to current namespace.
 In either case,
 an ordinary Tcl variable is also created by the same fully resolved
 name as the relvar.
@@ -596,7 +595,7 @@ The value of [arg relvarName] is modified in place.
 The return value is a relation value with the same heading as the
 value held in [arg relvarName] and whose body contains the tuples as they
 were actually inserted.
-This give the caller access to any attributes that might have been modified
+This gives the caller access to any attributes that might have been modified
 by a relvar trace.
 It is an error to attempt to insert a duplicate tuple or a tuple whose
 heading does not match the heading of the value held in [arg relvarName].
@@ -881,8 +880,8 @@ to modify the value of [arg tupleVarName].
 The return value of the subcommand
 is a relation value with the same heading as the
 value held in [arg relvarName] and whose body contains the tuples as they
-were actually inserted.
-This give the caller access to any attributes that might have been modified
+were actually updated.
+This gives the caller access to any attributes that might have been modified
 by a relvar trace.
 If the [arg script] throws an error or the modified value of a tuple cannot
 be updated into [arg relvarName], all changes to [arg relvarName] are
@@ -1017,8 +1016,8 @@ The trace command is invoked when the corresponding relvar operation
 is invoked and is invoked in the context of the caller of the relvar operation,
 which, in general, is different from the caller of the [cmd "relvar trace add"]
 command.
-When executing a variable type trace for a relvar all other variable type
-tracing for that relvar is inhibited.
+When executing a variable type trace for a relvar,
+all other variable type tracing for that relvar is inhibited.
 If multiple traces have been added to a relvar,
 the traces are invoked in the order of most recent first to oldest last.
 

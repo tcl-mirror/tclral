@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.35 $
-# $Date: 2007/06/23 18:50:03 $
+# $Revision: 1.36 $
+# $Date: 2008/01/10 16:44:45 $
 #  *--
 
 namespace eval ::ral {
@@ -833,8 +833,8 @@ proc ::ral::getRelativeConstraintInfo {cname} {
 	    }
 	}
 	partition {
-	    lset cinfo 1 [string trimleft [lindex 1 $cinfo] ":"]
-	    lset cinfo 2 [string trimleft [lindex 2 $cinfo] ":"]
+	    lset cinfo 1 [string trimleft [lindex $cinfo 1] ":"]
+	    lset cinfo 2 [string trimleft [lindex $cinfo 2] ":"]
 	    for {set index 4} {$index < [llength $cinfo]} {incr index 2} {
 		lset cinfo $index [string trimleft [lindex $cinfo $index] ":"]
 	    }
@@ -887,4 +887,4 @@ proc ::ral::setRelativeConstraintInfo {ns cinfo} {
     return $cinfo
 }
 
-package provide ral 0.8.4
+package provide ral 0.8.5

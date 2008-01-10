@@ -1,3 +1,15 @@
+========= ral 0.8.5 =========
+Version 0.8.5 is a bug fix release.
+
+1. Corrected a problem with the package configuration command, "ral::pkgconfig".
+This command is formed by a call to Tcl_RegisterConfig(). In previous verions,
+an incorrect encoding string was passed to the call. Late in the 8.5 release,
+the semantics of how this was handled was changed and the error, which in the
+past was effective masked, now shows up.
+
+2. Fixed an anonymous union that causes compilation problems on compilers other
+than GCC.
+
 ========= ral 0.8.3 =========
 Version 0.8.3 is primarily a bug fix release, however, several new commands
 were added.
