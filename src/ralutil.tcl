@@ -49,11 +49,11 @@
 # without cluttering the TclRAL package proper.
 # 
 # $RCSfile: ralutil.tcl,v $
-# $Revision: 1.10 $
-# $Date: 2008/01/10 16:44:45 $
+# $Revision: 1.11 $
+# $Date: 2008/01/19 19:26:14 $
 #  *--
 
-package provide ralutil 0.8.5
+package provide ralutil 0.8.6
 
 namespace eval ::ralutil {
     namespace export pipe

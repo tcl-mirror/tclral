@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.36 $
-# $Date: 2008/01/10 16:44:45 $
+# $Revision: 1.37 $
+# $Date: 2008/01/19 19:26:14 $
 #  *--
 
 namespace eval ::ral {
@@ -887,4 +887,4 @@ proc ::ral::setRelativeConstraintInfo {ns cinfo} {
     return $cinfo
 }
 
-package provide ral 0.8.5
+package provide ral 0.8.6
