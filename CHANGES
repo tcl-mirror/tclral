@@ -1,3 +1,9 @@
+========= ral 0.8.6 =========
+Version 0.8.6 is a code clean up release. There were a number of GCC specific
+constructs that were in the source that caused errors for other compilers
+(e.g. the native Sun compiler). There was no change in functionality, only
+the elimination of some anonymous unions in a couple data structures.
+
 ========= ral 0.8.5 =========
 Version 0.8.5 is a bug fix release.
 

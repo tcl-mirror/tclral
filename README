@@ -11,7 +11,8 @@ it should be sufficient to unwrap the source and:
 % make install
 
 Configure typically needs to know where Tcl is installed on your system
-via the "--with-tcl=...." argument.
+via the "--with-tcl=...." argument. You may also wish to remove the
+assertions by defining "CPPFLAGS=-DNDEBUG" as an environment variable.
 
 This also works more or less on Windows system using MSys or Cygwin.
 I build the Windows binary distributes using MSys.
