@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.h,v $
-$Revision: 1.10 $
-$Date: 2007/01/28 02:21:11 $
+$Revision: 1.11 $
+$Date: 2008/01/19 20:51:16 $
  *--
  */
 #ifndef _ral_relvar_h_
@@ -122,7 +122,7 @@ typedef struct Ral_Constraint {
 	Ral_AssociationConstraint association ;
 	Ral_PartitionConstraint partition ;
 	Ral_CorrelationConstraint correlation ;
-    } ;
+    } constraint ;
 } *Ral_Constraint ;
 
 /*

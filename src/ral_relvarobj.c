@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.32 $
-$Date: 2007/06/03 00:38:20 $
+$Revision: 1.33 $
+$Date: 2008/01/19 20:51:16 $
  *--
  */
 
@@ -151,7 +151,7 @@ static const struct traceOpsMap {
 } ;
 static const char specErrMsg[] = "multiplicity specification" ;
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.32 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.33 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -637,7 +637,7 @@ Ral_RelvarObjCreateAssoc(
 	Tcl_DStringFree(&resolve) ;
 	return TCL_ERROR ;
     }
-    assoc = constraint->association ;
+    assoc = constraint->constraint.association ;
     assoc->referringRelvar = relvar1 ;
     assoc->referringCond = specTable[specIndex1].conditionality ;
     assoc->referringMult = specTable[specIndex1].multiplicity ;
@@ -773,7 +773,7 @@ Ral_RelvarObjCreatePartition(
 	Tcl_DStringFree(&resolve) ;
 	return TCL_ERROR ;
     }
-    partition = constraint->partition ;
+    partition = constraint->constraint.partition ;
     partition->referredToRelvar = super ;
 
     Ral_PtrVectorPushBack(super->constraints, constraint) ;
@@ -1051,7 +1051,7 @@ Ral_RelvarObjCreateCorrelation(
 	Tcl_DStringFree(&resolve) ;
 	return TCL_ERROR ;
     }
-    correl = constraint->correlation ;
+    correl = constraint->constraint.correlation ;
     correl->referringRelvar = relvarC ;
     correl->aRefToRelvar = relvar1 ;
     correl->aCond = specTable[specIndex1].conditionality ;
@@ -1229,7 +1229,7 @@ Ral_RelvarObjConstraintInfo(
 	/* association name relvar1 attr-list1 spec1
 	 * relvar2 attr-list2 spec2
 	 */
-	Ral_AssociationConstraint assoc = constraint->association ;
+	Ral_AssociationConstraint assoc = constraint->constraint.association ;
 
 	if (Tcl_ListObjAppendElement(interp, resultObj,
 	    Tcl_NewStringObj("association", -1)) != TCL_OK) {
@@ -1289,7 +1289,7 @@ Ral_RelvarObjConstraintInfo(
 	 * partition name super super-attrs sub1 sub1-attrs
 	 * ?sub2 sub2-attrs sub3 sub3-attrs ...?
 	 */
-	Ral_PartitionConstraint partition = constraint->partition ;
+	Ral_PartitionConstraint partition = constraint->constraint.partition ;
 	Ral_PtrVectorIter refEnd =
 	    Ral_PtrVectorEnd(partition->subsetReferences) ;
 	Ral_PtrVectorIter refIter ;
@@ -1353,7 +1353,7 @@ Ral_RelvarObjConstraintInfo(
 	 *	attr-listC1 spec1 relvar1 attr-list1
 	 *	attr-listC2 spec2 relvar2 attr-list2
 	 */
-	Ral_CorrelationConstraint correl = constraint->correlation ;
+	Ral_CorrelationConstraint correl = constraint->constraint.correlation ;
 
 	if (Tcl_ListObjAppendElement(interp, resultObj,
 	    Tcl_NewStringObj("correlation", -1)) != TCL_OK) {

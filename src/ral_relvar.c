@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.c,v $
-$Revision: 1.15 $
-$Date: 2007/01/28 02:21:11 $
+$Revision: 1.16 $
+$Date: 2008/01/19 20:51:16 $
  *--
  */
 
@@ -120,7 +120,7 @@ static char const * const condMultStrings[2][2] = {
     {"1", "+"},
     {"?", "*"}
 } ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.15 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.16 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -555,9 +555,10 @@ Ral_ConstraintNewAssociation(
     Ral_Constraint constraint = Ral_ConstraintNew(name) ;
 
     constraint->type = ConstraintAssociation ;
-    constraint->association = (Ral_AssociationConstraint)ckalloc(
-	sizeof(*constraint->association)) ;
-    memset(constraint->association, 0, sizeof(*constraint->association)) ;
+    constraint->constraint.association = (Ral_AssociationConstraint)ckalloc(
+	sizeof(*constraint->constraint.association)) ;
+    memset(constraint->constraint.association, 0,
+	    sizeof(*constraint->constraint.association)) ;
 
     return constraint ;
 }
@@ -569,9 +570,9 @@ Ral_ConstraintNewPartition(
     Ral_Constraint constraint = Ral_ConstraintNew(name) ;
 
     constraint->type = ConstraintPartition ;
-    constraint->partition = (Ral_PartitionConstraint)ckalloc(
-	sizeof(*constraint->partition)) ;
-    constraint->partition->subsetReferences = Ral_PtrVectorNew(2) ;
+    constraint->constraint.partition = (Ral_PartitionConstraint)ckalloc(
+	sizeof(*constraint->constraint.partition)) ;
+    constraint->constraint.partition->subsetReferences = Ral_PtrVectorNew(2) ;
 
     return constraint ;
 }
@@ -583,9 +584,10 @@ Ral_ConstraintNewCorrelation(
     Ral_Constraint constraint = Ral_ConstraintNew(name) ;
 
     constraint->type = ConstraintCorrelation ;
-    constraint->correlation = (Ral_CorrelationConstraint)ckalloc(
-	sizeof(*constraint->correlation)) ;
-    memset(constraint->correlation, 0, sizeof(*constraint->correlation)) ;
+    constraint->constraint.correlation = (Ral_CorrelationConstraint)ckalloc(
+	sizeof(*constraint->constraint.correlation)) ;
+    memset(constraint->constraint.correlation, 0,
+	    sizeof(*constraint->constraint.correlation)) ;
 
     return constraint ;
 }
@@ -597,7 +599,7 @@ Ral_ConstraintDelete(
     switch (constraint->type) {
     case ConstraintAssociation:
     {
-	Ral_AssociationConstraint assoc = constraint->association ;
+	Ral_AssociationConstraint assoc = constraint->constraint.association ;
 	Ral_Relvar referring = assoc->referringRelvar ;
 	Ral_Relvar referred = assoc->referredToRelvar ;
 	Ral_PtrVectorIter found ;
@@ -627,7 +629,7 @@ Ral_ConstraintDelete(
 
     case ConstraintPartition:
     {
-	Ral_PartitionConstraint partition = constraint->partition ;
+	Ral_PartitionConstraint partition = constraint->constraint.partition ;
 	Ral_Relvar super = partition->referredToRelvar ;
 	Ral_PtrVectorIter found ;
 	Ral_PtrVectorIter sEnd ;
@@ -671,7 +673,7 @@ Ral_ConstraintDelete(
 
     case ConstraintCorrelation:
     {
-	Ral_CorrelationConstraint correl = constraint->correlation ;
+	Ral_CorrelationConstraint correl = constraint->constraint.correlation ;
 	Ral_Relvar referring = correl->referringRelvar ;
 	Ral_Relvar aRef = correl->aRefToRelvar ;
 	Ral_Relvar bRef = correl->bRefToRelvar ;
@@ -719,17 +721,17 @@ Ral_RelvarConstraintEval(
     switch (constraint->type) {
     case ConstraintAssociation:
 	return relvarAssocConstraintEval(constraint->name,
-	    constraint->association, errMsg) ;
+	    constraint->constraint.association, errMsg) ;
 	break ;
 
     case ConstraintPartition:
 	return relvarPartitionConstraintEval(constraint->name,
-	    constraint->partition, errMsg) ;
+	    constraint->constraint.partition, errMsg) ;
 	break ;
 
     case ConstraintCorrelation:
 	return relvarCorrelationConstraintEval(constraint->name,
-	    constraint->correlation, errMsg) ;
+	    constraint->constraint.correlation, errMsg) ;
 	break ;
 
     default:
@@ -921,7 +923,7 @@ relvarConstraintCleanup(
     switch (constraint->type) {
     case ConstraintAssociation:
     {
-	Ral_AssociationConstraint assoc = constraint->association ;
+	Ral_AssociationConstraint assoc = constraint->constraint.association ;
 	if (assoc->referenceMap) {
 	    Ral_JoinMapDelete(assoc->referenceMap) ;
 	}
@@ -931,15 +933,15 @@ relvarConstraintCleanup(
 
     case ConstraintPartition:
     {
-	Ral_PartitionConstraint partition = constraint->partition ;
+	Ral_PartitionConstraint partition = constraint->constraint.partition ;
 	Ral_PtrVectorDelete(partition->subsetReferences) ;
-	ckfree((char *)constraint->partition) ;
+	ckfree((char *)partition) ;
     }
 	break ;
 
     case ConstraintCorrelation:
     {
-	Ral_CorrelationConstraint correl = constraint->correlation ;
+	Ral_CorrelationConstraint correl = constraint->constraint.correlation ;
 	if (correl->aReferenceMap) {
 	    Ral_JoinMapDelete(correl->aReferenceMap) ;
 	}
