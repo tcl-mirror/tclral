@@ -46,8 +46,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.36 $
-$Date: 2008/01/10 16:43:11 $
+$Revision: 1.37 $
+$Date: 2008/01/19 19:16:45 $
  *--
  */
 
@@ -148,7 +148,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.36 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.37 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -534,11 +534,15 @@ RelationChooseCmd(
      * the result. Otherwise the result will have cardinality 0.
      */
     if (found != Ral_RelationEnd(relation)) {
+#	ifndef NDEBUG
 	int inserted = Ral_RelationPushBack(newRelation, *found, NULL) ;
 	/*
 	 * Should always be able to insert into an empty relation.
 	 */
 	assert(inserted != 0) ;
+#	else
+	Ral_RelationPushBack(newRelation, *found, NULL) ;
+#	endif
     }
 
     Tcl_SetObjResult(interp, Ral_RelationObjNew(newRelation)) ;

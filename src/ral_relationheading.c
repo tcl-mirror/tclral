@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationheading.c,v $
-$Revision: 1.21 $
-$Date: 2007/05/19 20:18:25 $
+$Revision: 1.22 $
+$Date: 2008/01/19 19:16:45 $
  *--
  */
 
@@ -95,7 +95,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.21 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.22 $" ;
 
 static char const openList = '{' ;
 static char const closeList = '}' ;
@@ -956,9 +956,13 @@ Ral_RelationHeadingCompose(
 	Ral_IntVector allId = Ral_IntVectorNew(
 	    Ral_RelationHeadingDegree(composeHeading), 0) ;
 	Ral_IntVectorFillConsecutive(allId, 0) ;
+#	ifndef NDEBUG
 	int added = Ral_RelationHeadingAddIdentifier(composeHeading, idNum,
 	    allId) ;
 	assert(added != 0) ;
+#	else
+	Ral_RelationHeadingAddIdentifier(composeHeading, idNum, allId) ;
+#	endif
 	idNum = 1 ;
     }
     /*
@@ -981,14 +985,16 @@ Ral_RelationHeadingScan(
     int length = strlen(Ral_RelationObjType.name) + 1 ; /* +1 for space */
 
     assert(flags->attrType == Relation_Type) ;
-    assert(flags->compoundFlags.flags == NULL) ;
+    assert(flags->flags.compoundFlags.flags == NULL) ;
     /*
      * Allocate space for the type flags for each attribute.
      */
-    flags->compoundFlags.count = Ral_RelationHeadingDegree(h) ;
-    nBytes = flags->compoundFlags.count * sizeof(*flags->compoundFlags.flags) ;
-    flags->compoundFlags.flags = (Ral_AttributeTypeScanFlags *)ckalloc(nBytes) ;
-    memset(flags->compoundFlags.flags, 0, nBytes) ;
+    flags->flags.compoundFlags.count = Ral_RelationHeadingDegree(h) ;
+    nBytes = flags->flags.compoundFlags.count
+	    * sizeof(*flags->flags.compoundFlags.flags) ;
+    flags->flags.compoundFlags.flags =
+	    (Ral_AttributeTypeScanFlags *)ckalloc(nBytes) ;
+    memset(flags->flags.compoundFlags.flags, 0, nBytes) ;
     /*
      * The attribute / type list of the heading.
      */
@@ -1013,11 +1019,11 @@ Ral_RelationHeadingScan(
 	    /*
 	     * Reuse the length stored when the attribute name was scanned.
 	     */
-	    assert(*iter < flags->compoundFlags.count) ;
+	    assert(*iter < flags->flags.compoundFlags.count) ;
 	    /*
 	     * +1 for the separating space
 	     */
-	    length += flags->compoundFlags.flags[*iter].nameLength + 1 ;
+	    length += flags->flags.compoundFlags.flags[*iter].nameLength + 1 ;
 	}
 	if (Ral_IntVectorSize(id) != 0) {
 	    length -= 1 ;
@@ -1051,7 +1057,7 @@ Ral_RelationHeadingConvert(
     Ral_TupleHeading tupleHeading = h->tupleHeading ;
 
     assert(flags->attrType == Relation_Type) ;
-    assert(flags->compoundFlags.count == Ral_RelationHeadingDegree(h)) ;
+    assert(flags->flags.compoundFlags.count == Ral_RelationHeadingDegree(h)) ;
 
     /*
      * Copy in the "Relation" keyword.
@@ -1084,9 +1090,9 @@ Ral_RelationHeadingConvert(
 	    /*
 	     * Reuse the flags gathered during the scanning of the header.
 	     */
-	    assert(*iter < flags->compoundFlags.count) ;
+	    assert(*iter < flags->flags.compoundFlags.count) ;
 	    p += Tcl_ConvertElement(attr->name, p,
-		flags->compoundFlags.flags[*iter].nameFlags) ;
+		flags->flags.compoundFlags.flags[*iter].nameFlags) ;
 	    *p++ = ' ' ;
 	}
 	if (Ral_IntVectorSize(id) != 0) {

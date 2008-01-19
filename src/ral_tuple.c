@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuple.c,v $
-$Revision: 1.12 $
-$Date: 2006/07/01 23:56:31 $
+$Revision: 1.13 $
+$Date: 2008/01/19 19:16:45 $
  *--
  */
 
@@ -91,7 +91,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_tuple.c,v $ $Revision: 1.12 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tuple.c,v $ $Revision: 1.13 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -514,25 +514,26 @@ Ral_TupleScanValue(
     Ral_TupleHeadingIter hEnd ;
 
     assert(typeFlags->attrType == Tuple_Type) ;
-    assert(typeFlags->compoundFlags.count == Ral_TupleDegree(tuple)) ;
+    assert(typeFlags->flags.compoundFlags.count == Ral_TupleDegree(tuple)) ;
     assert(valueFlags->attrType == Tuple_Type) ;
-    assert(valueFlags->compoundFlags.flags == NULL) ;
+    assert(valueFlags->flags.compoundFlags.flags == NULL) ;
 
     /*
      * Allocate space for the value flags.
      */
-    valueFlags->compoundFlags.count = typeFlags->compoundFlags.count ;
-    nBytes = valueFlags->compoundFlags.count *
-	sizeof(*valueFlags->compoundFlags.flags) ;
-    valueFlags->compoundFlags.flags =
+    valueFlags->flags.compoundFlags.count =
+	    typeFlags->flags.compoundFlags.count ;
+    nBytes = valueFlags->flags.compoundFlags.count *
+	sizeof(*valueFlags->flags.compoundFlags.flags) ;
+    valueFlags->flags.compoundFlags.flags =
 	(Ral_AttributeValueScanFlags *)ckalloc(nBytes) ;
-    memset(valueFlags->compoundFlags.flags, 0, nBytes) ;
+    memset(valueFlags->flags.compoundFlags.flags, 0, nBytes) ;
 
     /*
      * Iterate through the heading and scan the corresponding values.
      */
-    typeFlag = typeFlags->compoundFlags.flags ;
-    valueFlag = valueFlags->compoundFlags.flags ;
+    typeFlag = typeFlags->flags.compoundFlags.flags ;
+    valueFlag = valueFlags->flags.compoundFlags.flags ;
     hEnd = Ral_TupleHeadingEnd(heading) ;
 
     length = sizeof(openList) ;
@@ -565,12 +566,12 @@ Ral_TupleConvertValue(
     Ral_TupleHeadingIter hEnd ;
 
     assert(typeFlags->attrType == Tuple_Type) ;
-    assert(typeFlags->compoundFlags.count == Ral_TupleDegree(tuple)) ;
+    assert(typeFlags->flags.compoundFlags.count == Ral_TupleDegree(tuple)) ;
     assert(valueFlags->attrType == Tuple_Type) ;
-    assert(valueFlags->compoundFlags.count == Ral_TupleDegree(tuple)) ;
+    assert(valueFlags->flags.compoundFlags.count == Ral_TupleDegree(tuple)) ;
 
-    typeFlag = typeFlags->compoundFlags.flags ;
-    valueFlag = valueFlags->compoundFlags.flags ;
+    typeFlag = typeFlags->flags.compoundFlags.flags ;
+    valueFlag = valueFlags->flags.compoundFlags.flags ;
     hEnd = Ral_TupleHeadingEnd(heading) ;
 
     *p++ = openList ;

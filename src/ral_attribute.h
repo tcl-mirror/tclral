@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.h,v $
-$Revision: 1.12 $
-$Date: 2008/01/10 16:38:53 $
+$Revision: 1.13 $
+$Date: 2008/01/19 19:16:45 $
  *--
  */
 #ifndef _ral_attribute_h_
@@ -125,7 +125,7 @@ typedef struct Ral_AttributeTypeScanFlags {
 	    int count ;
 	    struct Ral_AttributeTypeScanFlags *flags ;
 	} compoundFlags ;
-    } ;
+    } flags ;
 } Ral_AttributeTypeScanFlags ;
 
 typedef struct Ral_AttributeValueScanFlags {
@@ -136,7 +136,7 @@ typedef struct Ral_AttributeValueScanFlags {
 	    int count ;
 	    struct Ral_AttributeValueScanFlags *flags ;
 	} compoundFlags ;
-    } ;
+    } flags ;
 } Ral_AttributeValueScanFlags ;
 
 /*

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.30 $
-$Date: 2008/01/10 16:43:11 $
+$Revision: 1.31 $
+$Date: 2008/01/19 19:16:45 $
  *--
  */
 
@@ -116,7 +116,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.30 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.31 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -2050,8 +2050,12 @@ Ral_RelationErase(
      * Reindex the new arrangement of tuples.
      */
     for (iter = first ; iter != relation->finish ; ++iter) {
+#	ifndef NDEBUG
 	int status = Ral_RelationIndexTuple(relation, *iter, iter) ;
 	assert(status != 0) ;
+#	else
+	Ral_RelationIndexTuple(relation, *iter, iter) ;
+#	endif
     }
     return first ;
 }
@@ -2330,28 +2334,29 @@ Ral_RelationScanValue(
     Ral_TupleHeadingIter hIter ;
 
     assert(typeFlags->attrType == Relation_Type) ;
-    assert(typeFlags->compoundFlags.count == Ral_RelationDegree(relation)) ;
+    assert(typeFlags->flags.compoundFlags.count
+	    == Ral_RelationDegree(relation)) ;
     assert(valueFlags->attrType == Relation_Type) ;
-    assert(valueFlags->compoundFlags.flags == NULL) ;
+    assert(valueFlags->flags.compoundFlags.flags == NULL) ;
     /*
      * Allocate space for the value flags.
      * For a relation we need a flag structure for each value in each tuple.
      */
-    valueFlags->compoundFlags.count =
-	typeFlags->compoundFlags.count * Ral_RelationCardinality(relation) ;
-    nBytes = valueFlags->compoundFlags.count *
-	sizeof(*valueFlags->compoundFlags.flags) ;
-    valueFlags->compoundFlags.flags =
+    valueFlags->flags.compoundFlags.count = typeFlags->flags.compoundFlags.count
+	    * Ral_RelationCardinality(relation) ;
+    nBytes = valueFlags->flags.compoundFlags.count *
+	sizeof(*valueFlags->flags.compoundFlags.flags) ;
+    valueFlags->flags.compoundFlags.flags =
 	(Ral_AttributeValueScanFlags *)ckalloc(nBytes) ;
-    memset(valueFlags->compoundFlags.flags, 0, nBytes) ;
+    memset(valueFlags->flags.compoundFlags.flags, 0, nBytes) ;
 
     length = sizeof(openList) ;
 
-    valueFlag = valueFlags->compoundFlags.flags ;
+    valueFlag = valueFlags->flags.compoundFlags.flags ;
     for (riter = Ral_RelationBegin(relation) ; riter != rend ; ++riter) {
 	Ral_Tuple tuple = *riter ;
 	Tcl_Obj **values = tuple->values ;
-	typeFlag = typeFlags->compoundFlags.flags ;
+	typeFlag = typeFlags->flags.compoundFlags.flags ;
 
 	length += sizeof(openList) ;
 	for (hIter = Ral_TupleHeadingBegin(tupleHeading) ;
@@ -2406,17 +2411,18 @@ Ral_RelationConvertValue(
     Ral_TupleHeadingIter hIter ;
 
     assert(typeFlags->attrType == Relation_Type) ;
-    assert(typeFlags->compoundFlags.count == Ral_RelationDegree(relation)) ;
+    assert(typeFlags->flags.compoundFlags.count
+	    == Ral_RelationDegree(relation)) ;
     assert(valueFlags->attrType == Relation_Type) ;
-    assert(valueFlags->compoundFlags.count ==
+    assert(valueFlags->flags.compoundFlags.count ==
 	Ral_RelationDegree(relation) * Ral_RelationCardinality(relation)) ;
 
-    valueFlag = valueFlags->compoundFlags.flags ;
+    valueFlag = valueFlags->flags.compoundFlags.flags ;
     *p++ = openList ;
     for (riter = Ral_RelationBegin(relation) ; riter != rend ; ++riter) {
 	Ral_Tuple tuple = *riter ;
 	Tcl_Obj **values = tuple->values ;
-	typeFlag = typeFlags->compoundFlags.flags ;
+	typeFlag = typeFlags->flags.compoundFlags.flags ;
 
 	*p++ = openList ;
 	for (hIter = Ral_TupleHeadingBegin(tupleHeading) ;

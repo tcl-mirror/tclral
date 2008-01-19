@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.c,v $
-$Revision: 1.17 $
-$Date: 2008/01/10 16:38:53 $
+$Revision: 1.18 $
+$Date: 2008/01/19 19:16:44 $
  *--
  */
 
@@ -98,7 +98,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.17 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.18 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -349,7 +349,7 @@ Ral_AttributeValueCompare(
     Tcl_Obj *v1,
     Tcl_Obj *v2)
 {
-    int result ;
+    int result = 0 ;
 
     switch (a->attrType) {
     case Tcl_Type:
@@ -622,7 +622,7 @@ Ral_AttributeScanType(
     switch (a->attrType) {
     case Tcl_Type:
 	length = Tcl_ScanElement(a->heading.tclType->name,
-		&flags->simpleFlags) ;
+		&flags->flags.simpleFlags) ;
 	break ;
 
     case Tuple_Type:
@@ -654,7 +654,7 @@ Ral_AttributeConvertType(
     switch (a->attrType) {
     case Tcl_Type:
 	length = Tcl_ConvertElement(a->heading.tclType->name, dst,
-		flags->simpleFlags) ;
+		flags->flags.simpleFlags) ;
 	break ;
 
     case Tuple_Type: {
@@ -698,7 +698,7 @@ Ral_AttributeScanValue(
     switch (a->attrType) {
     case Tcl_Type:
 	length = Tcl_ScanElement(Tcl_GetString(value),
-	    &valueFlags->simpleFlags) ;
+	    &valueFlags->flags.simpleFlags) ;
 	break ;
 
     case Tuple_Type:
@@ -732,7 +732,7 @@ Ral_AttributeConvertValue(
     switch (a->attrType) {
     case Tcl_Type:
 	length = Tcl_ConvertElement(Tcl_GetString(value), dst,
-	    valueFlags->simpleFlags) ;
+	    valueFlags->flags.simpleFlags) ;
 	break ;
 
     case Tuple_Type:
@@ -763,16 +763,17 @@ Ral_AttributeTypeScanFlagsFree(
 
     case Tuple_Type:
     case Relation_Type: {
-	int count = flags->compoundFlags.count ;
-	Ral_AttributeTypeScanFlags *typeFlags = flags->compoundFlags.flags ;
+	int count = flags->flags.compoundFlags.count ;
+	Ral_AttributeTypeScanFlags *typeFlags =
+		flags->flags.compoundFlags.flags ;
 
 	assert(typeFlags != NULL) ;
 
 	while (count-- > 0) {
 	    Ral_AttributeTypeScanFlagsFree(typeFlags++) ;
 	}
-	ckfree((char *)flags->compoundFlags.flags) ;
-	flags->compoundFlags.flags = NULL ;
+	ckfree((char *)flags->flags.compoundFlags.flags) ;
+	flags->flags.compoundFlags.flags = NULL ;
     }
 	break ;
 
@@ -792,16 +793,17 @@ Ral_AttributeValueScanFlagsFree(
 
     case Tuple_Type:
     case Relation_Type: {
-	int count = flags->compoundFlags.count ;
-	Ral_AttributeValueScanFlags *valueFlags = flags->compoundFlags.flags ;
+	int count = flags->flags.compoundFlags.count ;
+	Ral_AttributeValueScanFlags *valueFlags =
+		flags->flags.compoundFlags.flags ;
 
 	assert(valueFlags != NULL) ;
 
 	while (count-- > 0) {
 	    Ral_AttributeValueScanFlagsFree(valueFlags++) ;
 	}
-	ckfree((char *)flags->compoundFlags.flags) ;
-	flags->compoundFlags.flags = NULL ;
+	ckfree((char *)flags->flags.compoundFlags.flags) ;
+	flags->flags.compoundFlags.flags = NULL ;
     }
 	break ;
 

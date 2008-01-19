@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleheading.c,v $
-$Revision: 1.12 $
-$Date: 2006/11/05 00:15:59 $
+$Revision: 1.13 $
+$Date: 2008/01/19 19:16:45 $
  *--
  */
 
@@ -91,7 +91,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tupleheading.c,v $ $Revision: 1.12 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tupleheading.c,v $ $Revision: 1.13 $" ;
 
 static const char openList = '{' ;
 static const char closeList = '}' ;
@@ -133,9 +133,13 @@ Ral_TupleHeadingSubset(
     for (iter = Ral_IntVectorBegin(attrSet) ; iter != end ; ++iter) {
 	Ral_Attribute attr = Ral_TupleHeadingFetch(heading, *iter) ;
 	Ral_Attribute newAttr = Ral_AttributeDup(attr) ;
+#	ifndef NDEBUG
 	Ral_TupleHeadingIter hIter = Ral_TupleHeadingPushBack(newHeading,
 	    newAttr) ;
 	assert(hIter != Ral_TupleHeadingEnd(newHeading)) ;
+#	else
+	Ral_TupleHeadingPushBack(newHeading, newAttr) ;
+#	endif
     }
 
     return newHeading ;
@@ -614,14 +618,16 @@ Ral_TupleHeadingScan(
     int length = strlen(Ral_TupleObjType.name) + 1 ; /* +1 for space */
 
     assert(flags->attrType == Tuple_Type) ;
-    assert(flags->compoundFlags.flags == NULL) ;
+    assert(flags->flags.compoundFlags.flags == NULL) ;
     /*
      * Allocate space for the type flags for each attribute.
      */
-    flags->compoundFlags.count = Ral_TupleHeadingSize(h) ;
-    nBytes = flags->compoundFlags.count * sizeof(*flags->compoundFlags.flags) ;
-    flags->compoundFlags.flags = (Ral_AttributeTypeScanFlags *)ckalloc(nBytes) ;
-    memset(flags->compoundFlags.flags, 0, nBytes) ;
+    flags->flags.compoundFlags.count = Ral_TupleHeadingSize(h) ;
+    nBytes = flags->flags.compoundFlags.count *
+	    sizeof(*flags->flags.compoundFlags.flags) ;
+    flags->flags.compoundFlags.flags =
+	    (Ral_AttributeTypeScanFlags *)ckalloc(nBytes) ;
+    memset(flags->flags.compoundFlags.flags, 0, nBytes) ;
 
     length += Ral_TupleHeadingScanAttr(h, flags) ;
 
@@ -633,12 +639,12 @@ Ral_TupleHeadingScanAttr(
     Ral_TupleHeading h,
     Ral_AttributeTypeScanFlags *flags)
 {
-    Ral_AttributeTypeScanFlags *typeFlag = flags->compoundFlags.flags ;
+    Ral_AttributeTypeScanFlags *typeFlag = flags->flags.compoundFlags.flags ;
     Ral_TupleHeadingIter i ;
     int length = sizeof(openList) ;
 
-    assert(flags->compoundFlags.count == Ral_TupleHeadingSize(h)) ;
-    assert(flags->compoundFlags.flags != NULL) ;
+    assert(flags->flags.compoundFlags.count == Ral_TupleHeadingSize(h)) ;
+    assert(flags->flags.compoundFlags.flags != NULL) ;
 
     for (i = h->start ; i < h->finish ; ++i) {
 	Ral_Attribute a = *i ;
@@ -667,7 +673,7 @@ Ral_TupleHeadingConvert(
     char *p = dst ;
 
     assert(flags->attrType == Tuple_Type) ;
-    assert(flags->compoundFlags.count == Ral_TupleHeadingSize(h)) ;
+    assert(flags->flags.compoundFlags.count == Ral_TupleHeadingSize(h)) ;
 
     strcpy(p, tupleKeyword) ;
     p += strlen(tupleKeyword) ;
@@ -685,10 +691,10 @@ Ral_TupleHeadingConvertAttr(
     Ral_AttributeTypeScanFlags *flags)
 {
     char *p = dst ;
-    Ral_AttributeTypeScanFlags *typeFlag = flags->compoundFlags.flags ;
+    Ral_AttributeTypeScanFlags *typeFlag = flags->flags.compoundFlags.flags ;
     Ral_TupleHeadingIter i ;
 
-    assert(flags->compoundFlags.count == Ral_TupleHeadingSize(h)) ;
+    assert(flags->flags.compoundFlags.count == Ral_TupleHeadingSize(h)) ;
 
     *p++ = openList ;
 

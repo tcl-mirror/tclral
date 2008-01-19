@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuplecmd.c,v $
-$Revision: 1.18 $
-$Date: 2007/05/13 22:00:08 $
+$Revision: 1.19 $
+$Date: 2008/01/19 19:16:45 $
  *--
  */
 
@@ -109,7 +109,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tuplecmd.c,v $ $Revision: 1.18 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tuplecmd.c,v $ $Revision: 1.19 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -734,8 +734,12 @@ TupleRelationCmd(
 	    Ral_IntVectorNew(Ral_TupleHeadingSize(tupHeading), 0) ;
 	Ral_IntVectorFillConsecutive(idVect, 0) ;
 	relHeading = Ral_RelationHeadingNew(tupHeading, 1) ;
+#	ifndef NDEBUG
 	int status = Ral_RelationHeadingAddIdentifier(relHeading, 0, idVect) ;
 	assert(status != 0) ;
+#	else
+	Ral_RelationHeadingAddIdentifier(relHeading, 0, idVect) ;
+#	endif
     } else {
 	/*
 	 * Iterate through the list of identifiers and add them to the
