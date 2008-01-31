@@ -1,3 +1,12 @@
+========= ral 0.8.7 =========
+Version 0.8.7 is a bug fix release.
+
+1. Correct a problem when a newer version of the serialization code contained
+in "ral.tcl" was committed. This code was being developed for the 0.9 release
+and was accidentally inserted in the the release. This broke the ability to
+serialize and deserialize relvars and contained a different serialization
+format that was inconsistent with the other 0.8 releases.
+
 ========= ral 0.8.6 =========
 Version 0.8.6 is a code clean up release. There were a number of GCC specific
 constructs that were in the source that caused errors for other compilers
