@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.31 $
-$Date: 2008/01/19 19:16:45 $
+$Revision: 1.32 $
+$Date: 2008/02/09 19:42:33 $
  *--
  */
 
@@ -116,7 +116,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.31 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.32 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -813,10 +813,10 @@ Ral_RelationGroup(
 	 * Therefore create a single identifier that consists of all
 	 * the attributes except the relation valued attribute.
 	 */
+	int status ;
 	Ral_IntVector allId =
 	    Ral_IntVectorNew(Ral_TupleHeadingSize(grpTupleHeading) - 1, 0) ;
 	grpHeading = Ral_RelationHeadingNew(grpTupleHeading, 1) ;
-	int status ;
 
 	Ral_IntVectorFillConsecutive(allId, 0) ;
 	status = Ral_RelationHeadingAddIdentifier(grpHeading, 0, allId) ;
@@ -2050,12 +2050,10 @@ Ral_RelationErase(
      * Reindex the new arrangement of tuples.
      */
     for (iter = first ; iter != relation->finish ; ++iter) {
-#	ifndef NDEBUG
-	int status = Ral_RelationIndexTuple(relation, *iter, iter) ;
+	int status ;
+
+	status = Ral_RelationIndexTuple(relation, *iter, iter) ;
 	assert(status != 0) ;
-#	else
-	Ral_RelationIndexTuple(relation, *iter, iter) ;
-#	endif
     }
     return first ;
 }

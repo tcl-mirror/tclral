@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleheading.c,v $
-$Revision: 1.13 $
-$Date: 2008/01/19 19:16:45 $
+$Revision: 1.14 $
+$Date: 2008/02/09 19:42:33 $
  *--
  */
 
@@ -91,7 +91,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tupleheading.c,v $ $Revision: 1.13 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tupleheading.c,v $ $Revision: 1.14 $" ;
 
 static const char openList = '{' ;
 static const char closeList = '}' ;
@@ -133,13 +133,10 @@ Ral_TupleHeadingSubset(
     for (iter = Ral_IntVectorBegin(attrSet) ; iter != end ; ++iter) {
 	Ral_Attribute attr = Ral_TupleHeadingFetch(heading, *iter) ;
 	Ral_Attribute newAttr = Ral_AttributeDup(attr) ;
-#	ifndef NDEBUG
-	Ral_TupleHeadingIter hIter = Ral_TupleHeadingPushBack(newHeading,
-	    newAttr) ;
+	Ral_TupleHeadingIter hIter ;
+
+	hIter = Ral_TupleHeadingPushBack(newHeading, newAttr) ;
 	assert(hIter != Ral_TupleHeadingEnd(newHeading)) ;
-#	else
-	Ral_TupleHeadingPushBack(newHeading, newAttr) ;
-#	endif
     }
 
     return newHeading ;
@@ -545,8 +542,16 @@ Ral_TupleHeadingNewOrderMap(
 	Ral_IntVectorStore(map, index1++, index2) ;
     }
 
-    return found == Ral_TupleHeadingSize(h1) ?
-	Ral_IntVectorDelete(map), NULL : map ;
+    /*
+     * Check if the mapping is the identity mapping and return NULL if it is.
+     * We have already allocated the map, so if NULL is returned the map must
+     * be deleted.
+     */
+    if (found == Ral_TupleHeadingSize(h1)) {
+	Ral_IntVectorDelete(map) ;
+	map = NULL ;
+    }
+    return map ;
 }
 
 /*

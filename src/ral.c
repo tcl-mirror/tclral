@@ -49,8 +49,8 @@ ABSTRACT:
     Algebra.
 
 $RCSfile: ral.c,v $
-$Revision: 1.38 $
-$Date: 2008/01/10 16:41:55 $
+$Revision: 1.39 $
+$Date: 2008/02/09 19:42:33 $
  *--
  */
 
@@ -105,7 +105,7 @@ STATIC DATA ALLOCATION
 static char const ral_pkgname[] = PACKAGE_NAME ;
 static char const ral_version[] = PACKAGE_VERSION ;
 static char const ral_rcsid[] =
-    "$Id: ral.c,v 1.38 2008/01/10 16:41:55 mangoa01 Exp $" ;
+    "$Id: ral.c,v 1.39 2008/02/09 19:42:33 mangoa01 Exp $" ;
 static char const ral_copyright[] =
     "This software is copyrighted 2004, 2005, 2006, 2007 by G. Andrew Mangogna."
     " Terms and conditions for use are distributed with the source code." ;
@@ -142,6 +142,7 @@ Ral_Init(
     Tcl_DString cmdName ;
     Tcl_Namespace *ralNs ;
     Ral_RelvarInfo rInfo ;
+    int baseLen;
 
     Tcl_InitStubs(interp, TCL_VERSION, 0) ;
 
@@ -162,7 +163,7 @@ Ral_Init(
      * Create the package commands.
      */
     Tcl_DStringAppend(&cmdName, nsSep, -1) ;
-    int baseLen = strlen(Tcl_DStringValue(&cmdName)) ;
+    baseLen = strlen(Tcl_DStringValue(&cmdName)) ;
     Tcl_DStringAppend(&cmdName, tupleCmdName, -1) ;
     Tcl_CreateObjCommand(interp, Tcl_DStringValue(&cmdName), tupleCmd,
 	    NULL, NULL) ;

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_vector.c,v $
-$Revision: 1.12 $
-$Date: 2006/09/09 21:37:47 $
+$Revision: 1.13 $
+$Date: 2008/02/09 19:42:33 $
  *--
  */
 
@@ -90,7 +90,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_vector.c,v $ $Revision: 1.12 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_vector.c,v $ $Revision: 1.13 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -912,10 +912,16 @@ ptr_ind_compare(
     const void *m1,
     const void *m2)
 {
-    const Ral_PtrVectorValueType *i1 = m1 ;
-    const Ral_PtrVectorValueType *i2 = m2 ;
+    Ral_PtrVectorValueType const *i1 = m1 ;
+    Ral_PtrVectorValueType const *i2 = m2 ;
 
-    return *i1 - *i2 ;
+    /*
+     * Strictly speaking "*i1" is "void *" and since pointer arithmetic is
+     * scaled by the size of the entity pointed to, you can't subtract two
+     * "void *". GCC is very forgiving here, but native compilers are more
+     * strict. It is sufficient to treat things as "char *".
+     */
+    return (char const *)*i1 - (char const *)*i2 ;
 }
 
 int

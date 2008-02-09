@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationheading.c,v $
-$Revision: 1.22 $
-$Date: 2008/01/19 19:16:45 $
+$Revision: 1.23 $
+$Date: 2008/02/09 19:42:33 $
  *--
  */
 
@@ -95,7 +95,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.22 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationheading.c,v $ $Revision: 1.23 $" ;
 
 static char const openList = '{' ;
 static char const closeList = '}' ;
@@ -953,16 +953,14 @@ Ral_RelationHeadingCompose(
 	 * In this case we didn't find any suitable identifiers and we must
 	 * create one that has all the attributes.
 	 */
+        int added;
 	Ral_IntVector allId = Ral_IntVectorNew(
 	    Ral_RelationHeadingDegree(composeHeading), 0) ;
+
 	Ral_IntVectorFillConsecutive(allId, 0) ;
-#	ifndef NDEBUG
-	int added = Ral_RelationHeadingAddIdentifier(composeHeading, idNum,
+	added = Ral_RelationHeadingAddIdentifier(composeHeading, idNum,
 	    allId) ;
 	assert(added != 0) ;
-#	else
-	Ral_RelationHeadingAddIdentifier(composeHeading, idNum, allId) ;
-#	endif
 	idNum = 1 ;
     }
     /*
