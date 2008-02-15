@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.39 $
-# $Date: 2008/01/31 02:15:30 $
+# $Revision: 1.40 $
+# $Date: 2008/02/15 02:24:36 $
 #  *--
 
 package require tcltest 2.2
@@ -1301,6 +1301,40 @@ namespace eval ::ral::test {
     test relation-create-2.0 {one id, zero tuple} -body {
 	relation create {A1 string} A1
     } -result {Relation {A1 string} A1 {}} -match relation
+
+    # Test fix for Bug # 1893238
+    # Empty relation valued and tuple valued attributes.
+    test relation-create-3.0 {
+	empty relation valued attribute
+    } -body {
+	relation create {A1 string A2 {Relation {B1 string} B1}} A1\
+	    {A1 foo A2 {}}
+    } -result {
+	Relation {
+	    A1 string
+	    A2 {Relation {B1 string} B1}
+	} {
+	    A1
+	} {
+	    {A1 foo A2 {}}
+	}
+    } -match relation
+
+    test relation-create-3.1 {
+	tuple valued attribute
+    } -body {
+	relation create {A1 string A2 {Tuple {B1 string}}} A1\
+	    {A1 foo A2 {B1 bar}}
+    } -result {
+	Relation {
+	    A1 string
+	    A2 {Tuple {B1 string}}
+	} {
+	    A1
+	} {
+	    {A1 foo A2 {B1 bar}}
+	}
+    } -match relation
 
     # relation degree subcommand
     test relation-degree-1.0 {dum relation} -body {
