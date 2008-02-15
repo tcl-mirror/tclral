@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.c,v $
-$Revision: 1.18 $
-$Date: 2008/01/19 19:16:44 $
+$Revision: 1.19 $
+$Date: 2008/02/15 02:06:55 $
  *--
  */
 
@@ -98,7 +98,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.18 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.19 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -536,12 +536,6 @@ Ral_AttributeConvertValueToType(
 {
     int result = TCL_OK ;
 
-    if (strlen(Tcl_GetString(objPtr)) == 0) {
-	return TCL_OK ;
-    }
-
-    /*
-     */
     switch (attr->attrType) {
     case Tcl_Type:
 	/*
@@ -552,21 +546,26 @@ Ral_AttributeConvertValueToType(
 	 * "0" and "1" are used for boolean values. In this case the
 	 * type ends up being "int". This means that "0" and "1" are
 	 * NOT valid boolean values.
+	 *
+	 * Also, we deem the empty string to be a valid value for any
+	 * simple Tcl type.
 	 */
-	result = Tcl_ConvertToType(interp, objPtr, attr->heading.tclType) ;
-	if (result != TCL_OK || objPtr->typePtr != attr->heading.tclType) {
-	    Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_BAD_VALUE, objPtr) ;
-	    Ral_InterpSetError(interp, errInfo) ;
-	} else if (strcmp(attr->heading.tclType->name, "string") != 0 &&
-	    attr->heading.tclType->updateStringProc != NULL) {
-	    /*
-	     * We also want to generate the canonical form of the string
-	     * representation so that string hashes, etc work properly.
-	     * We only do this on non-string types and on those types
-	     * that can actually regenerate a string rep once invalidated.
-	     */
-	    Tcl_InvalidateStringRep(objPtr) ;
-	    (*attr->heading.tclType->updateStringProc)(objPtr) ;
+	if (strlen(Tcl_GetString(objPtr)) != 0) {
+	    result = Tcl_ConvertToType(interp, objPtr, attr->heading.tclType) ;
+	    if (result != TCL_OK || objPtr->typePtr != attr->heading.tclType) {
+		Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_BAD_VALUE, objPtr) ;
+		Ral_InterpSetError(interp, errInfo) ;
+	    } else if (strcmp(attr->heading.tclType->name, "string") != 0 &&
+		attr->heading.tclType->updateStringProc != NULL) {
+		/*
+		 * We also want to generate the canonical form of the string
+		 * representation so that string hashes, etc work properly.
+		 * We only do this on non-string types and on those types
+		 * that can actually regenerate a string rep once invalidated.
+		 */
+		Tcl_InvalidateStringRep(objPtr) ;
+		(*attr->heading.tclType->updateStringProc)(objPtr) ;
+	    }
 	}
 	break ;
 
