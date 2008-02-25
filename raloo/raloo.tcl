@@ -48,7 +48,7 @@
 #  capabilities of TclOO.
 # 
 # $RCSfile: raloo.tcl,v $
-# $Revision: 1.1 $
+# $Revision: 1.1.1.1 $
 # $Date: 2008/02/25 00:16:46 $
 #  *--
 
