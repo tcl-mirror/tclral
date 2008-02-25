@@ -1,0 +1,1533 @@
+#!/bin/sh
+# \
+exec tclsh "$0" "$@"
+# This software is copyrighted 2008 by G. Andrew Mangogna.
+# The following terms apply to all files associated with the software unless
+# explicitly disclaimed in individual files.
+# 
+# The authors hereby grant permission to use, copy, modify, distribute,
+# and license this software and its documentation for any purpose, provided
+# that existing copyright notices are retained in all copies and that this
+# notice is included verbatim in any distributions. No written agreement,
+# license, or royalty fee is required for any of the authorized uses.
+# Modifications to this software may be copyrighted by their authors and
+# need not follow the licensing terms described here, provided that the
+# new terms are clearly indicated on the first page of each file where
+# they apply.
+# 
+# IN NO EVENT SHALL THE AUTHORS OR DISTRIBUTORS BE LIABLE TO ANY PARTY FOR
+# DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING
+# OUT OF THE USE OF THIS SOFTWARE, ITS DOCUMENTATION, OR ANY DERIVATIVES
+# THEREOF, EVEN IF THE AUTHORS HAVE BEEN ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
+# 
+# THE AUTHORS AND DISTRIBUTORS SPECIFICALLY DISCLAIM ANY WARRANTIES,
+# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.  THIS SOFTWARE
+# IS PROVIDED ON AN "AS IS" BASIS, AND THE AUTHORS AND DISTRIBUTORS HAVE
+# NO OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS,
+# OR MODIFICATIONS.
+# 
+# GOVERNMENT USE: If you are acquiring this software on behalf of the
+# U.S. government, the Government shall have only "Restricted Rights"
+# in the software and related documentation as defined in the Federal
+# Acquisition Regulations (FARs) in Clause 52.227.19 (c) (2).  If you
+# are acquiring the software on behalf of the Department of Defense,
+# the software shall be classified as "Commercial Computer Software"
+# and the Government shall have only "Restricted Rights" as defined in
+# Clause 252.227-7013 (c) (1) of DFARs.  Notwithstanding the foregoing,
+# the authors grant the U.S. Government and others acting in its behalf
+# permission to use and distribute the software in accordance with the
+# terms specified in this license.
+# 
+#  *++
+# MODULE:
+#   raloo.test -- test cases for Relation Oriented Programming package
+# 
+# ABSTRACT:
+# 
+# $RCSfile: raloo.test,v $
+# $Revision: 1.1 $
+# $Date: 2008/02/25 00:16:47 $
+#  *--
+
+package require tcltest 2.2
+
+eval tcltest::configure $argv
+
+source ../raloo.tcl
+
+proc tupleMatch {expected actual} {
+    return [::ral::tuple equal $expected $actual]
+}
+
+proc relationMatch {expected actual} {
+    return [::ral::relation is $expected == $actual]
+}
+
+namespace eval ::raloo::test {
+    namespace import ::tcltest::*
+    namespace import ::ral::*
+    namespace import ::raloo::*
+
+    customMatch tuple tupleMatch
+    customMatch relation relationMatch
+
+    proc dumpMM {} {
+	puts [relformat $::raloo::Class Class]
+	puts [relformat $::raloo::Attribute Attribute]
+	puts [relformat $::raloo::Identifier Identifier]
+	puts [relformat $::raloo::IdComposition IdComposition]
+    }
+    proc setupDogOwnerOwnership {} {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *DogName string
+		}
+	    }
+	    Class Owner {
+		Attribute {
+		    *OwnerName string
+		}
+	    }
+	    Class Ownership {
+		Attribute {
+		    *DogName string
+		    *OwnerName string
+		}
+	    }
+	    AssocRelationship R1 Dog +-Ownership->* Owner
+	}
+    }
+    proc cleanupDogOwnerOwnership {} {
+	A destroy
+    }
+    proc setupDogPlays {} {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *DogName string
+		}
+	    }
+	    Class Plays {
+		Attribute {
+		    *DogName string
+		    *PlayerName string
+		}
+	    }
+	    AssocRelationship R1 Dog *--Plays-->* Dog {
+		PlayerName -> DogName} {
+		DogName -> DogName
+	    }
+	}
+	relvar eval {
+	    A::Dog insert DogName Fido
+	    A::Dog insert DogName Fred
+	    A::Dog insert DogName Alice
+	    A::Plays insert DogName Fido PlayerName Fido
+	    A::Plays insert DogName Fido PlayerName Fred
+	    A::Plays insert DogName Fido PlayerName Alice
+	    A::Plays insert DogName Alice PlayerName Fred
+	    A::Plays insert DogName Fred PlayerName Fido
+	}
+    }
+    proc cleanupDogPlays {} {
+	A destroy
+    }
+
+    test Domain-1.1 {
+	domain created in a relative namespace
+    } -setup {
+	Domain create A {}
+    } -cleanup {
+	A destroy
+    } -body {
+	namespace exists A
+    } -result {1}
+
+    test Domain-1.2 {
+	domain created in an full-qualified namespace
+    } -setup {
+	Domain create ::A {}
+    } -cleanup {
+	A destroy
+    } -body {
+	namespace exists ::A
+    } -result {1}
+
+    test Domain-1.3 {
+	domain / namespace conflict
+    } -setup {
+	namespace eval B {}
+    } -cleanup {
+	namespace delete B
+    } -body {
+	Domain create B {}
+    } -result {A namespace with name, "::raloo::test::B", already exists and so a Domain by the same name may not be created.} -returnCodes error
+
+    test Domain-2.1 {
+	domain with domain operation
+    } -setup {
+	Domain create A {
+	    DomainOp echo {a} {
+		return $a
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	A echo a
+    } -result {a}
+
+    test Domain-2.2 {
+	failure in a domain operation invocation
+    } -setup {
+	Domain create A {
+	    DomainOp echo {a} {
+		return [$a]
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	A echo a
+    } -result {invalid command name "a"} -returnCodes error
+
+    test Domain-2.3 {
+	incrementally define a domain
+    } -setup {
+	Domain create A {
+	    DomainOp echo {a} {
+		return $a
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	A define {
+	    DomainOp repeat {str cnt} {
+		return [string repeat $str $cnt]
+	    }
+	}
+	A repeat a 3
+    } -result {aaa}
+
+    test Domain-3.1 {
+	simple relationship definition
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *DogName string
+		    OwnerName string
+		}
+	    }
+	    Class Owner {
+		Attribute {
+		    *OwnerName string
+		}
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	A define {
+	    Relationship R1 Dog +-->1 Owner
+	}
+	A::R1 info
+    } -result {association ::raloo::test::A::R1 ::raloo::test::A::Dog OwnerName + ::raloo::test::A::Owner OwnerName 1}
+
+    test Domain-3.2 {
+	simple relationship definition with formalization
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *Name string
+		    OwnerName string
+		}
+	    }
+	    Class Owner {
+		Attribute {
+		    *Name string
+		}
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	A define {
+	    Relationship R1 Dog +-->1 Owner {
+		OwnerName --> Name
+	    }
+	}
+	A::R1 info
+    } -result {association ::raloo::test::A::R1 ::raloo::test::A::Dog OwnerName + ::raloo::test::A::Owner Name 1}
+
+    test Domain-3.3 {
+	simple relationship definition with multiple identifiers
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *Name string
+		    OwnerName string
+		    OwnerId int
+		}
+	    }
+	    Class Owner {
+		Attribute {
+		    *Name string
+		    *Id int
+		}
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	A define {
+	    Relationship R1 Dog +-->1 Owner {
+		OwnerId --> Id
+		OwnerName --> Name
+	    }
+	}
+	A::R1 info
+    } -result {association ::raloo::test::A::R1 ::raloo::test::A::Dog {OwnerName OwnerId} + ::raloo::test::A::Owner {Name Id} 1}
+
+    test Domain-3.4 {
+	relationship definition error -- bad id attribute
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *DogName string
+		    OwnerName string
+		}
+	    }
+	    Class Owner {
+		Attribute {
+		    *Name string
+		}
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	A define {
+	    Relationship R1 Dog +-->1 Owner {
+		OwnerName --> Id
+	    }
+	}
+    } -result {attribute(s), "Id", do(es) not constitute an identifier of, "Owner"}\
+    -returnCodes error
+
+    test Domain-3.5 {
+	relationship definition error -- bad referring attribute
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *DogName string
+		    OwnerName string
+		}
+	    }
+	    Class Owner {
+		Attribute {
+		    *Name string
+		}
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	A define {
+	    Relationship R1 Dog +-->1 Owner {
+		Name --> Name
+	    }
+	}
+    } -result {"Name", is(are) not attributes of class, "Dog"}\
+    -returnCodes error
+
+    test Domain-3.6 {
+	relationship definition error -- referring to wrong identifier
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *DogName string
+		    OwnerName string
+		}
+	    }
+	    Class Owner {
+		Attribute {
+		    *Name string
+		    *2SSNum string
+		}
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	A define {
+	    Relationship R1 Dog +-->1 *2Owner {
+		OwnerName --> Name
+	    }
+	}
+    } -result {referring attribute(s), "OwnerName", do(es) not refer to identifier, "2" of class,"Owner"}\
+    -returnCodes error
+
+    test Domain-4.1 {
+	generalization relationship
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *Name string
+		    OwnerName string
+		}
+	    }
+	    Class SmallDog {
+		Attribute {
+		    *Name string
+		}
+	    }
+	    Class BigDog {
+		Attribute {
+		    *Name string
+		}
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	A define {
+	    Generalization R1 Dog {
+		SubType SmallDog
+		SubType BigDog
+	    }
+	}
+	A::R1 info
+    } -result {partition ::raloo::test::A::R1 ::raloo::test::A::Dog Name ::raloo::test::A::SmallDog Name ::raloo::test::A::BigDog Name}
+
+    test Domain-4.2 {
+	generalization relationship specifying the reference mapping
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *Name string
+		}
+	    }
+	    Class SmallDog {
+		Attribute {
+		    *SDName string
+		}
+	    }
+	    Class BigDog {
+		Attribute {
+		    *BDName string
+		}
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	A define {
+	    Generalization R1 Dog {
+		SubType SmallDog {
+		    SDName -> Name
+		}
+		SubType BigDog {
+		    BDName -> Name
+		}
+	    }
+	}
+	A::R1 info
+    } -result {partition ::raloo::test::A::R1 ::raloo::test::A::Dog Name ::raloo::test::A::SmallDog SDName ::raloo::test::A::BigDog BDName}
+
+    test Domain-5.1 {
+	associative relationship
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *DogName string
+		}
+	    }
+	    Class Owner {
+		Attribute {
+		    *OwnerName string
+		}
+	    }
+	    Class Ownership {
+		Attribute {
+		    *OwnerName string
+		    *DogName string
+		}
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	A define {
+	    AssocRelationship R1 Owner *--Ownership-->+ Dog
+	}
+	A::R1 info
+    } -result {correlation ::raloo::test::A::R1 ::raloo::test::A::Ownership OwnerName + ::raloo::test::A::Owner OwnerName DogName * ::raloo::test::A::Dog DogName}
+
+    test Domain-5.2 {
+	associative relationship with explicit references
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *Name string
+		}
+	    }
+	    Class Owner {
+		Attribute {
+		    *Name string
+		}
+	    }
+	    Class Ownership {
+		Attribute {
+		    *OwnerName string
+		    *DogName string
+		}
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	A define {
+	    AssocRelationship R1 Owner *--Ownership-->+ Dog {
+		DogName -> Name} {
+		OwnerName -> Name
+	    }
+	}
+	A::R1 info
+    } -result {correlation ::raloo::test::A::R1 ::raloo::test::A::Ownership OwnerName + ::raloo::test::A::Owner Name DogName * ::raloo::test::A::Dog Name}
+
+    test Class-1.1 {
+	classes have a backing relvar
+    } -setup {
+    } -cleanup {
+	A destroy
+    } -body {
+	Domain create A {
+	    Class Foo {
+		Attribute {
+		    *Id int
+		    Attr1 string
+		    *1Other string
+		}
+	    }
+	}
+	relation attributes $A::Foo
+    } -result {Id Attr1 Other}
+
+    test Class-1.2 {
+	inserting a tuple into a class relvar
+    } -setup {
+	Domain create B {
+	    Class Dog {
+		Attribute {
+		    *Name string
+		    Breed string
+		    Age int
+		}
+	    }
+	}
+    } -cleanup {
+	B destroy
+    } -body {
+	B::Dog insert Name Fifi Breed Poodle Age 3
+    } -result {
+	Relation {
+	    Name string
+	    Breed string
+	    Age int
+	} {
+	    Name
+	} {
+	    {Name Fifi Breed Poodle Age 3}
+	}
+    } -match relation
+
+    test Class-1.3 {
+	create class reference
+    } -setup {
+	Domain create C {
+	    Class Dog {
+		Attribute {
+		    *Name string
+		    Breed string
+		    Age int
+		}
+	    }
+	}
+    } -cleanup {
+	C destroy
+    } -body {
+	set r [C::Dog new Name Rover Breed Retriever Age 5]
+	$r cardinality
+    } -result {1}
+
+    test Class-1.4 {
+	class with multiple identifiers
+    } -setup {
+	Domain create C {
+	    Class Dog {
+		Attribute {
+		    *Name string
+		    *2Id int
+		}
+	    }
+	}
+    } -cleanup {
+	C destroy
+    } -body {
+	set r [C::Dog new Name Rover Id 3]
+	$r Name
+    } -result {Rover}
+
+    test Class-1.5 {
+	class with overlapping identifiers
+    } -setup {
+	Domain create C {
+	    Class Dog {
+		Attribute {
+		    **2Name string
+		    *Breed string
+		    *2Id int
+		}
+	    }
+	}
+    } -cleanup {
+	C destroy
+    } -body {
+	set r [C::Dog new Name Rover Breed Poodle Id 3]
+	$r Name
+    } -result {Rover}
+
+    test Class-1.6 {
+	class with unique identifier
+    } -setup {
+	Domain create C {
+	    Class Foo {
+		Attribute {
+		    *Id UNIQUE
+		    Breed string
+		}
+	    }
+	}
+    } -cleanup {
+	C destroy
+    } -body {
+	set r [C::Foo new Id {} Breed Poodle]
+	$r Id
+    } -result {1}
+
+    test Class-2.1 {
+	create class reference by selection
+    } -setup {
+	Domain create C {
+	    Class Dog {
+		Attribute {
+		    *Name string
+		    Breed string
+		    Age int
+		}
+	    }
+	}
+	C::Dog insert Name Rover Breed Retriever Age 5
+    } -cleanup {
+	C destroy
+    } -body {
+	set r [C::Dog new]
+	$r selectOne Name Rover
+	$r cardinality
+    } -result {1}
+
+    test Class-3.1 {
+	retrieve attribute
+    } -setup {
+	Domain create C {
+	    Class Dog {
+		Attribute {
+		    *Name string
+		    Breed string
+		    Age int
+		}
+	    }
+	}
+    } -cleanup {
+	C destroy
+    } -body {
+	set r [C::Dog new Name Rover Breed Retriever Age 5]
+	$r selectOne Name Rover
+	$r Breed
+    } -result {Retriever}
+
+    test Class-3.2 {
+	update attribute
+    } -setup {
+	Domain create C {
+	    Class Dog {
+		Attribute {
+		    *Name string
+		    Breed string
+		    Age int
+		}
+	    }
+	}
+    } -cleanup {
+	C destroy
+    } -body {
+	set r [C::Dog new Name Rover Breed Retriever Age 5]
+	$r selectOne Name Rover
+	$r Age 10
+	$r Age
+    } -result {10}
+
+    test Class-4.1 {
+	class based operations
+    } -setup {
+	Domain create A {
+	    Class Foo {
+		Attribute {
+		    *Id int
+		}
+		ClassOp echo {thing} {
+		    return $thing
+		}
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	A::Foo echo bar
+    } -result {bar}
+
+    test Class-4.2 {
+	instance based operations
+    } -setup {
+	Domain create A {
+	    Class Foo {
+		Attribute {
+		    *Id int
+		}
+		ClassOp echo {thing} {
+		    return $thing
+		}
+		InstOp echo {thing} {
+		    return $thing
+		}
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	set r [A::Foo new Id 1]
+	$r echo bar
+    } -result {bar}
+
+    test Class-5.1 {
+	simple relationship traversal
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *DogName string
+		    OwnerName string
+		}
+	    }
+	    Class Owner {
+		Attribute {
+		    *OwnerName string
+		}
+	    }
+	    Relationship R1 Dog *-->1 Owner
+	}
+	A::Owner insert OwnerName John
+    } -cleanup {
+	$owner destroy
+	$dog destroy
+	A destroy
+    } -body {
+	set dog [A::Dog new DogName Fred OwnerName John]
+	set owner [$dog selectRelated R1]
+	$owner OwnerName
+    } -result {John}
+
+    test Class-5.2 {
+	simple relationship traversal, error in destination
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *DogName string
+		    OwnerName string
+		}
+	    }
+	    Class Owner {
+		Attribute {
+		    *OwnerName string
+		}
+	    }
+	    Relationship R1 Dog *-->1 Owner
+	}
+	A::Owner insert OwnerName John
+    } -cleanup {
+	$dog destroy
+	A destroy
+    } -body {
+	set dog [A::Dog new DogName Fred OwnerName John]
+	set owner [$dog selectRelated R1.Dog]
+    } -result {traversing R1 ends at, "Owner", and not at "Dog"}\
+    -returnCodes error
+
+    test Class-5.3 {
+	simple relationship traversal, error in direction
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *DogName string
+		    OwnerName string
+		}
+	    }
+	    Class Owner {
+		Attribute {
+		    *OwnerName string
+		}
+	    }
+	    Relationship R1 Dog *-->1 Owner
+	}
+	A::Owner insert OwnerName John
+    } -cleanup {
+	$dog destroy
+	A destroy
+    } -body {
+	set dog [A::Dog new DogName Fred OwnerName John]
+	set owner [$dog selectRelated ~R1]
+    } -result {traversing ~R1 begins at, "Owner", and not at "Dog"}\
+    -returnCodes error
+
+    test Class-5.4 {
+	simple relationship backwards traversal
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *DogName string
+		    OwnerName string
+		}
+	    }
+	    Class Owner {
+		Attribute {
+		    *OwnerName string
+		}
+	    }
+	    Relationship R1 Dog *-->1 Owner
+	}
+	A::Owner insert OwnerName John
+	A::Dog insert DogName Fred OwnerName John
+    } -cleanup {
+	$owner destroy
+	$dog destroy
+	A destroy
+    } -body {
+	set owner [A::Owner new]
+	$owner selectOne OwnerName John
+	set dog [$owner selectRelated ~R1]
+	$dog DogName
+    } -result {Fred}
+
+    test Class-5.5 {
+	simple relationship traversal -- multiple traversals
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *DogName string
+		    OwnerName string
+		}
+	    }
+	    Class Owner {
+		Attribute {
+		    *OwnerName string
+		}
+	    }
+	    Relationship R1 Dog *-->1 Owner
+	    Class Phone {
+		Attribute {
+		    *Number string
+		    OwnerName string
+		}
+	    }
+	    Relationship R2 Phone *-->1 Owner
+	}
+	A::Owner insert OwnerName John
+	A::Dog insert DogName Fred OwnerName John
+	A::Phone insert Number 555-1212 OwnerName John
+    } -cleanup {
+	$phone destroy
+	$dog destroy
+	A destroy
+    } -body {
+	set dog [A::Dog new]
+	$dog selectOne DogName Fred
+	set phone [$dog selectRelated R1 ~R2]
+	$phone Number
+    } -result {555-1212}
+
+    test Class-5.6 {
+	simple relationship traversal -- reflexive, forward direction
+    } -setup {
+	Domain create A {
+	    Class Phone {
+		Attribute {
+		    *Number string
+		    PrevNumber string
+		}
+	    }
+	    Relationship R1 Phone ?-->? Phone {
+		PrevNumber -> Number
+	    }
+	}
+	A::Phone insert Number 555-1212 PrevNumber {}
+	A::Phone insert Number 555-1213 PrevNumber 555-1212
+    } -cleanup {
+	$phone destroy
+	$prevphone destroy
+	A destroy
+    } -body {
+	set phone [A::Phone new]
+	$phone selectOne Number 555-1213
+	set prevphone [$phone selectRelated R1]
+	$prevphone Number
+    } -result {555-1212}
+
+    test Class-5.7 {
+	simple relationship traversal -- reflexive, backward direction
+    } -setup {
+	Domain create A {
+	    Class Phone {
+		Attribute {
+		    *Number string
+		    PrevNumber string
+		}
+	    }
+	    Relationship R1 Phone ?-->? Phone {
+		PrevNumber -> Number
+	    }
+	}
+	A::Phone insert Number 555-1212 PrevNumber {}
+	A::Phone insert Number 555-1213 PrevNumber 555-1212
+    } -cleanup {
+	$phone destroy
+	$nextphone destroy
+	A destroy
+    } -body {
+	set phone [A::Phone new]
+	$phone selectOne Number 555-1212
+	set nextphone [$phone selectRelated ~R1]
+	$nextphone Number
+    } -result {555-1213}
+
+    test Class-6.1 {
+	generalization relationship traversal -- sub to super
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *Name string
+		}
+	    }
+	    Class SmallDog {
+		Attribute {
+		    *Name string
+		}
+	    }
+	    Class BigDog {
+		Attribute {
+		    *Name string
+		}
+	    }
+	    Generalization R1 Dog {
+		SubType SmallDog
+		SubType BigDog
+	    }
+	}
+	relvar eval {
+	    A::Dog insert Name Fred
+	    A::SmallDog insert Name Fred
+	}
+    } -cleanup {
+	$dog destroy
+	$sdog destroy
+	A destroy
+    } -body {
+	set sdog [A::SmallDog new]
+	$sdog selectOne Name Fred
+	set dog [$sdog selectRelated R1]
+	$dog Name
+    } -result {Fred}
+
+    test Class-6.2 {
+	generalization relationship traversal -- super to sub
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *Name string
+		}
+	    }
+	    Class SmallDog {
+		Attribute {
+		    *Name string
+		}
+	    }
+	    Class BigDog {
+		Attribute {
+		    *Name string
+		}
+	    }
+	    Generalization R1 Dog {
+		SubType SmallDog
+		SubType BigDog
+	    }
+	}
+	relvar eval {
+	    A::Dog insert Name Fred
+	    A::SmallDog insert Name Fred
+	}
+    } -cleanup {
+	$dog destroy
+	$sdog destroy
+	A destroy
+    } -body {
+	set dog [A::Dog new]
+	$dog selectOne Name Fred
+	set sdog [$dog selectRelated ~R1.SmallDog]
+	$sdog Name
+    } -result {Fred}
+
+    test Class-6.3 {
+	generalization relationship traversal -- super to sub, alternate syntax
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *Name string
+		}
+	    }
+	    Class SmallDog {
+		Attribute {
+		    *Name string
+		}
+	    }
+	    Class BigDog {
+		Attribute {
+		    *Name string
+		}
+	    }
+	    Generalization R1 Dog {
+		SubType SmallDog
+		SubType BigDog
+	    }
+	}
+	relvar eval {
+	    A::Dog insert Name Fred
+	    A::SmallDog insert Name Fred
+	}
+    } -cleanup {
+	$dog destroy
+	$sdog destroy
+	A destroy
+    } -body {
+	set dog [A::Dog new]
+	$dog selectOne Name Fred
+	set sdog [$dog selectRelated R1.SmallDog]
+	$sdog Name
+    } -result {Fred}
+
+    test Class-7.1 {
+	associative relationship traversal -- source to target
+    } -setup {
+	setupDogOwnerOwnership
+	relvar eval {
+	    A::Owner insert OwnerName John
+	    A::Dog insert DogName Fido
+	    A::Ownership insert DogName Fido OwnerName John
+	}
+    } -cleanup {
+	$owner destroy
+	$dog destroy
+	cleanupDogOwnerOwnership
+    } -body {
+	set dog [A::Dog new]
+	$dog selectOne DogName Fido
+	set owner [$dog selectRelated R1]
+	$owner OwnerName
+    } -result {John}
+
+    test Class-7.2 {
+	associative relationship traversal -- target to source
+    } -setup {
+	setupDogOwnerOwnership
+	relvar eval {
+	    A::Owner insert OwnerName John
+	    A::Dog insert DogName Fido
+	    A::Ownership insert DogName Fido OwnerName John
+	}
+    } -cleanup {
+	$owner destroy
+	$dog destroy
+	cleanupDogOwnerOwnership
+    } -body {
+	set owner [A::Owner new]
+	$owner selectOne OwnerName John
+	set dog [$owner selectRelated ~R1]
+	$dog DogName
+    } -result {Fido}
+
+    test Class-7.3 {
+	associative relationship traversal -- source to associative class
+    } -setup {
+	setupDogOwnerOwnership
+	relvar eval {
+	    A::Owner insert OwnerName John
+	    A::Dog insert DogName Fido
+	    A::Ownership insert DogName Fido OwnerName John
+	}
+    } -cleanup {
+	$ownership destroy
+	$dog destroy
+	cleanupDogOwnerOwnership
+    } -body {
+	set dog [A::Dog new]
+	$dog selectOne DogName Fido
+	set ownership [$dog selectRelated R1.Ownership]
+	$ownership OwnerName
+    } -result {John}
+
+    test Class-7.4 {
+	associative relationship traversal -- target to associative class
+    } -setup {
+	setupDogOwnerOwnership
+	relvar eval {
+	    A::Owner insert OwnerName John
+	    A::Dog insert DogName Fido
+	    A::Ownership insert DogName Fido OwnerName John
+	}
+    } -cleanup {
+	$owner destroy
+	$ownership destroy
+	cleanupDogOwnerOwnership
+    } -body {
+	set owner [A::Owner new]
+	$owner selectOne OwnerName John
+	set ownership [$owner selectRelated ~R1.Ownership]
+	$ownership DogName
+    } -result {Fido}
+
+    test Class-7.5 {
+	associate relationship traversal -- reflexive, forward
+    } -setup {
+	setupDogPlays
+    } -cleanup {
+	$dog destroy
+	$players destroy
+	cleanupDogPlays
+    } -body {
+	set dog [A::Dog new]
+	$dog selectOne DogName Fido
+	set players [$dog selectRelated R1]
+	$players get
+    } -result {
+	Relation {
+	    DogName string
+	} {
+	    DogName
+	} {
+	    {DogName Fido}
+	    {DogName Fred}
+	    {DogName Alice}
+	}
+    } -match relation
+
+    test Class-7.6 {
+	associate relationship traversal -- reflexive, backward
+    } -setup {
+	setupDogPlays
+    } -cleanup {
+	$playmate destroy
+	$dog destroy
+	cleanupDogPlays
+    } -body {
+	set playmate [A::Dog new]
+	$playmate selectOne DogName Fred
+	set dog [$playmate selectRelated ~R1]
+	$dog get
+    } -result {
+	Relation {
+	    DogName string
+	} {
+	    DogName
+	} {
+	    {DogName Fido}
+	    {DogName Alice}
+	}
+    } -match relation
+
+    test Class-7.7 {
+	associate relationship traversal -- reflexive, target to associative
+    } -setup {
+	setupDogPlays
+    } -cleanup {
+	$playmate destroy
+	$plays destroy
+	cleanupDogPlays
+    } -body {
+	set playmate [A::Dog new]
+	$playmate selectOne DogName Fred
+	set plays [$playmate selectRelated ~R1.Plays]
+	$plays get
+    } -result {
+	Relation {
+	    DogName string
+	    PlayerName string
+	} {
+	    {DogName PlayerName}
+	} {
+	    {DogName Fido PlayerName Fred}
+	    {DogName Alice PlayerName Fred}
+	}
+    } -match relation
+
+    test Class-7.8 {
+	associate relationship traversal -- reflexive, source to associative
+    } -setup {
+	setupDogPlays
+    } -cleanup {
+	$dog destroy
+	$plays destroy
+	cleanupDogPlays
+    } -body {
+	set dog [A::Dog new]
+	$dog selectOne DogName Fred
+	set plays [$dog selectRelated R1.Plays]
+	$plays get
+    } -result {
+	Relation {
+	    DogName string
+	    PlayerName string
+	} {
+	    {DogName PlayerName}
+	} {
+	    {DogName Fred PlayerName Fido}
+	}
+    } -match relation
+
+    test Class-8.1 {
+	relate across simple relationship
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *DogName string
+		    OwnerName string
+		}
+	    }
+	    Class Owner {
+		Attribute {
+		    *OwnerName string
+		}
+	    }
+	    Relationship R1 Dog *-->1 Owner
+	}
+    } -cleanup {
+	$owner destroy
+	$dog destroy
+	A destroy
+    } -body {
+	relvar eval {
+	    set owner [A::Owner new OwnerName John]
+	    set dog [A::Dog new DogName Fred OwnerName {}]
+	    $dog relate R1 $owner
+	}
+	$dog OwnerName
+    } -result {John}
+
+    test Class-8.2 {
+	relate across simple relationship -- backward
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *DogName string
+		    OwnerName string
+		}
+	    }
+	    Class Owner {
+		Attribute {
+		    *OwnerName string
+		}
+	    }
+	    Relationship R1 Dog *-->1 Owner
+	}
+    } -cleanup {
+	$owner destroy
+	$dog destroy
+	A destroy
+    } -body {
+	relvar eval {
+	    set owner [A::Owner new OwnerName John]
+	    set dog [A::Dog new DogName Fred OwnerName {}]
+	    $owner relate ~R1 $dog
+	}
+	$dog OwnerName
+    } -result {John}
+
+    test Class-8.3 {
+	relate across simple relationship -- reflexive, forward
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *DogName string
+		    PrevDog string
+		}
+	    }
+	    Relationship R1 Dog ?-->? Dog {
+		PrevDog -> DogName
+	    }
+	}
+    } -cleanup {
+	$leaddog destroy
+	$nextdog destroy
+	A destroy
+    } -body {
+	relvar eval {
+	    set leaddog [A::Dog new DogName Fred PrevDog {}]
+	    set nextdog [A::Dog new DogName Fido PrevDog {}]
+	    $nextdog relate R1 $leaddog
+	}
+	$nextdog PrevDog
+    } -result {Fred}
+
+    test Class-8.4 {
+	relate across simple relationship -- reflexive, backward
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *DogName string
+		    PrevDog string
+		}
+	    }
+	    Relationship R1 Dog ?-->? Dog {
+		PrevDog -> DogName
+	    }
+	}
+    } -cleanup {
+	$leaddog destroy
+	$nextdog destroy
+	A destroy
+    } -body {
+	relvar eval {
+	    set leaddog [A::Dog new DogName Fred PrevDog {}]
+	    set nextdog [A::Dog new DogName Fido PrevDog {}]
+	    $leaddog relate ~R1 $nextdog
+	}
+	$nextdog PrevDog
+    } -result {Fred}
+
+    test Class-8.5 {
+	relate across simple relationship -- error
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *DogName string
+		    OwnerName string
+		}
+	    }
+	    Class Owner {
+		Attribute {
+		    *OwnerName string
+		}
+	    }
+	    Relationship R1 Dog *-->1 Owner
+	}
+    } -cleanup {
+	$fred destroy
+	$fido destroy
+	A destroy
+    } -body {
+	relvar eval {
+	    set fred [A::Dog new DogName Fred OwnerName {}]
+	    set fido [A::Dog new DogName Fido OwnerName {}]
+	    $fred relate R1 $fido
+	}
+    } -result {"Dog" and "Dog" do not participate in relationship\
+	"::raloo::test::A::R1"}\
+    -returnCodes error
+
+    test Class-9.1 {
+	relate across generalization relationship - sub to super
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *Name string
+		}
+	    }
+	    Class SmallDog {
+		Attribute {
+		    *Name string
+		}
+	    }
+	    Class BigDog {
+		Attribute {
+		    *Name string
+		}
+	    }
+	    Generalization R1 Dog {
+		SubType SmallDog
+		SubType BigDog
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	relvar eval {
+	    set dog [A::Dog new Name Fred]
+	    set sdog [A::SmallDog new Name {}]
+	    $sdog relate R1 $dog
+	}
+	$sdog Name
+    } -result {Fred}
+
+    test Class-9.2 {
+	relate across generalization relationship - super to sub
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *Name string
+		}
+	    }
+	    Class SmallDog {
+		Attribute {
+		    *Name string
+		}
+	    }
+	    Class BigDog {
+		Attribute {
+		    *Name string
+		}
+	    }
+	    Generalization R1 Dog {
+		SubType SmallDog
+		SubType BigDog
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	relvar eval {
+	    set dog [A::Dog new Name Fred]
+	    set sdog [A::SmallDog new Name {}]
+	    $dog relate R1 $sdog
+	}
+	$sdog Name
+    } -result {Fred}
+
+    test Class-10.1 {
+	relate across associative relationship -- backward
+    } -setup {
+	setupDogOwnerOwnership
+    } -cleanup {
+	$ownership destroy
+	$owner destroy
+	$dog destroy
+	cleanupDogOwnerOwnership
+    } -body {
+	relvar eval {
+	    set dog [A::Dog new DogName Fido]
+	    set owner [A::Owner new OwnerName John]
+	    set ownership [$owner relateAssoc R1 $dog]
+	}
+	list [$ownership OwnerName] [$dog DogName]
+    } -result {John Fido}
+
+    test Class-10.2 {
+	relate across associative relationship -- foreward
+    } -setup {
+	setupDogOwnerOwnership
+    } -cleanup {
+	$ownership destroy
+	$owner destroy
+	$dog destroy
+	cleanupDogOwnerOwnership
+    } -body {
+	relvar eval {
+	    set dog [A::Dog new DogName Fido]
+	    set owner [A::Owner new OwnerName John]
+	    set ownership [$dog relateAssoc R1 $owner]
+	}
+	list [$ownership OwnerName] [$dog DogName]
+    } -result {John Fido}
+
+    test Class-10.3 {
+	relate across associative relationship -- reflexive, foreward
+    } -setup {
+	setupDogPlays
+    } -cleanup {
+	$dog1 destroy
+	$dog2 destroy
+	$plays destroy
+	cleanupDogPlays
+    } -body {
+	set dog1 [A::Dog new]
+	$dog1 selectOne DogName Alice
+	set dog2 [A::Dog new]
+	$dog2 selectOne DogName Fido
+	set plays [$dog1 relateAssoc R1 $dog2]
+	$plays PlayerName
+    } -result {Fido}
+
+    test Class-10.3 {
+	relate across associative relationship -- reflexive, foreward
+    } -setup {
+	setupDogPlays
+    } -cleanup {
+	$dog1 destroy
+	$dog2 destroy
+	$plays destroy
+	cleanupDogPlays
+    } -body {
+	set dog1 [A::Dog new]
+	$dog1 selectOne DogName Alice
+	set dog2 [A::Dog new]
+	$dog2 selectOne DogName Fido
+	set plays [$dog2 relateAssoc ~R1 $dog1]
+	$plays PlayerName
+    } -result {Fido}
+
+    cleanupTests
+}
+
+namespace delete ::raloo::test
+
+if 0 {
+    test X.1 {
+    } -setup {
+    } -cleanup {
+    } -body {
+    } -result {}
+}
