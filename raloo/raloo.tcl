@@ -48,8 +48,8 @@
 #  capabilities of TclOO.
 # 
 # $RCSfile: raloo.tcl,v $
-# $Revision: 1.1 $
-# $Date: 2008/02/25 00:16:46 $
+# $Revision: 1.2 $
+# $Date: 2008/02/25 02:33:20 $
 #  *--
 
 package require Tcl 8.5
@@ -489,7 +489,7 @@ oo::class create ::raloo::Domain {
     self.unexport new
     # We overload the create method so that each domain may be created in
     # a namespace that corresponds to its name.
-    self.method create {name script} {
+    self.method create {name {script {}}} {
 	# If the domain name is given as relative, make the domain in
 	# the namespace of the caller.
 	if {[string range $name 0 1] ne "::"} {
@@ -546,7 +546,7 @@ oo::class create ::raloo::Domain {
 	}
     }
 
-    method define {script} {
+    method define {{script {}}} {
 	# Invoke the script arranging for defining procs in the script
 	# to be aliased to unexported methods. This is just a convenience
 	# so that the definition script does not have to contain a set of
@@ -565,6 +565,9 @@ oo::class create ::raloo::Domain {
     }
     # Interpret the definition of a class.
     method Class {name script} {
+	if {[string match {*::*} $name]} {
+	    error "class names may not have namespace separators, \"$name\""
+	}
 	my variable className
 	set className $name
 	# Define the class into the meta-model and then evaluate the
@@ -1072,7 +1075,7 @@ oo::class create ::raloo::Domain {
 
     method ParseAttrName {name {attrNameRef attrName}} {
 	upvar 1 $attrNameRef attrName
-	if {![regexp {\A((?:\*[1-9]?)*)([[:alnum:]].+)\Z} $name match idMark\
+	if {![regexp {\A((?:\*[1-9]?)*)(\w.+)\Z} $name match idMark\
 		attrName]} {
 	    error "unrecognized attribute name syntax, \"$name\""
 	}
@@ -1089,7 +1092,7 @@ oo::class create ::raloo::Domain {
     method ParseClassName {name {classNameRef className} {idNumRef idNum}} {
 	upvar 1 $classNameRef className
 	upvar 1 $idNumRef idNum
-	if {![regexp {\A(\*[1-9]?)?([[:alnum:]].+)\Z} $name match idMark\
+	if {![regexp {\A(\*[1-9]?)?(\w.+)\Z} $name match idMark\
 		className]} {
 	    error "unrecognized class name syntax, \"$name\""
 	}

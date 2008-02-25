@@ -47,8 +47,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: raloo.test,v $
-# $Revision: 1.1 $
-# $Date: 2008/02/25 00:16:47 $
+# $Revision: 1.2 $
+# $Date: 2008/02/25 02:33:20 $
 #  *--
 
 package require tcltest 2.2
@@ -212,6 +212,65 @@ namespace eval ::raloo::test {
 	}
 	A repeat a 3
     } -result {aaa}
+
+    test Domain-2.4 {
+	class reference within a DomainOp
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *DogName string
+		    Breed string
+		}
+	    }
+	    DomainOp newDog {name breed} {
+		Dog insert DogName $name Breed $breed
+	    }
+	    DomainOp getDogBreed {name} {
+		set dog [Dog new]
+		$dog selectOne DogName $name
+		return [$dog Breed]
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	A newDog Fred Poodle
+	A getDogBreed Fred
+    } -result {Poodle}
+
+    test Domain-2.5 {
+	domain operation transaction error
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *DogName string
+		}
+	    }
+	    Class Owner {
+		Attribute {
+		    *OwnerName string
+		}
+	    }
+	    Class Ownership {
+		Attribute {
+		    *DogName string
+		    *OwnerName string
+		}
+	    }
+	    AssocRelationship R1 Dog +-Ownership->+ Owner
+	    DomainOp newDog {name} {
+		Dog insert DogName $name
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	A newDog Fred
+    } -result {for correlation ::raloo::test::A::R1(::raloo::test::A::Dog <== [+] ::raloo::test::A::Ownership [+] ==> ::raloo::test::A::Owner), in relvar ::raloo::test::A::Dog
+tuple {DogName Fred} is not referenced by any tuple
+} -returnCodes error
 
     test Domain-3.1 {
 	simple relationship definition

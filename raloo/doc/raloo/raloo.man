@@ -1,0 +1,216 @@
+[manpage_begin raloo n 0.1]
+[comment {
+# This software is copyrighted 2003 by G. Andrew Mangogna.
+# The following terms apply to all files associated with the software unless
+# explicitly disclaimed in individual files.
+# 
+# The authors hereby grant permission to use, copy, modify, distribute,
+# and license this software and its documentation for any purpose, provided
+# that existing copyright notices are retained in all copies and that this
+# notice is included verbatim in any distributions. No written agreement,
+# license, or royalty fee is required for any of the authorized uses.
+# Modifications to this software may be copyrighted by their authors and
+# need not follow the licensing terms described here, provided that the
+# new terms are clearly indicated on the first page of each file where
+# they apply.
+# 
+# IN NO EVENT SHALL THE AUTHORS OR DISTRIBUTORS BE LIABLE TO ANY PARTY FOR
+# DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING
+# OUT OF THE USE OF THIS SOFTWARE, ITS DOCUMENTATION, OR ANY DERIVATIVES
+# THEREOF, EVEN IF THE AUTHORS HAVE BEEN ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
+# 
+# THE AUTHORS AND DISTRIBUTORS SPECIFICALLY DISCLAIM ANY WARRANTIES,
+# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.  THIS SOFTWARE
+# IS PROVIDED ON AN "AS IS" BASIS, AND THE AUTHORS AND DISTRIBUTORS HAVE
+# NO OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS,
+# OR MODIFICATIONS.
+# 
+# GOVERNMENT USE: If you are acquiring this software on behalf of the
+# U.S. government, the Government shall have only "Restricted Rights"
+# in the software and related documentation as defined in the Federal
+# Acquisition Regulations (FARs) in Clause 52.227.19 (c) (2).  If you
+# are acquiring the software on behalf of the Department of Defense,
+# the software shall be classified as "Commercial Computer Software"
+# and the Government shall have only "Restricted Rights" as defined in
+# Clause 252.227-7013 (c) (1) of DFARs.  Notwithstanding the foregoing,
+# the authors grant the U.S. Government and others acting in its behalf
+# permission to use and distribute the software in accordance with the
+# terms specified in this license.
+# 
+#  *++
+# MODULE:
+#   raloo.man -- documentation for the raloo package
+# ABSTRACT:
+#   This file contains the documentation for the raloo package.
+#   This package is part of TclRAL. This file is in Tcl Markup Language
+#   format.
+# $RCSfile: raloo.man,v $
+# $Revision: 1.1 $
+# $Date: 2008/02/25 02:33:20 $
+#  *--
+}]
+[moddesc "raloo"]
+[titledesc "Relation Oriented Programming"]
+[copyright "2008 by G. Andrew Mangogna"]
+[require raloo [opt 0.1]]
+[description]
+
+[package raloo] is a relation oriented programming extention to Tcl.
+It combines the relational algebra of TclRAL with TclOO to create an
+object oriented programming system that relies heavily on relational
+algebra to structure the class data.
+
+[para]
+The [package raloo] package exports one command, [cmd Domain].
+[cmd Domain] is a TclOO class which exports the [cmd create] method
+[cmd Domain] does not export the [cmd new] method as we insist that all
+domains be given an explicit name.
+
+[section "Exported Domain Methods"]
+
+[list_begin definitions]
+[call [cmd "::raloo::Domain create"] [arg name] [opt [arg script]]]
+
+The [cmd create] method creates a new Domain named [arg name].
+If given, [arg script] contains a Tcl script that defines the characteristics
+of the Domain (see [sectref "Domain Definition"], below).
+The Domain object is created in a namespace that is the same as [arg name],
+resolved relative to the current namespace if [arg name] is not given as
+fully qualified.
+[list_end]
+
+[subsection "Domain Object Methods"]
+
+[list_begin definitions]
+[call [arg domain] [cmd define] [opt [arg script]]]
+A Domain can be incrementally defined by invoking the [cmd define] method.
+This method evaluates [arg script] in the same context as the script
+evaluation is done when a Domain is created.
+
+[call [arg domain] [cmd destroy]]
+The [cmd destroy] method destroys the given [cmd domain] along with all
+of its component classes and relationships.
+
+[list_end]
+
+[subsection "Domain Definition"]
+During Domain creation or when executing the [cmd define] method for a domain,
+the [arg script] argument is evaluated in a context where the following
+definition commands are available.
+Domains consist of the following entities:
+[list_begin item]
+[item] Domain Operations
+[item] Classes
+[item] Relationships
+[item] Generalizations
+[item] Associative Relationships
+[list_end]
+
+[list_begin definitions]
+[call [cmd DomainOp] [arg name] [arg argList] [arg body]]
+The [cmd DomainOp] command defines [arg name] as a domain-based operation.
+[arg name] appears as an exported method of the domain.
+Domain operations are the only exported aspects of a domain
+and constitute the primary external interface of the domain.
+The [arg argList] argument gives the formal parameters of the operation
+in the same way as for the [cmd proc] command.
+The [arg body] argument is the body of the domain operation.
+Domain operations are executed as a transaction against the relvars
+defined by the classes of the domain.
+At the end of a domain, the referential integrity of the underlying
+relvar constraints is evaluated and must be found consistent.
+
+[call [cmd Class] [arg name] [arg script]]
+The [cmd Class] command defines a class within a Domain.
+Each class of a Domain is created in a namespace with the same name as
+[arg name] relative to the Domain's namespace.
+In addition, a [emph relvar] by the same name is created.
+The [arg script] argument is evaluated in a context where procedures
+that define the properties of class are available
+(see [sectref "Class Definition"], below).
+
+[call [cmd Relationship] [arg name] [arg refngClass] [arg relSpec]\
+	[arg refToClass] [opt [arg script]]]
+The [cmd Relationship] command defines a relationship named [arg name]
+within the defined Domain.
+A Relationship is a referential association between a Referring Class
+named [arg refngClass] and a Referred-To Class named [arg refToClass].
+The cardinality of the reference is given by [arg relSpec].
+[arg relSpec] is of the form "f->t", where [emph f] is one
+of *, +, ? or 1 and [emph t] is one of ? or 1. The arbitrary number of
+hyphens (-) and the single greater than (>) characters are
+ignored syntactic sugar and are optional.
+The direction of the relationship is taken to left to right or from
+[arg refngClass] to [arg refToClass].
+The direction is significant in the reflexive case ([emph i.e.] when
+[arg refngClass] is the same as [arg refToClass]).
+The [arg script] argument, if present gives the detailed enumeration of
+attribute references.
+The [cmd Relationship] command establishes that one or more attributes
+in the [arg refngClass] class have values that are the same as
+a corresponding set of attributes in the [arg refToClass] class.
+The set of attributes referenced in the [arg refToClass] must form an
+identifier of [arg refToClass].
+The [arg refToClass] argument may contain an optional leading asterisk (*)
+or asterisk followed by a single decimal digit (e.g. *2).
+If present, this means that the reference is to be to the identifier numbered
+by the given decimal digit or to identifier 1 if no digit is given.
+The [arg relSpec] gives the cardinality of the reference and the significant
+characters are meant to be mnemonic of their use in regular expressions:
+* ==> zero or more, + ==> 1 or more, ? ==> at most one, 1 ==> exactly one.
+So a [arg relSpec] argument of [cmd +--->1] states that every instance
+of [arg refngClass] references exactly one instance of [arg refToClass] and
+that every instance of [arg refToClass] is referred to by one or more instances
+of [arg refngClass]
+If no [arg script] is given,
+then it is assumed that [arg refngClass] contains referring
+attributes that have the same name as the selected identifying attributes
+of [arg refToClass].
+Otherwise, [arg script] must be present and consists of a set of triples
+of the form: refngAttrName -> refToAttrName.
+Here, [arg refngAttrName] is the name of an attribute in [arg refngClass] and
+[arg refToAttrName] is the name of an attribute in [arg refToClass].
+The [arg ->] argument is syntactic sugar and its value is ignored.
+Each triple in [arg script] establishes a referential attribute
+correspondence.
+The set of [arg refToAttrName] attributes in [arg script] must constitute
+and the selected identifier of [arg refToClass].
+
+
+[call [cmd Generalization] [arg name] [arg supertype] [arg script]]
+The [cmd Generalization] command defines a generalization
+relationship named [arg name] within the defined Domain.
+A Generalization Relationship is a referential association between a
+[arg supertype] class and a set of [arg subtype] classes that completely
+partitions [arg supertype] into disjoint subtypes.
+The [arg script] argument is executed in a context where the
+[cmd SubType] command is defined.
+The [cmd SubType] command is used to define the set of classes that
+are subtypes of [arg supertype] and to define the referential attribute
+associations between the subtypes and [arg supertype].
+
+[call [cmd AssocRelationship] [arg name] [arg source] [arg assocSpec]\
+	[arg target] [opt [arg fwrdscript]] [opt [arg backscript]]]
+
+[list_end]
+
+[subsection "Class Definition"]
+Classes consist of the following entities:
+[list_begin item]
+[item] Attributes
+[item] Lifecycles
+[item] Class-based Operations
+[item] Instance-based Operations
+[list_end]
+
+[subsection "Relationship Definition"]
+
+[para]
+
+[see_also TclRAL tuple relation]
+
+[keywords object-oriented relation variable]
+
+[manpage_end]
