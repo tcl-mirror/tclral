@@ -47,8 +47,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: raloo.test,v $
-# $Revision: 1.2 $
-# $Date: 2008/02/25 02:33:20 $
+# $Revision: 1.3 $
+# $Date: 2008/02/26 02:59:04 $
 #  *--
 
 package require tcltest 2.2
@@ -121,15 +121,15 @@ namespace eval ::raloo::test {
 		DogName -> DogName
 	    }
 	}
-	relvar eval {
-	    A::Dog insert DogName Fido
-	    A::Dog insert DogName Fred
-	    A::Dog insert DogName Alice
-	    A::Plays insert DogName Fido PlayerName Fido
-	    A::Plays insert DogName Fido PlayerName Fred
-	    A::Plays insert DogName Fido PlayerName Alice
-	    A::Plays insert DogName Alice PlayerName Fred
-	    A::Plays insert DogName Fred PlayerName Fido
+	A transaction {
+	    Dog insert DogName Fido
+	    Dog insert DogName Fred
+	    Dog insert DogName Alice
+	    Plays insert DogName Fido PlayerName Fido
+	    Plays insert DogName Fido PlayerName Fred
+	    Plays insert DogName Fido PlayerName Alice
+	    Plays insert DogName Alice PlayerName Fred
+	    Plays insert DogName Fred PlayerName Fido
 	}
     }
     proc cleanupDogPlays {} {
@@ -227,8 +227,7 @@ namespace eval ::raloo::test {
 		Dog insert DogName $name Breed $breed
 	    }
 	    DomainOp getDogBreed {name} {
-		set dog [Dog new]
-		$dog selectOne DogName $name
+		set dog [Dog selectOne DogName $name]
 		return [$dog Breed]
 	    }
 	}
@@ -699,13 +698,12 @@ tuple {DogName Fred} is not referenced by any tuple
 		    Age int
 		}
 	    }
+	    Dog insert Name Rover Breed Retriever Age 5
 	}
-	C::Dog insert Name Rover Breed Retriever Age 5
     } -cleanup {
 	C destroy
     } -body {
-	set r [C::Dog new]
-	$r selectOne Name Rover
+	set r [C::Dog selectOne Name Rover]
 	$r cardinality
     } -result {1}
 
@@ -725,7 +723,6 @@ tuple {DogName Fred} is not referenced by any tuple
 	C destroy
     } -body {
 	set r [C::Dog new Name Rover Breed Retriever Age 5]
-	$r selectOne Name Rover
 	$r Breed
     } -result {Retriever}
 
@@ -745,7 +742,6 @@ tuple {DogName Fred} is not referenced by any tuple
 	C destroy
     } -body {
 	set r [C::Dog new Name Rover Breed Retriever Age 5]
-	$r selectOne Name Rover
 	$r Age 10
 	$r Age
     } -result {10}
@@ -890,16 +886,16 @@ tuple {DogName Fred} is not referenced by any tuple
 		}
 	    }
 	    Relationship R1 Dog *-->1 Owner
+
+	    Owner insert OwnerName John
+	    Dog insert DogName Fred OwnerName John
 	}
-	A::Owner insert OwnerName John
-	A::Dog insert DogName Fred OwnerName John
     } -cleanup {
 	$owner destroy
 	$dog destroy
 	A destroy
     } -body {
-	set owner [A::Owner new]
-	$owner selectOne OwnerName John
+	set owner [A::Owner selectOne OwnerName John]
 	set dog [$owner selectRelated ~R1]
 	$dog DogName
     } -result {Fred}
@@ -936,8 +932,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	$dog destroy
 	A destroy
     } -body {
-	set dog [A::Dog new]
-	$dog selectOne DogName Fred
+	set dog [A::Dog selectOne DogName Fred]
 	set phone [$dog selectRelated R1 ~R2]
 	$phone Number
     } -result {555-1212}
@@ -963,8 +958,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	$prevphone destroy
 	A destroy
     } -body {
-	set phone [A::Phone new]
-	$phone selectOne Number 555-1213
+	set phone [A::Phone selectOne Number 555-1213]
 	set prevphone [$phone selectRelated R1]
 	$prevphone Number
     } -result {555-1212}
@@ -990,8 +984,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	$nextphone destroy
 	A destroy
     } -body {
-	set phone [A::Phone new]
-	$phone selectOne Number 555-1212
+	set phone [A::Phone selectOne Number 555-1212]
 	set nextphone [$phone selectRelated ~R1]
 	$nextphone Number
     } -result {555-1213}
@@ -1020,17 +1013,16 @@ tuple {DogName Fred} is not referenced by any tuple
 		SubType BigDog
 	    }
 	}
-	relvar eval {
-	    A::Dog insert Name Fred
-	    A::SmallDog insert Name Fred
+	A transaction {
+	    Dog insert Name Fred
+	    SmallDog insert Name Fred
 	}
     } -cleanup {
 	$dog destroy
 	$sdog destroy
 	A destroy
     } -body {
-	set sdog [A::SmallDog new]
-	$sdog selectOne Name Fred
+	set sdog [A::SmallDog selectOne Name Fred]
 	set dog [$sdog selectRelated R1]
 	$dog Name
     } -result {Fred}
@@ -1059,17 +1051,16 @@ tuple {DogName Fred} is not referenced by any tuple
 		SubType BigDog
 	    }
 	}
-	relvar eval {
-	    A::Dog insert Name Fred
-	    A::SmallDog insert Name Fred
+	A transaction {
+	    Dog insert Name Fred
+	    SmallDog insert Name Fred
 	}
     } -cleanup {
 	$dog destroy
 	$sdog destroy
 	A destroy
     } -body {
-	set dog [A::Dog new]
-	$dog selectOne Name Fred
+	set dog [A::Dog selectOne Name Fred]
 	set sdog [$dog selectRelated ~R1.SmallDog]
 	$sdog Name
     } -result {Fred}
@@ -1098,17 +1089,16 @@ tuple {DogName Fred} is not referenced by any tuple
 		SubType BigDog
 	    }
 	}
-	relvar eval {
-	    A::Dog insert Name Fred
-	    A::SmallDog insert Name Fred
+	A transaction {
+	    Dog insert Name Fred
+	    SmallDog insert Name Fred
 	}
     } -cleanup {
 	$dog destroy
 	$sdog destroy
 	A destroy
     } -body {
-	set dog [A::Dog new]
-	$dog selectOne Name Fred
+	set dog [A::Dog selectOne Name Fred]
 	set sdog [$dog selectRelated R1.SmallDog]
 	$sdog Name
     } -result {Fred}
@@ -1117,18 +1107,17 @@ tuple {DogName Fred} is not referenced by any tuple
 	associative relationship traversal -- source to target
     } -setup {
 	setupDogOwnerOwnership
-	relvar eval {
-	    A::Owner insert OwnerName John
-	    A::Dog insert DogName Fido
-	    A::Ownership insert DogName Fido OwnerName John
+	A transaction {
+	    Owner insert OwnerName John
+	    Dog insert DogName Fido
+	    Ownership insert DogName Fido OwnerName John
 	}
     } -cleanup {
 	$owner destroy
 	$dog destroy
 	cleanupDogOwnerOwnership
     } -body {
-	set dog [A::Dog new]
-	$dog selectOne DogName Fido
+	set dog [A::Dog selectOne DogName Fido]
 	set owner [$dog selectRelated R1]
 	$owner OwnerName
     } -result {John}
@@ -1137,18 +1126,17 @@ tuple {DogName Fred} is not referenced by any tuple
 	associative relationship traversal -- target to source
     } -setup {
 	setupDogOwnerOwnership
-	relvar eval {
-	    A::Owner insert OwnerName John
-	    A::Dog insert DogName Fido
-	    A::Ownership insert DogName Fido OwnerName John
+	A transaction {
+	    Owner insert OwnerName John
+	    Dog insert DogName Fido
+	    Ownership insert DogName Fido OwnerName John
 	}
     } -cleanup {
 	$owner destroy
 	$dog destroy
 	cleanupDogOwnerOwnership
     } -body {
-	set owner [A::Owner new]
-	$owner selectOne OwnerName John
+	set owner [A::Owner selectOne OwnerName John]
 	set dog [$owner selectRelated ~R1]
 	$dog DogName
     } -result {Fido}
@@ -1157,18 +1145,17 @@ tuple {DogName Fred} is not referenced by any tuple
 	associative relationship traversal -- source to associative class
     } -setup {
 	setupDogOwnerOwnership
-	relvar eval {
-	    A::Owner insert OwnerName John
-	    A::Dog insert DogName Fido
-	    A::Ownership insert DogName Fido OwnerName John
+	A transaction {
+	    Owner insert OwnerName John
+	    Dog insert DogName Fido
+	    Ownership insert DogName Fido OwnerName John
 	}
     } -cleanup {
 	$ownership destroy
 	$dog destroy
 	cleanupDogOwnerOwnership
     } -body {
-	set dog [A::Dog new]
-	$dog selectOne DogName Fido
+	set dog [A::Dog selectOne DogName Fido]
 	set ownership [$dog selectRelated R1.Ownership]
 	$ownership OwnerName
     } -result {John}
@@ -1177,18 +1164,17 @@ tuple {DogName Fred} is not referenced by any tuple
 	associative relationship traversal -- target to associative class
     } -setup {
 	setupDogOwnerOwnership
-	relvar eval {
-	    A::Owner insert OwnerName John
-	    A::Dog insert DogName Fido
-	    A::Ownership insert DogName Fido OwnerName John
+	A transaction {
+	    Owner insert OwnerName John
+	    Dog insert DogName Fido
+	    Ownership insert DogName Fido OwnerName John
 	}
     } -cleanup {
 	$owner destroy
 	$ownership destroy
 	cleanupDogOwnerOwnership
     } -body {
-	set owner [A::Owner new]
-	$owner selectOne OwnerName John
+	set owner [A::Owner selectOne OwnerName John]
 	set ownership [$owner selectRelated ~R1.Ownership]
 	$ownership DogName
     } -result {Fido}
@@ -1202,8 +1188,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	$players destroy
 	cleanupDogPlays
     } -body {
-	set dog [A::Dog new]
-	$dog selectOne DogName Fido
+	set dog [A::Dog selectOne DogName Fido]
 	set players [$dog selectRelated R1]
 	$players get
     } -result {
@@ -1227,8 +1212,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	$dog destroy
 	cleanupDogPlays
     } -body {
-	set playmate [A::Dog new]
-	$playmate selectOne DogName Fred
+	set playmate [A::Dog selectOne DogName Fred]
 	set dog [$playmate selectRelated ~R1]
 	$dog get
     } -result {
@@ -1251,8 +1235,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	$plays destroy
 	cleanupDogPlays
     } -body {
-	set playmate [A::Dog new]
-	$playmate selectOne DogName Fred
+	set playmate [A::Dog selectOne DogName Fred]
 	set plays [$playmate selectRelated ~R1.Plays]
 	$plays get
     } -result {
@@ -1276,8 +1259,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	$plays destroy
 	cleanupDogPlays
     } -body {
-	set dog [A::Dog new]
-	$dog selectOne DogName Fred
+	set dog [A::Dog selectOne DogName Fred]
 	set plays [$dog selectRelated R1.Plays]
 	$plays get
     } -result {
@@ -1552,10 +1534,8 @@ tuple {DogName Fred} is not referenced by any tuple
 	$plays destroy
 	cleanupDogPlays
     } -body {
-	set dog1 [A::Dog new]
-	$dog1 selectOne DogName Alice
-	set dog2 [A::Dog new]
-	$dog2 selectOne DogName Fido
+	set dog1 [A::Dog selectOne DogName Alice]
+	set dog2 [A::Dog selectOne DogName Fido]
 	set plays [$dog1 relateAssoc R1 $dog2]
 	$plays PlayerName
     } -result {Fido}
@@ -1570,13 +1550,186 @@ tuple {DogName Fred} is not referenced by any tuple
 	$plays destroy
 	cleanupDogPlays
     } -body {
-	set dog1 [A::Dog new]
-	$dog1 selectOne DogName Alice
-	set dog2 [A::Dog new]
-	$dog2 selectOne DogName Fido
+	set dog1 [A::Dog selectOne DogName Alice]
+	set dog2 [A::Dog selectOne DogName Fido]
 	set plays [$dog2 relateAssoc ~R1 $dog1]
 	$plays PlayerName
     } -result {Fido}
+
+    test Class-11.1 {
+	unrelate across simple relationship
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *DogName string
+		    OwnerName string
+		}
+	    }
+	    Class Owner {
+		Attribute {
+		    *OwnerName string
+		}
+	    }
+	    Relationship R1 Dog *-->? Owner
+	}
+    } -cleanup {
+	$owner destroy
+	$dog destroy
+	A destroy
+    } -body {
+	relvar eval {
+	    set owner [A::Owner new OwnerName John]
+	    set dog [A::Dog new DogName Fido OwnerName John]
+	    $dog unrelate R1 $owner
+	}
+	$dog OwnerName
+    } -result {}
+
+    test Class-11.2 {
+	unrelate across simple relationship -- reflexive, forward
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *DogName string
+		    PrevDog string
+		}
+	    }
+	    Relationship R1 Dog ?-->? Dog {
+		PrevDog -> DogName
+	    }
+	}
+	A transaction {
+	    Dog insert DogName Fred PrevDog {}
+	    Dog insert DogName Alice PrevDog Fred
+	    Dog insert DogName Fido PrevDog Alice
+	}
+    } -cleanup {
+	$alice destroy
+	$fido destroy
+	A destroy
+    } -body {
+	set alice [A::Dog selectOne DogName Alice]
+	set fido [A::Dog selectOne DogName Fido]
+	$alice unrelate R1 $fido
+	$alice PrevDog
+	list [$alice PrevDog] [$fido PrevDog]
+    } -result {{} Alice}
+
+    test Class-11.3 {
+	unrelate across simple relationship -- reflexive, backward
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *DogName string
+		    PrevDog string
+		}
+	    }
+	    Relationship R1 Dog ?-->? Dog {
+		PrevDog -> DogName
+	    }
+	}
+	A transaction {
+	    Dog insert DogName Fred PrevDog {}
+	    Dog insert DogName Alice PrevDog Fred
+	    Dog insert DogName Fido PrevDog Alice
+	}
+    } -cleanup {
+	$alice destroy
+	$fido destroy
+	A destroy
+    } -body {
+	set alice [A::Dog selectOne DogName Alice]
+	set fido [A::Dog selectOne DogName Fido]
+	$alice unrelate ~R1 $fido
+	list [$alice PrevDog] [$fido PrevDog]
+    } -result {Fred {}}
+
+    test Class-12.1 {
+	subtype migration
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *Name string
+		    Weight int
+		}
+	    }
+	    Class SmallDog {
+		Attribute {
+		    *Name string
+		    BreedSize string
+		}
+	    }
+	    Class BigDog {
+		Attribute {
+		    *Name string
+		}
+	    }
+	    Generalization R1 Dog {
+		SubType SmallDog
+		SubType BigDog
+	    }
+	}
+    } -cleanup {
+	$dog destroy
+	$bdog destroy
+	$sdog destroy
+	A destroy
+    } -body {
+	relvar eval {
+	    set dog [A::Dog new Name Fido Weight 20]
+	    set bdog [A::BigDog new Name Fido]
+	    set sdog [$bdog migrate R1 SmallDog BreedSize toy]
+	}
+	list [$sdog Name] [$sdog BreedSize]
+    } -result {Fido toy}
+
+    test Class-12.2 {
+	subtype migration -- subtype names are different
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *Name string
+		    Weight int
+		}
+	    }
+	    Class SmallDog {
+		Attribute {
+		    *SName string
+		    BreedSize string
+		}
+	    }
+	    Class BigDog {
+		Attribute {
+		    *BName string
+		}
+	    }
+	    Generalization R1 Dog {
+		SubType SmallDog {
+		    SName -> Name
+		}
+		SubType BigDog {
+		    BName -> Name
+		}
+	    }
+	}
+    } -cleanup {
+	$dog destroy
+	$bdog destroy
+	$sdog destroy
+	A destroy
+    } -body {
+	relvar eval {
+	    set dog [A::Dog new Name Fido Weight 20]
+	    set bdog [A::BigDog new BName Fido]
+	    set sdog [$bdog migrate R1 SmallDog BreedSize toy]
+	}
+	list [$sdog SName] [$sdog BreedSize]
+    } -result {Fido toy}
 
     cleanupTests
 }

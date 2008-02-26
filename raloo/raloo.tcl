@@ -48,8 +48,8 @@
 #  capabilities of TclOO.
 # 
 # $RCSfile: raloo.tcl,v $
-# $Revision: 1.2 $
-# $Date: 2008/02/25 02:33:20 $
+# $Revision: 1.3 $
+# $Date: 2008/02/26 02:59:04 $
 #  *--
 
 package require Tcl 8.5
@@ -557,6 +557,9 @@ oo::class create ::raloo::Domain {
 	    Relationship\
 	    Generalization\
 	    AssocRelationship
+    }
+    method transaction {{script {}} {
+	relvar eval $script
     }
     # Methods that are used in the definition of a domain during construction.
     method DomainOp {name argList body} {
@@ -1243,16 +1246,12 @@ oo::class create ::raloo::RelvarClass {
     method insert {args} {
 	relvar insert [self] $args
     }
-    method delete {idValList} {
-	foreach attrValSet $idValList {
-	    relvar deleteone [self] {*}$attrValSet
-	}
+    method delete {args} {
+	relvar deleteone [self] {*}$args
     }
-    method update {idValList attrName value} {
-	foreach attrValSet $idValList {
-	    relvar updateone [self] t $attrValSet {
-		tuple update t $attrName $value
-	    }
+    method update {attrValueList attrName value} {
+	relvar updateone [self] t $attrValueList {
+	    tuple update t $attrName $value
 	}
     }
     method cardinality {} {
@@ -1267,6 +1266,14 @@ oo::class create ::raloo::RelvarClass {
     method newFromRelation {relValue} {
 	set obj [my new]
 	$obj set $relValue
+	return $obj
+    }
+    method selectOne {args} {
+	set obj [my new]
+	$obj set [::ralutil::pipe {
+	    relvar set [self] |
+	    relation choose ~ {*}$args
+	}]
 	return $obj
     }
 }
@@ -1493,10 +1500,82 @@ oo::class create ::raloo::RelvarRef {
 	    [concat $assocTuple $args]]
 	return $assocInst
     }
-    method unrelate {rship} {
-	# HERE -- the difficulty here is if "self" is not the referring
-	# class, then we have to find the referring tuples across the
-	# relationship. Need to look at this.
+    method unrelate {rship target} {
+	lassign [::raloo::RelBase parseRelate $rship] dirMark rName
+	if {[$rName type] eq "correlation"} {
+	    error "the \"unrelate\" method cannot be use for an associative\
+		type of relationship"
+	}
+	if {[my isempty]} {
+	    error "relating empty source, \"[self]\""
+	}
+	if {[$target isempty]} {
+	    error "relating empty target, \"$target\""
+	}
+	lassign [$rName relate $dirMark [self] $target]\
+	    refngObj reftoObj refAttrMapping
+	# Update the referential attributes in the relvar to have the same
+	# values as the referred to attributes in the target.  The update can
+	# change the values that are held in the referring reference if
+	# we are changing the identifiers. So we must make sure to update the
+	# referring reference.
+	# Cf.  __UpdateAttr.
+	set refngRelvar [$refngObj relvarName]
+	set allupdates [relation emptyof [relvar set $refngRelvar]]
+	foreach refTuple [relation body [$refngObj ref]] {
+	    set updated [relvar updateone $refngRelvar tup $refTuple {
+		set avList [list]
+		dict for {reftoAttr refngAttr} $refAttrMapping {
+		    lappend avList $refngAttr {}
+		}
+		tuple update tup {*}$avList
+	    }]
+	    set allupdates [relation union $allupdates $updated]
+	}
+	$refngObj set [relation create {*}[lrange\
+	    [relation heading [relvar set $refngRelvar]] 1 end]\
+	    {*}[relation body $allupdates]]
+	return
+    }
+    method migrate {rName targetClass args} {
+	if {[$rName type] ne "partition"} {
+	    error "the \"migrate\" method can only be used with a\
+		generalization type of relationship"
+	}
+	if {[my isempty]} {
+	    error "migrating empty source, \"[self]\""
+	}
+	if {[my cardinality] > 1} {
+	    error "migrate only a single instance, \"[self]\""
+	}
+	# Get a map of the referring attributes of self. This maps supertype
+	# attribute names to the corresponding subtype attribute names.
+	set refAttrMap [$rName superTypeRefAttrs [my classOf]]
+	# Get a map of the referring attributes of the new class. Here we
+	# get the mapping of subtype attribute names to supertype attribute
+	# names.
+	set migAttrMap [$rName subTypeRefAttrs $targetClass]
+	# Construct a list of attribute / value pairs appropriate to the class
+	# to which we are migrating.  Attribute names are the subtype referring
+	# attributes. Values are the corresponding values from "self".  This is
+	# a bit tricky. We have to map to the super type attribute name and
+	# then back down to the subtype attribute name in "self", just in case
+	# the referring attribute names in the sub types are different.
+	set avList [list]
+	set valueDict [tuple get [relation tuple [my get]]]
+	dict for {subAttr superAttr} $migAttrMap {
+	    lappend avList $subAttr [dict get $valueDict\
+		[dict get $refAttrMap $superAttr]]
+	}
+	# Add on any addition attribute/values required by the migration.
+	set avList [concat $avList $args]
+	# Transform "self" into the new subtype.
+	my variable relvarName
+	relvar eval {
+	    my delete
+	    set subObj [$targetClass new {*}$avList]
+	}
+	return $subObj
     }
     # Unexported methods.
     #
@@ -2038,6 +2117,22 @@ oo::class create ::raloo::Generalization {
 	}
 
 	return $result
+    }
+    method superTypeRefAttrs {subtypeName} {
+	my variable superJoinAttrs
+	if {![dict exists $superJoinAttrs $subtypeName]} {
+	    error "\"$subtypeName\" is not a subtype of relationship,\
+		\"[self]\""
+	}
+	return [dict get $superJoinAttrs $subtypeName]
+    }
+    method subTypeRefAttrs {subtypeName} {
+	my variable subJoinAttrs
+	if {![dict exists $subJoinAttrs $subtypeName]} {
+	    error "\"$subtypeName\" is not a subtype of relationship,\
+		\"[self]\""
+	}
+	return [dict get $subJoinAttrs $subtypeName]
     }
 }
 

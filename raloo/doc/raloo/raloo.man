@@ -47,8 +47,8 @@
 #   This package is part of TclRAL. This file is in Tcl Markup Language
 #   format.
 # $RCSfile: raloo.man,v $
-# $Revision: 1.1 $
-# $Date: 2008/02/25 02:33:20 $
+# $Revision: 1.2 $
+# $Date: 2008/02/26 02:59:04 $
 #  *--
 }]
 [moddesc "raloo"]
@@ -88,6 +88,8 @@ fully qualified.
 A Domain can be incrementally defined by invoking the [cmd define] method.
 This method evaluates [arg script] in the same context as the script
 evaluation is done when a Domain is created.
+
+[call [arg domain] [cmd transaction] [arg [opt script]]]
 
 [call [arg domain] [cmd destroy]]
 The [cmd destroy] method destroys the given [cmd domain] along with all
@@ -206,6 +208,48 @@ Classes consist of the following entities:
 [list_end]
 
 [subsection "Relationship Definition"]
+
+[subsection "Class Methods"]
+[list_begin definitions]
+[call [arg class] [cmd new] [arg "attr1 value1"] [arg "attr2 value2"]\
+    [arg ...]]
+[call [arg class] [cmd insert] [arg "attr1 value1"] [arg "attr2 value2"]\
+    [arg ...]]
+[call [arg class] [cmd delete] [arg "attr1 value1"] [arg "attr2 value2"]\
+    [arg ...]]
+[call [arg class] [cmd update] [arg attrValueList] [arg attrName] [arg value]]
+[call [arg class] [cmd cardinality]]
+[call [arg class] [cmd degree]]
+[call [arg class] [cmd format] [arg [opt sortAttrList]] [arg [opt title]]]
+[call [arg class] [cmd newFromRelation] [arg relValue]]
+[call [arg class] [cmd selectOne] [arg "attr1 value1"] [arg "attr2 value2"]\
+    [arg ...]]
+[list_end]
+
+[subsection "Instance References"]
+[list_begin definitions]
+[call [arg inst] [cmd set] [arg relValue]]
+[call [arg inst] [cmd get]]
+[call [arg inst] [cmd classOf]]
+[call [arg inst] [cmd relvarName]]
+[call [arg inst] [cmd ref]]
+[call [arg inst] [cmd delete]]
+[call [arg inst] [cmd cardinality]]
+[call [arg inst] [cmd isempty]]
+[call [arg inst] [cmd isnotempty]]
+[call [arg inst] [cmd format] [arg [opt sortAttrList]] [arg [opt title]]]
+[call [arg inst] [cmd selectOne] [arg "attr1 value1"] [arg "attr2 value2"]\
+    [arg ...]]
+[call [arg inst] [cmd selectWhere] [arg expr]]
+[call [arg inst] [cmd selectAny] [arg expr]]
+[call [arg inst] [cmd selectRelated] [arg relName1] [arg relName2] [arg ...]]
+[call [arg inst] [cmd relate] [arg relName] [arg targetInst]]
+[call [arg inst] [cmd relateAssoc] [arg rship] [arg targetInst]\
+    [arg [opt "attr1 value1"]] [arg [opt "attr2 value2"]] [arg ...]]
+[call [arg inst] [cmd unrelate] [arg relName] [arg targetInst]]
+[call [arg inst] [cmd migrate] [arg relName] [arg targetClass]\
+    [arg [opt "attr1 value1"]] [arg [opt "attr2 value2"]] [arg ...]]
+[list_end]
 
 [para]
 
