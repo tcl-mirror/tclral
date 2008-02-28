@@ -48,8 +48,8 @@
 #  capabilities of TclOO.
 # 
 # $RCSfile: raloo.tcl,v $
-# $Revision: 1.3 $
-# $Date: 2008/02/26 02:59:04 $
+# $Revision: 1.4 $
+# $Date: 2008/02/28 02:27:16 $
 #  *--
 
 package require Tcl 8.5
@@ -558,8 +558,20 @@ oo::class create ::raloo::Domain {
 	    Generalization\
 	    AssocRelationship
     }
-    method transaction {{script {}} {
-	relvar eval $script
+    method transaction {script} {
+	my Transact $script
+    }
+    # This method wraps a script in a relvar transaction.
+    method Transact {script} {
+	catch {
+	    relvar eval {
+		uplevel 1 $script
+	    }
+	} result options
+	foreach instref [info class instances ::raloo::RelvarRef] {
+	    $instref destroy
+	}
+	return -options $options $result
     }
     # Methods that are used in the definition of a domain during construction.
     method DomainOp {name argList body} {
@@ -1047,15 +1059,6 @@ oo::class create ::raloo::Domain {
 	return
     }
 
-    # Unexported method used internal to the Domain class.
-    # This method wraps a script in a relvar transaction.
-    method Transact {script} {
-	relvar eval {
-	    set ecode [catch {uplevel 1 $script} result options]
-	}
-	return -options $options $result
-    }
-
     # Utility method to define a set of aliases that map to unexported
     # methods that are used as definition procs during Domain definition.
     method DefineWith {level script args} {
@@ -1246,13 +1249,21 @@ oo::class create ::raloo::RelvarClass {
     method insert {args} {
 	relvar insert [self] $args
     }
-    method delete {args} {
-	relvar deleteone [self] {*}$args
+    method delete {idValList} {
+	foreach attrValSet $idValList {
+	    relvar deleteone [self] {*}$attrValSet
+	}
     }
     method update {attrValueList attrName value} {
 	relvar updateone [self] t $attrValueList {
 	    tuple update t $attrName $value
 	}
+    }
+    method set {relValue} {
+	relvar set [self] $relValue
+    }
+    method get {} {
+	return [relvar set [self]]
     }
     method cardinality {} {
 	relation cardinality [relvar set [self]]
@@ -1278,11 +1289,6 @@ oo::class create ::raloo::RelvarClass {
     }
 }
 
-# HERE -- think about creating each reference in a child namespace of
-# the class. That child namespace can have a fixed name. This might allow
-# clean up of instances by simply deleting the child namespace.
-# HERE -- may not be necessary. After each domain function or state action
-# should be save to simply destroy all objects of the RelvarRef class.
 oo::class create ::raloo::RelvarRef {
     constructor {name args} {
 	namespace import ::ral::*

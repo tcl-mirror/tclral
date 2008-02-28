@@ -47,8 +47,8 @@
 #   This package is part of TclRAL. This file is in Tcl Markup Language
 #   format.
 # $RCSfile: raloo.man,v $
-# $Revision: 1.2 $
-# $Date: 2008/02/26 02:59:04 $
+# $Revision: 1.3 $
+# $Date: 2008/02/28 02:27:16 $
 #  *--
 }]
 [moddesc "raloo"]
@@ -71,19 +71,15 @@ domains be given an explicit name.
 [section "Exported Domain Methods"]
 
 [list_begin definitions]
-[call [cmd "::raloo::Domain create"] [arg name] [opt [arg script]]]
 
+[call [cmd "::raloo::Domain create"] [arg name] [opt [arg script]]]
 The [cmd create] method creates a new Domain named [arg name].
 If given, [arg script] contains a Tcl script that defines the characteristics
 of the Domain (see [sectref "Domain Definition"], below).
 The Domain object is created in a namespace that is the same as [arg name],
 resolved relative to the current namespace if [arg name] is not given as
 fully qualified.
-[list_end]
 
-[subsection "Domain Object Methods"]
-
-[list_begin definitions]
 [call [arg domain] [cmd define] [opt [arg script]]]
 A Domain can be incrementally defined by invoking the [cmd define] method.
 This method evaluates [arg script] in the same context as the script
@@ -218,6 +214,8 @@ Classes consist of the following entities:
 [call [arg class] [cmd delete] [arg "attr1 value1"] [arg "attr2 value2"]\
     [arg ...]]
 [call [arg class] [cmd update] [arg attrValueList] [arg attrName] [arg value]]
+[call [arg class] [cmd set] [arg relValue]]
+[call [arg class] [cmd get]]
 [call [arg class] [cmd cardinality]]
 [call [arg class] [cmd degree]]
 [call [arg class] [cmd format] [arg [opt sortAttrList]] [arg [opt title]]]
