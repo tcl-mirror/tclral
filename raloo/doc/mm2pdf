@@ -1,0 +1,9 @@
+#!/usr/bin/env tclsh
+
+if {[llength $argv] == 0} {
+    set argv [glob *.fig]
+}
+
+foreach figFile $argv {
+    exec fig2dev -L pdf -z Letter $figFile [file rootname $figFile].pdf
+}
