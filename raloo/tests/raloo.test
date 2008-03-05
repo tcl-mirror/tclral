@@ -47,8 +47,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: raloo.test,v $
-# $Revision: 1.4 $
-# $Date: 2008/02/28 02:27:16 $
+# $Revision: 1.5 $
+# $Date: 2008/03/05 05:28:14 $
 #  *--
 
 package require tcltest 2.2
@@ -504,6 +504,39 @@ tuple {DogName Fred} is not referenced by any tuple
 	A::R1 info
     } -result {partition ::raloo::test::A::R1 ::raloo::test::A::Dog Name ::raloo::test::A::SmallDog SDName ::raloo::test::A::BigDog BDName}
 
+    test Domain-4.3 {
+	generalization relationship -- super type error
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *Name string
+		}
+	    }
+	    Class SmallDog {
+		Attribute {
+		    *SDName string
+		}
+	    }
+	    Class BigDog {
+		Attribute {
+		    *BDName string
+		}
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	A define {
+	    Generalization R1 Dog {
+		SubType SmallDog {
+		    SDName -> Name
+		}
+		SubType Dog
+	    }
+	}
+    } -result {a supertype may not be its own subtype, "Dog"} -returnCodes error
+
     test Domain-5.1 {
 	associative relationship
     } -setup {
@@ -566,6 +599,35 @@ tuple {DogName Fred} is not referenced by any tuple
 	}
 	A::R1 info
     } -result {correlation ::raloo::test::A::R1 ::raloo::test::A::Ownership OwnerName + ::raloo::test::A::Owner Name DogName * ::raloo::test::A::Dog Name}
+
+    test Domain-5.3 {
+	associative relationship -- target same as associator
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *DogName string
+		}
+	    }
+	    Class Owner {
+		Attribute {
+		    *OwnerName string
+		}
+	    }
+	    Class Ownership {
+		Attribute {
+		    *OwnerName string
+		    *DogName string
+		}
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	A define {
+	    AssocRelationship R1 Owner *--Ownership-->+ Ownership
+	}
+    } -result {an associate relationship participant may not also be the associative class, "Ownership"} -returnCodes error
 
     test Class-1.1 {
 	classes have a backing relvar
@@ -1706,6 +1768,105 @@ tuple {DogName Fred} is not referenced by any tuple
 	    list [$sdog SName] [$sdog BreedSize]
 	}
     } -result {Fido toy}
+
+    test Lifecycle-1.1 {
+	active class -- defining states
+    } -setup {
+	Domain create A {
+	    Class Foo {
+		Attribute {
+		    *Id int
+		}
+
+		Lifecycle {
+		    State born {date} {
+			puts born
+		    }
+		    Transition born - E1 -> born
+		}
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	A::Foo states
+    } -result {born}
+
+    test Lifecycle-1.2 {
+	active class -- creation state
+    } -setup {
+	Domain create A {
+	    Class Foo {
+		Attribute {
+		    *Id int
+		}
+
+		Lifecycle {
+		    State born {date} {
+			puts born
+		    }
+		    Transition @ - E1 -> born
+		}
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	#puts [relformat $::raloo::mm::StateModel StateModel]
+	A::Foo states
+    } -result {born}
+
+    test Lifecycle-1.3 {
+	active class -- specifying default transition
+    } -setup {
+	Domain create A {
+	    Class Foo {
+		Attribute {
+		    *Id int
+		}
+
+		Lifecycle {
+		    State born {date} {
+			puts born
+		    }
+		    Transition @ - E1 -> born
+		    DefaultTransition IG
+		}
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	#puts [relformat $::raloo::mm::StateModel StateModel]
+	relation list\
+	    [relation restrictwith $::raloo::mm::StateModel {
+		[string match *A $DomName] && $ModelName eq "Foo"}]\
+	    DefaultTrans
+    } -result {IG}
+
+    test Lifecycle-1.3.1 {
+	active class -- error in specifying default transition
+    } -setup {
+    } -cleanup {
+    } -body {
+	Domain create A {
+	    Class Foo {
+		Attribute {
+		    *Id int
+		}
+
+		Lifecycle {
+		    State born {date} {
+			puts born
+		    }
+		    Transition @ - E1 -> born
+		    DefaultTransition XX
+		}
+	    }
+	}
+    } -result {for association ::raloo::mm::R35(::raloo::mm::StateModel [*] ==> [1] ::raloo::mm::TransitionRule), in relvar ::raloo::mm::StateModel
+tuple {DomName ::raloo::test::A ModelName Foo InitialState born DefaultTrans XX} references no tuple
+} -returnCodes error
 
     cleanupTests
 }

@@ -48,8 +48,8 @@
 #  capabilities of TclOO.
 # 
 # $RCSfile: raloo.tcl,v $
-# $Revision: 1.4 $
-# $Date: 2008/02/28 02:27:16 $
+# $Revision: 1.5 $
+# $Date: 2008/03/05 05:28:14 $
 #  *--
 
 package require Tcl 8.5
@@ -62,7 +62,10 @@ package provide raloo 0.1
 namespace eval ::raloo {
     namespace export Domain
     namespace import ::ral::*
+}
 
+namespace eval ::raloo::mm {
+    namespace import ::ral::*
     # The following relvars and constraints define a "meta-model" for raloo.
     # The commands that are used to define the domains and domain components
     # serve as a "user interface" to populating the meta-model. The TclOO
@@ -262,7 +265,7 @@ namespace eval ::raloo {
 	SimpleRefTo {DomName RelName} 1\
 	SimpleRel {DomName RelName} 1
 
-    relvar create Supertype {
+    relvar create SupertypeRole {
 	Relation {
 	    DomName string
 	    RelName string
@@ -274,10 +277,10 @@ namespace eval ::raloo {
     }
 
     relvar association R11\
-	Supertype {DomName RelName} 1\
+	SupertypeRole {DomName RelName} 1\
 	GenRel {DomName RelName} 1
 
-    relvar create Subtype {
+    relvar create SubtypeRole {
 	Relation {
 	    DomName string
 	    RelName string
@@ -289,8 +292,26 @@ namespace eval ::raloo {
     }
 
     relvar association R12\
-	Subtype {DomName RelName} +\
+	SubtypeRole {DomName RelName} +\
 	GenRel {DomName RelName} 1
+
+    # This defines a procedural constraint to insure that no Subtypes
+    # are also Supertypes.
+    relvar trace add variable SubtypeRole insert\
+	[namespace code superTypeNotSubType]
+    proc superTypeNotSubType {op relvarName tupleValue} {
+	set isSuper [ralutil::pipe {
+	    tuple relation $tupleValue |
+	    relation semijoin ~ $::raloo::mm::SupertypeRole -using\
+		    {DomName DomName RelName RelName ClassName ClassName} |
+	    relation isnotempty
+	}]
+	if {$isSuper} {
+	    error "a supertype may not be its own subtype,\
+		\"[tuple extract $tupleValue ClassName]\""
+	}
+	return $tupleValue
+    }
 
     relvar create AssocSource {
 	Relation {
@@ -339,6 +360,24 @@ namespace eval ::raloo {
 	AssocTarget {DomName RelName} 1\
 	AssocRel {DomName RelName} 1
 
+    # This defines a procedural constraint to insure that no
+    # associative sources or targets have the same names as an associator.
+    relvar trace add variable AssocSource insert [namespace code notAssociator]
+    relvar trace add variable AssocTarget insert [namespace code notAssociator]
+    proc notAssociator {op relvarName tupleValue} {
+	set isAssoc [ralutil::pipe {
+	    tuple relation $tupleValue {{DomName RelName ClassName RoleId}} |
+	    relation semijoin ~ $::raloo::mm::Associator -using\
+		    {DomName DomName RelName RelName ClassName ClassName} |
+	    relation isnotempty
+	}]
+	if {$isAssoc} {
+	    error "an associate relationship participant may not also be the\
+		associative class, \"[tuple extract $tupleValue ClassName]\""
+	}
+	return $tupleValue
+    }
+
     relvar create ReferringClass {
 	Relation {
 	    DomName string
@@ -353,7 +392,7 @@ namespace eval ::raloo {
     relvar partition R16\
 	ReferringClass {DomName RelName ClassName RoleId}\
 	    SimpleReferring {DomName RelName ClassName RoleId}\
-	    Subtype {DomName RelName ClassName RoleId}\
+	    SubtypeRole {DomName RelName ClassName RoleId}\
 	    Associator {DomName RelName ClassName RoleId}
 
     relvar create RefToClass {
@@ -370,7 +409,7 @@ namespace eval ::raloo {
     relvar partition R17\
 	RefToClass {DomName RelName ClassName RoleId}\
 	    SimpleRefTo {DomName RelName ClassName RoleId}\
-	    Supertype {DomName RelName ClassName RoleId}\
+	    SupertypeRole {DomName RelName ClassName RoleId}\
 	    AssocSource {DomName RelName ClassName RoleId}\
 	    AssocTarget {DomName RelName ClassName RoleId}
 
@@ -440,6 +479,381 @@ namespace eval ::raloo {
 	AttributeRef {DomName RefngClassName RefngAttrName} *\
 	Attribute {DomName ClassName AttrName} 1
 
+    relvar create InstStateModel {
+	Relation {
+	    DomName string
+	    ClassName string
+	} {
+	    {DomName ClassName}
+	}
+    }
+
+    relvar association R30\
+	InstStateModel {DomName ClassName} ?\
+	Class {DomName ClassName} 1
+
+    relvar create AssignerStateModel {
+	Relation {
+	    DomName string
+	    RelName string
+	    CurrentState string
+	} {
+	    {DomName RelName}
+	}
+    }
+
+    relvar association R31\
+	AssignerStateModel {DomName RelName} ?\
+	Relationship {DomName RelName} 1
+
+    relvar create StateModel {
+	Relation {
+	    DomName string
+	    ModelName string
+	    InitialState string
+	    DefaultTrans string
+	} {
+	    {DomName ModelName}
+	}
+    }
+
+    relvar partition R32\
+	StateModel {DomName ModelName}\
+	    InstStateModel {DomName ClassName}\
+	    AssignerStateModel {DomName RelName}
+
+    relvar create StatePlace {
+	Relation {
+	    DomName string
+	    ModelName string
+	    StateName string
+	} {
+	    {DomName ModelName StateName}
+	}
+    }
+
+    relvar create State {
+	Relation {
+	    DomName string
+	    ModelName string
+	    StateName string
+	    Action string
+	} {
+	    {DomName ModelName StateName}
+	}
+    }
+
+    relvar association R33\
+	State {DomName ModelName} +\
+	StateModel {DomName ModelName} 1
+
+    relvar create StateParameter {
+	Relation {
+	    DomName string
+	    ModelName string
+	    StateName string
+	    ParamName string
+	    DefaultValue string
+	} {
+	    {DomName ModelName StateName ParamName}
+	}
+    }
+
+    relvar association R39\
+	StateParameter {DomName ModelName StateName} *\
+	State {DomName ModelName StateName} 1
+
+    relvar create CreationState {
+	Relation {
+	    DomName string
+	    ModelName string
+	    StateName string
+	} {
+	    {DomName ModelName}
+	}
+    }
+
+    relvar partition R37\
+	StatePlace {DomName ModelName StateName}\
+	    State {DomName ModelName StateName}\
+	    CreationState {DomName ModelName StateName}
+
+    relvar create ActiveState {
+	Relation {
+	    DomName string
+	    ModelName string
+	    StateName string
+	} {
+	    {DomName ModelName StateName}
+	}
+    }
+
+    relvar association R34\
+	StateModel {DomName ModelName InitialState} ?\
+	ActiveState {DomName ModelName StateName} 1
+
+    relvar association R40\
+	CreationState {DomName ModelName} ?\
+	StateModel {DomName ModelName} 1
+
+    relvar create DeadState {
+	Relation {
+	    DomName string
+	    ModelName string
+	    StateName string
+	} {
+	    {DomName ModelName StateName}
+	}
+    }
+
+    relvar partition R36\
+	State {DomName ModelName StateName}\
+	    ActiveState {DomName ModelName StateName}\
+	    DeadState {DomName ModelName StateName}
+
+    relvar create TransitionPlace {
+	Relation {
+	    DomName string
+	    ModelName string
+	    EventName string
+	    StateName string
+	} {
+	    {DomName ModelName EventName StateName}
+	}
+    }
+
+    relvar create StateTrans {
+	Relation {
+	    DomName string
+	    ModelName string
+	    EventName string
+	    StateName string
+	    NewState string
+	} {
+	    {DomName ModelName EventName StateName}
+	}
+    }
+
+    relvar association R46\
+	StateTrans {DomName ModelName NewState} *\
+	State {DomName ModelName StateName} 1
+
+    relvar create NonStateTrans {
+	Relation {
+	    DomName string
+	    ModelName string
+	    EventName string
+	    StateName string
+	    TransRule string
+	} {
+	    {DomName ModelName EventName StateName}
+	}
+    }
+
+    relvar partition R45\
+	TransitionPlace {DomName ModelName EventName StateName}\
+	StateTrans {DomName ModelName EventName StateName}\
+	NonStateTrans {DomName ModelName EventName StateName}
+
+    relvar create TransitionRule {
+	Relation {
+	    RuleName string
+	} {
+	    RuleName
+	}
+    }
+
+    relvar insert TransitionRule {
+	RuleName CH
+    } {
+	RuleName IG
+    }
+
+    relvar association R44\
+	NonStateTrans TransRule *\
+	TransitionRule RuleName 1
+
+    relvar association R35\
+	StateModel DefaultTrans *\
+	TransitionRule RuleName 1
+
+    relvar create NewStateTrans {
+	Relation {
+	    DomName string
+	    ModelName string
+	    EventName string
+	    StateName string
+	} {
+	    {DomName ModelName EventName StateName}
+	}
+    }
+
+    relvar create CreationTrans {
+	Relation {
+	    DomName string
+	    ModelName string
+	    EventName string
+	    StateName string
+	} {
+	    {DomName ModelName EventName}
+	}
+    }
+
+    relvar partition R47\
+	StateTrans {DomName ModelName EventName StateName}\
+	    NewStateTrans {DomName ModelName EventName StateName}\
+	    CreationTrans {DomName ModelName EventName StateName}
+
+    relvar create EffectiveEvent {
+	Relation {
+	    DomName string
+	    ModelName string
+	    EventName string
+	} {
+	    {DomName ModelName EventName}
+	}
+    }
+
+    relvar correlation R41 TransitionPlace\
+	{DomName ModelName EventName} *\
+		EffectiveEvent {DomName ModelName EventName}\
+	{DomName ModelName StateName} *\
+		StatePlace {DomName ModelName StateName}
+
+    relvar correlation R42 NewStateTrans\
+	{DomName ModelName EventName} *\
+		EffectiveEvent {DomName ModelName EventName}\
+	{DomName ModelName StateName} *\
+		ActiveState {DomName ModelName StateName}
+
+    relvar correlation R43 CreationTrans\
+	{DomName ModelName EventName} ?\
+		EffectiveEvent {DomName ModelName EventName}\
+	{DomName ModelName} *\
+		CreationState {DomName ModelName}
+
+    relvar create Event {
+	Relation {
+	    DomName string
+	    ModelName string
+	    EventName string
+	} {
+	    {DomName ModelName EventName}
+	}
+    }
+
+    relvar create DeferredEvent {
+	Relation {
+	    DomName string
+	    ModelName string
+	    EventName string
+	} {
+	    {DomName ModelName EventName}
+	}
+    }
+
+    relvar partition R50\
+	Event {DomName ModelName EventName}\
+	    DeferredEvent {DomName ModelName EventName}\
+	    EffectiveEvent {DomName ModelName EventName}
+
+    relvar create PolymorphicEvent {
+	Relation {
+	    DomName string
+	    ModelName string
+	    EventName string
+	} {
+	    {DomName ModelName EventName}
+	}
+    }
+
+    relvar create InheritedEvent {
+	Relation {
+	    DomName string
+	    ModelName string
+	    EventName string
+	} {
+	    {DomName ModelName EventName}
+	}
+    }
+
+    relvar partition R51\
+	DeferredEvent {DomName ModelName EventName}\
+	    PolymorphicEvent {DomName ModelName EventName}\
+	    InheritedEvent {DomName ModelName EventName}
+
+    relvar create MappedEvent {
+	Relation {
+	    DomName string
+	    ModelName string
+	    EventName string
+	    ParentModel string
+	} {
+	    {DomName ModelName EventName}
+	}
+    }
+
+    relvar association R53\
+	MappedEvent {DomName ModelName EventName} *\
+	DeferredEvent {DomName ModelName EventName} 1
+
+    relvar create LocalEvent {
+	Relation {
+	    DomName string
+	    ModelName string
+	    EventName string
+	} {
+	    {DomName ModelName EventName}
+	}
+    }
+
+    relvar partition R52\
+	EffectiveEvent {DomName ModelName EventName}\
+	    MappedEvent {DomName ModelName EventName}\
+	    LocalEvent {DomName ModelName EventName}
+
+    relvar create NonLocalEvent {
+	Relation {
+	    DomName string
+	    ModelName string
+	    EventName string
+	    RelName string
+	    RoleId int
+	} {
+	    {DomName ModelName EventName}
+	}
+    }
+
+    relvar partition R54\
+	NonLocalEvent {DomName ModelName EventName}\
+	    MappedEvent {DomName ModelName EventName}\
+	    InheritedEvent {DomName ModelName EventName}
+
+    relvar association R56\
+	NonLocalEvent {DomName ModelName RelName RoleId} *\
+	SupertypeRole {DomName ClassName RelName RoleId} 1\
+
+    relvar create DeferralPath {
+	Relation {
+	    DomName string
+	    ModelName string
+	    EventName string
+	    RelName string
+	    RoleId int
+	} {
+	    {DomName ModelName EventName RelName RoleId}
+	}
+    }
+
+    relvar correlation R55 DeferralPath\
+	{DomName ModelName EventName} +\
+	    DeferredEvent {DomName ModelName EventName}\
+	{DomName ModelName RelName RoleId} *\
+	    SupertypeRole {DomName ClassName RelName RoleId}
+
+
+################################################################################
+
     # This relvar is used to hold system generated unique identifiers.
     relvar create __uniqueids__ {
 	Relation {
@@ -448,37 +862,37 @@ namespace eval ::raloo {
 	    {RelvarName IdAttr}
 	}
     }
-}
 
-# A convenience proc that installs a trace on an attribute of
-# a relvar in order to have the system assign a unique value
-# to that attribute.
-proc ::raloo::uniqueId {relvarName attrName} {
-    relvar insert __uniqueids__ [list\
-	RelvarName $relvarName\
-	IdAttr $attrName\
-	IdNum 0
-    ]
-    relvar trace add variable $relvarName insert\
-	[list ::raloo::uniqueIdInsertTrace $attrName]
-}
-
-# This proc can be used in a relvar trace on insert to
-# create a unique identifier for an attribute.
-proc ::raloo::uniqueIdInsertTrace {attrName op relvarName tup} {
-    # Retrieve the Id number and update the stored value
-    # We need the "relvar eval" here because this ends up being are
-    # recursive invocation and TclRAL requires an ongoing transaction to
-    # do recursive relvar commands (in case something fails).
-    relvar eval {
-	relvar updateone __uniqueids__ uid\
-		[list RelvarName $relvarName IdAttr $attrName] {
-	    set idValue [tuple extract $uid IdNum]
-	    tuple update uid IdNum [incr idValue]
-	}
+    # A convenience proc that installs a trace on an attribute of
+    # a relvar in order to have the system assign a unique value
+    # to that attribute.
+    proc uniqueId {relvarName attrName} {
+	relvar insert __uniqueids__ [list\
+	    RelvarName $relvarName\
+	    IdAttr $attrName\
+	    IdNum 0
+	]
+	relvar trace add variable $relvarName insert\
+	    [namespace code [list uniqueIdInsertTrace $attrName]]
     }
-    # Return the tuple to insert with the Id value.
-    return [tuple update tup $attrName $idValue]
+
+    # This proc can be used in a relvar trace on insert to
+    # create a unique identifier for an attribute.
+    proc uniqueIdInsertTrace {attrName op relvarName tup} {
+	# Retrieve the Id number and update the stored value
+	# We need the "relvar eval" here because this ends up being are
+	# recursive invocation and TclRAL requires an ongoing transaction to
+	# do recursive relvar commands (in case something fails).
+	relvar eval {
+	    relvar updateone __uniqueids__ uid\
+		    [list RelvarName $relvarName IdAttr $attrName] {
+		set idValue [tuple extract $uid IdNum]
+		tuple update uid IdNum [incr idValue]
+	    }
+	}
+	# Return the tuple to insert with the Id value.
+	return [tuple update tup $attrName $idValue]
+    }
 }
 
 # Domain class.
@@ -511,7 +925,7 @@ oo::class create ::raloo::Domain {
 	my variable domName
 	set domName [self]
 
-	relvar insert ::raloo::Domain [list\
+	relvar insert ::raloo::mm::Domain [list\
 	    DomName [self]\
 	]
 	my define $script
@@ -537,10 +951,10 @@ oo::class create ::raloo::Domain {
 	# Clean up the meta-model data
 	if {[catch {
 	    relvar eval {
-		relvar delete ::raloo::DomainOp d {
+		relvar delete ::raloo::mm::DomainOp d {
 		    [tuple extract $d DomName] eq [self]
 		}
-		relvar deleteone ::raloo::Domain DomName [self]
+		relvar deleteone ::raloo::mm::Domain DomName [self]
 	    }} result]} {
 	    puts "Domain: $result"
 	}
@@ -589,7 +1003,7 @@ oo::class create ::raloo::Domain {
 	# class definition. The class definition will invoke other methods
 	# to populate the meta-model.
 	relvar eval {
-	    relvar insert ::raloo::Class [list\
+	    relvar insert ::raloo::mm::Class [list\
 		DomName [self]\
 		ClassName $name\
 	    ]
@@ -618,47 +1032,47 @@ oo::class create ::raloo::Domain {
 	# Determine the identifier which is referred to in the relationship.
 	set gotId [my ParseClassName $refToClassName refToClassName refToIdNum]
 	relvar eval {
-	    relvar insert ::raloo::Relationship [list\
+	    relvar insert ::raloo::mm::Relationship [list\
 		DomName [self]\
 		RelName $name\
 	    ]
-	    relvar insert ::raloo::SimpleRel [list\
+	    relvar insert ::raloo::mm::SimpleRel [list\
 		DomName [self]\
 		RelName $name\
 	    ]
-	    relvar insert ::raloo::SimpleReferring [list\
+	    relvar insert ::raloo::mm::SimpleReferring [list\
 		DomName [self]\
 		RelName $name\
 		ClassName $refngClassName\
 		RoleId $refngRoleId\
 		Cardinality $refngCard\
 	    ]
-	    set refngClass [relvar insert ::raloo::ReferringClass [list\
+	    set refngClass [relvar insert ::raloo::mm::ReferringClass [list\
 		DomName [self]\
 		RelName $name\
 		ClassName $refngClassName\
 		RoleId $refngRoleId\
 	    ]]
-	    relvar insert ::raloo::ClassRoleInRel [list\
+	    relvar insert ::raloo::mm::ClassRoleInRel [list\
 		DomName [self]\
 		RelName $name\
 		ClassName $refngClassName\
 		RoleId $refngRoleId\
 	    ]
-	    relvar insert ::raloo::SimpleRefTo [list\
+	    relvar insert ::raloo::mm::SimpleRefTo [list\
 		DomName [self]\
 		RelName $name\
 		ClassName $refToClassName\
 		RoleId $refToRoleId\
 		Cardinality $refToCard\
 	    ]
-	    set reftoClass [relvar insert ::raloo::RefToClass [list\
+	    set reftoClass [relvar insert ::raloo::mm::RefToClass [list\
 		DomName [self]\
 		RelName $name\
 		ClassName $refToClassName\
 		RoleId $refToRoleId\
 	    ]]
-	    relvar insert ::raloo::ClassRoleInRel [list\
+	    relvar insert ::raloo::mm::ClassRoleInRel [list\
 		DomName [self]\
 		RelName $name\
 		ClassName $refToClassName\
@@ -710,28 +1124,28 @@ oo::class create ::raloo::Domain {
 	my variable superIdGiven
 	set superIdGiven [my ParseClassName $supertype superName superIdNum]
 	relvar eval {
-	    relvar insert ::raloo::Relationship [list\
+	    relvar insert ::raloo::mm::Relationship [list\
 		DomName [self]\
 		RelName $name\
 	    ]
-	    relvar insert ::raloo::GenRel [list\
+	    relvar insert ::raloo::mm::GenRel [list\
 		DomName [self]\
 		RelName $name\
 	    ]
-	    relvar insert ::raloo::Supertype [list\
+	    relvar insert ::raloo::mm::SupertypeRole [list\
 		DomName [self]\
 		RelName $name\
 		ClassName $superName\
 		RoleId 0\
 	    ]
 	    my variable superClass
-	    set superClass [relvar insert ::raloo::RefToClass [list\
+	    set superClass [relvar insert ::raloo::mm::RefToClass [list\
 		DomName [self]\
 		ClassName $superName\
 		RelName $name\
 		RoleId 0\
 	    ]]
-	    relvar insert ::raloo::ClassRoleInRel [list\
+	    relvar insert ::raloo::mm::ClassRoleInRel [list\
 		DomName [self]\
 		ClassName $superName\
 		RelName $name\
@@ -754,14 +1168,8 @@ oo::class create ::raloo::Domain {
     # as those of the identifier in the supertype, otherwise there must be a
     # script to define the referential associations.
     method SubType {subName {script {}}} {
-	# Check that the request makes sense
-	my variable superName
-	if {$superName eq $subName} {
-	    error "a supertype may not be its own subtype, \"$subName\""
-	}
-
 	my variable relName
-	set matchingSubtype [relation restrictwith $::raloo::Subtype {
+	set matchingSubtype [relation restrictwith $::raloo::mm::SubtypeRole {
 		$DomName eq [self] && $RelName eq $relName &&
 		$ClassName eq $subName}]
 	if {[relation isnotempty $matchingSubtype]} {
@@ -769,19 +1177,19 @@ oo::class create ::raloo::Domain {
 	}
 
 	my variable subRoleId
-	relvar insert ::raloo::Subtype [list\
+	relvar insert ::raloo::mm::SubtypeRole [list\
 	    DomName [self]\
 	    RelName $relName\
 	    ClassName $subName\
 	    RoleId $subRoleId\
 	]
-	set refngClass [relvar insert ::raloo::ReferringClass [list\
+	set refngClass [relvar insert ::raloo::mm::ReferringClass [list\
 	    DomName [self]\
 	    RelName $relName\
 	    ClassName $subName\
 	    RoleId $subRoleId\
 	]]
-	relvar insert ::raloo::ClassRoleInRel [list\
+	relvar insert ::raloo::mm::ClassRoleInRel [list\
 	    DomName [self]\
 	    RelName $relName\
 	    ClassName $subName\
@@ -799,6 +1207,7 @@ oo::class create ::raloo::Domain {
 	    # Find the identifier number.
 	    my variable superClass
 	    set idNum [my FindRefToIdNum $superClass $attrMapRel]
+	    my variable superName
 	    my variable superIdNum
 	    my variable superIdGiven
 	    if {$superIdGiven && $idNum != $superIdNum} {
@@ -828,14 +1237,6 @@ oo::class create ::raloo::Domain {
 	    error "unrecognized associative relationship specification,\
 		\"$spec\""
 	}
-	if {$assocClassName eq $sourceClassName} {
-	    error "the associative class, \"$assocClassName\", may not be\
-		the same class as the source class, \"$sourceClassName\""
-	}
-	if {$assocClassName eq $targetClassName} {
-	    error "the associative class, \"$assocClassName\", may not be\
-		the same class as the target class, \"$targetClassName\""
-	}
 	# For reflexive relationship it is not allowed to have both
 	# the forward and backward scripts empty. The inherent ambiguity
 	# must be resolved by at least on reference script.
@@ -845,65 +1246,65 @@ oo::class create ::raloo::Domain {
 		definition to resolve the ambiguity"
 	}
 	relvar eval {
-	    relvar insert ::raloo::Relationship [list\
+	    relvar insert ::raloo::mm::Relationship [list\
 		DomName [self]\
 		RelName $name\
 	    ]
-	    relvar insert ::raloo::AssocRel [list\
+	    relvar insert ::raloo::mm::AssocRel [list\
 		DomName [self]\
 		RelName $name\
 	    ]
-	    relvar insert ::raloo::Associator [list\
+	    relvar insert ::raloo::mm::Associator [list\
 		DomName [self]\
 		RelName $name\
 		ClassName $assocClassName\
 		RoleId 0\
 	    ]
-	    set assocClass [relvar insert ::raloo::ReferringClass [list\
+	    set assocClass [relvar insert ::raloo::mm::ReferringClass [list\
 		DomName [self]\
 		RelName $name\
 		ClassName $assocClassName\
 		RoleId 0\
 	    ]]
-	    relvar insert ::raloo::ClassRoleInRel [list\
+	    relvar insert ::raloo::mm::ClassRoleInRel [list\
 		DomName [self]\
 		RelName $name\
 		ClassName $assocClassName\
 		RoleId 0\
 	    ]
-	    relvar insert ::raloo::AssocSource [list\
+	    relvar insert ::raloo::mm::AssocSource [list\
 		DomName [self]\
 		RelName $name\
 		ClassName $sourceClassName\
 		RoleId 1\
 		Cardinality $sourceCard\
 	    ]
-	    set sourceClass [relvar insert ::raloo::RefToClass [list\
+	    set sourceClass [relvar insert ::raloo::mm::RefToClass [list\
 		DomName [self]\
 		RelName $name\
 		ClassName $sourceClassName\
 		RoleId 1\
 	    ]]
-	    relvar insert ::raloo::ClassRoleInRel [list\
+	    relvar insert ::raloo::mm::ClassRoleInRel [list\
 		DomName [self]\
 		RelName $name\
 		ClassName $sourceClassName\
 		RoleId 1\
 	    ]
-	    relvar insert ::raloo::AssocTarget [list\
+	    relvar insert ::raloo::mm::AssocTarget [list\
 		DomName [self]\
 		RelName $name\
 		ClassName $targetClassName\
 		RoleId 2\
 		Cardinality $targetCard\
 	    ]
-	    set targetClass [relvar insert ::raloo::RefToClass [list\
+	    set targetClass [relvar insert ::raloo::mm::RefToClass [list\
 		DomName [self]\
 		RelName $name\
 		ClassName $targetClassName\
 		RoleId 2\
 	    ]]
-	    relvar insert ::raloo::ClassRoleInRel [list\
+	    relvar insert ::raloo::mm::ClassRoleInRel [list\
 		DomName [self]\
 		RelName $name\
 		ClassName $targetClassName\
@@ -979,21 +1380,21 @@ oo::class create ::raloo::Domain {
 	my variable className
 	foreach {name attrType} $nameTypeList {
 	    set idNumList [my ParseAttrName $name attrName]
-	    relvar insert ::raloo::Attribute [list\
+	    relvar insert ::raloo::mm::Attribute [list\
 		DomName $domName\
 		ClassName $className\
 		AttrName $attrName\
 		AttrType $attrType\
 	    ]
 	    foreach idNum $idNumList {
-		relvar union ::raloo::Identifier [relation create\
+		relvar union ::raloo::mm::Identifier [relation create\
 		    {DomName string ClassName string IdNum int}\
 		    {{DomName ClassName IdNum}} [list\
 		    DomName $domName\
 		    ClassName $className\
 		    IdNum $idNum\
 		]]
-		relvar insert ::raloo::IdAttribute [list\
+		relvar insert ::raloo::mm::IdAttribute [list\
 		    DomName $domName\
 		    ClassName $className\
 		    IdNum $idNum\
@@ -1004,39 +1405,169 @@ oo::class create ::raloo::Domain {
 	return
     }
     method Lifecycle {script} {
-	my variable defTrans
-	set defTrans CH
+	my variable className
+	relvar insert ::raloo::mm::StateModel [list\
+	    DomName [self]\
+	    ModelName $className\
+	    InitialState {}\
+	    DefaultTrans CH\
+	]
+	relvar insert ::raloo::mm::InstStateModel [list\
+	    DomName [self]\
+	    ClassName $className\
+	]
+
 	my DefineWith StateModel $script\
 	    State\
 	    Transition\
 	    DefaultTransition\
-	    DefaultInitialState\
+	    DefaultInitialState
+
 	return
     }
-    method State {name argList body} {
-	my variable defState
-	if {![info exists defState]} {
-	    set defState $name
+    method State {name argList body {final false}} {
+	my variable className
+	# If the default initial state is not already set, then
+	# the first mentioned state becomes the default as long as it
+	# it not a final state.
+	set sm [relation choose $::raloo::mm::StateModel\
+	    DomName [self] ModelName $className]
+	if {[relation extract $sm InitialState] eq "" && !$final} {
+	    relvar updateone ::raloo::mm::StateModel stup [list\
+		    DomName [self] ModelName $className] {
+		tuple update stup InitialState $name
+	    }
+	}
+	relvar insert ::raloo::mm::StatePlace [list\
+	    DomName [self]\
+	    ModelName $className\
+	    StateName $name\
+	]
+	relvar insert ::raloo::mm::State [list\
+	    DomName [self]\
+	    ModelName $className\
+	    StateName $name\
+	    Action $body\
+	]
+	relvar insert\
+	    ::raloo::mm::[expr {$final ? "DeadState" : "ActiveState"}] [list\
+	    DomName [self]\
+	    ModelName $className\
+	    StateName $name\
+	]
+	foreach arg $argList {
+	    relvar insert ::raloo::mm::StateParameter [list\
+		DomName [self]\
+		ModelName $className\
+		StateName $name\
+		ParamName [lindex $arg 0]\
+		DefaultValue [lindex $arg 1]\
+	    ]
 	}
 	return
     }
-    method Transition {start event end} {
+    method Transition {current - eventName -> new} {
+	my variable domName
+	my variable className
+	# The creation state is known as "@".
+	if {$current eq "@"} {
+	    # If the creation state is mentioned, the add it in.
+	    # We use "relvar union" to do this in case there are multiple
+	    # creation transitions.
+	    set csTuple [tuple create\
+		{DomName string ModelName string StateName string}\
+		[list DomName $domName ModelName $className StateName $current]]
+	    relvar union ::raloo::mm::CreationState\
+		[tuple relation $csTuple {{DomName ModelName}}]
+	    relvar union ::raloo::mm::StatePlace\
+		[tuple relation $csTuple {{DomName ModelName StateName}}]
+	}
+	# When defining transitions for a class, we assume that all the
+	# events are "LocalEvent". Later, if any polymorphism is defined
+	# we will subtype migrate the LocalEvent appropriately. Again we
+	# use "relvar union" here in case the event name is mentioned
+	# in multiple transitions.
+	set event [relation create\
+	    {DomName string ModelName string EventName string}\
+	    {{DomName ModelName EventName}}\
+	    [list\
+		DomName $domName\
+		ModelName $className\
+		EventName $eventName\
+	    ]]
+	relvar union ::raloo::mm::Event $event
+	relvar union ::raloo::mm::EffectiveEvent $event
+	relvar union ::raloo::mm::LocalEvent $event
+
+	# Add the transition information to the meta-model.
+	relvar insert ::raloo::mm::TransitionPlace [list\
+	    DomName $domName\
+	    ModelName $className\
+	    EventName $eventName\
+	    StateName $current\
+	]
+	# Now we must determine if this is a state transition or a non-state
+	# transition (i.e. a CH or IG). So if the "new" state matches a
+	# TransitionRule then we have a NonState Transition.
+	if {[relation isnotempty\
+		[relation choose $::raloo::mm::TransitionRule RuleName $new]]} {
+	    relvar insert ::raloo::mm::NonStateTrans [list\
+		DomName $domName\
+		ModelName $className\
+		EventName $eventName\
+		StateName $current\
+		TransRule $new\
+	    ]
+	} else {
+	    set trans [list\
+		DomName $domName\
+		ModelName $className\
+		EventName $eventName\
+		StateName $current\
+		NewState $new\
+	    ]
+	    relvar insert ::raloo::mm::StateTrans [list\
+		DomName $domName\
+		ModelName $className\
+		EventName $eventName\
+		StateName $current\
+		NewState $new\
+	    ]
+	    # For state transition, we must determine if this is a creation
+	    # transition or not.
+	    relvar insert ::raloo::mm::[expr {$current eq "@" ?\
+		    "CreationTrans" : "NewStateTrans"}] [list\
+		DomName $domName\
+		ModelName $className\
+		EventName $eventName\
+		StateName $current\
+	    ]
+	}
+
 	return
     }
     method DefaultTransition {trans} {
-	my variable defTrans
-	set defTrans $trans
+	my variable domName
+	my variable className
+	relvar updateone ::raloo::mm::StateModel sm [list\
+		DomName $domName ModelName $className] {
+	    tuple update sm DefaultTrans $trans
+	}
 	return
     }
     method DefaultInitialState {state} {
-	my variable defState
-	set defState $state
+	my variable domName
+	my variable className
+	relvar updateone ::raloo::mm::StateModel sm [list\
+		DomName $domName ModelName $className] {
+	    tuple update sm InitialState $state
+	}
 	return
     }
     method InstOp {name argList body} {
 	my variable domName
 	my variable className
-	relvar insert ::raloo::InstOp [list\
+	relvar insert ::raloo::mm::InstOp [list\
 	    DomName $domName\
 	    ClassName $className\
 	    OpName $name\
@@ -1048,7 +1579,7 @@ oo::class create ::raloo::Domain {
     method ClassOp {name argList body} {
 	my variable domName
 	my variable className
-	relvar insert ::raloo::ClassOp [list\
+	relvar insert ::raloo::mm::ClassOp [list\
 	    DomName $domName\
 	    ClassName $className\
 	    OpName $name\
@@ -1113,11 +1644,11 @@ oo::class create ::raloo::Domain {
 	# Find the identifying attributes for the given "idNum".
 	# Create the referred to identifying attributes
 	set refToIdAttribute [ralutil::pipe {
-	    relation semijoin $refToClass $::raloo::IdAttribute |
+	    relation semijoin $refToClass $::raloo::mm::IdAttribute |
 	    relation restrictwith ~ {$IdNum == $idNum} |
 	    relation join $refToClass ~
 	}]
-	relvar union ::raloo::RefToIdAttribute $refToIdAttribute
+	relvar union ::raloo::mm::RefToIdAttribute $refToIdAttribute
 	return $refToIdAttribute
     }
 
@@ -1161,7 +1692,7 @@ oo::class create ::raloo::Domain {
 	# Check if all the attribute refs are actually attributes.  The
 	# referential integrity checks would find this, but we want to have a
 	# better user error message.
-	set refngAttrs [relation semijoin $attrRefs $::raloo::Attribute\
+	set refngAttrs [relation semijoin $attrRefs $::raloo::mm::Attribute\
 	    -using {DomName DomName RefngClassName ClassName\
 		RefngAttrName AttrName}]
 	if {[relation cardinality $attrRefs] !=
@@ -1178,7 +1709,7 @@ oo::class create ::raloo::Domain {
 	    error "\"[join $missing {, }]\", is(are) not attributes of class,\
 		\"[relation extract $referringClass RefngClassName]\""
 	}
-	relvar union ::raloo::AttributeRef $attrRefs
+	relvar union ::raloo::mm::AttributeRef $attrRefs
     }
 
     # "script" is of the form:
@@ -1220,7 +1751,7 @@ oo::class create ::raloo::Domain {
 	    relation rename ~ RefToAttrName AttrName
 	}]
 	set idAttribute [ralutil::pipe {
-	    relation semijoin $refToClass $::raloo::IdAttribute |
+	    relation semijoin $refToClass $::raloo::mm::IdAttribute |
 	    relation project ~ IdNum AttrName
 	}]
 	set possIds [relation project $idAttribute IdNum]
@@ -1286,6 +1817,15 @@ oo::class create ::raloo::RelvarClass {
 	    relation choose ~ {*}$args
 	}]
 	return $obj
+    }
+    method states {} {
+	set domName [namespace qualifiers [self]]
+	set className [namespace tail [self]]
+	return [ralutil::pipe {
+	    relation restrictwith $::raloo::mm::State {
+		$DomName eq $domName && $ModelName eq $className} |
+	    relation list ~ StateName
+	}]
     }
 }
 
@@ -1626,7 +2166,7 @@ oo::class create ::raloo::PasvRelvarClass {
 	# identifier is unique within the class. First we have to squirrel
 	# away the attribute names. We place the trace later.
 	set uniqueAttrs [list]
-	relvar update ::raloo::Attribute attr {
+	relvar update ::raloo::mm::Attribute attr {
 	    [tuple extract $attr DomName] eq $domName &&
 	    [tuple extract $attr ClassName] eq $className &&
 	    [tuple extract $attr AttrType] eq "UNIQUE"} {
@@ -1636,7 +2176,7 @@ oo::class create ::raloo::PasvRelvarClass {
 
 	# Second a dictionary of attribute name / attribute type.
 	lappend relHeading [ralutil::pipe {
-	    relation restrictwith $::raloo::Attribute {
+	    relation restrictwith $::raloo::mm::Attribute {
 		$DomName eq $domName && $ClassName eq $className} |
 	    relation dict ~ AttrName AttrType
 	}]
@@ -1644,7 +2184,7 @@ oo::class create ::raloo::PasvRelvarClass {
 	# Third a list of identifiers. Each identifier is in turn a list
 	# of the attribute names that make up the identifier.
 	set ids [ralutil::pipe {
-	    relation restrictwith $::raloo::IdAttribute {
+	    relation restrictwith $::raloo::mm::IdAttribute {
 		$DomName eq $domName && $ClassName eq $className} |
 	    relation group ~ IdAttr AttrName
 	}]
@@ -1657,7 +2197,7 @@ oo::class create ::raloo::PasvRelvarClass {
 	relvar create [self] $relHeading
 	# Now that the relvar exists, we can add traces
 	foreach attr $uniqueAttrs {
-	    ::raloo::uniqueId [self] $attr
+	    ::raloo::mm::uniqueId [self] $attr
 	}
 
 	oo::define [self] {
@@ -1675,11 +2215,11 @@ oo::class create ::raloo::PasvRelvarClass {
 	# will not accept the additional argument.  Make sure that there is no
 	# "currentstate" method. "currentstate" is strictly controlled
 	# internally.
-	set attributes [relation restrictwith $::raloo::Attribute {
+	set attributes [relation restrictwith $::raloo::mm::Attribute {
 		$DomName eq $domName && $ClassName eq $className &&\
 		$AttrName ne "__currentstate__"}]
 	set attrNotIds [ralutil::pipe {
-	    relvar set ::raloo::IdAttribute |
+	    relvar set ::raloo::mm::IdAttribute |
 	    relation semiminus ~ $attributes |
 	    relation list ~ AttrName
 	}]
@@ -1693,7 +2233,7 @@ oo::class create ::raloo::PasvRelvarClass {
 	    oo::define [self] export $attr
 	}
 	set attrAsIds [ralutil::pipe {
-	    relvar set ::raloo::IdAttribute |
+	    relvar set ::raloo::mm::IdAttribute |
 	    relation semijoin ~ $attributes |
 	    relation list ~ AttrName
 	}]
@@ -1705,13 +2245,13 @@ oo::class create ::raloo::PasvRelvarClass {
 	}
 
 	# Class operations are turned into class methods.
-	relation foreach op [relation restrictwith $::raloo::ClassOp {
+	relation foreach op [relation restrictwith $::raloo::mm::ClassOp {
 		$DomName eq $domName && $ClassName eq $className}] {
 	    relation assign $op OpName OpParams OpBody
 	    oo::define [self] self.method $OpName $OpParams $OpBody
 	}
 	# Instance operations are turned into ordinary methods.
-	relation foreach op [relation restrictwith $::raloo::InstOp {
+	relation foreach op [relation restrictwith $::raloo::mm::InstOp {
 		$DomName eq $domName && $ClassName eq $className}] {
 	    relation assign $op OpName OpParams OpBody
 	    oo::define [self] method $OpName $OpParams $OpBody
@@ -1723,27 +2263,112 @@ oo::class create ::raloo::PasvRelvarClass {
 	set className [namespace tail [self]]
 	if {[catch {
 	    relvar eval {
-		relvar delete ::raloo::Attribute co {
+		relvar deleteone ::raloo::mm::InstStateModel\
+		    DomName $domName ClassName $className
+		relvar deleteone ::raloo::mm::StateModel\
+		    DomName $domName ModelName $className
+		relvar delete ::raloo::mm::StatePlace co {
+		    [tuple extract $co DomName] eq $domName &&\
+		    [tuple extract $co ModelName] eq $className
+		}
+		relvar delete ::raloo::mm::State co {
+		    [tuple extract $co DomName] eq $domName &&\
+		    [tuple extract $co ModelName] eq $className
+		}
+		relvar delete ::raloo::mm::StateParameter co {
+		    [tuple extract $co DomName] eq $domName &&\
+		    [tuple extract $co ModelName] eq $className
+		}
+		relvar deleteone ::raloo::mm::CreationState\
+		    DomName $domName ModelName $className
+		relvar delete ::raloo::mm::ActiveState co {
+		    [tuple extract $co DomName] eq $domName &&\
+		    [tuple extract $co ModelName] eq $className
+		}
+		relvar delete ::raloo::mm::DeadState co {
+		    [tuple extract $co DomName] eq $domName &&\
+		    [tuple extract $co ModelName] eq $className
+		}
+################################################################################
+		relvar delete ::raloo::mm::Event co {
+		    [tuple extract $co DomName] eq $domName &&\
+		    [tuple extract $co ModelName] eq $className
+		}
+		relvar delete ::raloo::mm::DeferredEvent co {
+		    [tuple extract $co DomName] eq $domName &&\
+		    [tuple extract $co ModelName] eq $className
+		}
+		relvar delete ::raloo::mm::EffectiveEvent co {
+		    [tuple extract $co DomName] eq $domName &&\
+		    [tuple extract $co ModelName] eq $className
+		}
+		relvar delete ::raloo::mm::PolymorphicEvent co {
+		    [tuple extract $co DomName] eq $domName &&\
+		    [tuple extract $co ModelName] eq $className
+		}
+		relvar delete ::raloo::mm::InheritedEvent co {
+		    [tuple extract $co DomName] eq $domName &&\
+		    [tuple extract $co ModelName] eq $className
+		}
+		relvar delete ::raloo::mm::MappedEvent co {
+		    [tuple extract $co DomName] eq $domName &&\
+		    [tuple extract $co ModelName] eq $className
+		}
+		relvar delete ::raloo::mm::LocalEvent co {
+		    [tuple extract $co DomName] eq $domName &&\
+		    [tuple extract $co ModelName] eq $className
+		}
+		relvar delete ::raloo::mm::NonLocalEvent co {
+		    [tuple extract $co DomName] eq $domName &&\
+		    [tuple extract $co ModelName] eq $className
+		}
+		relvar delete ::raloo::mm::DeferredEvent co {
+		    [tuple extract $co DomName] eq $domName &&\
+		    [tuple extract $co ModelName] eq $className
+		}
+################################################################################
+		relvar delete ::raloo::mm::TransitionPlace co {
+		    [tuple extract $co DomName] eq $domName &&\
+		    [tuple extract $co ModelName] eq $className
+		}
+		relvar delete ::raloo::mm::StateTrans co {
+		    [tuple extract $co DomName] eq $domName &&\
+		    [tuple extract $co ModelName] eq $className
+		}
+		relvar delete ::raloo::mm::NonStateTrans co {
+		    [tuple extract $co DomName] eq $domName &&\
+		    [tuple extract $co ModelName] eq $className
+		}
+		relvar delete ::raloo::mm::NewStateTrans co {
+		    [tuple extract $co DomName] eq $domName &&\
+		    [tuple extract $co ModelName] eq $className
+		}
+		relvar delete ::raloo::mm::CreationTrans co {
+		    [tuple extract $co DomName] eq $domName &&\
+		    [tuple extract $co ModelName] eq $className
+		}
+################################################################################
+		relvar delete ::raloo::mm::Attribute co {
 		    [tuple extract $co DomName] eq $domName &&\
 		    [tuple extract $co ClassName] eq $className
 		}
-		relvar delete ::raloo::Identifier co {
+		relvar delete ::raloo::mm::Identifier co {
 		    [tuple extract $co DomName] eq $domName &&\
 		    [tuple extract $co ClassName] eq $className
 		}
-		relvar delete ::raloo::IdAttribute co {
+		relvar delete ::raloo::mm::IdAttribute co {
 		    [tuple extract $co DomName] eq $domName &&\
 		    [tuple extract $co ClassName] eq $className
 		}
-		relvar delete ::raloo::ClassOp co {
+		relvar delete ::raloo::mm::ClassOp co {
 		    [tuple extract $co DomName] eq $domName &&\
 		    [tuple extract $co ClassName] eq $className
 		}
-		relvar delete ::raloo::InstOp co {
+		relvar delete ::raloo::mm::InstOp co {
 		    [tuple extract $co DomName] eq $domName &&\
 		    [tuple extract $co ClassName] eq $className
 		}
-		relvar deleteone ::raloo::Class\
+		relvar deleteone ::raloo::mm::Class\
 			DomName $domName ClassName $className
 	    }
 	    relvar unset [self]
@@ -1772,21 +2397,21 @@ oo::class create ::raloo::RelBase {
 	set domName [namespace qualifiers [self]]
 	set relName [namespace tail [self]]
 	if {[catch {
-	    relvar deleteone ::raloo::Relationship\
+	    relvar deleteone ::raloo::mm::Relationship\
 		DomName $domName RelName $relName
-	    relvar delete ::raloo::ReferringClass r {
+	    relvar delete ::raloo::mm::ReferringClass r {
 		[tuple extract $r DomName] eq $domName &&
 		[tuple extract $r RelName] eq $relName}
-	    relvar delete ::raloo::RefToClass r {
+	    relvar delete ::raloo::mm::RefToClass r {
 		[tuple extract $r DomName] eq $domName &&
 		[tuple extract $r RelName] eq $relName}
-	    relvar delete ::raloo::ClassRoleInRel r {
+	    relvar delete ::raloo::mm::ClassRoleInRel r {
 		[tuple extract $r DomName] eq $domName &&
 		[tuple extract $r RelName] eq $relName}
-	    relvar delete ::raloo::RefToIdAttribute r {
+	    relvar delete ::raloo::mm::RefToIdAttribute r {
 		[tuple extract $r DomName] eq $domName &&
 		[tuple extract $r RelName] eq $relName}
-	    relvar delete ::raloo::AttributeRef r {
+	    relvar delete ::raloo::mm::AttributeRef r {
 		[tuple extract $r DomName] eq $domName &&
 		[tuple extract $r RelName] eq $relName}
 		} result]} {
@@ -1839,18 +2464,18 @@ oo::class create ::raloo::Relationship {
 	set domName [namespace qualifiers [self]]
 	set relName [namespace tail [self]]
 	set simplerel [ralutil::pipe {
-	    relation choose $::raloo::Relationship DomName $domName\
+	    relation choose $::raloo::mm::Relationship DomName $domName\
 		RelName $relName |
-	    relation semijoin ~ $::raloo::SimpleRel
+	    relation semijoin ~ $::raloo::mm::SimpleRel
 	}]
 
 	set simplereferring [relation semijoin $simplerel\
-		$::raloo::SimpleReferring]
+		$::raloo::mm::SimpleReferring]
 	my variable refngClass
 	set refngClass [relation extract $simplereferring ClassName]
 	set refngCard [relation extract $simplereferring Cardinality]
 
-	set simplerefto [relation semijoin $simplerel $::raloo::SimpleRefTo]
+	set simplerefto [relation semijoin $simplerel $::raloo::mm::SimpleRefTo]
 	my variable reftoClass
 	set reftoClass [relation extract $simplerefto ClassName]
 	set reftoCard [relation extract $simplerefto Cardinality]
@@ -1860,8 +2485,8 @@ oo::class create ::raloo::Relationship {
 	# the behavior of dictionaries to return keys and values in
 	# the same order that they were put into the dictionary.
 	set attrMap [ralutil::pipe {
-	    relation semijoin $simplereferring $::raloo::ReferringClass\
-		$::raloo::AttributeRef -using\
+	    relation semijoin $simplereferring $::raloo::mm::ReferringClass\
+		$::raloo::mm::AttributeRef -using\
 		{DomName DomName ClassName RefngClassName RelName RelName\
 		    RoleId RefngRoleId} |
 	    relation dict ~ RefngAttrName RefToAttrName
@@ -1884,12 +2509,12 @@ oo::class create ::raloo::Relationship {
 	set relName [namespace tail [self]]
 	if {[catch {
 	    relvar eval {
-		relvar deleteone ::raloo::SimpleRel\
+		relvar deleteone ::raloo::mm::SimpleRel\
 		    DomName $domName RelName $relName
-		relvar delete ::raloo::SimpleReferring r {
+		relvar delete ::raloo::mm::SimpleReferring r {
 		    [tuple extract $r DomName] eq $domName &&
 		    [tuple extract $r RelName] eq $relName}
-		relvar delete ::raloo::SimpleRefTo r {
+		relvar delete ::raloo::mm::SimpleRefTo r {
 		    [tuple extract $r DomName] eq $domName &&
 		    [tuple extract $r RelName] eq $relName}
 		next
@@ -1978,11 +2603,11 @@ oo::class create ::raloo::Generalization {
 	set relName [namespace tail [self]]
 	# construct the "relvar partition"
 	set genrel [ralutil::pipe {
-	    relation choose $::raloo::Relationship DomName $domName\
+	    relation choose $::raloo::mm::Relationship DomName $domName\
 		RelName $relName |
-	    relation semijoin ~ $::raloo::GenRel
+	    relation semijoin ~ $::raloo::mm::GenRel
 	}]
-	set supertype [relation semijoin $genrel $::raloo::Supertype]
+	set supertype [relation semijoin $genrel $::raloo::mm::SupertypeRole]
 
 	my variable superClass
 	set superClass [relation extract $supertype ClassName]
@@ -1992,9 +2617,9 @@ oo::class create ::raloo::Generalization {
 	set attributeref [ralutil::pipe {
 	    relation semijoin\
 		$supertype\
-		$::raloo::RefToClass\
-		$::raloo::RefToIdAttribute\
-		$::raloo::AttributeRef -using\
+		$::raloo::mm::RefToClass\
+		$::raloo::mm::RefToIdAttribute\
+		$::raloo::mm::AttributeRef -using\
 		{DomName DomName ClassName RefToClassName RelName RelName\
 		RoleId RefToRoleId AttrName RefToAttrName IdNum RefToIdNum} |
 	    relation project ~ RefngClassName RefngAttrName RefToAttrName |
@@ -2029,14 +2654,15 @@ oo::class create ::raloo::Generalization {
     destructor {
 	set domName [namespace qualifiers [self]]
 	set relName [namespace tail [self]]
+	my variable superClass
 	if {[catch {
 	    relvar eval {
-		relvar deleteone ::raloo::GenRel\
+		relvar deleteone ::raloo::mm::GenRel\
 		    DomName $domName RelName $relName
-		relvar delete ::raloo::Supertype r {
+		relvar delete ::raloo::mm::SupertypeRole r {
 		    [tuple extract $r DomName] eq $domName &&
 		    [tuple extract $r RelName] eq $relName}
-		relvar delete ::raloo::Subtype r {
+		relvar delete ::raloo::mm::SubtypeRole r {
 		    [tuple extract $r DomName] eq $domName &&
 		    [tuple extract $r RelName] eq $relName}
 		next
@@ -2152,21 +2778,21 @@ oo::class create ::raloo::AssocRelationship {
 	set relName [namespace tail [self]]
 
 	set assocrel [ralutil::pipe {
-	    relation choose $::raloo::Relationship DomName $domName\
+	    relation choose $::raloo::mm::Relationship DomName $domName\
 		RelName $relName |
-	    relation semijoin ~ $::raloo::AssocRel
+	    relation semijoin ~ $::raloo::mm::AssocRel
 	}]
 
-	set associator [relation semijoin $assocrel $::raloo::Associator]
+	set associator [relation semijoin $assocrel $::raloo::mm::Associator]
 	my variable assocClassName
 	set assocClassName [relation extract $associator ClassName]
 
-	set assocsource [relation semijoin $assocrel $::raloo::AssocSource]
+	set assocsource [relation semijoin $assocrel $::raloo::mm::AssocSource]
 	my variable sourceClassName
 	set sourceClassName [relation extract $assocsource ClassName]
 	set sourceCard [relation extract $assocsource Cardinality]
 
-	set assoctarget [relation semijoin $assocrel $::raloo::AssocTarget]
+	set assoctarget [relation semijoin $assocrel $::raloo::mm::AssocTarget]
 	my variable targetClassName
 	set targetClassName [relation extract $assoctarget ClassName]
 	set targetCard [relation extract $assoctarget Cardinality]
@@ -2176,8 +2802,8 @@ oo::class create ::raloo::AssocRelationship {
 	# First retrieve all the attributes references
 	set attributeref [relation semijoin\
 	    $associator\
-	    $::raloo::ReferringClass\
-	    $::raloo::AttributeRef -using\
+	    $::raloo::mm::ReferringClass\
+	    $::raloo::mm::AttributeRef -using\
 		{DomName DomName ClassName RefngClassName RelName RelName\
 		    RoleId RefngRoleId}
 	]
@@ -2227,15 +2853,15 @@ oo::class create ::raloo::AssocRelationship {
 	set relName [namespace tail [self]]
 	if {[catch {
 	    relvar eval {
-		relvar deleteone ::raloo::AssocRel\
+		relvar deleteone ::raloo::mm::AssocRel\
 		    DomName $domName RelName $relName
-		relvar delete ::raloo::Associator r {
+		relvar delete ::raloo::mm::Associator r {
 		    [tuple extract $r DomName] eq $domName &&
 		    [tuple extract $r RelName] eq $relName}
-		relvar delete ::raloo::AssocSource r {
+		relvar delete ::raloo::mm::AssocSource r {
 		    [tuple extract $r DomName] eq $domName &&
 		    [tuple extract $r RelName] eq $relName}
-		relvar delete ::raloo::AssocTarget r {
+		relvar delete ::raloo::mm::AssocTarget r {
 		    [tuple extract $r DomName] eq $domName &&
 		    [tuple extract $r RelName] eq $relName}
 		next
