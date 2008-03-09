@@ -47,8 +47,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: raloo.test,v $
-# $Revision: 1.5 $
-# $Date: 2008/03/05 05:28:14 $
+# $Revision: 1.6 $
+# $Date: 2008/03/09 01:56:46 $
 #  *--
 
 package require tcltest 2.2
@@ -1867,6 +1867,143 @@ tuple {DogName Fred} is not referenced by any tuple
     } -result {for association ::raloo::mm::R35(::raloo::mm::StateModel [*] ==> [1] ::raloo::mm::TransitionRule), in relvar ::raloo::mm::StateModel
 tuple {DomName ::raloo::test::A ModelName Foo InitialState born DefaultTrans XX} references no tuple
 } -returnCodes error
+
+    test Lifecycle-1.3.2 {
+	active class -- error in specifying default initial state
+    } -setup {
+    } -cleanup {
+    } -body {
+	Domain create A {
+	    Class Foo {
+		Attribute {
+		    *Id int
+		}
+
+		Lifecycle {
+		    State born {date} {
+			puts born
+		    }
+		    Transition born - E1 -> born
+		    DefaultInitialState foo
+		}
+	    }
+	}
+    } -result {for association ::raloo::mm::R34(::raloo::mm::StateModel [?] ==> [1] ::raloo::mm::ActiveState), in relvar ::raloo::mm::StateModel
+tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} references no tuple
+} -returnCodes error
+
+    test Lifecycle-1.4 {
+	active class -- signature mismatch
+    } -setup {
+    } -cleanup {
+    } -body {
+	Domain create A {
+	    Class Foo {
+		Attribute {
+		    *Id int
+		}
+
+		Lifecycle {
+		    State born {date} {
+			puts born
+		    }
+		    State grow {} {
+			puts grow
+		    }
+		    Transition born - E1 -> grow
+		    Transition grow - E1 -> born
+		}
+	    }
+	}
+    } -result {for the transition, "grow - E1 -> born", the parameter signature for the event, "E1 {}", does not match the signature of the destination state, "born {date}"}\
+    -returnCodes error
+
+    test Polymorphic-1.1 {
+	polymorphic event
+    } -setup {
+	Domain create A {
+	    Class Super {
+		Attribute {
+		    *Id UNIQUE
+		}
+	    }
+	    Class Sub1 {
+		Attribute {
+		    *Id UNIQUE
+		}
+		Lifecycle {
+		    State s1 {} {
+			puts "in s1"
+		    }
+		    Transition s1 - E1 -> s1
+		}
+	    }
+	    Class Sub2 {
+		Attribute {
+		    *Id UNIQUE
+		}
+		Lifecycle {
+		    State s1 {} {
+			puts "in s1"
+		    }
+		    Transition s1 - E1 -> s1
+		}
+	    }
+	    Generalization R1 Super {
+		SubType Sub1
+		SubType Sub2
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	A define {
+	    Polymorphic Super E1 {}
+	}
+	relation extract [relation choose $::raloo::mm::PolymorphicEvent\
+	    DomName ::raloo::test::A ModelName Super EventName E1] EventName
+    } -result {E1}
+
+    test Assigner-1.1 {
+	assigner state model
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *DogName string
+		}
+	    }
+	    Class Owner {
+		Attribute {
+		    *OwnerName string
+		}
+	    }
+	    Class Ownership {
+		Attribute {
+		    *DogName string
+		    *OwnerName string
+		}
+	    }
+	    AssocRelationship R1 Dog +-Ownership->+ Owner
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	A define {
+	    Assigner R1 {
+		State s1 {p1} {
+		    puts "s1: $p1"
+		}
+		State s2 {} {
+		    puts "s2"
+		}
+		Transition s1 - e1 -> s2
+		Transition s2 - e2 -> s1
+	    }
+	}
+	relation extract [relation choose $::raloo::mm::AssignerStateModel\
+	    DomName ::raloo::test::A RelName R1] RelName
+    } -result {R1}
 
     cleanupTests
 }
