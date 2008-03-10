@@ -47,8 +47,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: raloo.test,v $
-# $Revision: 1.6 $
-# $Date: 2008/03/09 01:56:46 $
+# $Revision: 1.7 $
+# $Date: 2008/03/10 01:43:38 $
 #  *--
 
 package require tcltest 2.2
@@ -1915,8 +1915,34 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		}
 	    }
 	}
-    } -result {for the transition, "grow - E1 -> born", the parameter signature for the event, "E1 {}", does not match the signature of the destination state, "born {date}"}\
+    } -result {for the transition, "grow - E1 -> born", the parameter signature for the event, "E1 {}", does not match the signature of the destination state, "born date"}\
     -returnCodes error
+
+    test Lifecycle-1.5 {
+	active class -- signalling events
+    } -setup {
+	Domain create A {
+	    Class Foo {
+		Attribute {
+		    *Id int
+		}
+
+		Lifecycle {
+		    State born {date} {
+			puts "born: $date"
+		    }
+		    Transition born - E1 -> born
+		}
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	set n [A::Foo new Id 1]
+	#puts [relformat $::raloo::test::A::Foo Foo]
+	$n signal E1 date [clock format [clock seconds]]
+	update idletasks
+    } -result {}
 
     test Polymorphic-1.1 {
 	polymorphic event

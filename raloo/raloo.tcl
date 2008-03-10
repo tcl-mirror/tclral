@@ -48,8 +48,8 @@
 #  capabilities of TclOO.
 # 
 # $RCSfile: raloo.tcl,v $
-# $Revision: 1.6 $
-# $Date: 2008/03/09 01:56:46 $
+# $Revision: 1.7 $
+# $Date: 2008/03/10 01:43:38 $
 #  *--
 
 package require Tcl 8.5
@@ -496,7 +496,6 @@ namespace eval ::raloo::mm {
 	Relation {
 	    DomName string
 	    RelName string
-	    CurrentState string
 	} {
 	    {DomName RelName}
 	}
@@ -854,9 +853,10 @@ namespace eval ::raloo::mm {
 	    ModelName string
 	    SigId int
 	    ParamName string
-	    DefaultValue string
+	    ParamOrder int
 	} {
 	    {DomName ModelName SigId ParamName}
+	    {DomName ModelName SigId ParamOrder}
 	}
     }
 
@@ -917,9 +917,9 @@ namespace eval ::raloo::mm {
 	    error "for the transition,\
 		\"$StateName - $EventName -> $NewState\",\
 		the parameter signature for the event,\
-		\"$EventName [formatSig $eventSig]\",\
+		\"$EventName [list [formatSig $eventSig]]\",\
 		does not match the signature of the destination state,\
-		\"$NewState [formatSig $transSig]\""
+		\"$NewState [list [formatSig $transSig]]\""
 	}
 	# This may never trigger since the signature id of a transition
 	# is set to be the same as that of the destination state when the
@@ -932,25 +932,22 @@ namespace eval ::raloo::mm {
 	    error "for the transition,\
 		\"$StateName - $EventName -> $NewState\",\
 		the parameter signature for the destination state,\
-		\"$NewState [formatSig $stateSig]\",\
+		\"$NewState [list [formatSig $stateSig]]\",\
 		does not match the signature of event,\
-		\"$EventName [formatSig $transSig]\""
+		\"$EventName [list [formatSig $transSig]]\""
 	}
 
 	return $tupleValue
     }
 
-    # Utility proc to make pretty error messages.
+    # Utility proc to turn a signature into an Tcl style argument list.
+    # "sig" is a singleton relation value.
     proc formatSig {sig} {
-	set result "\{"
-	relation foreach param\
-		[relation semijoin $sig $::raloo::mm::SignatureParam] {
-	    relation assign $param ParamName DefaultValue
-	    append result [expr {$DefaultValue ne "" ?\
-		    "\{$ParamName $DefaultValue\} " : "$ParamName "}]
+	set result [list]
+	set params [relation semijoin $sig $::raloo::mm::SignatureParam]
+	relation foreach param $params -ascending ParamOrder {
+	    lappend result [relation extract $param ParamName]
 	}
-	set result [string trimright $result]
-	append result "\}"
 	return $result
     }
 
@@ -1140,6 +1137,10 @@ oo::class create ::raloo::Domain {
 		[info class instances ::raloo::PasvRelvarClass [self]::*] {
 	    $class destroy
 	}
+	foreach class\
+		[info class instances ::raloo::ActiveRelvarClass [self]::*] {
+	    $class destroy
+	}
 	# Clean up the meta-model data
 	if {[catch {
 	    relvar eval {
@@ -1210,7 +1211,13 @@ oo::class create ::raloo::Domain {
 	}
 	# If we come out of the class definition without any errors, then
 	# we can now create the relvar that represents the class.
-	::raloo::PasvRelvarClass create $className
+	# If a lifecycle was defined for the class, then we create an
+	# active class. Otherwise a passive one is fine.
+	set classType [expr {[relation isempty\
+	    [relation choose $::raloo::mm::InstStateModel DomName $domName\
+		ClassName $className]] ?\
+	    "PasvRelvarClass" : "ActiveRelvarClass"}]
+	::raloo::$classType create $className
 
 	return
     }
@@ -1626,7 +1633,6 @@ oo::class create ::raloo::Domain {
 	    relvar insert ::raloo::mm::AssignerStateModel [list\
 		DomName $domName\
 		RelName $relName\
-		CurrentState {}\
 	    ]
 
 	    my variable className
@@ -2139,15 +2145,15 @@ oo::class create ::raloo::Domain {
 	# of SigId from SignatureParam and a relation value built up from
 	# the argument list.
 	set paramTuples [list]
-	foreach arg $argList {
-	    lassign $arg paramName defaultValue
+	set order -1
+	foreach paramName $argList {
 	    lappend paramTuples [list DomName $domName ModelName $modelName\
-		ParamName $paramName DefaultValue $defaultValue]
+		ParamName $paramName ParamOrder [incr order]]
 	}
 	set dsor [relation create\
 	    {DomName string ModelName string ParamName string\
-		DefaultValue string}\
-	    {{DomName ModelName ParamName}}\
+		ParamOrder int}\
+	    {{DomName ModelName ParamName} {DomName ModelName ParamOrder}}\
 	    {*}$paramTuples]
 	#puts [relformat $dsor dsor]
 	# Find the signature Id which matches all of the parameters.
@@ -2188,7 +2194,9 @@ oo::class create ::raloo::Domain {
 	    ralutil::pipe {
 		relation extend $dsor sp\
 			SigId int {[relation extract $sig SigId]} |
-		relation reidentify ~ {DomName ModelName SigId ParamName} |
+		relation reidentify ~\
+		    {DomName ModelName SigId ParamName}\
+		    {DomName ModelName SigId ParamOrder} |
 		relvar union ::raloo::mm::SignatureParam
 	    }
 	    #puts [relformat $::raloo::mm::Signature Signature]
@@ -2581,6 +2589,105 @@ oo::class create ::raloo::RelvarRef {
     unexport __UpdateAttr
 }
 
+oo::class create ::raloo::ActiveRelvarRef {
+    superclass ::raloo::RelvarRef
+    constructor {name args} {
+	#puts "ActiveRelvarRef constructor: $name: $args"
+	namespace import ::ral::*
+	# Check if the initial state is specified. If not,
+	# look it up and supply it by default.
+	if {!([llength $args] == 0 || "__CS__" in $args)} {
+	    set domName [namespace qualifiers $name]
+	    set className [namespace tail $name]
+	    set sm [relation choose $::raloo::mm::StateModel\
+		DomName $domName ModelName $className]
+	    lappend args __CS__ [relation extract $sm InitialState]
+	}
+	next $name {*}$args
+    }
+    destructor {
+	#puts "ActiveRelvarRef destructor"
+	next
+    }
+    # "args" is a dictionary of parameter name / parameter values pairs
+    method signal {eventName args} {
+	my variable relvarName
+	# Check if this event even exists.
+	set domName [namespace qualifiers $relvarName]
+	set modelName [namespace tail $relvarName]
+	set event [relation choose $::raloo::mm::Event\
+	    DomName $domName\
+	    ModelName $modelName\
+	    EventName $eventName\
+	]
+	if {[relation isempty $event]} {
+	    error "event, \"$eventName\", does not exist for\
+		\"$domName.$modelName\""
+	}
+	# Arrange the argument dictionary into the correct order to
+	# match the signature of the event.
+	if {[llength $args] % 2 != 0} {
+	    error "event parameters must be as name / value pairs: $args"
+	}
+	set argList [my BuildArguments $event $args]
+
+	# Determine if this is a self-directed event or not.
+	if {[catch {self caller} caller]} {
+	    set queue queueEvent
+	} else {
+	    set queue [expr {[lindex $caller 1] eq [self] ?\
+		    "queueSelfEvent" : "queueEvent"}]
+	}
+	# This reference may be multi-valued. Generate an event to each one.
+	relation foreach refValue [my get] {
+	    ::raloo::arch::$queue $event $refValue $argList
+	}
+    }
+    method signalDelayed {time eventName args} {
+	my variable relvarName
+	# Check if this event even exists.
+	set domName [namespace qualifiers $relvarName]
+	set modelName [namespace tail $relvarName]
+	set event [relation choose $::raloo::mm::Event\
+	    DomName $domName\
+	    ModelName $modelName\
+	    EventName $eventName\
+	]
+	if {[relation isempty $event]} {
+	    error "event, \"$eventName\", does not exist for\
+		\"$domName.$modelName\""
+	}
+	# Arrange the argument dictionary into the correct order to
+	# match the signature of the event.
+	if {[llength $args] % 2 != 0} {
+	    error "event parameters must be as name / value pairs: $args"
+	}
+	set argList [my BuildArguments $event $args]
+
+	# This reference may be multi-valued. Generate an event to each one.
+	relation foreach refValue [my get] {
+	    ::raloo::arch::queueDelayed $time $relvarName $refValue $event\
+		    $argList
+	}
+    }
+    # Build up a invocation argument list from a dictionary of
+    # parameter names / values
+    method BuildArguments {event paramDict} {
+	set sigParams [relation semijoin $event $::raloo::mm::Signature\
+	    $::raloo::mm::SignatureParam]
+	set argList [list]
+	relation foreach param $sigParams -ascending ParamOrder {
+	    relation assign $param ParamName
+	    if {![dict exists $paramDict $ParamName]} {
+		error "parameter, \"$ParamName\", does not exist in argument\
+		    dictionary, \"$paramDict\""
+	    }
+	    lappend argList [dict get $paramDict $ParamName]
+	}
+	return $argList
+    }
+}
+
 # This is a meta-class for classes based on relvars.
 oo::class create ::raloo::PasvRelvarClass {
     superclass ::oo::class ::raloo::RelvarClass
@@ -2631,6 +2738,7 @@ oo::class create ::raloo::PasvRelvarClass {
 	}
 	lappend relHeading $idList
 
+	# Finally create the relvar.
 	relvar create [self] $relHeading
 	# Now that the relvar exists, we can add traces
 	foreach attr $uniqueAttrs {
@@ -2654,7 +2762,7 @@ oo::class create ::raloo::PasvRelvarClass {
 	# internally.
 	set attributes [relation restrictwith $::raloo::mm::Attribute {
 		$DomName eq $domName && $ClassName eq $className &&\
-		$AttrName ne "__currentstate__"}]
+		$AttrName ne "__CS__"}]
 	set attrNotIds [ralutil::pipe {
 	    relvar set ::raloo::mm::IdAttribute |
 	    relation semiminus ~ $attributes |
@@ -2731,6 +2839,43 @@ oo::class create ::raloo::PasvRelvarClass {
 	} result]} {
 	    puts "Class: $result"
 	}
+    }
+}
+
+oo::class create ::raloo::ActiveRelvarClass {
+    superclass ::raloo::PasvRelvarClass
+    constructor {} {
+	namespace import ::ral::*
+	set domName [namespace qualifiers [self]]
+	set className [namespace tail [self]]
+	# Active classes have an additional attribute of current state.
+	relvar insert ::raloo::mm::Attribute [list\
+	    DomName $domName\
+	    ClassName $className\
+	    AttrName __CS__\
+	    AttrType string\
+	]
+	next
+
+	# Now change our super class so that we get active references.
+	oo::define [self] {
+	    superclass ::raloo::ActiveRelvarRef
+	}
+	# Define an unexported method for each state, prepending "__" to
+	# prevent name conflicts.
+	set states [relation restrictwith $::raloo::mm::State {
+	    $DomName eq $domName && $ModelName eq $className
+	}]
+	relation foreach state $states {
+	    relation assign $state
+	    set argList [::raloo::mm::formatSig\
+		[relation semijoin $state $::raloo::mm::Signature]]
+	    oo::define [self] method __$StateName $argList $Action
+	    oo::define [self] unexport __$StateName
+	}
+    }
+    destructor {
+	next
     }
 }
 
@@ -3360,4 +3505,188 @@ oo::class create ::raloo::AssocRelationship {
 	lappend result $assocClassName
 	return $result
     }
+}
+
+package require struct::queue
+package require logger
+namespace eval ::raloo::arch {
+    namespace import ::ral::*
+
+    variable eventQueue [struct::queue]
+    variable selfEventQueue [struct::queue]
+    # Number of milliseconds that constitutes one tick for delayed events.
+    variable delayTick 10
+    variable delayQueue
+
+    logger::initNamespace ::raloo::arch info
+}
+
+# "event" here is a single relation from ::raloo::mm::Event
+# "refValue" is a singleton relation value that is a projection of an
+# identifier of the relvar to which event refers
+proc ::raloo::arch::queueEvent {event refValue argList} {
+    log::debug "queueEvent: [relation body $event]\
+	[relation body $refValue] $argList"
+    variable eventQueue
+    $eventQueue put [list $event $refValue $argList]
+    after idle ::raloo::arch::serviceEventQueues
+}
+
+proc ::raloo::arch::queueSelfEvent {relvarName refValue event argList} {
+    log::debug "queueSelfEvent: [relation body $event]\
+	[relation body $refValue] $argList"
+    variable selfEventQueue
+    $selfEventQueue put [list $event $refValue $argList]
+    after idle ::raloo::arch::serviceEventQueues
+}
+
+proc ::raloo::arch::serviceEventQueues {} {
+    variable selfEventQueue
+    variable eventQueue
+
+    if {[$selfEventQueue size] != 0} {
+	deliverEvent {*}[$selfEventQueue get]
+    } elseif {[$eventQueue size] != 0} {
+	deliverEvent {*}[$eventQueue get]
+    } else {
+	log::notice "[lindex [info level 0] 0]: no event to dispatch"
+    }
+}
+
+proc ::raloo::arch::deliverEvent {event refValue argList} {
+    log::debug "deliverEvent: [relation body $event]\
+	[relation body $refValue] $argList"
+    # Determine if we are delivering an ordinary event or a polymorphic event
+    set effEvent [relation semijoin $event $::raloo::mm::EffectiveEvent]
+    if {[relation isnotempty $effEvent]} {
+	deliverEffEvent $effEvent $refValue $argList
+	return
+    }
+
+    # HERE deal with deferred events
+    set defEvent [relation semijoin $event $::raloo::mm::DeferredEvent]
+    if {[relation isnotempty $defEvent]} {
+	return
+    }
+
+    log::error "cannot find EffectiveEvent or DeferredEvent associated\
+	with:\n[relformat $event Event]"
+}
+
+proc ::raloo::arch::deliverEffEvent {event refValue argList} {
+    relation assign $event
+    set cs [relation extract $refValue __CS__]
+    # Find the transition and the new state to which we are headed.
+    set trans [relation choose $::raloo::mm::TransitionPlace\
+	DomName $DomName ModelName $ModelName EventName $EventName\
+	StateName $cs]
+    if {[relation isempty $trans]} {
+	# For unspecified transitions, we use the default recorded
+	# in the StateModel. Default transition are always non-state
+	# transitions.
+	set sm [relation choose $::raloo::mm::StateModel\
+	    DomName $DomName ModelName $ModelName]
+	deliverNonStateTrans $cs [relation extract $sm DefaultTrans]
+    } else {
+	# Determine if this transition goes to a new state or is a
+	# non-state transition.
+	set nons [relation semijoin $trans $::raloo::mm::NonStateTrans]
+	if {[relation isnotempty $nons]} {
+	    deliverNonStateTrans $cs [relation extract $nons TransRule]
+	} else {
+	    set news [relation semijoin $trans $::raloo::mm::StateTrans]
+	    if {[relation isempty $news]} {
+		error "Panic: cannot find subtype of TransitionPlace"
+	    }
+	    set newStateName [relation extract $news NewState]
+	    set relvarName ${DomName}::${ModelName}
+	    log::info "$relvarName.[list [idValues $refValue]]:\
+		$cs - $EventName -> $newStateName"
+	    # Update the current state to be the new state
+	    relvar updateone $relvarName tup [idValues $refValue] {
+		tuple update tup __CS__ $newStateName
+	    }
+	    # Create an instance reference. We will need it to deliver the
+	    # event.
+	    set inst [$relvarName new]
+	    $inst set $refValue
+	    if {[catch {namespace inscope $inst [list my __$newStateName]\
+		    {*}$argList} result options]} {
+		log::error $result
+		return -options $options
+	    }
+	    $inst destroy
+	}
+    }
+    return
+}
+
+proc ::raloo::arch::deliverNonStateTrans {currstate transRule} {
+    if {$transRule eq "IG"} {
+	log::info "$relvarName.[list [idValues $refValue]]:\
+	    $currstate - $EventName -> IG"
+	return
+    } elseif {$transRule eq "CH"} {
+	set errText "$relvarName: [list [idValues $refValue]]:\
+	    $currstate - $EventName -> CH"
+	log::error $errText
+	error $errText
+    } else {
+	error "Panic: unknown transition rule, \"$transRule\""
+    }
+}
+
+# HERE -- delayed events need to deal with source / target issues.
+# Probably should make all event have a source so that we log better.
+proc ::raloo::arch::queueDelayed {time relvarName refValue event argList} {
+    # See if we are already expired
+    if {$time <= 0} {
+	queueEvent $relvarName $refValue $event $argList
+	return
+    }
+
+    variable delayQueue
+    lappend delayQueue [list $time $relvarName $refValue $event $argList]
+    if {[llength $delayQueue] == 1} {
+	# Only start a timer to tick down the delay queue when the
+	# first entry is inserted.
+	variable delayTick
+	after $delayTick ::raloo::arch::serviceDelayedQueue
+    }
+}
+
+proc ::raloo::arch::cancelDelayed {relvarName refValue event argList} {
+}
+
+proc ::raloo::arch::serviceDelayedQueue {} {
+    set tmr [after $delayTick ::raloo::arch::serviceDelayedQueue]
+
+    variable delayQueue
+    variable delayTick
+    set delayIncr -$delayTick
+    for {set i 0} {$i < [llength $delayQueue]} {} {
+	set time [lindex $delayQueue $i 0]
+	incr $time $delayIncr
+	if {$time <= 0} {
+	    queueEvent {*}[lrange [lindex $delayQueue $i] 1 end]
+	    set delayQueue [lreplace $delayQueue $i $i]
+	} else {
+	    lset delayQueue $i 0 $time
+	    incr i
+	}
+    }
+
+    # Cancel the timer if there are no items left on the queue.
+    if {[llength $delayQueue] <= 0} {
+	after cancel $tmr
+    }
+}
+
+proc ::raloo::arch::idValues {relValue} {
+    return [ralutil::pipe {
+	relation identifiers $relValue |
+	relation project $relValue [lindex ~ 0] |
+	relation body ~ |
+	lindex ~ 0
+    }]
 }
