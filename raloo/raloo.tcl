@@ -48,8 +48,8 @@
 #  capabilities of TclOO.
 # 
 # $RCSfile: raloo.tcl,v $
-# $Revision: 1.7 $
-# $Date: 2008/03/10 01:43:38 $
+# $Revision: 1.8 $
+# $Date: 2008/03/14 04:05:41 $
 #  *--
 
 package require Tcl 8.5
@@ -1620,6 +1620,7 @@ oo::class create ::raloo::Domain {
 		my AddNonLocalEvent $className $subrole $eventName $signature
 	    }
 	}
+	oo::define ${domName}::$className superclass ::raloo::ActiveRelvarRef
     }
     method Assigner {relName script} {
 	my variable domName
@@ -1712,7 +1713,7 @@ oo::class create ::raloo::Domain {
 	    # class, resolving the inherited events.
 	    set subroles [relation semijoin $superRoles\
 		    $::raloo::mm::GenRel $::raloo::mm::SubtypeRole]
-	    foreach subrole $subroles {
+	    relation foreach subrole $subroles {
 		my AddNonLocalEvent $ClassName $subrole $eventName $signature
 	    }
 	}
@@ -2296,8 +2297,10 @@ oo::class create ::raloo::RelvarRef {
     method set {relValue} {
 	my variable relvarName
 	if {[relation isnotempty $relValue] && [relation isempty\
-	    [relation intersect [relvar set $relvarName] $relValue]]} {
-	    error "relation value is not contained in $relvarName"
+	    [relation choose [relvar set $relvarName]\
+	    {*}[::raloo::arch::idValues $relValue]]]} {
+	    error "relation value:\n[relformat $relValue]\nis not contained\
+		in $relvarName:\n[relformat [relvar set $relvarName]]"
 	}
 	my variable ref
 	set ref [relation project $relValue\
@@ -2528,7 +2531,7 @@ oo::class create ::raloo::RelvarRef {
 	    {*}[relation body $allupdates]]
 	return
     }
-    method migrate {rName targetClass args} {
+    method reclassify {rName targetClass args} {
 	if {[$rName type] ne "partition"} {
 	    error "the \"migrate\" method can only be used with a\
 		generalization type of relationship"
@@ -2596,7 +2599,7 @@ oo::class create ::raloo::ActiveRelvarRef {
 	namespace import ::ral::*
 	# Check if the initial state is specified. If not,
 	# look it up and supply it by default.
-	if {!([llength $args] == 0 || "__CS__" in $args)} {
+	if {!([llength $args] == 0 || "INSTATE" in $args)} {
 	    set domName [namespace qualifiers $name]
 	    set className [namespace tail $name]
 	    set sm [relation choose $::raloo::mm::StateModel\
@@ -2610,20 +2613,8 @@ oo::class create ::raloo::ActiveRelvarRef {
 	next
     }
     # "args" is a dictionary of parameter name / parameter values pairs
-    method signal {eventName args} {
-	my variable relvarName
-	# Check if this event even exists.
-	set domName [namespace qualifiers $relvarName]
-	set modelName [namespace tail $relvarName]
-	set event [relation choose $::raloo::mm::Event\
-	    DomName $domName\
-	    ModelName $modelName\
-	    EventName $eventName\
-	]
-	if {[relation isempty $event]} {
-	    error "event, \"$eventName\", does not exist for\
-		\"$domName.$modelName\""
-	}
+    method generate {eventName args} {
+	set event [my LookUpEvent $eventName]
 	# Arrange the argument dictionary into the correct order to
 	# match the signature of the event.
 	if {[llength $args] % 2 != 0} {
@@ -2634,16 +2625,61 @@ oo::class create ::raloo::ActiveRelvarRef {
 	# Determine if this is a self-directed event or not.
 	if {[catch {self caller} caller]} {
 	    set queue queueEvent
+	    set objName ::
+	    set objRef {Relation {} {{}} {{}}}
 	} else {
-	    set queue [expr {[lindex $caller 1] eq [self] ?\
+	    set obj [lindex $caller 1]
+	    set queue [expr {$obj eq [self] ?\
 		    "queueSelfEvent" : "queueEvent"}]
+	    set objRef [$obj get]
+	    set objName [$obj relvarName]
 	}
 	# This reference may be multi-valued. Generate an event to each one.
 	relation foreach refValue [my get] {
-	    ::raloo::arch::$queue $event $refValue $argList
+	    ::raloo::arch::$queue $event $refValue $objName $objRef $argList
+	}
+
+	return
+    }
+    method generateDelayed {time eventName args} {
+	set event [my LookUpEvent $eventName]
+	# Arrange the argument dictionary into the correct order to
+	# match the signature of the event.
+	if {[llength $args] % 2 != 0} {
+	    error "event parameters must be as name / value pairs: $args"
+	}
+	set argList [my BuildArguments $event $args]
+
+	if {[catch {self caller} caller]} {
+	    set caller ::
+	    set callerValue {Relation {} {{}} {{}}}
+	} else {
+	    set callerValue [$caller get]
+	}
+
+	# This reference may be multi-valued. Generate an event to each one.
+	relation foreach refValue [my get] {
+	    ::raloo::arch::queueDelayed $time $event $refValue $caller\
+		    $callerValue $argList
 	}
     }
-    method signalDelayed {time eventName args} {
+    method cancelDelayed {eventName} {
+	set event [my LookUpEvent $eventName]
+
+	if {[catch {self caller} caller]} {
+	    set caller ::
+	    set callerValue {Relation {} {{}} {{}}}
+	} else {
+	    set callerValue [$caller get]
+	}
+
+	# This reference may be multi-valued. Cancel each event.
+	relation foreach refValue [my get] {
+	    ::raloo::arch::cancelDelayed $event $refValue $caller $callerValue
+	}
+    }
+    # Look up the event name in the context of this instance
+    method LookUpEvent {eventName} {
 	my variable relvarName
 	# Check if this event even exists.
 	set domName [namespace qualifiers $relvarName]
@@ -2657,18 +2693,7 @@ oo::class create ::raloo::ActiveRelvarRef {
 	    error "event, \"$eventName\", does not exist for\
 		\"$domName.$modelName\""
 	}
-	# Arrange the argument dictionary into the correct order to
-	# match the signature of the event.
-	if {[llength $args] % 2 != 0} {
-	    error "event parameters must be as name / value pairs: $args"
-	}
-	set argList [my BuildArguments $event $args]
-
-	# This reference may be multi-valued. Generate an event to each one.
-	relation foreach refValue [my get] {
-	    ::raloo::arch::queueDelayed $time $relvarName $refValue $event\
-		    $argList
-	}
+	return $event
     }
     # Build up a invocation argument list from a dictionary of
     # parameter names / values
@@ -3518,25 +3543,25 @@ namespace eval ::raloo::arch {
     variable delayTick 10
     variable delayQueue
 
-    logger::initNamespace ::raloo::arch info
+    logger::initNamespace ::raloo::arch debug
 }
 
 # "event" here is a single relation from ::raloo::mm::Event
 # "refValue" is a singleton relation value that is a projection of an
 # identifier of the relvar to which event refers
-proc ::raloo::arch::queueEvent {event refValue argList} {
-    log::debug "queueEvent: [relation body $event]\
-	[relation body $refValue] $argList"
+proc ::raloo::arch::queueEvent {event refValue source sourceValue argList} {
+    log::debug "queueEvent: $source.[relation body $sourceValue] ==>\
+	[relation body $event] [relation body $refValue] $argList"
     variable eventQueue
-    $eventQueue put [list $event $refValue $argList]
+    $eventQueue put [list $event $refValue $source $sourceValue $argList]
     after idle ::raloo::arch::serviceEventQueues
 }
 
-proc ::raloo::arch::queueSelfEvent {relvarName refValue event argList} {
-    log::debug "queueSelfEvent: [relation body $event]\
-	[relation body $refValue] $argList"
+proc ::raloo::arch::queueSelfEvent {event refValue source sourceValue argList} {
+    log::debug "queueSelfEvent: $source.[relation body $sourceValue] ==>\
+	[relation body $event] [relation body $refValue] $argList"
     variable selfEventQueue
-    $selfEventQueue put [list $event $refValue $argList]
+    $selfEventQueue put [list $event $refValue $source $sourceValue $argList]
     after idle ::raloo::arch::serviceEventQueues
 }
 
@@ -3553,19 +3578,19 @@ proc ::raloo::arch::serviceEventQueues {} {
     }
 }
 
-proc ::raloo::arch::deliverEvent {event refValue argList} {
+proc ::raloo::arch::deliverEvent {event refValue source sourceValue argList} {
     log::debug "deliverEvent: [relation body $event]\
 	[relation body $refValue] $argList"
     # Determine if we are delivering an ordinary event or a polymorphic event
     set effEvent [relation semijoin $event $::raloo::mm::EffectiveEvent]
     if {[relation isnotempty $effEvent]} {
-	deliverEffEvent $effEvent $refValue $argList
+	deliverEffEvent $effEvent $refValue $source $sourceValue $argList
 	return
     }
 
-    # HERE deal with deferred events
     set defEvent [relation semijoin $event $::raloo::mm::DeferredEvent]
     if {[relation isnotempty $defEvent]} {
+	deliverDefEvent $defEvent $refValue $source $sourceValue $argList
 	return
     }
 
@@ -3573,35 +3598,25 @@ proc ::raloo::arch::deliverEvent {event refValue argList} {
 	with:\n[relformat $event Event]"
 }
 
-proc ::raloo::arch::deliverEffEvent {event refValue argList} {
+proc ::raloo::arch::deliverEffEvent {event refValue source sourceValue\
+				     argList} {
     relation assign $event
     set cs [relation extract $refValue __CS__]
     # Find the transition and the new state to which we are headed.
     set trans [relation choose $::raloo::mm::TransitionPlace\
 	DomName $DomName ModelName $ModelName EventName $EventName\
 	StateName $cs]
-    if {[relation isempty $trans]} {
-	# For unspecified transitions, we use the default recorded
-	# in the StateModel. Default transition are always non-state
-	# transitions.
-	set sm [relation choose $::raloo::mm::StateModel\
-	    DomName $DomName ModelName $ModelName]
-	deliverNonStateTrans $cs [relation extract $sm DefaultTrans]
-    } else {
+    if {[relation isnotempty $trans]} {
 	# Determine if this transition goes to a new state or is a
 	# non-state transition.
-	set nons [relation semijoin $trans $::raloo::mm::NonStateTrans]
-	if {[relation isnotempty $nons]} {
-	    deliverNonStateTrans $cs [relation extract $nons TransRule]
-	} else {
-	    set news [relation semijoin $trans $::raloo::mm::StateTrans]
-	    if {[relation isempty $news]} {
-		error "Panic: cannot find subtype of TransitionPlace"
-	    }
+	set news [relation semijoin $trans $::raloo::mm::StateTrans]
+	if {[relation isnotempty $news]} {
+	    # Transition to a new state.
 	    set newStateName [relation extract $news NewState]
 	    set relvarName ${DomName}::${ModelName}
-	    log::info "$relvarName.[list [idValues $refValue]]:\
-		$cs - $EventName -> $newStateName"
+	    log::info "transition:\
+		[formatEvent $source $sourceValue $relvarName $refValue]:\
+		$cs - $EventName [list $argList] -> $newStateName"
 	    # Update the current state to be the new state
 	    relvar updateone $relvarName tup [idValues $refValue] {
 		tuple update tup __CS__ $newStateName
@@ -3610,25 +3625,110 @@ proc ::raloo::arch::deliverEffEvent {event refValue argList} {
 	    # event.
 	    set inst [$relvarName new]
 	    $inst set $refValue
+	    # This is where it all happens! This code snippet comes from DKF
+	    # and shows how "namespace inscope" can be used to invoke an
+	    # unexported method for an object. Clever, but it allows us to have
+	    # state actions as unexported methods and still have the software
+	    # architecture invoke the action.
 	    if {[catch {namespace inscope $inst [list my __$newStateName]\
 		    {*}$argList} result options]} {
 		log::error $result
-		return -options $options
 	    }
 	    $inst destroy
+	    return -options $options
+	} else {
+	    set nons [relation semijoin $trans $::raloo::mm::NonStateTrans]
+	    if {[relation isempty $nons]} {
+		error "Panic: cannot find subtype of TransitionPlace"
+	    }
+	    deliverNonStateTrans $cs [relation extract $nons TransRule]\
+		$source $sourceValue $argList
 	}
+    } else {
+	# For unspecified transitions, we use the default recorded in the
+	# StateModel. Default transition are always non-state transitions (see
+	# R35 of metamodel).  Unspecified creation transitions are always
+	# deemed a "can't happen".
+	deliverNonStateTrans $cs [expr {$cs eq "@" ? "CH" :\
+	    [relation extract [relation choose $::raloo::mm::StateModel\
+		DomName $DomName ModelName $ModelName] DefaultTrans]}]\
+	    $source $sourceValue $argList
     }
-    return
 }
 
-proc ::raloo::arch::deliverNonStateTrans {currstate transRule} {
+# HERE -- test this
+proc ::raloo::arch::deliverDefEvent {event refValue source sourceValue\
+				     argList} {
+    # What domain are we in?
+    relation assign $event {DomName domName}
+    # Find the super type roles. There can be many since a given supertype
+    # may be the supertype for multiple generalizations.
+    set superRoles [relation semijoin $event $::raloo::mm::DeferralPath\
+	$::raloo::mm::SupertypeRole]
+    # For each generalization hierarchy, find the set of subtypes.
+    # It is in these subtypes that we must find the related instance.
+    relation foreach superRole $superRoles {
+	set subRoles [relation semijoin $superRole $::raloo::mm::GenRel\
+	    $::raloo::mm::SubtypeRole]
+	# Loop through the subtypes finding the attributes that make up the
+	# supertype to subtype reference -- subtypes are the referring class.
+	# We will construct a semijoin from the supertype to the subtype, i.e.
+	# from the referred to class to the referring class.
+	relation foreach subRole $subRoles {
+	    set joinAttrs [ralutil::pipe {
+		relation semijoin $subRole $::raloo::mm::AttributeRef |
+		relation dict ~ RefToAttrName RefngAttrName
+	    }]
+	    # Check if this subtype is the one related to the supertype.
+	    set inst [ralutil::pipe {
+		relvar set ${domName}::[relation extract $subRole ClassName] |
+		relation semijoin $refValue ~ -using $joinAttrs
+	    }]
+	    if {[relation isnotempty $inst]} {
+		# Okay, found the related subtype!
+		# Find the non-local event that this subtype receives
+		set nlevt [relation semijoin $subRole\
+		    $::raloo::mm::NonLocalEvent]
+		# If the non-local event is a mapped event, then it is
+		# consumed at this level.
+		set effEvent [relation semijoin $nlevt\
+		    $::raloo::mm::MappedEvent $::raloo::mm::EffectiveEvent]
+		if {[relation isnotempty $effEvent]} {
+		    deliverEffEvent $effEvent $inst $source $sourceValue\
+			$argList
+		    break
+		}
+		# Otherwise if the non-local event is an inherited event,
+		# then it must be passed down to the next level.
+		set defEvent [relation semijoin $nlevt\
+		    $::raloo::mm::InheritedEvent $::raloo::mm::DeferredEvent]
+		if {[relation isnotempty $defEvent]} {
+		    deliverDefEvent $defEvent $inst $source $sourceValue\
+			$argList
+		    break
+		}
+
+		error "Panic: cannot find subtype of\
+		    NonLocalEvent:\n[relformat $nlevt]"
+	    }
+	}
+    }
+}
+
+# Non state transitions are just special rules to avoid adding states
+# to the state model for common circumstances. In our case, IG ==> ignore
+# and CH ==> can't happen.
+proc ::raloo::arch::deliverNonStateTrans {currstate transRule src srcValue\
+    argList} {
     if {$transRule eq "IG"} {
-	log::info "$relvarName.[list [idValues $refValue]]:\
-	    $currstate - $EventName -> IG"
+	log::info "transition:\
+	    [formatEvent $src $srcValue $relvarName $refValue]:\
+	    $currstate - $EventName [list $argList] -> IG"
 	return
     } elseif {$transRule eq "CH"} {
-	set errText "$relvarName: [list [idValues $refValue]]:\
-	    $currstate - $EventName -> CH"
+	set errText "transition:\
+	    [formatEvent $src $srcValue $relvarName $refValue]:\
+	    $currstate - $EventName [list $argList] -> CH"
 	log::error $errText
 	error $errText
     } else {
@@ -3636,17 +3736,21 @@ proc ::raloo::arch::deliverNonStateTrans {currstate transRule} {
     }
 }
 
-# HERE -- delayed events need to deal with source / target issues.
-# Probably should make all event have a source so that we log better.
-proc ::raloo::arch::queueDelayed {time relvarName refValue event argList} {
+proc ::raloo::arch::queueDelayed {time event refValue source sourceValue\
+				  argList} {
     # See if we are already expired
     if {$time <= 0} {
-	queueEvent $relvarName $refValue $event $argList
+	queueEvent $event $refValue $source $sourceValue $argList
 	return
     }
 
     variable delayQueue
-    lappend delayQueue [list $time $relvarName $refValue $event $argList]
+    lappend delayQueue [list $time $event $refValue $source $sourceValue\
+	    $argList]
+    relation assign $event
+    log::info "delayed queued($time):\
+	[formatEvent $source $sourceValue ${DomName}::${ModelName} $refValue]:\
+	$EventName [list $argList]"
     if {[llength $delayQueue] == 1} {
 	# Only start a timer to tick down the delay queue when the
 	# first entry is inserted.
@@ -3655,20 +3759,34 @@ proc ::raloo::arch::queueDelayed {time relvarName refValue event argList} {
     }
 }
 
-proc ::raloo::arch::cancelDelayed {relvarName refValue event argList} {
+proc ::raloo::arch::cancelDelayed {event refValue source sourceValue} {
+    variable delayQueue
+    for {set i 0} {$i < [llength $delayQueue]} {incr i} {
+	lassign [lindex $delayQueue $i] qtime qevent qref qsrc qsrcValue
+	if {[relation is $qevent == $event] && $qref == $refValue &&\
+		$qsrc == $source && $qsrcValue == $sourceValue} {
+	    set delayQueue [lreplace $delayQueue $i $i]
+	    break
+	}
+    }
 }
 
 proc ::raloo::arch::serviceDelayedQueue {} {
+    variable delayTick
     set tmr [after $delayTick ::raloo::arch::serviceDelayedQueue]
 
     variable delayQueue
-    variable delayTick
-    set delayIncr -$delayTick
     for {set i 0} {$i < [llength $delayQueue]} {} {
-	set time [lindex $delayQueue $i 0]
-	incr $time $delayIncr
+	set time [expr {[lindex $delayQueue $i 0] - $delayTick}]
 	if {$time <= 0} {
-	    queueEvent {*}[lrange [lindex $delayQueue $i] 1 end]
+	    set event [lrange [lindex $delayQueue $i] 1 end]
+	    # This is really ugly, but ... its a log message
+	    relation assign [lindex $event 0]
+	    log::info "delayed dispatch($time):\
+		[formatEvent [lindex $event 2] [lindex $event 3]\
+		${DomName}::${ModelName} [lindex $event 1]]:\
+		$EventName [list [lindex $event 4]]"
+	    queueEvent {*}$event
 	    set delayQueue [lreplace $delayQueue $i $i]
 	} else {
 	    lset delayQueue $i 0 $time
@@ -3682,11 +3800,18 @@ proc ::raloo::arch::serviceDelayedQueue {} {
     }
 }
 
+# Returns a dictionary of attribute names / values that correspond to
+# the values of identifier 1 for a relation. This is sufficient information
+# to find the corresponding tuple in a relvar.
 proc ::raloo::arch::idValues {relValue} {
     return [ralutil::pipe {
 	relation identifiers $relValue |
-	relation project $relValue [lindex ~ 0] |
+	relation project $relValue {*}[lindex ~ 0] |
 	relation body ~ |
 	lindex ~ 0
     }]
+}
+
+proc ::raloo::arch::formatEvent {src srcRef dst dstRef} {
+    return "$src.[list [idValues $srcRef]] ==> $dst.[list [idValues $dstRef]]"
 }

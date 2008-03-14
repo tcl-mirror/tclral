@@ -47,8 +47,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: raloo.test,v $
-# $Revision: 1.7 $
-# $Date: 2008/03/10 01:43:38 $
+# $Revision: 1.8 $
+# $Date: 2008/03/14 04:05:42 $
 #  *--
 
 package require tcltest 2.2
@@ -73,12 +73,6 @@ namespace eval ::raloo::test {
     customMatch tuple tupleMatch
     customMatch relation relationMatch
 
-    proc dumpMM {} {
-	puts [relformat $::raloo::Class Class]
-	puts [relformat $::raloo::Attribute Attribute]
-	puts [relformat $::raloo::Identifier Identifier]
-	puts [relformat $::raloo::IdComposition IdComposition]
-    }
     proc setupDogOwnerOwnership {} {
 	Domain create A {
 	    Class Dog {
@@ -134,6 +128,15 @@ namespace eval ::raloo::test {
     }
     proc cleanupDogPlays {} {
 	A destroy
+    }
+
+    proc syncSleep {} {
+	vwait ::sync
+	return $::sync
+    }
+
+    proc syncWake {{value 1}} {
+	set ::sync $value
     }
 
     test Domain-1.1 {
@@ -1723,7 +1726,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	A transaction {
 	    set dog [Dog new Name Fido Weight 20]
 	    set bdog [BigDog new Name Fido]
-	    set sdog [$bdog migrate R1 SmallDog BreedSize toy]
+	    set sdog [$bdog reclassify R1 SmallDog BreedSize toy]
 	    list [$sdog Name] [$sdog BreedSize]
 	}
     } -result {Fido toy}
@@ -1764,7 +1767,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	A transaction {
 	    set dog [Dog new Name Fido Weight 20]
 	    set bdog [BigDog new BName Fido]
-	    set sdog [$bdog migrate R1 SmallDog BreedSize toy]
+	    set sdog [$bdog reclassify R1 SmallDog BreedSize toy]
 	    list [$sdog SName] [$sdog BreedSize]
 	}
     } -result {Fido toy}
@@ -1919,7 +1922,7 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
     -returnCodes error
 
     test Lifecycle-1.5 {
-	active class -- signalling events
+	active class -- generating events
     } -setup {
 	Domain create A {
 	    Class Foo {
@@ -1940,9 +1943,199 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
     } -body {
 	set n [A::Foo new Id 1]
 	#puts [relformat $::raloo::test::A::Foo Foo]
-	$n signal E1 date [clock format [clock seconds]]
+	$n generate E1 date [clock format [clock seconds]]
 	update idletasks
     } -result {}
+
+    test Lifecycle-1.6 {
+	active class -- generating self directed events
+    } -setup {
+	Domain create A {
+	    Class Foo {
+		Attribute {
+		    *Id int
+		    Count int
+		}
+
+		Lifecycle {
+		    State grow {date} {
+			puts "grow: $date"
+			my Count [expr {[my Count] + 1}]
+			if {[my Count] == 1} {
+			    my generate E1 date epoch
+			}
+		    }
+		    Transition grow - E1 -> grow
+		}
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	set n [A::Foo new Id 1 Count 0]
+	#puts [relformat $::raloo::test::A::Foo Foo]
+	$n generate E1 date [clock format [clock seconds]]
+	update idletasks
+    } -result {}
+
+    test Lifecycle-1.7 {
+	active class -- generating delayed events
+    } -setup {
+	Domain create A {
+	    Class Foo {
+		Attribute {
+		    *Id int
+		}
+
+		Lifecycle {
+		    State born {date} {
+			puts "born: $date"
+			set ::sync 1
+		    }
+		    Transition born - E1 -> born
+		}
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	set n [A::Foo new Id 1]
+	#puts [relformat $::raloo::test::A::Foo Foo]
+	$n generateDelayed 100 E1 date [clock format [clock seconds]]
+	syncSleep
+    } -result {1}
+
+    test Lifecycle-2.1 {
+	polymorphic event
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *Name string
+		}
+	    }
+	    Class SmallDog {
+		Attribute {
+		    *Name string
+		}
+		Lifecycle {
+		    State barking {} {
+			puts "SmallDog: bark"
+			set ::out SmallDog
+		    }
+		    Transition barking - taunt -> barking
+		}
+	    }
+	    Class BigDog {
+		Attribute {
+		    *Name string
+		}
+		Lifecycle {
+		    State barking {} {
+			puts "BigDog: bark"
+			set ::out BigDog
+		    }
+		    Transition barking - taunt -> barking
+		}
+	    }
+	    Generalization R1 Dog {
+		SubType SmallDog
+		SubType BigDog
+	    }
+	    Polymorphic Dog taunt {}
+	}
+	A transaction {
+	    Dog insert Name Poopsy
+	    SmallDog insert Name Poopsy __CS__ barking
+	    Dog insert Name Rover
+	    BigDog insert Name Rover __CS__ barking
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	set sd [A::Dog new]
+	$sd selectOne Name Poopsy
+	$sd generate taunt
+	update idletasks
+	set ::out
+    } -result {SmallDog}
+
+    test Lifecycle-2.2 {
+	polymorphic event inherited more than one level
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *Name string
+		}
+	    }
+	    Class SmallDog {
+		Attribute {
+		    *Name string
+		}
+		Lifecycle {
+		    State barking {} {
+			puts "SmallDog: bark"
+			set ::out SmallDog
+		    }
+		    Transition barking - taunt -> barking
+		}
+	    }
+	    Class BigDog {
+		Attribute {
+		    *Name string
+		}
+	    }
+	    Class WorkingDog {
+		Attribute {
+		    *Name string
+		}
+		Lifecycle {
+		    State barking {} {
+			puts "WorkingDog: bark"
+			set ::out WorkingDog
+		    }
+		    Transition barking - taunt -> barking
+		}
+	    }
+	    Class ShowDog {
+		Attribute {
+		    *Name string
+		}
+		Lifecycle {
+		    State barking {} {
+			puts "ShowDog: bark"
+			set ::out ShowDog
+		    }
+		    Transition barking - taunt -> barking
+		}
+	    }
+	    Generalization R1 Dog {
+		SubType SmallDog
+		SubType BigDog
+	    }
+	    Generalization R2 BigDog {
+		SubType WorkingDog
+		SubType ShowDog
+	    }
+	    Polymorphic Dog taunt {}
+	}
+	A transaction {
+	    Dog insert Name Poopsy
+	    SmallDog insert Name Poopsy __CS__ barking
+	    Dog insert Name Rover
+	    BigDog insert Name Rover
+	    ShowDog insert Name Rover __CS__ barking
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	set sd [A::Dog new]
+	$sd selectOne Name Rover
+	$sd generate taunt
+	update idletasks
+	set ::out
+    } -result {ShowDog}
 
     test Polymorphic-1.1 {
 	polymorphic event
