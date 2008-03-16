@@ -48,8 +48,8 @@
 #  capabilities of TclOO.
 # 
 # $RCSfile: raloo.tcl,v $
-# $Revision: 1.8 $
-# $Date: 2008/03/14 04:05:41 $
+# $Revision: 1.9 $
+# $Date: 2008/03/16 00:23:58 $
 #  *--
 
 package require Tcl 8.5
@@ -3200,29 +3200,36 @@ oo::class create ::raloo::Generalization {
 		}]
 		relvar minus ::raloo::mm::SubtypeRole $subr
 
+		# This clean up is more complicated than might first appear.
+		# For supertypes, we delete all the PolymorphicEvents
+		# and the corresponding DeferralPath and Event instances
 		set dp [relation semijoin $supr $::raloo::mm::DeferralPath\
 		    -using {DomName DomName ClassName ModelName}]
-
 		relvar minus ::raloo::mm::DeferralPath $dp
 		set ev [relation semijoin $dp $::raloo::mm::DeferredEvent]
 		relvar minus ::raloo::mm::Event\
 		    [relation semijoin $ev $::raloo::mm::Event]
 		relvar minus ::raloo::mm::DeferredEvent $ev
 		relvar minus ::raloo::mm::PolymorphicEvent $ev
-		relvar minus ::raloo::mm::InheritedEvent $ev
-		relvar minus ::raloo::mm::NonLocalEvent\
-		    [relation semijoin $ev $::raloo::mm::NonLocalEvent]
 
-
+		# For subtypes, we turn MappedEvents into LocalEvents
+		# and InheritedEvents into PolymorphicEvents. Thus destroying
+		# a generalization that contains polymorphism, converts
+		# the mapped events in the leaf nodes to local events and
+		# converts the inherited events in the interior nodes into
+		# polymorphic events. Strangely, the polymorphism migrates
+		# as a result of destroying a generalization relationship
+		# at the top of a hierarchy.
 		set nle [relation semijoin $subr $::raloo::mm::NonLocalEvent\
 		    -using {DomName DomName ClassName ModelName}]
 		relvar minus ::raloo::mm::NonLocalEvent $nle
-		relvar minus ::raloo::mm::MappedEvent\
-		    [relation semijoin $nle $::raloo::mm::MappedEvent]
-		relvar insert ::raloo::mm::LocalEvent {*}[ralutil::pipe {
-		    relation project $nle DomName ModelName EventName |
-		    relation body
-		}]
+		set mapped [relation semijoin $nle $::raloo::mm::MappedEvent]
+		relvar minus ::raloo::mm::MappedEvent $mapped
+		relvar union ::raloo::mm::LocalEvent\
+		    [relation eliminate $mapped ParentModel]
+		set inhe [relation semijoin $nle $::raloo::mm::InheritedEvent]
+		relvar minus ::raloo::mm::InheritedEvent $inhe
+		relvar union ::raloo::mm::PolymorphicEvent $inhe
 
 		next
 	    }} result]} {
@@ -3543,7 +3550,7 @@ namespace eval ::raloo::arch {
     variable delayTick 10
     variable delayQueue
 
-    logger::initNamespace ::raloo::arch debug
+    logger::initNamespace ::raloo::arch info
 }
 
 # "event" here is a single relation from ::raloo::mm::Event
@@ -3660,7 +3667,7 @@ proc ::raloo::arch::deliverEffEvent {event refValue source sourceValue\
 proc ::raloo::arch::deliverDefEvent {event refValue source sourceValue\
 				     argList} {
     # What domain are we in?
-    relation assign $event {DomName domName}
+    relation assign $event {DomName domName} {EventName eventName}
     # Find the super type roles. There can be many since a given supertype
     # may be the supertype for multiple generalizations.
     set superRoles [relation semijoin $event $::raloo::mm::DeferralPath\
@@ -3668,6 +3675,7 @@ proc ::raloo::arch::deliverDefEvent {event refValue source sourceValue\
     # For each generalization hierarchy, find the set of subtypes.
     # It is in these subtypes that we must find the related instance.
     relation foreach superRole $superRoles {
+	set superSrc ${domName}::[relation extract $superRole ClassName]
 	set subRoles [relation semijoin $superRole $::raloo::mm::GenRel\
 	    $::raloo::mm::SubtypeRole]
 	# Loop through the subtypes finding the attributes that make up the
@@ -3675,6 +3683,7 @@ proc ::raloo::arch::deliverDefEvent {event refValue source sourceValue\
 	# We will construct a semijoin from the supertype to the subtype, i.e.
 	# from the referred to class to the referring class.
 	relation foreach subRole $subRoles {
+	    set subDst ${domName}::[relation extract $subRole ClassName]
 	    set joinAttrs [ralutil::pipe {
 		relation semijoin $subRole $::raloo::mm::AttributeRef |
 		relation dict ~ RefToAttrName RefngAttrName
@@ -3686,6 +3695,10 @@ proc ::raloo::arch::deliverDefEvent {event refValue source sourceValue\
 	    }]
 	    if {[relation isnotempty $inst]} {
 		# Okay, found the related subtype!
+		log::info "polymorphic dispatch:\
+		    $superSrc.[list [idValues $refValue]] ==>\
+		    $subDst.[list [idValues $inst]]:\
+		    $eventName [list $argList]"
 		# Find the non-local event that this subtype receives
 		set nlevt [relation semijoin $subRole\
 		    $::raloo::mm::NonLocalEvent]
