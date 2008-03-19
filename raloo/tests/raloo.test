@@ -47,8 +47,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: raloo.test,v $
-# $Revision: 1.8 $
-# $Date: 2008/03/14 04:05:42 $
+# $Revision: 1.9 $
+# $Date: 2008/03/19 03:10:23 $
 #  *--
 
 package require tcltest 2.2
@@ -173,7 +173,7 @@ namespace eval ::raloo::test {
 	domain with domain operation
     } -setup {
 	Domain create A {
-	    DomainOp echo {a} {
+	    SyncService echo {a} {
 		return $a
 	    }
 	}
@@ -187,7 +187,7 @@ namespace eval ::raloo::test {
 	failure in a domain operation invocation
     } -setup {
 	Domain create A {
-	    DomainOp echo {a} {
+	    SyncService echo {a} {
 		return [$a]
 	    }
 	}
@@ -201,7 +201,7 @@ namespace eval ::raloo::test {
 	incrementally define a domain
     } -setup {
 	Domain create A {
-	    DomainOp echo {a} {
+	    SyncService echo {a} {
 		return $a
 	    }
 	}
@@ -209,7 +209,7 @@ namespace eval ::raloo::test {
 	A destroy
     } -body {
 	A define {
-	    DomainOp repeat {str cnt} {
+	    SyncService repeat {str cnt} {
 		return [string repeat $str $cnt]
 	    }
 	}
@@ -217,7 +217,7 @@ namespace eval ::raloo::test {
     } -result {aaa}
 
     test Domain-2.4 {
-	class reference within a DomainOp
+	class reference within a SyncService
     } -setup {
 	Domain create A {
 	    Class Dog {
@@ -226,10 +226,10 @@ namespace eval ::raloo::test {
 		    Breed string
 		}
 	    }
-	    DomainOp newDog {name breed} {
+	    SyncService newDog {name breed} {
 		Dog insert DogName $name Breed $breed
 	    }
-	    DomainOp getDogBreed {name} {
+	    SyncService getDogBreed {name} {
 		set dog [Dog selectOne DogName $name]
 		return [$dog Breed]
 	    }
@@ -262,7 +262,7 @@ namespace eval ::raloo::test {
 		}
 	    }
 	    AssocRelationship R1 Dog +-Ownership->+ Owner
-	    DomainOp newDog {name} {
+	    SyncService newDog {name} {
 		Dog insert DogName $name
 	    }
 	}
@@ -1937,13 +1937,16 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		    Transition born - E1 -> born
 		}
 	    }
+	    DomainOp start {} {
+		set n [Foo new Id 1]
+		#puts [relformat $::raloo::test::A::Foo Foo]
+		$n generate E1 date [clock format [clock seconds]]
+	    }
 	}
     } -cleanup {
 	A destroy
     } -body {
-	set n [A::Foo new Id 1]
-	#puts [relformat $::raloo::test::A::Foo Foo]
-	$n generate E1 date [clock format [clock seconds]]
+	A start
 	update idletasks
     } -result {}
 
@@ -1968,13 +1971,16 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		    Transition grow - E1 -> grow
 		}
 	    }
+	    DomainOp start {} {
+		set n [Foo new Id 1 Count 0]
+		#puts [relformat $::raloo::test::A::Foo Foo]
+		$n generate E1 date [clock format [clock seconds]]
+	    }
 	}
     } -cleanup {
 	A destroy
     } -body {
-	set n [A::Foo new Id 1 Count 0]
-	#puts [relformat $::raloo::test::A::Foo Foo]
-	$n generate E1 date [clock format [clock seconds]]
+	A start
 	update idletasks
     } -result {}
 
@@ -2043,6 +2049,11 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		SubType BigDog
 	    }
 	    Polymorphic Dog taunt {}
+	    DomainOp start {} {
+		set sd [Dog new]
+		$sd selectOne Name Poopsy
+		$sd generate taunt
+	    }
 	}
 	A transaction {
 	    Dog insert Name Poopsy
@@ -2053,9 +2064,7 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
     } -cleanup {
 	A destroy
     } -body {
-	set sd [A::Dog new]
-	$sd selectOne Name Poopsy
-	$sd generate taunt
+	A start
 	update idletasks
 	set ::out
     } -result {SmallDog}
@@ -2119,6 +2128,11 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		SubType ShowDog
 	    }
 	    Polymorphic Dog taunt {}
+	    DomainOp start {} {
+		set sd [Dog new]
+		$sd selectOne Name Rover
+		$sd generate taunt
+	    }
 	}
 	A transaction {
 	    Dog insert Name Poopsy
@@ -2130,9 +2144,7 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
     } -cleanup {
 	A destroy
     } -body {
-	set sd [A::Dog new]
-	$sd selectOne Name Rover
-	$sd generate taunt
+	A start
 	update idletasks
 	set ::out
     } -result {ShowDog}

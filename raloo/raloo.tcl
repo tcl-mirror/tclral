@@ -48,8 +48,8 @@
 #  capabilities of TclOO.
 # 
 # $RCSfile: raloo.tcl,v $
-# $Revision: 1.9 $
-# $Date: 2008/03/16 00:23:58 $
+# $Revision: 1.10 $
+# $Date: 2008/03/19 03:10:22 $
 #  *--
 
 package require Tcl 8.5
@@ -1160,6 +1160,7 @@ oo::class create ::raloo::Domain {
 	# "my" commands preceding the definition procs.
 	my DefineWith Domain $script\
 	    DomainOp\
+	    SyncService\
 	    Class\
 	    Relationship\
 	    Generalization\
@@ -1170,7 +1171,6 @@ oo::class create ::raloo::Domain {
     method transaction {script} {
 	my Transact $script
     }
-    # This method wraps a script in a relvar transaction.
     method Transact {script} {
 	catch {
 	    relvar eval {
@@ -1180,12 +1180,22 @@ oo::class create ::raloo::Domain {
 	foreach instref [info class instances ::raloo::RelvarRef] {
 	    $instref destroy
 	}
+	foreach instref [info class instances ::raloo::ActiveRelvarRef] {
+	    $instref destroy
+	}
 	return -options $options $result
+    }
+    method SyncService {name argList body} {
+	oo::define [self] method $name $argList [list my Transact $body]
+	oo::define [self] export $name
     }
     # Methods that are used in the definition of a domain during construction.
     method DomainOp {name argList body} {
-	oo::define [self] method $name $argList [list my Transact $body]
+	oo::define [self] method $name $argList\
+	    [list ::raloo::arch::newTOC [self] {}\
+		[relation create {} {{}} {}] $body $argList]
 	oo::define [self] export $name
+	return
     }
     # Interpret the definition of a class.
     method Class {name script} {
@@ -2622,21 +2632,9 @@ oo::class create ::raloo::ActiveRelvarRef {
 	}
 	set argList [my BuildArguments $event $args]
 
-	# Determine if this is a self-directed event or not.
-	if {[catch {self caller} caller]} {
-	    set queue queueEvent
-	    set objName ::
-	    set objRef {Relation {} {{}} {{}}}
-	} else {
-	    set obj [lindex $caller 1]
-	    set queue [expr {$obj eq [self] ?\
-		    "queueSelfEvent" : "queueEvent"}]
-	    set objRef [$obj get]
-	    set objName [$obj relvarName]
-	}
 	# This reference may be multi-valued. Generate an event to each one.
 	relation foreach refValue [my get] {
-	    ::raloo::arch::$queue $event $refValue $objName $objRef $argList
+	    ::raloo::arch::queueEvent $refValue $event $argList
 	}
 
 	return
@@ -3539,49 +3537,155 @@ oo::class create ::raloo::AssocRelationship {
     }
 }
 
-package require struct::queue
+################################################################################
+#
+# State Machine Execution Engine
+#
+# These procs form the state machine execution engine that drives the
+# raloo execution. The engine supports the notion of a thread of control.
+# A thread of control is the tree that is started by a DomainOp or a
+# delayed event and represents the events generated as the state machines
+# of a domain interact with each other. The event generation evolves as a
+# tree as it is traversed in breadth first order.
+#
+# The execution rules are:
+# 1. Only one thread of control is operating at a time.
+# 2. If a new thread of control is started, then it is deferred and executed
+#    after any preceding threads are done.
+# 3. The engine is driven by idle task events. Each starting of a thread
+#    of control or generation of an event inserts an idle task event which
+#    is then used to dispatch the next state machine event.
+# 4. Polymorphic events are synchonously mapped until they are consumed, i.e.
+#    the mapped event is not re-inserted into thread of control tree. If the
+#    polymorphic event generates multiple events, then they are all
+#    synchronously dispatched in an arbitrary order.
+
 package require logger
+package require struct::tree
+
 namespace eval ::raloo::arch {
     namespace import ::ral::*
 
-    variable eventQueue [struct::queue]
-    variable selfEventQueue [struct::queue]
     # Number of milliseconds that constitutes one tick for delayed events.
     variable delayTick 10
     variable delayQueue
+    # The list of threads of control
+    variable controlTree [list]
+    # This variable controls whether or not we are "single" stepping the
+    # thread of control. When single stepping, some supervisor part of the
+    # program must call "dispatchEvent" to cause each event to be delivered.
+    # Otherwise, the execution engine will drive itself by queuing calls to
+    # "dispatchEvent" as an idle task on the Tcl event queue.
+    variable singleStep 0
 
-    logger::initNamespace ::raloo::arch info
+    logger::initNamespace ::raloo::arch
 }
 
+proc ::raloo::arch::newTOC {domName modelName inst script argList} {
+    log::debug [info level 0]
+    variable controlTree
+    lappend controlTree [set tocTree [struct::tree]]
+
+    $tocTree set root queue [list root]
+    $tocTree set root inst $inst
+    $tocTree set root event [relation create\
+	{DomName string ModelName string EventName string}\
+	{{DomName ModelName EventName}} [list\
+	    DomName $domName\
+	    ModelName $modelName\
+	    EventName {}\
+	]]
+    $tocTree set root script $script
+    $tocTree set root params $argList
+    stepEngine
+
+    return
+}
+
+# "instValue" is a singleton relation value that is the target instance
 # "event" here is a single relation from ::raloo::mm::Event
-# "refValue" is a singleton relation value that is a projection of an
-# identifier of the relvar to which event refers
-proc ::raloo::arch::queueEvent {event refValue source sourceValue argList} {
-    log::debug "queueEvent: $source.[relation body $sourceValue] ==>\
-	[relation body $event] [relation body $refValue] $argList"
-    variable eventQueue
-    $eventQueue put [list $event $refValue $source $sourceValue $argList]
-    after idle ::raloo::arch::serviceEventQueues
-}
+proc ::raloo::arch::queueEvent {instValue event argList} {
+    log::debug [info level 0]
+    variable controlTree
+    set tocTree [lindex $controlTree 0]
 
-proc ::raloo::arch::queueSelfEvent {event refValue source sourceValue argList} {
-    log::debug "queueSelfEvent: $source.[relation body $sourceValue] ==>\
-	[relation body $event] [relation body $refValue] $argList"
-    variable selfEventQueue
-    $selfEventQueue put [list $event $refValue $source $sourceValue $argList]
-    after idle ::raloo::arch::serviceEventQueues
-}
+    if {$tocTree eq ""} {
+	error "attempt to generate an event, \"$event\", outside of\
+	    a thread of control"
+    }
 
-proc ::raloo::arch::serviceEventQueues {} {
-    variable selfEventQueue
-    variable eventQueue
+    set tocQueue [$tocTree get root queue]
+    set srcNode [lindex $tocQueue 0]
 
-    if {[$selfEventQueue size] != 0} {
-	deliverEvent {*}[$selfEventQueue get]
-    } elseif {[$eventQueue size] != 0} {
-	deliverEvent {*}[$eventQueue get]
+    set srcClass [relation extract [$tocTree get $srcNode event] ModelName]
+    set srcInst [$tocTree get $srcNode inst]
+
+    relation assign $event
+    log::debug "queueEvent: $DomName: $srcClass.[list [idValues $srcInst]] -\
+	$EventName [list $argList] -> $ModelName.[list [idValues $instValue]]"
+
+    # Deal with self directed events. If an event is self directed, then
+    # we insert it at the beginning of the list of child nodes. Otherwise,
+    # event are simply placed at the end. One more complication is the placing
+    # the node at the proper location in the queue.
+    catch {relation is [idProject $srcInst] == [idProject $instValue]} sameInst
+    if {$srcClass eq $ModelName && [string is true -strict $sameInst]} {
+	set firstChild [lindex [$tocTree children $srcNode] 0]
+	set dstNode [$tocTree insert $srcNode 0]
+	$tocTree set root queue [linsert $tocQueue\
+	    [lsearch -exact $tocQueue $firstChild] $dstNode]
+	log::debug "self directed event"
     } else {
-	log::notice "[lindex [info level 0] 0]: no event to dispatch"
+	set dstNode [$tocTree insert $srcNode end]
+	$tocTree lappend root queue $dstNode
+	log::debug "non-self directed event: $srcClass, $ModelName, $sameInst"
+    }
+    $tocTree set $dstNode inst $instValue
+    $tocTree set $dstNode event $event
+    $tocTree set $dstNode params $argList
+
+    stepEngine
+}
+
+proc ::raloo::arch::dispatchEvent {} {
+    log::debug [info level 0]
+    variable controlTree
+    set tocTree [lindex $controlTree 0]
+
+    set tocQueue [$tocTree get root queue]
+    set dstNode [lindex $tocQueue 0]
+    if {$dstNode eq "root"} {
+	log::debug "beginning transaction"
+	relvar transaction begin
+	# Execute the script associated with thread of control. This gets
+	# things going.
+	relation assign [$tocTree get $dstNode event] {DomName domName}
+	namespace inscope $domName [$tocTree get $dstNode script]\
+	    {*}[$tocTree get $dstNode params]
+    } else {
+	set srcNode [$tocTree parent $dstNode]
+	deliverEvent [$tocTree get $dstNode event] [$tocTree get $dstNode inst]\
+	    [relation extract [$tocTree get $srcNode event] ModelName]\
+	    [$tocTree get $srcNode inst] [$tocTree get $dstNode params]
+    }
+
+    # Fetch the queue again. It could have been modified when the
+    # event was delivered, e.g. another event could be generated.
+    set tocQueue [$tocTree get root queue]
+    # Drop the front node on the queue. We have finished its dispatch.
+    $tocTree set root queue [set tocQueue [lrange $tocQueue 1 end]]
+    # Check for the end of the thread of control.
+    if {[llength $tocQueue] == 0} {
+	$tocTree destroy
+	set controlTree [lrange $controlTree 1 end]
+	foreach instref [info class instances ::raloo::RelvarRef] {
+	    $instref destroy
+	}
+	foreach instref [info class instances ::raloo::ActiveRelvarRef] {
+	    $instref destroy
+	}
+	log::debug "ending transaction"
+	relvar transaction end
     }
 }
 
@@ -3663,7 +3767,6 @@ proc ::raloo::arch::deliverEffEvent {event refValue source sourceValue\
     }
 }
 
-# HERE -- test this
 proc ::raloo::arch::deliverDefEvent {event refValue source sourceValue\
 				     argList} {
     # What domain are we in?
@@ -3753,7 +3856,7 @@ proc ::raloo::arch::queueDelayed {time event refValue source sourceValue\
 				  argList} {
     # See if we are already expired
     if {$time <= 0} {
-	queueEvent $event $refValue $source $sourceValue $argList
+	queueEvent $refValue $event $argList
 	return
     }
 
@@ -3799,7 +3902,9 @@ proc ::raloo::arch::serviceDelayedQueue {} {
 		[formatEvent [lindex $event 2] [lindex $event 3]\
 		${DomName}::${ModelName} [lindex $event 1]]:\
 		$EventName [list [lindex $event 4]]"
-	    queueEvent {*}$event
+	    newTOC $DomName [lindex $event 2] [lindex $event 3]\
+		[list ::raloo::arch::queueEvent [lindex $event 1]\
+		[lindex $event 0] [lindex $event 4]] {}
 	    set delayQueue [lreplace $delayQueue $i $i]
 	} else {
 	    lset delayQueue $i 0 $time
@@ -3813,16 +3918,23 @@ proc ::raloo::arch::serviceDelayedQueue {} {
     }
 }
 
+proc ::raloo::arch::stepEngine {} {
+    variable singleStep
+    if {!$singleStep} {
+	after idle [list ::raloo::arch::dispatchEvent]
+    }
+}
+
+# Returns a relation value that consists of the projection of identifier 1.
+proc ::raloo::arch::idProject {relValue} {
+    relation project $relValue {*}[lindex [relation identifiers $relValue] 0]
+}
+
 # Returns a dictionary of attribute names / values that correspond to
 # the values of identifier 1 for a relation. This is sufficient information
 # to find the corresponding tuple in a relvar.
 proc ::raloo::arch::idValues {relValue} {
-    return [ralutil::pipe {
-	relation identifiers $relValue |
-	relation project $relValue {*}[lindex ~ 0] |
-	relation body ~ |
-	lindex ~ 0
-    }]
+    lindex [relation body [idProject $relValue]] 0
 }
 
 proc ::raloo::arch::formatEvent {src srcRef dst dstRef} {
