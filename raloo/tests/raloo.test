@@ -47,8 +47,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: raloo.test,v $
-# $Revision: 1.9 $
-# $Date: 2008/03/19 03:10:23 $
+# $Revision: 1.10 $
+# $Date: 2008/03/21 03:34:24 $
 #  *--
 
 package require tcltest 2.2
@@ -63,6 +63,11 @@ proc tupleMatch {expected actual} {
 
 proc relationMatch {expected actual} {
     return [::ral::relation is $expected == $actual]
+}
+
+proc ::bgerror msg {
+    puts stderr $msg
+    set ::bgerrorMsg $msg
 }
 
 namespace eval ::raloo::test {
@@ -231,7 +236,7 @@ namespace eval ::raloo::test {
 	    }
 	    SyncService getDogBreed {name} {
 		set dog [Dog selectOne DogName $name]
-		return [$dog Breed]
+		return [$dog readAttr Breed]
 	    }
 	}
     } -cleanup {
@@ -712,7 +717,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	C destroy
     } -body {
 	set r [C::Dog new Name Rover Id 3]
-	$r Name
+	$r readAttr Name
     } -result {Rover}
 
     test Class-1.5 {
@@ -731,7 +736,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	C destroy
     } -body {
 	set r [C::Dog new Name Rover Breed Poodle Id 3]
-	$r Name
+	$r readAttr Name
     } -result {Rover}
 
     test Class-1.6 {
@@ -749,7 +754,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	C destroy
     } -body {
 	set r [C::Foo new Id {} Breed Poodle]
-	$r Id
+	$r readAttr Id
     } -result {1}
 
     test Class-2.1 {
@@ -788,7 +793,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	C destroy
     } -body {
 	set r [C::Dog new Name Rover Breed Retriever Age 5]
-	$r Breed
+	$r readAttr Breed
     } -result {Retriever}
 
     test Class-3.2 {
@@ -807,8 +812,8 @@ tuple {DogName Fred} is not referenced by any tuple
 	C destroy
     } -body {
 	set r [C::Dog new Name Rover Breed Retriever Age 5]
-	$r Age 10
-	$r Age
+	$r writeAttr Age 10
+	$r readAttr Age
     } -result {10}
 
     test Class-4.1 {
@@ -878,7 +883,7 @@ tuple {DogName Fred} is not referenced by any tuple
     } -body {
 	set dog [A::Dog new DogName Fred OwnerName John]
 	set owner [$dog selectRelated R1]
-	$owner OwnerName
+	$owner readAttr OwnerName
     } -result {John}
 
     test Class-5.2 {
@@ -962,7 +967,7 @@ tuple {DogName Fred} is not referenced by any tuple
     } -body {
 	set owner [A::Owner selectOne OwnerName John]
 	set dog [$owner selectRelated ~R1]
-	$dog DogName
+	$dog readAttr DogName
     } -result {Fred}
 
     test Class-5.5 {
@@ -999,7 +1004,7 @@ tuple {DogName Fred} is not referenced by any tuple
     } -body {
 	set dog [A::Dog selectOne DogName Fred]
 	set phone [$dog selectRelated R1 ~R2]
-	$phone Number
+	$phone readAttr Number
     } -result {555-1212}
 
     test Class-5.6 {
@@ -1025,7 +1030,7 @@ tuple {DogName Fred} is not referenced by any tuple
     } -body {
 	set phone [A::Phone selectOne Number 555-1213]
 	set prevphone [$phone selectRelated R1]
-	$prevphone Number
+	$prevphone readAttr Number
     } -result {555-1212}
 
     test Class-5.7 {
@@ -1051,7 +1056,7 @@ tuple {DogName Fred} is not referenced by any tuple
     } -body {
 	set phone [A::Phone selectOne Number 555-1212]
 	set nextphone [$phone selectRelated ~R1]
-	$nextphone Number
+	$nextphone readAttr Number
     } -result {555-1213}
 
     test Class-6.1 {
@@ -1089,7 +1094,7 @@ tuple {DogName Fred} is not referenced by any tuple
     } -body {
 	set sdog [A::SmallDog selectOne Name Fred]
 	set dog [$sdog selectRelated R1]
-	$dog Name
+	$dog readAttr Name
     } -result {Fred}
 
     test Class-6.2 {
@@ -1127,7 +1132,7 @@ tuple {DogName Fred} is not referenced by any tuple
     } -body {
 	set dog [A::Dog selectOne Name Fred]
 	set sdog [$dog selectRelated ~R1.SmallDog]
-	$sdog Name
+	$sdog readAttr Name
     } -result {Fred}
 
     test Class-6.3 {
@@ -1165,7 +1170,7 @@ tuple {DogName Fred} is not referenced by any tuple
     } -body {
 	set dog [A::Dog selectOne Name Fred]
 	set sdog [$dog selectRelated R1.SmallDog]
-	$sdog Name
+	$sdog readAttr Name
     } -result {Fred}
 
     test Class-7.1 {
@@ -1184,7 +1189,7 @@ tuple {DogName Fred} is not referenced by any tuple
     } -body {
 	set dog [A::Dog selectOne DogName Fido]
 	set owner [$dog selectRelated R1]
-	$owner OwnerName
+	$owner readAttr OwnerName
     } -result {John}
 
     test Class-7.2 {
@@ -1203,7 +1208,7 @@ tuple {DogName Fred} is not referenced by any tuple
     } -body {
 	set owner [A::Owner selectOne OwnerName John]
 	set dog [$owner selectRelated ~R1]
-	$dog DogName
+	$dog readAttr DogName
     } -result {Fido}
 
     test Class-7.3 {
@@ -1222,7 +1227,7 @@ tuple {DogName Fred} is not referenced by any tuple
     } -body {
 	set dog [A::Dog selectOne DogName Fido]
 	set ownership [$dog selectRelated R1.Ownership]
-	$ownership OwnerName
+	$ownership readAttr OwnerName
     } -result {John}
 
     test Class-7.4 {
@@ -1241,7 +1246,7 @@ tuple {DogName Fred} is not referenced by any tuple
     } -body {
 	set owner [A::Owner selectOne OwnerName John]
 	set ownership [$owner selectRelated ~R1.Ownership]
-	$ownership DogName
+	$ownership readAttr DogName
     } -result {Fido}
 
     test Class-7.5 {
@@ -1362,7 +1367,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	    set owner [Owner new OwnerName John]
 	    set dog [Dog new DogName Fred OwnerName {}]
 	    $dog relate R1 $owner
-	    $dog OwnerName
+	    $dog readAttr OwnerName
 	}
     } -result {John}
 
@@ -1390,7 +1395,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	    set owner [Owner new OwnerName John]
 	    set dog [Dog new DogName Fred OwnerName {}]
 	    $owner relate ~R1 $dog
-	    $dog OwnerName
+	    $dog readAttr OwnerName
 	}
     } -result {John}
 
@@ -1415,7 +1420,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	    set leaddog [Dog new DogName Fred PrevDog {}]
 	    set nextdog [Dog new DogName Fido PrevDog {}]
 	    $nextdog relate R1 $leaddog
-	    $nextdog PrevDog
+	    $nextdog readAttr PrevDog
 	}
     } -result {Fred}
 
@@ -1440,7 +1445,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	    set leaddog [Dog new DogName Fred PrevDog {}]
 	    set nextdog [Dog new DogName Fido PrevDog {}]
 	    $leaddog relate ~R1 $nextdog
-	    $nextdog PrevDog
+	    $nextdog readAttr PrevDog
 	}
     } -result {Fred}
 
@@ -1504,7 +1509,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	    set dog [Dog new Name Fred]
 	    set sdog [SmallDog new Name {}]
 	    $sdog relate R1 $dog
-	    $sdog Name
+	    $sdog readAttr Name
 	}
     } -result {Fred}
 
@@ -1539,7 +1544,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	    set dog [Dog new Name Fred]
 	    set sdog [SmallDog new Name {}]
 	    $dog relate R1 $sdog
-	    $sdog Name
+	    $sdog readAttr Name
 	}
     } -result {Fred}
 
@@ -1554,7 +1559,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	    set dog [Dog new DogName Fido]
 	    set owner [Owner new OwnerName John]
 	    set ownership [$owner relateAssoc R1 $dog]
-	    list [$ownership OwnerName] [$dog DogName]
+	    list [$ownership readAttr OwnerName] [$dog readAttr DogName]
 	}
     } -result {John Fido}
 
@@ -1569,7 +1574,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	    set dog [Dog new DogName Fido]
 	    set owner [Owner new OwnerName John]
 	    set ownership [$dog relateAssoc R1 $owner]
-	    list [$ownership OwnerName] [$dog DogName]
+	    list [$ownership readAttr OwnerName] [$dog readAttr DogName]
 	}
     } -result {John Fido}
 
@@ -1586,7 +1591,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	set dog1 [A::Dog selectOne DogName Alice]
 	set dog2 [A::Dog selectOne DogName Fido]
 	set plays [$dog1 relateAssoc R1 $dog2]
-	$plays PlayerName
+	$plays readAttr PlayerName
     } -result {Fido}
 
     test Class-10.3 {
@@ -1602,7 +1607,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	set dog1 [A::Dog selectOne DogName Alice]
 	set dog2 [A::Dog selectOne DogName Fido]
 	set plays [$dog2 relateAssoc ~R1 $dog1]
-	$plays PlayerName
+	$plays readAttr PlayerName
     } -result {Fido}
 
     test Class-11.1 {
@@ -1629,7 +1634,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	    set owner [Owner new OwnerName John]
 	    set dog [Dog new DogName Fido OwnerName John]
 	    $dog unrelate R1 $owner
-	    $dog OwnerName
+	    $dog readAttr OwnerName
 	}
     } -result {}
 
@@ -1660,8 +1665,8 @@ tuple {DogName Fred} is not referenced by any tuple
 	set alice [A::Dog selectOne DogName Alice]
 	set fido [A::Dog selectOne DogName Fido]
 	$alice unrelate R1 $fido
-	$alice PrevDog
-	list [$alice PrevDog] [$fido PrevDog]
+	$alice readAttr PrevDog
+	list [$alice readAttr PrevDog] [$fido readAttr PrevDog]
     } -result {{} Alice}
 
     test Class-11.3 {
@@ -1691,7 +1696,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	set alice [A::Dog selectOne DogName Alice]
 	set fido [A::Dog selectOne DogName Fido]
 	$alice unrelate ~R1 $fido
-	list [$alice PrevDog] [$fido PrevDog]
+	list [$alice readAttr PrevDog] [$fido readAttr PrevDog]
     } -result {Fred {}}
 
     test Class-12.1 {
@@ -1727,7 +1732,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	    set dog [Dog new Name Fido Weight 20]
 	    set bdog [BigDog new Name Fido]
 	    set sdog [$bdog reclassify R1 SmallDog BreedSize toy]
-	    list [$sdog Name] [$sdog BreedSize]
+	    list [$sdog readAttr Name] [$sdog readAttr BreedSize]
 	}
     } -result {Fido toy}
 
@@ -1768,7 +1773,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	    set dog [Dog new Name Fido Weight 20]
 	    set bdog [BigDog new BName Fido]
 	    set sdog [$bdog reclassify R1 SmallDog BreedSize toy]
-	    list [$sdog SName] [$sdog BreedSize]
+	    list [$sdog readAttr SName] [$sdog readAttr BreedSize]
 	}
     } -result {Fido toy}
 
@@ -1963,9 +1968,12 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		Lifecycle {
 		    State grow {date} {
 			puts "grow: $date"
-			my Count [expr {[my Count] + 1}]
-			if {[my Count] == 1} {
-			    my generate E1 date epoch
+			my with Count {
+			    incr Count
+			    my writeAttr Count $Count
+			    if {$Count == 1} {
+				my generate E1 date epoch
+			    }
 			}
 		    }
 		    Transition grow - E1 -> grow
@@ -2148,6 +2156,41 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 	update idletasks
 	set ::out
     } -result {ShowDog}
+
+    test Lifecycle-2.3 {
+	thread of control leaves data inconsistent
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *DogName string
+		}
+	    }
+	    Class Owner {
+		Attribute {
+		    *OwnerName string
+		}
+	    }
+	    Class Ownership {
+		Attribute {
+		    *DogName string
+		    *OwnerName string
+		}
+	    }
+	    AssocRelationship R1 Dog +-Ownership->+ Owner
+	    DomainOp newDog {name} {
+		Dog insert DogName $name
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	A newDog Fred
+	vwait ::bgerrorMsg
+	set ::bgerrorMsg
+    } -result {for correlation ::raloo::test::A::R1(::raloo::test::A::Dog <== [+] ::raloo::test::A::Ownership [+] ==> ::raloo::test::A::Owner), in relvar ::raloo::test::A::Dog
+tuple {DogName Fred} is not referenced by any tuple
+}
 
     test Polymorphic-1.1 {
 	polymorphic event

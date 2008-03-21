@@ -166,17 +166,17 @@ Domain create DogMgmt {
 # Domain definitions may be extended by the "define" method. This evaluates
 # a definition script in much the same way as the "create" method, adding
 # any additional components to the existing Domain. This allows separating
-# domain definitions into more manageable chuncks.
+# domain definitions into more manageable chunks.
 DogMgmt define {
-    # The other type of component of a Domain is a domain operation.
-    # The "DomainOp" command defines a domain operation. Its interface
-    # is the same as the "proc" command. Domain operations server as the
-    # primary procedural interface to the Domain. They are run as a
-    # transaction on the data of the Domain, so at the end of each
+    # Another type of component of a Domain is a synchronous service.  The
+    # "SyncService" command defines a synchronous service. Its interface is the
+    # same as the "proc" command. Synchronous services provide a procedural
+    # interface to the Domain that leaves the class structure consistent. They
+    # are run as a transaction on the data of the Domain, so at the end of each
     # domain operation the referential integrity of the domain data is
     # verified.
 
-    DomainOp newDog {name breed age} {
+    SyncService newDog {name breed age} {
 	Dog insert Name $name Id {} Breed $breed Age $age
 	return
     }
@@ -184,7 +184,7 @@ DogMgmt define {
     # Within a domain operation, classes and other domain components can
     # be referred to without any qualification.
 
-    DomainOp firstPurchase {ownerName age area phone dogName} {
+    SyncService firstPurchase {ownerName age area phone dogName} {
 	set dog [Dog selectOne Name $dogName]
 	if {[$dog isempty]} {
 	    error "no such dog, \"$dogName\""
@@ -197,11 +197,11 @@ DogMgmt define {
 	return
     }
 
-    DomainOp ownerReport {} {
+    SyncService ownerReport {} {
 	return [Ownership format OwnerName]
     }
 
-    DomainOp dogList {} {
+    SyncService dogList {} {
 	return [Dog dogList]
     }
 }

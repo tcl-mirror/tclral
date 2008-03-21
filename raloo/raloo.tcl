@@ -48,8 +48,8 @@
 #  capabilities of TclOO.
 # 
 # $RCSfile: raloo.tcl,v $
-# $Revision: 1.10 $
-# $Date: 2008/03/19 03:10:22 $
+# $Revision: 1.11 $
+# $Date: 2008/03/21 03:34:24 $
 #  *--
 
 package require Tcl 8.5
@@ -154,6 +154,21 @@ namespace eval ::raloo::mm {
 
     relvar association R5\
 	DomainOp DomName *\
+	Domain DomName 1
+
+    relvar create SyncService {
+	Relation {
+	    DomName string
+	    ServiceName string
+	    Params list
+	    Body string
+	} {
+	    {DomName ServiceName}
+	}
+    }
+
+    relvar association R24\
+	SyncService DomName *\
 	Domain DomName 1
 
     relvar create ClassOp {
@@ -1147,6 +1162,9 @@ oo::class create ::raloo::Domain {
 		relvar delete ::raloo::mm::DomainOp d {
 		    [tuple extract $d DomName] eq [self]
 		}
+		relvar delete ::raloo::mm::SyncService d {
+		    [tuple extract $d DomName] eq [self]
+		}
 		relvar deleteone ::raloo::mm::Domain DomName [self]
 	    }} result]} {
 	    puts "Domain: $result"
@@ -1186,15 +1204,32 @@ oo::class create ::raloo::Domain {
 	return -options $options $result
     }
     method SyncService {name argList body} {
+	relvar insert ::raloo::mm::SyncService [list\
+	    DomName [self]\
+	    ServiceName $name\
+	    Params $argList\
+	    Body $body\
+	]
 	oo::define [self] method $name $argList [list my Transact $body]
 	oo::define [self] export $name
     }
     # Methods that are used in the definition of a domain during construction.
     method DomainOp {name argList body} {
-	oo::define [self] method $name $argList\
-	    [list ::raloo::arch::newTOC [self] {}\
-		[relation create {} {{}} {}] $body $argList]
+	relvar insert ::raloo::mm::DomainOp [list\
+	    DomName [self]\
+	    OpName $name\
+	    OpParams $argList\
+	    OpBody $body\
+	]
+
+	oo::define [self] method $name $argList [format {
+	    ::raloo::arch::newTOC %1$s {} [relation create {} {{}} {}]\
+		[list my __%2$s] [lrange [info level 0] 2 end]
+	} [self] $name]
 	oo::define [self] export $name
+
+	oo::define [self] method __$name $argList $body
+	oo::define [self] unexport __$name
 	return
     }
     # Interpret the definition of a class.
@@ -1800,7 +1835,6 @@ oo::class create ::raloo::Domain {
     method State {name argList body {final false}} {
 	my variable domName
 	my variable className
-	#puts "$domName : $className : [info level 0]"
 	# If the default initial state is not already set, then
 	# the first mentioned state becomes the default as long as it
 	# it not a final state.
@@ -1966,7 +2000,6 @@ oo::class create ::raloo::Domain {
 	    OpParams $argList\
 	    OpBody $body\
 	]
-	return
 	return
     }
 
@@ -2290,31 +2323,34 @@ oo::class create ::raloo::RelvarRef {
 	namespace import ::ral::*
 	my variable relvarName
 	set relvarName $name
-	my variable ref
-	set ref [relation emptyof [relvar set $relvarName]]
 	namespace path [concat [namespace path]\
 		[namespace qualifiers $relvarName]]
 
 	# constructor for object ==> reference
-	if {[llength $args] != 0} {
-	    # relvar insert returns just what was inserted.
-	    set ref [relvar insert $relvarName $args]
+	set nArgs [llength $args]
+	my variable ref
+	if {$nArgs == 0} {
+	    set ref [relation emptyof [relvar set $relvarName]]
+	} else {
+	    set ref [::raloo::RelvarRef idProjection\
+		[relvar insert $relvarName $args]]
 	}
-	set ref [relation project $ref\
-	    {*}[lindex [relation identifiers $ref] 0]]
+    }
+    self.method idProjection {relValue {id 0}} {
+	::ral::relation project $relValue\
+	    {*}[lindex [::ral::relation identifiers $relValue] $id]
     }
     # Convert a relation value contained in the base relvar into a reference.
     method set {relValue} {
 	my variable relvarName
-	if {[relation isnotempty $relValue] && [relation isempty\
-	    [relation choose [relvar set $relvarName]\
-	    {*}[::raloo::arch::idValues $relValue]]]} {
+	my variable ref
+	catch {relation is $relValue subsetof [relvar set $relvarName]}\
+	    isSubset
+	if {!([relation isempty $ref] || [string is true -strict $isSubset])} {
 	    error "relation value:\n[relformat $relValue]\nis not contained\
 		in $relvarName:\n[relformat [relvar set $relvarName]]"
 	}
-	my variable ref
-	set ref [relation project $relValue\
-	    {*}[lindex [relation identifiers $relValue] 0]]
+	set ref [::raloo::RelvarRef idProjection $relValue]
     }
     # Find the tuples in the base relvar that this reference actually refers
     # to.
@@ -2322,6 +2358,35 @@ oo::class create ::raloo::RelvarRef {
 	my variable ref
 	my variable relvarName
 	return [relation semijoin $ref [relvar set $relvarName]]
+    }
+    # readAttr attr1 ?att2 ...?
+    method readAttr {args} {
+	set instValue [my get]
+	set attrValue [list]
+	if {[llength $args] == 1} {
+	    set attrValue [relation extract $instValue [lindex $args 0]]
+	} else {
+	    foreach attrName $args {
+		lappend attrValue [relation extract $instValue $attrName]
+	    }
+	}
+	return $attrValue
+    }
+    # writeAttr attr1 value1 ?attr2 value2 ...?
+    method writeAttr {args} {
+	dict for {attr value} $args {
+	    my UpdateAttr $attr $value
+	}
+	return
+    }
+    method with {attrList script} {
+	uplevel 1 [list lassign [my readAttr {*}$attrList] {*}$attrList]
+	uplevel 1 $script
+    }
+    method assign {attr cmd} {
+	uplevel 1 [list set $attr [my readAttr $attr]]
+	my writeAttr $attr [uplevel 1 [list expr $cmd]]
+	uplevel 1 [list unset $attr]
     }
     method classOf {} {
 	my variable relvarName
@@ -2438,7 +2503,7 @@ oo::class create ::raloo::RelvarRef {
 	# change the values that are held in the referring reference if
 	# we are changing the identifiers. So we must make sure to update the
 	# referring reference.
-	# Cf.  __UpdateAttr.
+	# Cf.  UpdateAttr.
 	set refngRelvar [$refngObj relvarName]
 	set allupdates [relation emptyof [relvar set $refngRelvar]]
 	set reftoDict [tuple get [relation tuple [$reftoObj get]]]
@@ -2523,7 +2588,7 @@ oo::class create ::raloo::RelvarRef {
 	# change the values that are held in the referring reference if
 	# we are changing the identifiers. So we must make sure to update the
 	# referring reference.
-	# Cf.  __UpdateAttr.
+	# Cf.  UpdateAttr.
 	set refngRelvar [$refngObj relvarName]
 	set allupdates [relation emptyof [relvar set $refngRelvar]]
 	foreach refTuple [relation body [$refngObj ref]] {
@@ -2585,21 +2650,20 @@ oo::class create ::raloo::RelvarRef {
     #
     # Update an attribute in the base relvar to which this reference
     # refers.
-    method __UpdateAttr {attrName value} {
+    method UpdateAttr {attrName value} {
 	my variable ref
 	my variable relvarName
 
-	set updates [list]
+	set updates [relation emptyof [relvar set $relvarName]]
 	relation foreach r $ref {
-	    lappend updates [relvar updateone $relvarName tup\
-		    [tuple get [relation tuple $r]] {
+	    set updates [relation union $updates\
+		    [relvar updateone $relvarName tup\
+			[tuple get [relation tuple $r]] {
 		    tuple update tup $attrName $value
-		}]
+		    }]]
 	}
-	my set [relation union\
-	    [relation emptyof [relvar set $relvarName]] {*}$updates]
+	my set $updates
     }
-    unexport __UpdateAttr
 }
 
 oo::class create ::raloo::ActiveRelvarRef {
@@ -2633,8 +2697,9 @@ oo::class create ::raloo::ActiveRelvarRef {
 	set argList [my BuildArguments $event $args]
 
 	# This reference may be multi-valued. Generate an event to each one.
-	relation foreach refValue [my get] {
-	    ::raloo::arch::queueEvent $refValue $event $argList
+	variable ref
+	relation foreach inst $ref {
+	    ::raloo::arch::queueEvent $inst $event $argList
 	}
 
 	return
@@ -2652,13 +2717,14 @@ oo::class create ::raloo::ActiveRelvarRef {
 	    set caller ::
 	    set callerValue {Relation {} {{}} {{}}}
 	} else {
-	    set callerValue [$caller get]
+	    set callerValue [$caller ref]
 	}
 
 	# This reference may be multi-valued. Generate an event to each one.
-	relation foreach refValue [my get] {
-	    ::raloo::arch::queueDelayed $time $event $refValue $caller\
-		    $callerValue $argList
+	variable ref
+	relation foreach refValue $ref {
+	    ::raloo::arch::queueDelayed $time $event $argList $refValue\
+		    $caller $callerValue
 	}
     }
     method cancelDelayed {eventName} {
@@ -2668,11 +2734,12 @@ oo::class create ::raloo::ActiveRelvarRef {
 	    set caller ::
 	    set callerValue {Relation {} {{}} {{}}}
 	} else {
-	    set callerValue [$caller get]
+	    set callerValue [$caller ref]
 	}
 
 	# This reference may be multi-valued. Cancel each event.
-	relation foreach refValue [my get] {
+	variable ref
+	relation foreach refValue $ref {
 	    ::raloo::arch::cancelDelayed $event $refValue $caller $callerValue
 	}
     }
@@ -2777,39 +2844,6 @@ oo::class create ::raloo::PasvRelvarClass {
 		namespace path [concat [namespace path]\
 		    [namespace qualifiers $relvarName]]
 	    }
-	}
-	# Define a method for each attribute. If the attribute is an
-	# identifier, then updates are not allowed and the method interface
-	# will not accept the additional argument.  Make sure that there is no
-	# "currentstate" method. "currentstate" is strictly controlled
-	# internally.
-	set attributes [relation restrictwith $::raloo::mm::Attribute {
-		$DomName eq $domName && $ClassName eq $className &&\
-		$AttrName ne "__CS__"}]
-	set attrNotIds [ralutil::pipe {
-	    relvar set ::raloo::mm::IdAttribute |
-	    relation semiminus ~ $attributes |
-	    relation list ~ AttrName
-	}]
-	foreach attr $attrNotIds {
-	    oo::define [self] method $attr {{val {}}} [format {
-		if {$val ne ""} {
-		    my __UpdateAttr %1$s $val
-		}
-		relation extract [my get] %1$s
-	    } $attr]
-	    oo::define [self] export $attr
-	}
-	set attrAsIds [ralutil::pipe {
-	    relvar set ::raloo::mm::IdAttribute |
-	    relation semijoin ~ $attributes |
-	    relation list ~ AttrName
-	}]
-	foreach attr $attrAsIds {
-	    oo::define [self] method $attr {} [format {
-		relation extract [my get] %s
-	    } $attr]
-	    oo::define [self] export $attr
 	}
 
 	# Class operations are turned into class methods.
@@ -3578,11 +3612,15 @@ namespace eval ::raloo::arch {
     # "dispatchEvent" as an idle task on the Tcl event queue.
     variable singleStep 0
 
-    logger::initNamespace ::raloo::arch
+    logger::initNamespace ::raloo::arch info
 }
 
+# Start a new Thread of Control. Threads of control are the implied tree
+# of event generation. This proc creates a new tree and adds it to the
+# list of threads of control that are to be executed.
+# The root node of a thread of control keep a list that is used to record
+# the breadth first order of the tree visits.
 proc ::raloo::arch::newTOC {domName modelName inst script argList} {
-    log::debug [info level 0]
     variable controlTree
     lappend controlTree [set tocTree [struct::tree]]
 
@@ -3602,33 +3640,36 @@ proc ::raloo::arch::newTOC {domName modelName inst script argList} {
     return
 }
 
-# "instValue" is a singleton relation value that is the target instance
+# Queue an event to the current thread of control.
+# "instValue" is a singleton relation value instance reference.
 # "event" here is a single relation from ::raloo::mm::Event
 proc ::raloo::arch::queueEvent {instValue event argList} {
-    log::debug [info level 0]
     variable controlTree
-    set tocTree [lindex $controlTree 0]
-
-    if {$tocTree eq ""} {
+    if {[llength $controlTree] eq 0} {
 	error "attempt to generate an event, \"$event\", outside of\
 	    a thread of control"
     }
-
+    set tocTree [lindex $controlTree 0]
     set tocQueue [$tocTree get root queue]
+    # The front of the queue is the current event dispatch that is executing.
+    # This invocation must come from executing a state transition for
+    # the instance contained in that node of the TOC tree. Establish the
+    # source of the event.
     set srcNode [lindex $tocQueue 0]
-
     set srcClass [relation extract [$tocTree get $srcNode event] ModelName]
     set srcInst [$tocTree get $srcNode inst]
 
     relation assign $event
-    log::debug "queueEvent: $DomName: $srcClass.[list [idValues $srcInst]] -\
-	$EventName [list $argList] -> $ModelName.[list [idValues $instValue]]"
+    log::debug "queueEvent: $DomName:\
+	$srcClass.[list [tuple get [relation tuple $srcInst]]] -\
+	$EventName [list $argList] ->\
+	$ModelName.[list [tuple get [relation tuple $instValue]]]"
 
     # Deal with self directed events. If an event is self directed, then
     # we insert it at the beginning of the list of child nodes. Otherwise,
     # event are simply placed at the end. One more complication is the placing
     # the node at the proper location in the queue.
-    catch {relation is [idProject $srcInst] == [idProject $instValue]} sameInst
+    catch {relation is $srcInst == $instValue} sameInst
     if {$srcClass eq $ModelName && [string is true -strict $sameInst]} {
 	set firstChild [lindex [$tocTree children $srcNode] 0]
 	set dstNode [$tocTree insert $srcNode 0]
@@ -3647,13 +3688,23 @@ proc ::raloo::arch::queueEvent {instValue event argList} {
     stepEngine
 }
 
+# The idle callbacks come here to cause the next event in the thread of
+# control to be dispatched.
 proc ::raloo::arch::dispatchEvent {} {
-    log::debug [info level 0]
     variable controlTree
+    if {[llength $controlTree] == 0} {
+	error "Panic: dispatching an event with an empty list of\
+	    control threads"
+    }
     set tocTree [lindex $controlTree 0]
-
     set tocQueue [$tocTree get root queue]
+    if {[llength $tocQueue] == 0} {
+	error "Panic: dispatching an event with an empty node queue"
+    }
     set dstNode [lindex $tocQueue 0]
+    # Threads of control begin at the "root" node of the tree. Here there are
+    # no events to deliver, but instead a script to execute to get things
+    # started. Most important, the data transaction is begun here.
     if {$dstNode eq "root"} {
 	log::debug "beginning transaction"
 	relvar transaction begin
@@ -3672,12 +3723,16 @@ proc ::raloo::arch::dispatchEvent {} {
     # Fetch the queue again. It could have been modified when the
     # event was delivered, e.g. another event could be generated.
     set tocQueue [$tocTree get root queue]
-    # Drop the front node on the queue. We have finished its dispatch.
+    # Drop the front node on the queue. We have finished with it.
     $tocTree set root queue [set tocQueue [lrange $tocQueue 1 end]]
     # Check for the end of the thread of control.
     if {[llength $tocQueue] == 0} {
+	# Clean up the tree.
+	# N.B. HERE we could serialize the tree and/or hand it off to
+	# a monitor callback.
 	$tocTree destroy
 	set controlTree [lrange $controlTree 1 end]
+	# All instance reference sets get deleted.
 	foreach instref [info class instances ::raloo::RelvarRef] {
 	    $instref destroy
 	}
@@ -3689,19 +3744,18 @@ proc ::raloo::arch::dispatchEvent {} {
     }
 }
 
+# Deliver an event. Here is where we determine if this is a monomorphic
+# event or a polymorphic one.
 proc ::raloo::arch::deliverEvent {event refValue source sourceValue argList} {
-    log::debug "deliverEvent: [relation body $event]\
-	[relation body $refValue] $argList"
-    # Determine if we are delivering an ordinary event or a polymorphic event
+    # Determine if we are delivering a monomorphic event or a polymorphic event
     set effEvent [relation semijoin $event $::raloo::mm::EffectiveEvent]
     if {[relation isnotempty $effEvent]} {
-	deliverEffEvent $effEvent $refValue $source $sourceValue $argList
+	deliverEffEvent $effEvent $argList $refValue $source $sourceValue
 	return
     }
-
     set defEvent [relation semijoin $event $::raloo::mm::DeferredEvent]
     if {[relation isnotempty $defEvent]} {
-	deliverDefEvent $defEvent $refValue $source $sourceValue $argList
+	deliverDefEvent $defEvent $argList $refValue $source $sourceValue
 	return
     }
 
@@ -3709,10 +3763,16 @@ proc ::raloo::arch::deliverEvent {event refValue source sourceValue argList} {
 	with:\n[relformat $event Event]"
 }
 
-proc ::raloo::arch::deliverEffEvent {event refValue source sourceValue\
-				     argList} {
+# Effective events are monomorphic and cause transitions.
+proc ::raloo::arch::deliverEffEvent {event argList refValue source\
+				     sourceValue} {
     relation assign $event
-    set cs [relation extract $refValue __CS__]
+    # Here "refValue" is an instance reference. Get the singleton relation
+    # value to which it refers from the relvar.
+    set relvarName ${DomName}::${ModelName}
+    set instValue [relation semijoin $refValue [relvar set $relvarName]]
+    # We need the current state to compute the transition.
+    set cs [relation extract $instValue __CS__]
     # Find the transition and the new state to which we are headed.
     set trans [relation choose $::raloo::mm::TransitionPlace\
 	DomName $DomName ModelName $ModelName EventName $EventName\
@@ -3724,30 +3784,27 @@ proc ::raloo::arch::deliverEffEvent {event refValue source sourceValue\
 	if {[relation isnotempty $news]} {
 	    # Transition to a new state.
 	    set newStateName [relation extract $news NewState]
-	    set relvarName ${DomName}::${ModelName}
 	    log::info "transition:\
 		[formatEvent $source $sourceValue $relvarName $refValue]:\
 		$cs - $EventName [list $argList] -> $newStateName"
-	    # Update the current state to be the new state
-	    relvar updateone $relvarName tup [idValues $refValue] {
-		tuple update tup __CS__ $newStateName
-	    }
-	    # Create an instance reference. We will need it to deliver the
-	    # event.
-	    set inst [$relvarName new]
-	    $inst set $refValue
 	    # This is where it all happens! This code snippet comes from DKF
 	    # and shows how "namespace inscope" can be used to invoke an
-	    # unexported method for an object. Clever, but it allows us to have
-	    # state actions as unexported methods and still have the software
-	    # architecture invoke the action.
+	    # unexported method for an object. A bit clever perhaps, but it
+	    # allows us to have state actions as unexported methods and still
+	    # have the software architecture invoke the action.
+	    set inst [$relvarName new]
+	    $inst set $instValue
 	    if {[catch {namespace inscope $inst [list my __$newStateName]\
 		    {*}$argList} result options]} {
 		log::error $result
 	    }
 	    $inst destroy
+	    # Update the current state to be the new state
+	    $relvarName update [idValues $instValue] __CS__ $newStateName
 	    return -options $options
 	} else {
+	    # A non-state transition. This is either a "can't happen" or an
+	    # "ignore". In either case, no transition is actually performed.
 	    set nons [relation semijoin $trans $::raloo::mm::NonStateTrans]
 	    if {[relation isempty $nons]} {
 		error "Panic: cannot find subtype of TransitionPlace"
@@ -3767,10 +3824,21 @@ proc ::raloo::arch::deliverEffEvent {event refValue source sourceValue\
     }
 }
 
-proc ::raloo::arch::deliverDefEvent {event refValue source sourceValue\
-				     argList} {
+# Deliver a Deferred Event. Deferred events are either polymorphic events
+# that have been injected at this level of the generalization hierarchy
+# or they have been inherited down the hierarchy because they were not
+# consumed in the supertype and this subtype acts as a supertype in another
+# generalization (i.e. a multi-level generalization hierarchy).
+proc ::raloo::arch::deliverDefEvent {event argList refValue source\
+				     sourceValue} {
     # What domain are we in?
-    relation assign $event {DomName domName} {EventName eventName}
+    relation assign $event
+    # Find the tuple associated with the instance reference. It is important
+    # when attempting to find the associated subtype to use the full relation
+    # value, since there may be multiple identifiers and we can be sure
+    # which ones are used to implement the generalization relationships.
+    set relvarName ${DomName}::${ModelName}
+    set superValue [relation semijoin $refValue [relvar set $relvarName]]
     # Find the super type roles. There can be many since a given supertype
     # may be the supertype for multiple generalizations.
     set superRoles [relation semijoin $event $::raloo::mm::DeferralPath\
@@ -3778,7 +3846,7 @@ proc ::raloo::arch::deliverDefEvent {event refValue source sourceValue\
     # For each generalization hierarchy, find the set of subtypes.
     # It is in these subtypes that we must find the related instance.
     relation foreach superRole $superRoles {
-	set superSrc ${domName}::[relation extract $superRole ClassName]
+	set superSrc ${DomName}::[relation extract $superRole ClassName]
 	set subRoles [relation semijoin $superRole $::raloo::mm::GenRel\
 	    $::raloo::mm::SubtypeRole]
 	# Loop through the subtypes finding the attributes that make up the
@@ -3786,32 +3854,33 @@ proc ::raloo::arch::deliverDefEvent {event refValue source sourceValue\
 	# We will construct a semijoin from the supertype to the subtype, i.e.
 	# from the referred to class to the referring class.
 	relation foreach subRole $subRoles {
-	    set subDst ${domName}::[relation extract $subRole ClassName]
+	    set subDst ${DomName}::[relation extract $subRole ClassName]
 	    set joinAttrs [ralutil::pipe {
 		relation semijoin $subRole $::raloo::mm::AttributeRef |
 		relation dict ~ RefToAttrName RefngAttrName
 	    }]
 	    # Check if this subtype is the one related to the supertype.
-	    set inst [ralutil::pipe {
-		relvar set ${domName}::[relation extract $subRole ClassName] |
-		relation semijoin $refValue ~ -using $joinAttrs
+	    set instValue [ralutil::pipe {
+		relvar set ${DomName}::[relation extract $subRole ClassName] |
+		relation semijoin $superValue ~ -using $joinAttrs
 	    }]
-	    if {[relation isnotempty $inst]} {
+	    if {[relation isnotempty $instValue]} {
 		# Okay, found the related subtype!
 		log::info "polymorphic dispatch:\
-		    $superSrc.[list [idValues $refValue]] ==>\
-		    $subDst.[list [idValues $inst]]:\
-		    $eventName [list $argList]"
+		    $superSrc.[list [tuple get [relation tuple $superValue]]]\
+		    ==> $subDst.[list [tuple get [relation tuple $instValue]]]:\
+		    $EventName [list $argList]"
 		# Find the non-local event that this subtype receives
 		set nlevt [relation semijoin $subRole\
 		    $::raloo::mm::NonLocalEvent]
 		# If the non-local event is a mapped event, then it is
 		# consumed at this level.
+		set inst [::raloo::RelvarRef idProjection $instValue]
 		set effEvent [relation semijoin $nlevt\
 		    $::raloo::mm::MappedEvent $::raloo::mm::EffectiveEvent]
 		if {[relation isnotempty $effEvent]} {
-		    deliverEffEvent $effEvent $inst $source $sourceValue\
-			$argList
+		    deliverEffEvent $effEvent $argList $inst $source\
+			$sourceValue
 		    break
 		}
 		# Otherwise if the non-local event is an inherited event,
@@ -3819,8 +3888,8 @@ proc ::raloo::arch::deliverDefEvent {event refValue source sourceValue\
 		set defEvent [relation semijoin $nlevt\
 		    $::raloo::mm::InheritedEvent $::raloo::mm::DeferredEvent]
 		if {[relation isnotempty $defEvent]} {
-		    deliverDefEvent $defEvent $inst $source $sourceValue\
-			$argList
+		    deliverDefEvent $defEvent $argList $inst $source\
+			$sourceValue
 		    break
 		}
 
@@ -3852,8 +3921,8 @@ proc ::raloo::arch::deliverNonStateTrans {currstate transRule src srcValue\
     }
 }
 
-proc ::raloo::arch::queueDelayed {time event refValue source sourceValue\
-				  argList} {
+proc ::raloo::arch::queueDelayed {time event argList refValue source\
+				  sourceValue} {
     # See if we are already expired
     if {$time <= 0} {
 	queueEvent $refValue $event $argList
@@ -3879,8 +3948,10 @@ proc ::raloo::arch::cancelDelayed {event refValue source sourceValue} {
     variable delayQueue
     for {set i 0} {$i < [llength $delayQueue]} {incr i} {
 	lassign [lindex $delayQueue $i] qtime qevent qref qsrc qsrcValue
-	if {[relation is $qevent == $event] && $qref == $refValue &&\
-		$qsrc == $source && $qsrcValue == $sourceValue} {
+	if {[relation is $qevent == $event] &&\
+		[relation is $qref == $refValue] &&\
+		$qsrc == $source &&
+		[relation is $qsrcValue == $sourceValue]} {
 	    set delayQueue [lreplace $delayQueue $i $i]
 	    break
 	}
@@ -3918,6 +3989,10 @@ proc ::raloo::arch::serviceDelayedQueue {} {
     }
 }
 
+# We send all the queue of idle event to the Tcl event loop through here.
+# A monitor program can single step the thread of control by calling
+# "dispatchEvent" and making sure there are not Tcl events by setting
+# the "singleStep" variable.
 proc ::raloo::arch::stepEngine {} {
     variable singleStep
     if {!$singleStep} {
