@@ -47,8 +47,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: raloo.test,v $
-# $Revision: 1.10 $
-# $Date: 2008/03/21 03:34:24 $
+# $Revision: 1.11 $
+# $Date: 2008/03/22 17:05:20 $
 #  *--
 
 package require tcltest 2.2
@@ -66,8 +66,9 @@ proc relationMatch {expected actual} {
 }
 
 proc ::bgerror msg {
-    puts stderr $msg
-    set ::bgerrorMsg $msg
+    puts $::errorInfo
+    #puts stderr $msg
+    set ::sync $msg
 }
 
 namespace eval ::raloo::test {
@@ -2157,7 +2158,7 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 	set ::out
     } -result {ShowDog}
 
-    test Lifecycle-2.3 {
+    test Lifecycle-3.1 {
 	thread of control leaves data inconsistent
     } -setup {
 	Domain create A {
@@ -2186,11 +2187,38 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 	A destroy
     } -body {
 	A newDog Fred
-	vwait ::bgerrorMsg
-	set ::bgerrorMsg
+	syncSleep
     } -result {for correlation ::raloo::test::A::R1(::raloo::test::A::Dog <== [+] ::raloo::test::A::Ownership [+] ==> ::raloo::test::A::Owner), in relvar ::raloo::test::A::Dog
 tuple {DogName Fred} is not referenced by any tuple
 }
+
+    test Lifecycle-4.1 {
+	creation events
+    } -setup {
+	Domain create A {
+	    Class Foo {
+		Attribute {
+		    *Id int
+		}
+
+		Lifecycle {
+		    State A {} {
+			puts "A"
+			set ::sync 4
+		    }
+		    Transition @ - E1 -> A
+		}
+		DomainOp startFoo {} {
+		    Foo generate {Id 1} E1
+		}
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	A startFoo
+	syncSleep
+    } -result {4}
 
     test Polymorphic-1.1 {
 	polymorphic event
