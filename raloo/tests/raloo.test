@@ -47,8 +47,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: raloo.test,v $
-# $Revision: 1.11 $
-# $Date: 2008/03/22 17:05:20 $
+# $Revision: 1.12 $
+# $Date: 2008/03/26 15:52:21 $
 #  *--
 
 package require tcltest 2.2
@@ -117,8 +117,12 @@ namespace eval ::raloo::test {
 		}
 	    }
 	    AssocRelationship R1 Dog *--Plays-->* Dog {
-		PlayerName -> DogName} {
-		DogName -> DogName
+		FwrdRefMap {
+		    PlayerName -> DogName
+		}
+		BackRefMap {
+		    DogName -> DogName
+		}
 	    }
 	}
 	A transaction {
@@ -326,7 +330,9 @@ tuple {DogName Fred} is not referenced by any tuple
     } -body {
 	A define {
 	    Relationship R1 Dog +-->1 Owner {
-		OwnerName --> Name
+		RefMap {
+		    OwnerName --> Name
+		}
 	    }
 	}
 	A::R1 info
@@ -355,8 +361,10 @@ tuple {DogName Fred} is not referenced by any tuple
     } -body {
 	A define {
 	    Relationship R1 Dog +-->1 Owner {
-		OwnerId --> Id
-		OwnerName --> Name
+		RefMap {
+		    OwnerId --> Id
+		    OwnerName --> Name
+		}
 	    }
 	}
 	A::R1 info
@@ -383,7 +391,9 @@ tuple {DogName Fred} is not referenced by any tuple
     } -body {
 	A define {
 	    Relationship R1 Dog +-->1 Owner {
-		OwnerName --> Id
+		RefMap {
+		    OwnerName --> Id
+		}
 	    }
 	}
     } -result {attribute(s), "Id", do(es) not constitute an identifier of, "Owner"}\
@@ -410,7 +420,9 @@ tuple {DogName Fred} is not referenced by any tuple
     } -body {
 	A define {
 	    Relationship R1 Dog +-->1 Owner {
-		Name --> Name
+		RefMap {
+		    Name --> Name
+		}
 	    }
 	}
     } -result {"Name", is(are) not attributes of class, "Dog"}\
@@ -438,10 +450,12 @@ tuple {DogName Fred} is not referenced by any tuple
     } -body {
 	A define {
 	    Relationship R1 Dog +-->1 *2Owner {
-		OwnerName --> Name
+		RefMap {
+		    OwnerName --> Name
+		}
 	    }
 	}
-    } -result {referring attribute(s), "OwnerName", do(es) not refer to identifier, "2" of class,"Owner"}\
+    } -result {referring attribute(s), "OwnerName", do(es) not refer to identifier, "2" of class, "Owner"}\
     -returnCodes error
 
     test Domain-4.1 {
@@ -602,8 +616,12 @@ tuple {DogName Fred} is not referenced by any tuple
     } -body {
 	A define {
 	    AssocRelationship R1 Owner *--Ownership-->+ Dog {
-		DogName -> Name} {
-		OwnerName -> Name
+		FwrdRefMap {
+		    DogName -> Name
+		}
+		BackRefMap {
+		    OwnerName -> Name
+		}
 	    }
 	}
 	A::R1 info
@@ -1019,7 +1037,9 @@ tuple {DogName Fred} is not referenced by any tuple
 		}
 	    }
 	    Relationship R1 Phone ?-->? Phone {
-		PrevNumber -> Number
+		RefMap {
+		    PrevNumber -> Number
+		}
 	    }
 	}
 	A::Phone insert Number 555-1212 PrevNumber {}
@@ -1045,7 +1065,9 @@ tuple {DogName Fred} is not referenced by any tuple
 		}
 	    }
 	    Relationship R1 Phone ?-->? Phone {
-		PrevNumber -> Number
+		RefMap {
+		    PrevNumber -> Number
+		}
 	    }
 	}
 	A::Phone insert Number 555-1212 PrevNumber {}
@@ -1411,7 +1433,9 @@ tuple {DogName Fred} is not referenced by any tuple
 		}
 	    }
 	    Relationship R1 Dog ?-->? Dog {
-		PrevDog -> DogName
+		RefMap {
+		    PrevDog -> DogName
+		}
 	    }
 	}
     } -cleanup {
@@ -1436,7 +1460,9 @@ tuple {DogName Fred} is not referenced by any tuple
 		}
 	    }
 	    Relationship R1 Dog ?-->? Dog {
-		PrevDog -> DogName
+		RefMap {
+		    PrevDog -> DogName
+		}
 	    }
 	}
     } -cleanup {
@@ -1650,7 +1676,9 @@ tuple {DogName Fred} is not referenced by any tuple
 		}
 	    }
 	    Relationship R1 Dog ?-->? Dog {
-		PrevDog -> DogName
+		RefMap {
+		    PrevDog -> DogName
+		}
 	    }
 	}
 	A transaction {
@@ -1681,7 +1709,9 @@ tuple {DogName Fred} is not referenced by any tuple
 		}
 	    }
 	    Relationship R1 Dog ?-->? Dog {
-		PrevDog -> DogName
+		RefMap {
+		    PrevDog -> DogName
+		}
 	    }
 	}
 	A transaction {
@@ -2286,26 +2316,111 @@ tuple {DogName Fred} is not referenced by any tuple
 		    *OwnerName string
 		}
 	    }
-	    AssocRelationship R1 Dog +-Ownership->+ Owner
+	    AssocRelationship R1 Dog +-Ownership->+ Owner {
+		Assigner {
+		    State s1 {p1} {
+			puts "s1: $p1"
+		    }
+		    State s2 {} {
+			puts "s2"
+		    }
+		    Transition s1 - e1 -> s2
+		    Transition s2 - e2 -> s1
+		}
+	    }
 	}
     } -cleanup {
 	A destroy
     } -body {
-	A define {
-	    Assigner R1 {
-		State s1 {p1} {
-		    puts "s1: $p1"
-		}
-		State s2 {} {
-		    puts "s2"
-		}
-		Transition s1 - e1 -> s2
-		Transition s2 - e2 -> s1
-	    }
-	}
 	relation extract [relation choose $::raloo::mm::AssignerStateModel\
 	    DomName ::raloo::test::A RelName R1] RelName
     } -result {R1}
+
+    test Assigner-1.2 {
+	generating an event to a single assigner state model
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *DogName string
+		    OwnerName string
+		}
+	    }
+	    Class Owner {
+		Attribute {
+		    *OwnerName string
+		}
+	    }
+	    Relationship R1 Dog +-->1 Owner {
+		Assigner {
+		    State s1 {p1} {
+			puts "s1: $p1"
+		    }
+		    State s2 {} {
+			puts "s2"
+			set ::sync s2
+		    }
+		    Transition s1 - e1 -> s2
+		    Transition s2 - e2 -> s1
+		}
+	    }
+	    DomainOp assignR1 {p} {
+		R1 generate e1
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	A assignR1 foo
+	syncSleep
+    } -result {s2}
+
+    test Assigner-1.3 {
+	generating an event to a multiple assigner state model
+    } -setup {
+	Domain create A {
+	    Class Dog {
+		Attribute {
+		    *DogName string
+		    OwnerName string
+		}
+	    }
+	    Class Owner {
+		Attribute {
+		    *OwnerName string
+		}
+	    }
+	    Relationship R1 Dog +-->1 Owner {
+		Assigner {
+		    IdentifyBy Dog
+		    State s1 {p1} {
+			puts "s1: $p1"
+		    }
+		    State s2 {} {
+			puts "s2"
+			set ::sync s2
+		    }
+		    Transition s1 - e1 -> s2
+		    Transition s2 - e2 -> s1
+		}
+	    }
+	    DomainOp assignR1 {p} {
+		set r1a [R1 new]
+		$r1a selectOne DogName Fido
+		$r1a generate e1
+	    }
+	}
+	A transaction {
+	    Dog insert DogName Fido OwnerName John
+	    Owner insert OwnerName John
+	    R1 insert DogName Fido __CS__ s1
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	A assignR1 foo
+	syncSleep
+    } -result {s2}
 
     cleanupTests
 }
