@@ -48,8 +48,8 @@
 #  capabilities of TclOO.
 # 
 # $RCSfile: raloo.tcl,v $
-# $Revision: 1.13 $
-# $Date: 2008/03/26 15:52:08 $
+# $Revision: 1.14 $
+# $Date: 2008/03/30 02:02:30 $
 #  *--
 
 package require Tcl 8.5
@@ -1241,12 +1241,7 @@ oo::class create ::raloo::Domain {
 		uplevel 1 $script
 	    }
 	} result options
-	foreach instref [info class instances ::raloo::RelvarRef] {
-	    $instref destroy
-	}
-	foreach instref [info class instances ::raloo::ActiveRelvarRef] {
-	    $instref destroy
-	}
+	::raloo::arch::cleanupRefs
 	return -options $options $result
     }
     method SyncService {name argList body} {
@@ -1269,7 +1264,7 @@ oo::class create ::raloo::Domain {
 	]
 
 	oo::define [self] method $name $argList [format {
-	    ::raloo::arch::newTOC %1$s {} [relation create {} {{}} {}]\
+	    ::raloo::arch::newTOC %1$s [self] {Relation {} {{}} {{}}}\
 		[list my __%2$s] [lrange [info level 0] 2 end]
 	} [self] $name]
 	oo::define [self] export $name
@@ -2522,33 +2517,94 @@ oo::class create ::raloo::PasvRelvarClass {
 	    puts "Class: $result"
 	}
     }
-    # Look up the event name in the context of this instance.  We need this
-    # even in a passive relvar because we may need to look up polymorphic
-    # events for a supertype that has no state machine.
-    method lookUpEvent {eventName} {
-	set relvarName [self]
-	# Check if this event even exists.
-	set domName [namespace qualifiers $relvarName]
-	set modelName [namespace tail $relvarName]
-	set event [relation choose $::raloo::mm::Event\
-	    DomName $domName\
-	    ModelName $modelName\
-	    EventName $eventName\
-	]
-	if {[relation isempty $event]} {
-	    error "event, \"$eventName\", does not exist for\
-		\"$domName.$modelName\""
+}
+
+oo::class create ::raloo::ActiveSingleton {
+    constructor {} {
+	# Define an unexported method for each state, prepending "__" to
+	# prevent name conflicts.
+	my variable domName
+	my variable modelName
+	set states [relation restrictwith $::raloo::mm::State {
+	    $DomName eq $domName && $ModelName eq $modelName
+	}]
+	relation foreach state $states {
+	    relation assign $state
+	    set argList [::raloo::mm::formatSig\
+		[relation semijoin $state $::raloo::mm::Signature]]
+	    oo::define [self] method __$StateName $argList $Action
+	    oo::define [self] unexport __$StateName
 	}
-	return $event
+	next
+    }
+    method states {} {
+	my variable domName
+	my variable modelName
+	return [ralutil::pipe {
+	    relation restrictwith $::raloo::mm::State {
+		$DomName eq $domName && $ModelName eq $modelName} |
+	    relation list ~ StateName
+	}]
+    }
+    method defaultInitialState {} {
+	my variable domName
+	my variable modelName
+	return [relation extract\
+	    [relation choose $::raloo::mm::StateModel\
+		DomName $domName ModelName $modelName]\
+	    InitialState]
+    }
+    method defaultTransition {} {
+	my variable domName
+	my variable modelName
+	return [relation extract\
+	    [relation choose $::raloo::mm::StateModel\
+		DomName $domName ModelName $modelName]\
+	    DefaultTrans]
+    }
+}
+
+oo::class create ::raloo::ActiveEntity {
+    superclass ::raloo::ActiveSingleton
+    # Generate a creation event
+    # "avList" is a list of attribute name / value pairs used to create
+    # the new instance.
+    # "args" is a dictionary of event parameter name / value pairs
+    method generate {avList eventName args} {
+	my variable domName
+	my variable modelName
+	::raloo::arch::genCreation $domName $modelName $avList $eventName $args
+	return
+    }
+    # Insert a single tuple into the backing relvar.
+    # "args" must be a set of attribute name / value pairs.
+    method insert {args} {
+	# Add in the default initial state
+	lappend args __CS__ [my defaultInitialState]
+	relvar insert [self] $args
+    }
+    # Insert a single tuple specifying the initial state
+    method insertInState {state args} {
+	# Check that we have a valid state
+	if {$state ni [my states]} {
+	    variable modelName
+	    error "\"$state\", is not a state of \"$modelName\""
+	}
+	lappend args __CS__ $state
+	relvar insert [self] $args
     }
 }
 
 oo::class create ::raloo::ActiveRelvarClass {
-    superclass ::raloo::PasvRelvarClass
+    superclass ::raloo::ActiveEntity ::raloo::PasvRelvarClass
     constructor {} {
 	namespace import ::ral::*
+	my variable domName
 	set domName [namespace qualifiers [self]]
+	my variable className
 	set className [namespace tail [self]]
+	my variable modelName
+	set modelName $className
 	# Active classes have an additional attribute of current state.
 	relvar insert ::raloo::mm::Attribute [list\
 	    DomName $domName\
@@ -2562,45 +2618,9 @@ oo::class create ::raloo::ActiveRelvarClass {
 	oo::define [self] {
 	    superclass ::raloo::ActiveRelvarRef
 	}
-	# Define an unexported method for each state, prepending "__" to
-	# prevent name conflicts.
-	set states [relation restrictwith $::raloo::mm::State {
-	    $DomName eq $domName && $ModelName eq $className
-	}]
-	relation foreach state $states {
-	    relation assign $state
-	    set argList [::raloo::mm::formatSig\
-		[relation semijoin $state $::raloo::mm::Signature]]
-	    oo::define [self] method __$StateName $argList $Action
-	    oo::define [self] unexport __$StateName
-	}
     }
     destructor {
 	next
-    }
-    # Generate a creation event
-    # "avList" is a list of attribute name / value pairs used to create
-    # the new instance.
-    # "args" is a dictionary of event parameter name / value pairs
-    method generate {avList eventName args} {
-	set event [my lookUpEvent $eventName]
-	# Arrange the argument dictionary into the correct order to
-	# match the signature of the event.
-	if {[llength $args] % 2 != 0} {
-	    error "event parameters must be as name / value pairs: $args"
-	}
-	set argList [::raloo::ActiveRelvarRef buildArguments $event $args]
-	::raloo::arch::queueCreationEvent $avList $event $argList
-	return
-    }
-    method states {} {
-	set domName [namespace qualifiers [self]]
-	set className [namespace tail [self]]
-	return [ralutil::pipe {
-	    relation restrictwith $::raloo::mm::State {
-		$DomName eq $domName && $ModelName eq $className} |
-	    relation list ~ StateName
-	}]
     }
 }
 
@@ -2619,8 +2639,11 @@ oo::class create ::raloo::RelvarRef {
 	if {$nArgs == 0} {
 	    set ref [relation emptyof [relvar set $relvarName]]
 	} else {
-	    set ref [::raloo::RelvarRef idProjection\
-		[relvar insert $relvarName $args]]
+	    set ref [::ralutil::pipe {
+		relvar set $relvarName |
+		relation choose ~ {*}$args |
+		::raloo::RelvarRef idProjection
+	    }]
 	}
     }
     self.method idProjection {relValue {id 0}} {
@@ -2642,8 +2665,8 @@ oo::class create ::raloo::RelvarRef {
     # Find the tuples in the base relvar that this reference actually refers
     # to.
     method get {} {
-	my variable ref
 	my variable relvarName
+	my variable ref
 	return [relation semijoin $ref [relvar set $relvarName]]
     }
     # readAttr attr1 ?att2 ...?
@@ -2723,7 +2746,7 @@ oo::class create ::raloo::RelvarRef {
 	    relvar set $relvarName |
 	    relation restrictwith ~ [list $expr]
 	} cmd
-	my set [uplevel $cmd]
+	my set [uplevel 1 $cmd]
     }
     method selectAny {expr} {
 	my variable relvarName
@@ -2733,7 +2756,7 @@ oo::class create ::raloo::RelvarRef {
 	    relation tag ~ __Order__ |
 	    relation choose ~ __Order__ 0
 	} cmd
-	my set [uplevel $cmd]
+	my set [uplevel 1 $cmd]
     }
     method selectRelated {args} {
 	my variable relvarName
@@ -2923,12 +2946,11 @@ oo::class create ::raloo::RelvarRef {
 	    lappend avList $subAttr [dict get $valueDict\
 		[dict get $refAttrMap $superAttr]]
 	}
-	# Add on any addition attribute/values required by the migration.
-	set avList [concat $avList $args]
 	# Transform "self" into the new subtype.
 	my variable relvarName
 	relvar eval {
 	    my delete
+	    $targetClass insert {*}[concat $avList $args]
 	    set subObj [$targetClass new {*}$avList]
 	}
 	return $subObj
@@ -2958,15 +2980,6 @@ oo::class create ::raloo::ActiveRelvarRef {
     constructor {name args} {
 	#puts "ActiveRelvarRef constructor: $name: $args"
 	namespace import ::ral::*
-	# Check if the initial state is specified. If not,
-	# look it up and supply it by default.
-	if {!([llength $args] == 0 || "INSTATE" in $args)} {
-	    set domName [namespace qualifiers $name]
-	    set className [namespace tail $name]
-	    set sm [relation choose $::raloo::mm::StateModel\
-		DomName $domName ModelName $className]
-	    lappend args __CS__ [relation extract $sm InitialState]
-	}
 	next $name {*}$args
     }
     destructor {
@@ -2976,78 +2989,48 @@ oo::class create ::raloo::ActiveRelvarRef {
     # "args" is a dictionary of parameter name / parameter values pairs
     method generate {eventName args} {
 	my variable relvarName
-	set event [$relvarName lookUpEvent $eventName]
-	# Arrange the argument dictionary into the correct order to
-	# match the signature of the event.
-	if {[llength $args] % 2 != 0} {
-	    error "event parameters must be as name / value pairs: $args"
-	}
-	set argList [::raloo::ActiveRelvarRef buildArguments $event $args]
-
-	# This reference may be multi-valued. Generate an event to each one.
 	my variable ref
-	relation foreach inst $ref {
-	    ::raloo::arch::queueEvent $inst $event $argList
-	}
-
+	::raloo::arch::genToInsts [namespace qualifiers $relvarName]\
+	    [namespace tail $relvarName] $ref $eventName $args
 	return
     }
     method generateDelayed {time eventName args} {
 	my variable relvarName
-	set event [$relvarName lookUpEvent $eventName]
-	# Arrange the argument dictionary into the correct order to
-	# match the signature of the event.
-	if {[llength $args] % 2 != 0} {
-	    error "event parameters must be as name / value pairs: $args"
-	}
-	set argList [::raloo::ActiveRelvarRef buildArguments $event $args]
-
-	if {[catch {self caller} caller]} {
-	    set caller ::
-	    set callerValue {Relation {} {{}} {{}}}
-	} else {
-	    set callerValue [$caller ref]
-	}
-
-	# This reference may be multi-valued. Generate an event to each one.
 	my variable ref
-	relation foreach refValue $ref {
-	    ::raloo::arch::queueDelayed $time $event $argList $refValue\
-		    $caller $callerValue
-	}
+	my Source
+	::raloo::arch::genDelayedToInsts $time\
+	    [namespace qualifiers $relvarName] $srcModel $srcRef\
+	    [namespace tail $relvarName] $ref $eventName $args
     }
     method cancelDelayed {eventName} {
 	my variable relvarName
-	set event [$relvarName lookUpEvent $eventName]
-
-	if {[catch {self caller} caller]} {
-	    set caller ::
-	    set callerValue {Relation {} {{}} {{}}}
-	} else {
-	    set callerValue [$caller ref]
-	}
-
-	# This reference may be multi-valued. Cancel each event.
 	my variable ref
-	relation foreach refValue $ref {
-	    ::raloo::arch::cancelDelayed $event $refValue $caller $callerValue
-	}
+	my Source
+	::raloo::arch::cancelDelayedToInsts [namespace qualifiers $relvarName]\
+	    $srcModel $srcRef [namespace tail $relvarName] $ref $eventName
     }
-    # Build up a invocation argument list from a dictionary of
-    # parameter names / values
-    self.method buildArguments {event paramDict} {
-	set sigParams [::ral::relation semijoin $event $::raloo::mm::Signature\
-	    $::raloo::mm::SignatureParam]
-	set argList [list]
-	::ral::relation foreach param $sigParams -ascending ParamOrder {
-	    ::ral::relation assign $param ParamName
-	    if {![dict exists $paramDict $ParamName]} {
-		error "parameter, \"$ParamName\", does not exist in argument\
-		    dictionary, \"$paramDict\""
+    method delayedRemaining {eventName} {
+	my variable relvarName
+	my variable ref
+	my Source
+	::raloo::arch::remainingDelayed [namespace qualifiers $relvarName]\
+	    $srcModel $srcRef [namespace tail $relvarName] $ref $eventName
+    }
+    method Source {{modelVar srcModel} {instVar srcRef}} {
+	upvar $modelVar srcModel
+	upvar $instVar srcRef
+	if {[catch {uplevel 1 self caller} caller]} {
+	    set srcModel [uplevel 2 namespace current]
+	    set srcRef {Relation {} {{}} {{}}}
+	} else {
+	    set obj [lindex $caller 1]
+	    if {[catch {$obj classOf} srcModel]} {
+		set srcModel $obj
 	    }
-	    lappend argList [dict get $paramDict $ParamName]
+	    if {[catch {$srcModel ref} srcRef]} {
+		set srcRef {Relation {} {{}} {{}}}
+	    }
 	}
-	return $argList
     }
 }
 
@@ -3705,10 +3688,15 @@ oo::class create ::raloo::AssocRelationship {
 }
 
 oo::class create ::raloo::SingleAssigner {
-    superclass ::oo::class
+    superclass ::raloo::ActiveSingleton ::oo::class
     self.unexport new
     constructor {} {
 	#puts "SingleAssigner constructor: \"[info level 0]\": \"[self next]\""
+	my variable domName
+	my variable relName
+	my variable modelName
+	set modelName $relName
+
 	next
 	namespace import ::ral::*
 	# Single assigners do create a relvar. It only has the current state as
@@ -3720,24 +3708,10 @@ oo::class create ::raloo::SingleAssigner {
 		__CS__
 	    }
 	}
-	my variable domName
-	my variable relName
 	relvar insert [self] [list\
 	    __CS__ [relation extract [relation choose $::raloo::mm::StateModel\
 		    DomName $domName ModelName $relName] InitialState]
 	]
-	# Define an unexported method for each state, prepending "__" to
-	# prevent name conflicts.
-	set states [relation restrictwith $::raloo::mm::State {
-	    $DomName eq $domName && $ModelName eq $relName
-	}]
-	relation foreach state $states {
-	    relation assign $state
-	    set argList [::raloo::mm::formatSig\
-		[relation semijoin $state $::raloo::mm::Signature]]
-	    oo::define [self] method __$StateName $argList $Action
-	    oo::define [self] unexport __$StateName
-	}
 
 	oo::define [self] {
 	    superclass ::raloo::SingleAssignerRef
@@ -3757,26 +3731,8 @@ oo::class create ::raloo::SingleAssigner {
     method generate {eventName args} {
 	my variable domName
 	my variable relName
-	# Check if this event even exists.
-	set event [relation choose $::raloo::mm::Event\
-	    DomName $domName\
-	    ModelName $relName\
-	    EventName $eventName\
-	]
-	if {[relation isempty $event]} {
-	    error "event, \"$eventName\", does not exist for\
-		\"$domName.$relName\""
-	}
-	# Arrange the argument dictionary into the correct order to
-	# match the signature of the event.
-	if {[llength $args] % 2 != 0} {
-	    error "event parameters must be as name / value pairs: $args"
-	}
-	set ref [::raloo::RelvarRef idProjection\
-	    [relvar set ${domName}::${relName}]]
-	::raloo::arch::queueEvent $ref $event\
-	    [::raloo::ActiveRelvarRef buildArguments $event $args]
-
+	set ref [::raloo::arch::idProject [relvar set ${domName}::${relName}]]
+	::raloo::arch::genToInsts $domName $relName $ref $eventName $args
 	return
     }
 }
@@ -3814,13 +3770,17 @@ oo::class create ::raloo::SingleAssignerRef {
 }
 
 oo::class create ::raloo::MultipleAssigner {
-    superclass ::oo::class
+    superclass ::raloo::ActiveEntity ::oo::class
     self.unexport new
     constructor {} {
-	next
-	namespace import ::ral::*
 	my variable domName
 	my variable relName
+	my variable modelName
+	set modelName $relName
+
+	next
+
+	namespace import ::ral::*
 	# Multiple assigners also create a relvar. In this case it contains
 	# the identifiers of the multiple assigner as well the current state.
 	# Find the identifying attributes/types associated with multiple
@@ -3923,27 +3883,9 @@ oo::class create ::raloo::MultipleAssignerRef {
     }
     method generate {eventName args} {
 	my variable relvarName
-	set domName [namespace qualifiers $relvarName]
-	set relName [namespace tail $relvarName]
-	# Check if this event even exists.
-	set event [relation choose $::raloo::mm::Event\
-	    DomName $domName\
-	    ModelName $relName\
-	    EventName $eventName\
-	]
-	if {[relation isempty $event]} {
-	    error "event, \"$eventName\", does not exist for\
-		\"$domName.$relName\""
-	}
-	# Arrange the argument dictionary into the correct order to
-	# match the signature of the event.
-	if {[llength $args] % 2 != 0} {
-	    error "event parameters must be as name / value pairs: $args"
-	}
 	my variable ref
-	::raloo::arch::queueEvent $ref $event\
-	    [::raloo::ActiveRelvarRef buildArguments $event $args]
-
+	::raloo::arch::genToInsts [namespace qualifiers $relvarName]\
+	    [namespace tail $relvarName] $ref $eventName $args
 	return
     }
 }
@@ -3961,22 +3903,27 @@ oo::class create ::raloo::MultipleAssignerRef {
 #
 # These procs form the state machine execution engine that drives execution in
 # raloo. The engine supports the notion of a thread of control.  A thread of
-# control is the tree that is started by a DomainOp or a delayed event and
-# records the events generated as the state machines of a domain interact
-# with each other. The event generation evolves as a tree as it is traversed in
-# breadth first order.
+# control is started by a DomainOp or a delayed event and evolves as a tree to
+# record the events generated as the state machines of a domain interact with
+# each other. The evolving tree is traversed in breadth first order for
+# dispatching events. This gives the proper ordering of event delivery relative
+# to event generation.
 #
 # The execution rules are:
 # 1. Only one thread of control is operating at a time.
 # 2. If a new thread of control is started, then it is deferred and executed
 #    after any preceding threads are done.
-# 3. The engine is driven by idle task events. Each starting of a thread
-#    of control or generation of an event inserts an idle task event which
-#    is then used to dispatch the next state machine event.
+# 3. The engine interface to the Tcl event loop is via idle task events.
+#    The starting of a thread of control or the generation of an event inserts
+#    an idle task event into the Tcl event loop which is then used to dispatch
+#    the next state machine event.
 # 4. Polymorphic events are synchonously mapped until they are consumed, i.e.
 #    the mapped event is not re-inserted into thread of control tree. If the
-#    polymorphic event generates multiple events, then they are all
-#    synchronously dispatched in an unspecified order.
+#    polymorphic event propagates along multiple generalization hierachies,
+#    then all the polymorphic events are synchronously dispatched and the
+#    order of dispatch along the hierarchies is unspecified.
+#
+################################################################################
 
 package require logger
 package require struct::tree
@@ -3984,9 +3931,6 @@ package require struct::tree
 namespace eval ::raloo::arch {
     namespace import ::ral::*
 
-    # Number of milliseconds that constitutes one tick for delayed events.
-    variable delayTick 10
-    variable delayQueue
     # The list of threads of control
     variable controlTree [list]
     # This variable controls whether or not we are "single" stepping the
@@ -3996,7 +3940,7 @@ namespace eval ::raloo::arch {
     # "dispatchEvent" as an idle task on the Tcl event queue.
     variable singleStep 0
 
-    logger::initNamespace ::raloo::arch info
+    logger::initNamespace ::raloo::arch debug
 }
 
 # Start a new Thread of Control. Threads of control are the implied tree
@@ -4004,90 +3948,164 @@ namespace eval ::raloo::arch {
 # list of threads of control that are to be executed.
 # The root node of a thread of control keep a list that is used to record
 # the breadth first order of the tree visits.
-proc ::raloo::arch::newTOC {domName modelName inst script argList} {
+# "inst" is a dictionary corresponding to an identifier of "modelName".
+proc ::raloo::arch::newTOC {domName modelName inst script params} {
     variable controlTree
     lappend controlTree [set tocTree [struct::tree]]
 
-    $tocTree set root queue [list root]
-    $tocTree set root inst $inst
-    $tocTree set root event [relation create\
-	{DomName string ModelName string EventName string}\
-	{{DomName ModelName EventName}} [list\
-	    DomName $domName\
-	    ModelName $modelName\
-	    EventName {}\
-	]]
-    $tocTree set root script $script
-    $tocTree set root params $argList
+    $tocTree set root currNode root
+    $tocTree set root queue [list]
+    $tocTree set root event [dict create\
+	domName $domName\
+	modelName $modelName\
+	inst $inst\
+	script $script\
+	params $params\
+    ]
+
     stepEngine
 
     return
 }
 
+proc ::raloo::arch::genToInsts {domName modelName refSet eventName argList} {
+    set event [lookUpEvent $domName $modelName $eventName]
+    set params [buildArguments $event $argList]
+    # This reference may be multi-valued. Generate an event to each one.
+    relation foreach inst $refSet {
+	queueEvent $domName $modelName $inst $eventName $params
+    }
+}
+
+proc ::raloo::arch::genDelayedToInsts {time domName srcModel srcRef\
+				       dstModel dstRef eventName argList} {
+    set event [lookUpEvent $domName $dstModel $eventName]
+    set params [buildArguments $event $argList]
+    # This reference may be multi-valued. Generate an event to each one.
+    relation foreach inst $dstRef {
+	queueDelayedEvent $time $domName $srcModel $srcRef $dstModel $inst\
+	    $eventName $params
+    }
+}
+
+proc ::raloo::arch::genCreation {domName modelName attrs eventName argList} {
+    set event [lookUpEvent $domName $modelName $eventName]
+    set params [buildArguments $event $argList]
+    queueCreationEvent $domName $modelName $attrs $eventName $params
+
+    return
+}
+
+proc ::raloo::arch::cancelDelayedToInsts {domName srcModel srcRef dstModel\
+					  dstRef eventName} {
+    set event [lookUpEvent $domName $dstModel $eventName]
+    relation foreach refValue $ref {
+	::raloo::arch::cancelDelayedEvent $domName $srcModel $srcRef $dstModel\
+	    $dstRef $eventName
+    }
+}
+
+proc ::raloo::arch::lookUpEvent {domName modelName eventName} {
+    # Check if this event even exists.
+    set event [relation choose $::raloo::mm::Event\
+	DomName $domName\
+	ModelName $modelName\
+	EventName $eventName\
+    ]
+    if {[relation isempty $event]} {
+	error "event, \"$eventName\", does not exist for\
+	    \"$domName.$modelName\""
+    }
+    return $event
+}
+proc ::raloo::arch::buildArguments {event paramDict} {
+    set sigParams [relation semijoin $event $::raloo::mm::Signature\
+	$::raloo::mm::SignatureParam]
+    if {[relation cardinality $sigParams] != [dict size $paramDict]} {
+	error "mismatch in the number of event parameters:\
+	    expected [::ral::relation cardinality $sigParams],\
+	    got [dict size $paramDict]"
+    }
+    set argList [list]
+    relation foreach param $sigParams -ascending ParamOrder {
+	relation assign $param ParamName
+	if {![dict exists $paramDict $ParamName]} {
+	    error "parameter, \"$ParamName\", does not exist in argument\
+		dictionary, \"$paramDict\""
+	}
+	lappend argList [dict get $paramDict $ParamName]
+    }
+    return $argList
+}
+
 # Queue an event to the current thread of control.
-# "instValue" is a singleton relation value instance reference.
-# "event" here is a single relation from ::raloo::mm::Event
-proc ::raloo::arch::queueEvent {instValue event argList} {
-    setupTOC tocTree tocQueue
+# "instRef" is a singleton relation value instance reference.
+proc ::raloo::arch::queueEvent {domName modelName instRef eventName params} {
+    setupTOC tocTree srcNode tocQueue
     # The front of the queue is the current event dispatch that is executing.
     # This invocation must come from executing a state transition for
     # the instance contained in that node of the TOC tree. Establish the
     # source of the event.
-    set srcNode [lindex $tocQueue 0]
-    set srcClass [relation extract [$tocTree get $srcNode event] ModelName]
-    set srcInst [$tocTree get $srcNode inst]
+    set srcValues [$tocTree get $srcNode event]
+    set srcClass [dict get $srcValues modelName]
+    set srcInst [dict get $srcValues inst]
 
-    relation assign $event
-    log::debug "queueEvent: $DomName:\
+    log::debug "queueEvent: $domName:\
 	$srcClass.[list [tuple get [relation tuple $srcInst]]] -\
-	$EventName [list $argList] ->\
-	$ModelName.[list [tuple get [relation tuple $instValue]]]"
+	$eventName [list $params] ->\
+	$modelName.[list [tuple get [relation tuple $instRef]]]"
 
     # Deal with self directed events. If an event is self directed, then
     # we insert it at the beginning of the list of child nodes. Otherwise,
-    # event are simply placed at the end. One more complication is the placing
+    # events are simply placed at the end. One more complication is the placing
     # the node at the proper location in the queue.
-    catch {relation is $srcInst == $instValue} sameInst
-    if {$srcClass eq $ModelName && [string is true -strict $sameInst]} {
-	set firstChild [lindex [$tocTree children $srcNode] 0]
+    catch {relation is $srcInst == $instRef} sameInst
+    if {$srcClass eq $modelName && [string is true -strict $sameInst]} {
 	set dstNode [$tocTree insert $srcNode 0]
-	$tocTree set root queue [linsert $tocQueue\
-	    [lsearch -exact $tocQueue $firstChild] $dstNode]
+	$tocTree set root queue [linsert $tocQueue 0 $dstNode]
 	log::debug "self directed event"
     } else {
 	set dstNode [$tocTree insert $srcNode end]
 	$tocTree lappend root queue $dstNode
-	log::debug "non-self directed event: $srcClass, $ModelName, $sameInst"
+	log::debug "non-self directed event: $srcClass, $modelName, $sameInst"
     }
-    $tocTree set $dstNode inst $instValue
-    $tocTree set $dstNode event $event
-    $tocTree set $dstNode params $argList
-    $tocTree set $dstNode type N
+    $tocTree set $dstNode event [dict create\
+	domName $domName\
+	modelName $modelName\
+	inst $instRef\
+	eventName $eventName\
+	params $params\
+	type N\
+    ]
 
     stepEngine
 }
 
-proc ::raloo::arch::queueCreationEvent {instValue event argList} {
-    setupTOC tocTree tocQueue
+proc ::raloo::arch::queueCreationEvent {domName modelName attrs eventName\
+					params} {
+    setupTOC tocTree srcNode tocQueue
     # The front of the queue is the current event dispatch that is executing.
     # This invocation must come from executing a state transition for
     # the instance contained in that node of the TOC tree. Establish the
     # source of the event.
-    set srcNode [lindex $tocQueue 0]
-    set srcClass [relation extract [$tocTree get $srcNode event] ModelName]
-    set srcInst [$tocTree get $srcNode inst]
+    set srcValues [$tocTree get $srcNode event]
+    set srcClass [dict get $srcValues modelName]
+    set srcInst [dict get $srcValues inst]
 
-    relation assign $event
-    log::debug "queueCreationEvent: $DomName:\
+    log::debug "queueCreationEvent: $domName:\
 	$srcClass.[list [tuple get [relation tuple $srcInst]]] -\
-	$EventName [list $argList] -> $ModelName.[list $instValue]"
+	$eventName [list $params] -> $modelName.[list $attrs]"
 
     set dstNode [$tocTree insert $srcNode end]
     $tocTree lappend root queue $dstNode
-    $tocTree set $dstNode inst $instValue
-    $tocTree set $dstNode event $event
-    $tocTree set $dstNode params $argList
-    $tocTree set $dstNode type C
+    $tocTree set $dstNode event [dict create\
+	domName $domName\
+	modelName $modelName\
+	inst $attrs\
+	eventName $eventName\
+	params $params\
+	type C\
+    ]
 
     stepEngine
 }
@@ -4095,100 +4113,116 @@ proc ::raloo::arch::queueCreationEvent {instValue event argList} {
 # The idle callbacks come here to cause the next event in the thread of
 # control to be dispatched.
 proc ::raloo::arch::dispatchEvent {} {
-    setupTOC tocTree tocQueue
-    set dstNode [lindex $tocQueue 0]
+    setupTOC tocTree dstNode tocQueue
+    set event [$tocTree get $dstNode event]
+    log::debug "dispatchEvent: $dstNode \"$event\""
+    set domName [dict get $event domName]
+    set modelName [dict get $event modelName]
     # Threads of control begin at the "root" node of the tree. Here there are
     # no events to deliver, but instead a script to execute to get things
     # started. Most important, the data transaction is begun here.
     if {$dstNode eq "root"} {
-	log::debug "beginning transaction"
+	log::info "begin TOC: $domName"
 	relvar transaction begin
 	# Execute the script associated with thread of control. This gets
 	# things going.
-	namespace inscope\
-	    [relation extract [$tocTree get $dstNode event] DomName]\
-	    [$tocTree get $dstNode script]\
-	    {*}[$tocTree get $dstNode params]
+	namespace inscope $domName\
+	    [dict get $event script] {*}[dict get $event params]
     } else {
 	set srcNode [$tocTree parent $dstNode]
 	# Check if we are dispatching a creation event. In that case, we
 	# must create the instance and set the current state to "@". After that
 	# it is an otherwise normal event dispatch.
-	set event [$tocTree get $dstNode event]
-	if {[$tocTree get $dstNode type] eq "C"} {
-	    relation assign $event
-	    set instValue [$tocTree get $dstNode inst]
-	    dict set instValue __CS__ @
+	if {[dict get $event type] eq "C"} {
+	    # For creation events the "inst" property is a dictionary of
+	    # attribute name / values for the new instance that is to be
+	    # created. We need to set the current state.
+	    set instValue [dict get $event inst]
 	    log::info "creation event:\
-		${DomName}::${ModelName}.[list $instValue]"
-	    set inst [idProject\
-		[relvar insert ${DomName}::${ModelName} $instValue]]
-	} else {
-	    set inst [$tocTree get $dstNode inst]
+		${domName}::${modelName}.[list $instValue]"
+	    dict set instValue __CS__ @
+	    dict set event inst [idProject\
+		[relvar insert ${domName}::${modelName} $instValue]]
 	}
-	deliverEvent $event $inst\
-	    [relation extract [$tocTree get $srcNode event] ModelName]\
-	    [$tocTree get $srcNode inst] [$tocTree get $dstNode params]
+	deliverEvent [$tocTree get [$tocTree parent $dstNode] event] $event
     }
 
     # Fetch the queue again. It could have been modified when the
     # event was delivered, e.g. another event could be generated.
     set tocQueue [$tocTree get root queue]
-    # Drop the front node on the queue. We have finished with it.
-    $tocTree set root queue [set tocQueue [lrange $tocQueue 1 end]]
     # Check for the end of the thread of control.
-    if {[llength $tocQueue] == 0} {
+    if {[llength $tocQueue] != 0} {
+	# Remove the node first node on the queue and make it the current node.
+	$tocTree set root currNode [lindex $tocQueue 0]
+	$tocTree set root queue [lrange $tocQueue 1 end]
+    } else {
 	# Clean up the tree.
 	# N.B. HERE we could serialize the tree and/or hand it off to
 	# a monitor callback.
 	$tocTree destroy
 	variable controlTree
 	set controlTree [lrange $controlTree 1 end]
-	# All instance reference sets get deleted.
-	foreach instref [info class instances ::raloo::RelvarRef] {
-	    $instref destroy
-	}
-	foreach instref [info class instances ::raloo::ActiveRelvarRef] {
-	    $instref destroy
-	}
-	log::debug "ending transaction"
+	cleanupRefs
 	relvar transaction end
+	log::info "end TOC: $domName"
     }
 }
 
-# Deliver an event. Here is where we determine if this is a monomorphic
+# Deliver an event.
+# "eventValue" is a dictionary containing all the event dispatch information.
+# Here is where we determine if this is a monomorphic
 # event or a polymorphic one.
-proc ::raloo::arch::deliverEvent {event refValue source sourceValue argList} {
+proc ::raloo::arch::deliverEvent {srcEvent dstEvent} {
     # Determine if we are delivering a monomorphic event or a polymorphic event
-    set effEvent [relation semijoin $event $::raloo::mm::EffectiveEvent]
+    set domName [dict get $dstEvent domName]
+    set modelName [dict get $dstEvent modelName]
+    set eventName [dict get $dstEvent eventName]
+    set effEvent [relation choose $::raloo::mm::EffectiveEvent\
+	DomName $domName\
+	ModelName $modelName\
+	EventName $eventName\
+    ]
     if {[relation isnotempty $effEvent]} {
-	deliverEffEvent $effEvent $argList $refValue $source $sourceValue
+	deliverEffEvent $srcEvent $dstEvent
 	return
     }
-    set defEvent [relation semijoin $event $::raloo::mm::DeferredEvent]
+
+    set defEvent [relation choose $::raloo::mm::DeferredEvent\
+	DomName $domName\
+	ModelName $modelName\
+	EventName $eventName\
+    ]
     if {[relation isnotempty $defEvent]} {
-	deliverDefEvent $defEvent $argList $refValue $source $sourceValue
+	deliverDefEvent $srcEvent $dstEvent
 	return
     }
 
     log::error "cannot find EffectiveEvent or DeferredEvent associated\
-	with:\n[relformat $event Event]"
+	with, ${domName}::${modelName} $eventName"
 }
 
 # Effective events are monomorphic and cause transitions.
-proc ::raloo::arch::deliverEffEvent {event argList refValue source\
-				     sourceValue} {
-    relation assign $event
-    # Here "refValue" is an instance reference. Get the singleton relation
+proc ::raloo::arch::deliverEffEvent {srcEvent dstEvent} {
+    set domName [dict get $dstEvent domName]
+    set dstModel [dict get $dstEvent modelName]
+    set eventName [dict get $dstEvent eventName]
+    set srcModel [dict get $srcEvent modelName]
+    set srcInst [dict get $srcEvent inst]
+    # Here "inst" is an instance reference. Get the singleton relation
     # value to which it refers from the relvar.
-    set relvarName ${DomName}::${ModelName}
-    set instValue [relation semijoin $refValue [relvar set $relvarName]]
+    set dstRef [dict get $dstEvent inst]
+    set relvarName ${domName}::${dstModel}
+    set instValue [relation choose [relvar set $relvarName]\
+	    {*}[lindex [relation body $dstRef] 0]]
     # We need the current state to compute the transition.
     set cs [relation extract $instValue __CS__]
     # Find the transition and the new state to which we are headed.
     set trans [relation choose $::raloo::mm::TransitionPlace\
-	DomName $DomName ModelName $ModelName EventName $EventName\
-	StateName $cs]
+	DomName $domName\
+	ModelName $dstModel\
+	EventName $eventName\
+	StateName $cs\
+    ]
     if {[relation isnotempty $trans]} {
 	# Determine if this transition goes to a new state or is a
 	# non-state transition.
@@ -4196,9 +4230,10 @@ proc ::raloo::arch::deliverEffEvent {event argList refValue source\
 	if {[relation isnotempty $news]} {
 	    # Transition to a new state.
 	    set newStateName [relation extract $news NewState]
+	    set params [dict get $dstEvent params]
 	    log::info "transition:\
-		[formatEvent $source $sourceValue $relvarName $refValue]:\
-		$cs - $EventName [list $argList] -> $newStateName"
+		[formatEvent $domName $srcModel $srcInst $dstModel $dstRef]:\
+		$cs - $eventName [list $params] -> $newStateName"
 	    # This is where it all happens! This code snippet comes from DKF
 	    # and shows how "namespace inscope" can be used to invoke an
 	    # unexported method for an object. A bit clever perhaps, but it
@@ -4207,15 +4242,16 @@ proc ::raloo::arch::deliverEffEvent {event argList refValue source\
 	    set inst [$relvarName new]
 	    $inst set $instValue
 	    if {[catch {namespace inscope $inst [list my __$newStateName]\
-		    {*}$argList} result options]} {
+		    {*}$params} result options]} {
 		log::error $result
+	    } else {
+		# Update the current state to be the new state
+		relvar updateone $relvarName tup\
+			[lindex [relation body $dstRef] 0] {
+		    tuple update tup __CS__ $newStateName
+		}
 	    }
 	    $inst destroy
-	    # Update the current state to be the new state
-	    relvar updateone $relvarName tup\
-		    [lindex [relation body $refValue] 0] {
-		tuple update tup __CS__ $newStateName
-	    }
 	    return -options $options
 	} else {
 	    # A non-state transition. This is either a "can't happen" or an
@@ -4224,18 +4260,20 @@ proc ::raloo::arch::deliverEffEvent {event argList refValue source\
 	    if {[relation isempty $nons]} {
 		error "Panic: cannot find subtype of TransitionPlace"
 	    }
-	    deliverNonStateTrans $cs [relation extract $nons TransRule]\
-		$source $sourceValue $relvarName $refValue $EventName $argList
+	    deliverNonStateTrans $domName $srcModel $srcInst $dstModel\
+		$dstRef $cs [relation extract $nons TransRule]\
+		$eventName $params
 	}
     } else {
 	# For unspecified transitions, we use the default recorded in the
 	# StateModel. Default transition are always non-state transitions (see
 	# R35 of metamodel).  Unspecified creation transitions are always
 	# deemed a "can't happen".
-	deliverNonStateTrans $cs [expr {$cs eq "@" ? "CH" :\
+	set defTrans [expr {$cs eq "@" ? "CH" :\
 	    [relation extract [relation choose $::raloo::mm::StateModel\
-		DomName $DomName ModelName $ModelName] DefaultTrans]}]\
-	    $source $sourceValue $relvarName $refValue $EventName $argList
+		DomName $domName ModelName $dstModel] DefaultTrans]}]
+	deliverNonStateTrans $domName $srcModel $srcInst $dstModel\
+	    $dstRef $cs $defTrans $eventName $params
     }
 }
 
@@ -4244,58 +4282,71 @@ proc ::raloo::arch::deliverEffEvent {event argList refValue source\
 # or they have been inherited down the hierarchy because they were not
 # consumed in the supertype and this subtype acts as a supertype in another
 # generalization (i.e. a multi-level generalization hierarchy).
-proc ::raloo::arch::deliverDefEvent {event argList refValue source\
-				     sourceValue} {
-    # What domain are we in?
-    relation assign $event
+proc ::raloo::arch::deliverDefEvent {srcEvent dstEvent} {
+    set domName [dict get $dstEvent domName]
+    set modelName [dict get $dstEvent modelName]
+    set eventName [dict get $dstEvent eventName]
+    set srcModel [dict get $srcEvent modelName]
+    set srcInst [dict get $srcEvent inst]
     # Find the tuple associated with the instance reference. It is important
     # when attempting to find the associated subtype to use the full relation
     # value, since there may be multiple identifiers and we can be sure
     # which ones are used to implement the generalization relationships.
-    set relvarName ${DomName}::${ModelName}
-    set superValue [relation semijoin $refValue [relvar set $relvarName]]
+    set relvarName ${domName}::${modelName}
+    set instRef [dict get $dstEvent inst]
+    set params [dict get $dstEvent params]
+    set superValue [relation semijoin $instRef [relvar set $relvarName]]
     # Find the super type roles. There can be many since a given supertype
     # may be the supertype for multiple generalizations.
-    set superRoles [relation semijoin $event $::raloo::mm::DeferralPath\
-	$::raloo::mm::SupertypeRole]
+    set superRoles [relation restrictwith $::raloo::mm::DeferralPath {
+	$DomName eq $domName && $ModelName eq $modelName &&\
+	$EventName eq $eventName}]
     # For each generalization hierarchy, find the set of subtypes.
     # It is in these subtypes that we must find the related instance.
     relation foreach superRole $superRoles {
-	set superSrc ${DomName}::[relation extract $superRole ClassName]
+	set superSrc ${domName}::[relation extract $superRole ModelName]
 	set subRoles [relation semijoin $superRole $::raloo::mm::GenRel\
 	    $::raloo::mm::SubtypeRole]
 	# Loop through the subtypes finding the attributes that make up the
 	# supertype to subtype reference -- subtypes are the referring class.
 	# We will construct a semijoin from the supertype to the subtype, i.e.
 	# from the referred to class to the referring class.
+	set dispatched 0
 	relation foreach subRole $subRoles {
-	    set subDst ${DomName}::[relation extract $subRole ClassName]
+	    set subDst ${domName}::[relation extract $subRole ClassName]
 	    set joinAttrs [ralutil::pipe {
 		relation semijoin $subRole $::raloo::mm::AttributeRef |
 		relation dict ~ RefToAttrName RefngAttrName
 	    }]
 	    # Check if this subtype is the one related to the supertype.
 	    set instValue [ralutil::pipe {
-		relvar set ${DomName}::[relation extract $subRole ClassName] |
+		relvar set ${domName}::[relation extract $subRole ClassName] |
 		relation semijoin $superValue ~ -using $joinAttrs
 	    }]
 	    if {[relation isnotempty $instValue]} {
 		# Okay, found the related subtype!
+		# We modify the "dstEvent" in place and then redispatch
+		# it when we find out where it is going.
+		dict set dstEvent inst [idProject $instValue]
+
 		log::info "polymorphic dispatch:\
 		    $superSrc.[list [tuple get [relation tuple $superValue]]]\
 		    ==> $subDst.[list [tuple get [relation tuple $instValue]]]:\
-		    $EventName [list $argList]"
+		    $eventName [list $params]"
 		# Find the non-local event that this subtype receives
 		set nlevt [relation semijoin $subRole\
 		    $::raloo::mm::NonLocalEvent]
 		# If the non-local event is a mapped event, then it is
 		# consumed at this level.
-		set inst [::raloo::RelvarRef idProjection $instValue]
 		set effEvent [relation semijoin $nlevt\
 		    $::raloo::mm::MappedEvent $::raloo::mm::EffectiveEvent]
 		if {[relation isnotempty $effEvent]} {
-		    deliverEffEvent $effEvent $argList $inst $source\
-			$sourceValue
+		    # modify the reflect the new model and event type
+		    dict set dstEvent modelName\
+			[relation extract $effEvent ModelName]
+		    dict set dstEvent type N
+		    deliverEffEvent $srcEvent $dstEvent
+		    set dispatched 1
 		    break
 		}
 		# Otherwise if the non-local event is an inherited event,
@@ -4303,14 +4354,28 @@ proc ::raloo::arch::deliverDefEvent {event argList refValue source\
 		set defEvent [relation semijoin $nlevt\
 		    $::raloo::mm::InheritedEvent $::raloo::mm::DeferredEvent]
 		if {[relation isnotempty $defEvent]} {
-		    deliverDefEvent $defEvent $argList $inst $source\
-			$sourceValue
+		    dict set dstEvent modelName\
+			[relation extract $defEvent ModelName]
+		    deliverDefEvent $srcEvent $dstEvent
+		    set dispatched 1
 		    break
 		}
-
+		# If we reach here, we have a tear in the space-time continuum.
+		# Really, it implies that somehow we created a meta-model
+		# population that was referentially inconsistent.
 		error "Panic: cannot find subtype of\
 		    NonLocalEvent:\n[relformat $nlevt]"
 	    }
+	}
+	# It is possible to get here without actually dispatching the event
+	# if we fail to find a related subtype in the above loop. This amount
+	# to an "event in flight" error, i.e. an event was sent to the
+	# supertype at some point in the thread of control, but the
+	# corresponding subtype was deleted before the event was taken off
+	# the queue to be delivered. This is deemed an analysis error,so
+	# we whine about it here.
+	if {!$dispatched} {
+	    error "failed to find subtype related to:\n[relformat $superRole]"
 	}
     }
 }
@@ -4318,40 +4383,95 @@ proc ::raloo::arch::deliverDefEvent {event argList refValue source\
 # Non state transitions are just special rules to avoid adding states
 # to the state model for common circumstances. In our case, IG ==> ignore
 # and CH ==> can't happen.
-proc ::raloo::arch::deliverNonStateTrans {currstate transRule src srcValue\
-    dst dstValue eventName argList} {
+proc ::raloo::arch::deliverNonStateTrans {domName srcModel srcRef dstModel\
+			      dstRef currstate transRule eventName params} {
+    set msg "transition:\
+	[formatEvent $domName $srcModel $srcRef $dstModel $dstRef]:\
+	$currstate - $eventName [list $params] -> $transRule"
     if {$transRule eq "IG"} {
-	log::info "transition:\
-	    [formatEvent $src $srcValue $dst $dstValue]:\
-	    $currstate - $eventName [list $argList] -> IG"
-	return
+	log::info $msg
     } elseif {$transRule eq "CH"} {
-	set errText "transition:\
-	    [formatEvent $src $srcValue $dst $dstValue]:\
-	    $currstate - $eventName [list $argList] -> CH"
-	log::error $errText
-	error $errText
+	log::error $msg
+	error $msg
     } else {
 	error "Panic: unknown transition rule, \"$transRule\""
     }
 }
 
-proc ::raloo::arch::queueDelayed {time event argList refValue source\
-				  sourceValue} {
+################################################################################
+#
+# Delayed event architecture
+#
+# There are several important rules about delayed events.
+#
+# 1. There can only be one instance of a given delayed event outstanding
+#    between any source and destination instances. We interpret any attempt
+#    to create a second one as the intent to cancel the existing one and
+#    create a new one with the new time. You could interpret the attempt as
+#    an error, but that would just cause a lot of needless calls to
+#    cancel events.
+# 2. When a delayed event expires it starts a new Thread of Control.
+# 3. When cancelling a delayed event, if we don't find it in the delayed
+#    event queue, then we will search the thread of control queue in an
+#    attempt to find it there. This solves the "race" condition associated
+#    with cancelling a delayed event that might have expired. It makes the
+#    state machines much easier if they can be sure that after cancelling
+#    a delayed event it will not be delivered.
+#
+################################################################################
+
+namespace eval ::raloo::arch {
+    # Number of milliseconds that constitutes one tick for delayed events.
+    variable delayTick 10
+    # The delayed event "queue". Delayed events are held in a list of
+    # dictionaries. The keys to the dictionary are:
+    # DomName string
+    # EventName string
+    # SrcModel string
+    # SrcInst Relation
+    # DstModel string
+    # DstInst Relation
+    # Params list
+    # Time int
+    variable DelayQueue [list]
+}
+
+proc ::raloo::arch::queueDelayedEvent {time domName srcModel srcRef\
+				       dstModel dstRef eventName params} {
+    variable DelayQueue
     # See if we are already expired
     if {$time <= 0} {
-	queueEvent $refValue $event $argList
+	newTOC $domName $srcModel $srcRef ::raloo::arch::queueEvent [list\
+		$domName $dstModel $dstRef $eventName $params]
 	return
     }
 
-    variable delayQueue
-    lappend delayQueue [list $time $event $refValue $source $sourceValue\
-	    $argList]
-    relation assign $event
+    # Check if the event already exists
+    set evtIndex [findDelayedEvent $domName $srcModel $srcRef $dstModel\
+	    $dstRef $eventName]
+    if {$evtIndex >= 0} {
+	# Just update to the new time and parameters.
+	set de [lindex $DelayQueue $evtIndex]
+	dict set de Time $time
+	dict set de Params $params
+	lset DelayQueue $evtIndex $de
+    } else {
+	# Otherwise we insert the new delayed event.
+	lappend DelayQueue [dict create\
+	    DomName $domName\
+	    EventName $eventName\
+	    SrcModel $srcModel\
+	    SrcInst $srcRef\
+	    DstModel $dstModel\
+	    DstInst $dstRef\
+	    Time $time\
+	    Params $params\
+	]
+    }
     log::info "delayed queued($time):\
-	[formatEvent $source $sourceValue ${DomName}::${ModelName} $refValue]:\
-	$EventName [list $argList]"
-    if {[llength $delayQueue] == 1} {
+	[formatEvent $domName $srcModel $srcRef $dstModel $dstRef]:\
+	$eventName [list $params]"
+    if {[llength $DelayQueue] == 1} {
 	# Only start a timer to tick down the delay queue when the
 	# first entry is inserted.
 	variable delayTick
@@ -4359,47 +4479,128 @@ proc ::raloo::arch::queueDelayed {time event argList refValue source\
     }
 }
 
-proc ::raloo::arch::cancelDelayed {event refValue source sourceValue} {
-    variable delayQueue
-    for {set i 0} {$i < [llength $delayQueue]} {incr i} {
-	lassign [lindex $delayQueue $i] qtime qevent qref qsrc qsrcValue
-	if {[relation is $qevent == $event] &&\
-		[relation is $qref == $refValue] &&\
-		$qsrc == $source &&
-		[relation is $qsrcValue == $sourceValue]} {
-	    set delayQueue [lreplace $delayQueue $i $i]
-	    break
+# Returns the index into DelayQueue where the event is found, or -1 if not
+# if the event is not found.
+proc ::raloo::arch::findDelayedEvent {domName srcModel srcRef dstModel dstRef\
+				      eventName} {
+    variable DelayQueue
+    set index 0
+    foreach de $DelayQueue {
+	catch {[relation is [dict get $de srcRef] == $srcRef} sameSrc
+	catch {[relation is [dict get $de dstRef] == $dstRef} sameDst
+	if {[string is true -strict $sameSrc] &&\
+	    [string is true -strict $sameDst] &&\
+	    [dict get $de EventName] eq $eventName &&\
+	    [dict get $de SrcModel eq $srcModel &&\
+	    [dict get $de DstModel] eq $dstModel &&\
+	    [dict get $de DomName] eq $domName} {
+
+	    return $index
+	}
+	incr index
+    }
+    return -1
+}
+
+# Cancel a delayed event
+proc ::raloo::arch::cancelDelayedEvent {domName srcModel srcRef dstModel dstRef\
+				      eventName} {
+    set evtIndex [findDelayedEvent $domName $srcModel $srcRef $dstModel\
+	    $dstRef $eventName]
+    if {$evtIndex >= 0} {
+	variable DelayQueue
+	set DelayQueue [lreplace $DelayQueue $evtIndex $evtIndex]
+	log::info "delayed cancelled:\
+	    [formatEvent $domName $srcModel $srcRef dstModel $dstRef]:\
+	    $eventName"
+    } else {
+	# If we did not find the event in the delay queue, then we search for
+	# the thread of control that was started when the delayed event
+	# expired. This is done to overcome the annoyance of the race condition
+	# between the event expiring and it being actually consumed by a state.
+	# This architecture guarantees that after a cancel, the event will not
+	# be delivered.  Three cases can come out of this:
+	#
+	# 1. The matching ToC is the currently executing one. In that case
+	#    it is truly too late.
+	# 2. We find a match that is not the current ToC and throw it away.
+	# 3. We don't find anything. This amounts to a big noop, where the
+	#    code has cancelled the event that it had never created in
+	#    the first place.
+	#
+	# Given #1 above we skip the first entry in our search.
+	# We are looking for that tree whose root node matches the source
+	# information and whose script is "::raloo::arch::queueEvent".
+	variable controlTree
+	set tocIndex 1
+	foreach toc [lrange $controlTree 1 end] {
+	    set event [$toc get root event]
+	    catch {[relation is [dict get $event inst] == $srcRef} sameRef
+	    if {[dict get $event domName] eq $domName &&\
+		[dict get $event modelName eq $srcModel] &&\
+		[string is true -strict $sameRef] &&\
+		[dict get $event script] eq "::raloo::arch::queueEvent"} {
+		$toc destroy
+		set controlTree [lreplace $controlTree $tocIndex $tocIndex]
+		log::info "delayed cancelled ToC:\
+		    [formatEvent $domName $srcModel $srcRef dstModel $dstRef]:\
+		    $eventName"
+		break
+	    }
+	    incr tocIndex
 	}
     }
+}
+
+# Query the time remaining for a delayed event.
+proc ::raloo::arch::remainingDelayed {domName srcModel srcRef dstModel dstRef\
+				      eventName} {
+    set evtIndex [findDelayedEvent $domName $srcModel $srcRef $dstModel\
+	    $dstRef $eventName]
+    variable DelayQueue
+    return [expr {$evtIndex == -1 ?\
+	    0 : [dict get [lindex $DelayQueue $evtIndex] Time]}]
 }
 
 proc ::raloo::arch::serviceDelayedQueue {} {
     variable delayTick
     set tmr [after $delayTick ::raloo::arch::serviceDelayedQueue]
 
-    variable delayQueue
-    for {set i 0} {$i < [llength $delayQueue]} {} {
-	set time [expr {[lindex $delayQueue $i 0] - $delayTick}]
+    variable DelayQueue
+    for {set index 0} {$index < [llength $DelayQueue]} {} {
+	set event [lindex $DelayQueue $index]
+	set time [expr {[dict get $event Time] - $delayTick}]
 	if {$time <= 0} {
-	    set event [lrange [lindex $delayQueue $i] 1 end]
-	    # This is really ugly, but ... its a log message
-	    relation assign [lindex $event 0]
-	    log::info "delayed dispatch($time):\
-		[formatEvent [lindex $event 2] [lindex $event 3]\
-		${DomName}::${ModelName} [lindex $event 1]]:\
-		$EventName [list [lindex $event 4]]"
-	    newTOC $DomName [lindex $event 2] [lindex $event 3]\
-		[list ::raloo::arch::queueEvent [lindex $event 1]\
-		[lindex $event 0] [lindex $event 4]] {}
-	    set delayQueue [lreplace $delayQueue $i $i]
+	    set DelayQueue [lreplace $DelayQueue $index $index]
+	    newTOC\
+		[dict get $event DomName]\
+		[dict get $event SrcModel]\
+		[dict get $event SrcInst]\
+		::raloo::arch::queueEvent\
+		[list\
+		    [dict get $event DomName]\
+		    [dict get $event DstModel]\
+		    [dict get $event DstInst]\
+		    [dict get $event EventName]\
+		    [dict get $event Params]\
+		]
+	    log::info "delayed queued($time):\
+		[formatEvent\
+		    [dict get $event DomName]\
+		    [dict get $event SrcModel]\
+		    [dict get $event SrcInst]\
+		    [dict get $event DstModel]\
+		    [dict get $event DstInst]]:\
+		[dict get $event EventName] [list [dict get $event Params]]"
 	} else {
-	    lset delayQueue $i 0 $time
-	    incr i
+	    dict set event Time $time
+	    lset DelayQueue $index $event
+	    incr index
 	}
     }
 
-    # Cancel the timer if there are no items left on the queue.
-    if {[llength $delayQueue] <= 0} {
+    # Cancel the timer if there are no events to be delayed.
+    if {[llength $DelayQueue] == 0} {
 	after cancel $tmr
     }
 }
@@ -4415,8 +4616,9 @@ proc ::raloo::arch::stepEngine {} {
     }
 }
 
-proc ::raloo::arch::setupTOC {treeRef queueRef} {
+proc ::raloo::arch::setupTOC {treeRef nodeRef queueRef} {
     upvar 1 $treeRef tocTree
+    upvar 1 $nodeRef tocNode
     upvar 1 $queueRef tocQueue
     variable controlTree
     if {[llength $controlTree] eq 0} {
@@ -4424,9 +4626,23 @@ proc ::raloo::arch::setupTOC {treeRef queueRef} {
 	    a thread of control"
     }
     set tocTree [lindex $controlTree 0]
+    set tocNode [$tocTree get root currNode]
     set tocQueue [$tocTree get root queue]
-    if {[llength $tocQueue] == 0} {
-	error "Panic: queueing an event with an empty node queue"
+}
+
+proc ::raloo::arch::cleanupRefs {} {
+    # All instance reference sets get deleted.
+    foreach instref [info class instances ::raloo::SingleAssignerRef] {
+	$instref destroy
+    }
+    foreach instref [info class instances ::raloo::MultipleAssignerRef] {
+	$instref destroy
+    }
+    foreach instref [info class instances ::raloo::RelvarRef] {
+	$instref destroy
+    }
+    foreach instref [info class instances ::raloo::ActiveRelvarRef] {
+	$instref destroy
     }
 }
 
@@ -4442,6 +4658,7 @@ proc ::raloo::arch::idValues {relValue} {
     lindex [relation body [idProject $relValue]] 0
 }
 
-proc ::raloo::arch::formatEvent {src srcRef dst dstRef} {
-    return "$src.[list [idValues $srcRef]] ==> $dst.[list [idValues $dstRef]]"
+proc ::raloo::arch::formatEvent {domName src srcRef dst dstRef} {
+    return "$domName:\
+	$src.[list [idValues $srcRef]] ==> $dst.[list [idValues $dstRef]]"
 }

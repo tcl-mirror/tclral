@@ -47,8 +47,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: raloo.test,v $
-# $Revision: 1.12 $
-# $Date: 2008/03/26 15:52:21 $
+# $Revision: 1.13 $
+# $Date: 2008/03/30 02:02:30 $
 #  *--
 
 package require tcltest 2.2
@@ -717,7 +717,8 @@ tuple {DogName Fred} is not referenced by any tuple
     } -cleanup {
 	C destroy
     } -body {
-	set r [C::Dog new Name Rover Breed Retriever Age 5]
+	C::Dog insert Name Rover Breed Retriever Age 5
+	set r [C::Dog new Name Rover]
 	$r cardinality
     } -result {1}
 
@@ -735,7 +736,8 @@ tuple {DogName Fred} is not referenced by any tuple
     } -cleanup {
 	C destroy
     } -body {
-	set r [C::Dog new Name Rover Id 3]
+	C::Dog insert Name Rover Id 3
+	set r [C::Dog new Name Rover]
 	$r readAttr Name
     } -result {Rover}
 
@@ -754,7 +756,8 @@ tuple {DogName Fred} is not referenced by any tuple
     } -cleanup {
 	C destroy
     } -body {
-	set r [C::Dog new Name Rover Breed Poodle Id 3]
+	C::Dog insert Name Rover Breed Poodle Id 3
+	set r [C::Dog new Name Rover Breed Poodle]
 	$r readAttr Name
     } -result {Rover}
 
@@ -772,7 +775,8 @@ tuple {DogName Fred} is not referenced by any tuple
     } -cleanup {
 	C destroy
     } -body {
-	set r [C::Foo new Id {} Breed Poodle]
+	C::Foo insert Id {} Breed Poodle
+	set r [C::Foo new Id 1]
 	$r readAttr Id
     } -result {1}
 
@@ -811,7 +815,8 @@ tuple {DogName Fred} is not referenced by any tuple
     } -cleanup {
 	C destroy
     } -body {
-	set r [C::Dog new Name Rover Breed Retriever Age 5]
+	C::Dog insert Name Rover Breed Retriever Age 5
+	set r [C::Dog new Name Rover]
 	$r readAttr Breed
     } -result {Retriever}
 
@@ -830,7 +835,8 @@ tuple {DogName Fred} is not referenced by any tuple
     } -cleanup {
 	C destroy
     } -body {
-	set r [C::Dog new Name Rover Breed Retriever Age 5]
+	C::Dog insert Name Rover Breed Retriever Age 5
+	set r [C::Dog new Name Rover]
 	$r writeAttr Age 10
 	$r readAttr Age
     } -result {10}
@@ -873,6 +879,7 @@ tuple {DogName Fred} is not referenced by any tuple
     } -cleanup {
 	A destroy
     } -body {
+	A::Foo insert Id 1
 	set r [A::Foo new Id 1]
 	$r echo bar
     } -result {bar}
@@ -894,13 +901,16 @@ tuple {DogName Fred} is not referenced by any tuple
 	    }
 	    Relationship R1 Dog *-->1 Owner
 	}
-	A::Owner insert OwnerName John
+	A transaction {
+	    Owner insert OwnerName John
+	    Dog insert DogName Fred OwnerName John
+	}
     } -cleanup {
 	$owner destroy
 	$dog destroy
 	A destroy
     } -body {
-	set dog [A::Dog new DogName Fred OwnerName John]
+	set dog [A::Dog new DogName Fred]
 	set owner [$dog selectRelated R1]
 	$owner readAttr OwnerName
     } -result {John}
@@ -922,12 +932,15 @@ tuple {DogName Fred} is not referenced by any tuple
 	    }
 	    Relationship R1 Dog *-->1 Owner
 	}
-	A::Owner insert OwnerName John
+	A transaction {
+	    Owner insert OwnerName John
+	    Dog insert DogName Fred OwnerName John
+	}
     } -cleanup {
 	$dog destroy
 	A destroy
     } -body {
-	set dog [A::Dog new DogName Fred OwnerName John]
+	set dog [A::Dog new DogName Fred]
 	set owner [$dog selectRelated R1.Dog]
     } -result {traversing R1 ends at, "Owner", and not at "Dog"}\
     -returnCodes error
@@ -949,12 +962,15 @@ tuple {DogName Fred} is not referenced by any tuple
 	    }
 	    Relationship R1 Dog *-->1 Owner
 	}
-	A::Owner insert OwnerName John
+	A transaction {
+	    Owner insert OwnerName John
+	    Dog insert DogName Fred OwnerName John
+	}
     } -cleanup {
 	$dog destroy
 	A destroy
     } -body {
-	set dog [A::Dog new DogName Fred OwnerName John]
+	set dog [A::Dog new DogName Fred]
 	set owner [$dog selectRelated ~R1]
     } -result {traversing ~R1 begins at, "Owner", and not at "Dog"}\
     -returnCodes error
@@ -984,7 +1000,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	$dog destroy
 	A destroy
     } -body {
-	set owner [A::Owner selectOne OwnerName John]
+	set owner [A::Owner new OwnerName John]
 	set dog [$owner selectRelated ~R1]
 	$dog readAttr DogName
     } -result {Fred}
@@ -1387,8 +1403,11 @@ tuple {DogName Fred} is not referenced by any tuple
 	A destroy
     } -body {
 	A transaction {
+	    Owner insert OwnerName John
+	    Dog insert DogName Fred OwnerName {}
+
 	    set owner [Owner new OwnerName John]
-	    set dog [Dog new DogName Fred OwnerName {}]
+	    set dog [Dog new DogName Fred]
 	    $dog relate R1 $owner
 	    $dog readAttr OwnerName
 	}
@@ -1415,8 +1434,11 @@ tuple {DogName Fred} is not referenced by any tuple
 	A destroy
     } -body {
 	A transaction {
+	    Owner insert OwnerName John
+	    Dog insert DogName Fred OwnerName {}
+
 	    set owner [Owner new OwnerName John]
-	    set dog [Dog new DogName Fred OwnerName {}]
+	    set dog [Dog new DogName Fred]
 	    $owner relate ~R1 $dog
 	    $dog readAttr OwnerName
 	}
@@ -1438,12 +1460,16 @@ tuple {DogName Fred} is not referenced by any tuple
 		}
 	    }
 	}
+	A transaction {
+	    Dog insert DogName Fred PrevDog {}
+	    Dog insert DogName Fido PrevDog {}
+	}
     } -cleanup {
 	A destroy
     } -body {
 	A transaction {
-	    set leaddog [Dog new DogName Fred PrevDog {}]
-	    set nextdog [Dog new DogName Fido PrevDog {}]
+	    set leaddog [Dog new DogName Fred]
+	    set nextdog [Dog new DogName Fido]
 	    $nextdog relate R1 $leaddog
 	    $nextdog readAttr PrevDog
 	}
@@ -1465,12 +1491,16 @@ tuple {DogName Fred} is not referenced by any tuple
 		}
 	    }
 	}
+	A transaction {
+	    Dog insert DogName Fred PrevDog {}
+	    Dog insert DogName Fido PrevDog {}
+	}
     } -cleanup {
 	A destroy
     } -body {
 	A transaction {
-	    set leaddog [Dog new DogName Fred PrevDog {}]
-	    set nextdog [Dog new DogName Fido PrevDog {}]
+	    set leaddog [Dog new DogName Fred]
+	    set nextdog [Dog new DogName Fido]
 	    $leaddog relate ~R1 $nextdog
 	    $nextdog readAttr PrevDog
 	}
@@ -1497,8 +1527,11 @@ tuple {DogName Fred} is not referenced by any tuple
 	A destroy
     } -body {
 	A transaction {
-	    set fred [Dog new DogName Fred OwnerName {}]
-	    set fido [Dog new DogName Fido OwnerName {}]
+	    Dog insert DogName Fred OwnerName {}
+	    Dog insert DogName Fido OwnerName {}
+
+	    set fred [Dog new DogName Fred]
+	    set fido [Dog new DogName Fido]
 	    $fred relate R1 $fido
 	}
     } -result {"Dog" and "Dog" do not participate in relationship\
@@ -1533,6 +1566,9 @@ tuple {DogName Fred} is not referenced by any tuple
 	A destroy
     } -body {
 	A transaction {
+	    Dog insert Name Fred
+	    SmallDog insert Name {}
+
 	    set dog [Dog new Name Fred]
 	    set sdog [SmallDog new Name {}]
 	    $sdog relate R1 $dog
@@ -1568,6 +1604,9 @@ tuple {DogName Fred} is not referenced by any tuple
 	A destroy
     } -body {
 	A transaction {
+	    Dog insert Name Fred
+	    SmallDog insert Name {}
+
 	    set dog [Dog new Name Fred]
 	    set sdog [SmallDog new Name {}]
 	    $dog relate R1 $sdog
@@ -1583,6 +1622,9 @@ tuple {DogName Fred} is not referenced by any tuple
 	cleanupDogOwnerOwnership
     } -body {
 	A transaction {
+	    Dog insert DogName Fido
+	    Owner insert OwnerName John
+
 	    set dog [Dog new DogName Fido]
 	    set owner [Owner new OwnerName John]
 	    set ownership [$owner relateAssoc R1 $dog]
@@ -1598,6 +1640,9 @@ tuple {DogName Fred} is not referenced by any tuple
 	cleanupDogOwnerOwnership
     } -body {
 	A transaction {
+	    Dog insert DogName Fido
+	    Owner insert OwnerName John
+
 	    set dog [Dog new DogName Fido]
 	    set owner [Owner new OwnerName John]
 	    set ownership [$dog relateAssoc R1 $owner]
@@ -1615,8 +1660,8 @@ tuple {DogName Fred} is not referenced by any tuple
 	$plays destroy
 	cleanupDogPlays
     } -body {
-	set dog1 [A::Dog selectOne DogName Alice]
-	set dog2 [A::Dog selectOne DogName Fido]
+	set dog1 [A::Dog new DogName Alice]
+	set dog2 [A::Dog new DogName Fido]
 	set plays [$dog1 relateAssoc R1 $dog2]
 	$plays readAttr PlayerName
     } -result {Fido}
@@ -1631,8 +1676,8 @@ tuple {DogName Fred} is not referenced by any tuple
 	$plays destroy
 	cleanupDogPlays
     } -body {
-	set dog1 [A::Dog selectOne DogName Alice]
-	set dog2 [A::Dog selectOne DogName Fido]
+	set dog1 [A::Dog new DogName Alice]
+	set dog2 [A::Dog new DogName Fido]
 	set plays [$dog2 relateAssoc ~R1 $dog1]
 	$plays readAttr PlayerName
     } -result {Fido}
@@ -1654,12 +1699,16 @@ tuple {DogName Fred} is not referenced by any tuple
 	    }
 	    Relationship R1 Dog *-->? Owner
 	}
+	A transaction {
+	    Owner insert OwnerName John
+	    Dog insert DogName Fido OwnerName John
+	}
     } -cleanup {
 	A destroy
     } -body {
 	A transaction {
 	    set owner [Owner new OwnerName John]
-	    set dog [Dog new DogName Fido OwnerName John]
+	    set dog [Dog new DogName Fido]
 	    $dog unrelate R1 $owner
 	    $dog readAttr OwnerName
 	}
@@ -1691,8 +1740,8 @@ tuple {DogName Fred} is not referenced by any tuple
 	$fido destroy
 	A destroy
     } -body {
-	set alice [A::Dog selectOne DogName Alice]
-	set fido [A::Dog selectOne DogName Fido]
+	set alice [A::Dog new DogName Alice]
+	set fido [A::Dog new DogName Fido]
 	$alice unrelate R1 $fido
 	$alice readAttr PrevDog
 	list [$alice readAttr PrevDog] [$fido readAttr PrevDog]
@@ -1724,8 +1773,8 @@ tuple {DogName Fred} is not referenced by any tuple
 	$fido destroy
 	A destroy
     } -body {
-	set alice [A::Dog selectOne DogName Alice]
-	set fido [A::Dog selectOne DogName Fido]
+	set alice [A::Dog new DogName Alice]
+	set fido [A::Dog new DogName Fido]
 	$alice unrelate ~R1 $fido
 	list [$alice readAttr PrevDog] [$fido readAttr PrevDog]
     } -result {Fred {}}
@@ -1760,7 +1809,10 @@ tuple {DogName Fred} is not referenced by any tuple
 	A destroy
     } -body {
 	A transaction {
-	    set dog [Dog new Name Fido Weight 20]
+	    Dog insert Name Fido Weight 20
+	    BigDog insert Name Fido
+
+	    set dog [Dog new Name Fido]
 	    set bdog [BigDog new Name Fido]
 	    set sdog [$bdog reclassify R1 SmallDog BreedSize toy]
 	    list [$sdog readAttr Name] [$sdog readAttr BreedSize]
@@ -1801,7 +1853,10 @@ tuple {DogName Fred} is not referenced by any tuple
 	A destroy
     } -body {
 	A transaction {
-	    set dog [Dog new Name Fido Weight 20]
+	    Dog insert Name Fido Weight 20
+	    BigDog insert BName Fido
+
+	    set dog [Dog new Name Fido]
 	    set bdog [BigDog new BName Fido]
 	    set sdog [$bdog reclassify R1 SmallDog BreedSize toy]
 	    list [$sdog readAttr SName] [$sdog readAttr BreedSize]
@@ -1974,6 +2029,7 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		}
 	    }
 	    DomainOp start {} {
+		Foo insert Id 1
 		set n [Foo new Id 1]
 		#puts [relformat $::raloo::test::A::Foo Foo]
 		$n generate E1 date [clock format [clock seconds]]
@@ -2011,7 +2067,8 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		}
 	    }
 	    DomainOp start {} {
-		set n [Foo new Id 1 Count 0]
+		Foo insert Id 1 Count 0
+		set n [Foo new Id 1]
 		#puts [relformat $::raloo::test::A::Foo Foo]
 		$n generate E1 date [clock format [clock seconds]]
 	    }
@@ -2040,13 +2097,16 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		    Transition born - E1 -> born
 		}
 	    }
+	    DomainOp start {} {
+		Foo insert Id 1
+		set n [Foo new Id 1]
+		$n generateDelayed 100 E1 date [clock format [clock seconds]]
+	    }
 	}
     } -cleanup {
 	A destroy
     } -body {
-	set n [A::Foo new Id 1]
-	#puts [relformat $::raloo::test::A::Foo Foo]
-	$n generateDelayed 100 E1 date [clock format [clock seconds]]
+	A start
 	syncSleep
     } -result {1}
 
@@ -2096,9 +2156,9 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 	}
 	A transaction {
 	    Dog insert Name Poopsy
-	    SmallDog insert Name Poopsy __CS__ barking
+	    SmallDog insert Name Poopsy
 	    Dog insert Name Rover
-	    BigDog insert Name Rover __CS__ barking
+	    BigDog insert Name Rover
 	}
     } -cleanup {
 	A destroy
@@ -2175,10 +2235,10 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 	}
 	A transaction {
 	    Dog insert Name Poopsy
-	    SmallDog insert Name Poopsy __CS__ barking
+	    SmallDog insertInState barking Name Poopsy
 	    Dog insert Name Rover
 	    BigDog insert Name Rover
-	    ShowDog insert Name Rover __CS__ barking
+	    ShowDog insertInState barking Name Rover
 	}
     } -cleanup {
 	A destroy
