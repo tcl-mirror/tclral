@@ -47,15 +47,25 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: raloo.test,v $
-# $Revision: 1.13 $
-# $Date: 2008/03/30 02:02:30 $
+# $Revision: 1.14 $
+# $Date: 2008/03/31 01:52:00 $
 #  *--
 
 package require tcltest 2.2
 
-eval tcltest::configure $argv
-
 source ../raloo.tcl
+
+if {"-level" in $argv} {
+    set index [lsearch -exact $argv "-level"]
+    ::raloo::arch::logLevel [lindex $argv $index+1]
+    set argv [lreplace $argv $index $index+1]
+} elseif {"-trace" in $argv} {
+    set index [lsearch -exact $argv "-trace"]
+    ::raloo::arch::trace [lindex $argv $index+1]
+    set argv [lreplace $argv $index $index+1]
+}
+
+eval tcltest::configure $argv
 
 proc tupleMatch {expected actual} {
     return [::ral::tuple equal $expected $actual]
@@ -2281,6 +2291,21 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
     } -result {for correlation ::raloo::test::A::R1(::raloo::test::A::Dog <== [+] ::raloo::test::A::Ownership [+] ==> ::raloo::test::A::Owner), in relvar ::raloo::test::A::Dog
 tuple {DogName Fred} is not referenced by any tuple
 }
+
+    test Lifecycle-3.2 {
+	thread of control creates an error
+    } -setup {
+	Domain create A {
+	    DomainOp op {} {
+		error "thread of control error"
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	A op
+	syncSleep
+    } -result {thread of control error}
 
     test Lifecycle-4.1 {
 	creation events

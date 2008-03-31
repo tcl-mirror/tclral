@@ -104,10 +104,12 @@ Domain create DogMgmt {
 
     # Frequently, the names of the referring and referred to attributes are the
     # same. In this case they need not be specified, as is the case of the
-    # example.  If the referring attribute correspondence is specified, then it
-    # appears as a list of triples. For the example it would be:
+    # example.  If the referring attribute correspondence is specified, then
+    # the "RefMap" command is used in the defintion of the relationship.
+    # RefMap takes a list of triples to define the referential correspondence.
+    # For the example it would be:
     # Relationship R1 Contact +-->1 Owner {
-    #	Name -> Name
+    #	RefMap {Name -> Name}
     # }
     # The middle part of the list is syntactic sugar and ignored. It is meant
     # to be mnemonic of the direction of reference of the attribute values.
@@ -117,22 +119,25 @@ Domain create DogMgmt {
     # referred to class. Assuming some relationship R20, that refers to the
     # second identifier of Dog, it might be specified as:
     # Relationship R20 Certificate 1-->1 *2Dog {
-    #	DogId -> Id
+    #	RefMap {DogId -> Id}
     # }
 
     # Associative relationships are specified with the "AssocRelationship"
-    # command. This is similar syntax to the simple relationship. Here, the
+    # command. This has similar syntax to the simple relationship. Here, the
     # third argument also specifies the name of the associative class.  As with
-    # the simple relationship, the "-" and ">" are optional and ignored.  An
-    # associative relationship can take up to two additional attribute
-    # reference lists. The first one specifies the attributes in the
+    # the simple relationship, the "-" and ">" are optional and ignored.
+    # The definition of an associative relationship can also specify the
+    # referential attribute mapping. For associative relationships the
+    # mapping can be specified in the forward and backward directions using
+    # the "FwrdRefMap" and "BackRefMap" commands.
+    # FwrdRefMap specifies the attributes in the
     # associative class that refer in the forward direction (i.e. toward the
-    # right hand Class. The second attribute reference list gives the attribute
+    # right hand Class. BackRefMap gives the attribute
     # references in the associate class that refer backwards (i.e.  toward the
     # left hand Class. For reflexive relationships, both lists must be
     # specified (since using the "same name" rule is ambiguous in the reflexive
     # case). For the non-reflexive case, one or both of the attribute reference
-    # lists may be empty and then attributes of the same name are assumed.
+    # commands may be absent and then attributes of the same name are assumed.
     # Either or both of the participating classes may use the asterisk (*)
     # notation to request that the reference be to an identifier other than
     # "*1" (since both class are referred to by the associative class).
@@ -140,9 +145,12 @@ Domain create DogMgmt {
     # since the referred to attributes in Dog and Owner have the same name.
 
     AssocRelationship R2 Dog +--Ownership-->* Owner {
-	OwnerName -> Name
-    } {
-	DogName -> Name
+	FwrdRefMap {
+	    OwnerName -> Name
+	}
+	BackRefMap {
+	    DogName -> Name
+	}
     }
 
     # The Generalization command is used to define a generalization
@@ -189,7 +197,8 @@ DogMgmt define {
 	if {[$dog isempty]} {
 	    error "no such dog, \"$dogName\""
 	}
-	set owner [Owner new Name $ownerName Age $age]
+	Owner insert Name $ownerName Age $age
+	set owner [Owner new Name $ownerName]
 	Contact insert Name $ownerName ContactOrder 1
 	PhoneNumber insert Name $ownerName ContactOrder 1 AreaCode $area\
 	    Number $phone
