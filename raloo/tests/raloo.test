@@ -47,8 +47,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: raloo.test,v $
-# $Revision: 1.14 $
-# $Date: 2008/03/31 01:52:00 $
+# $Revision: 1.15 $
+# $Date: 2008/04/04 15:33:32 $
 #  *--
 
 package require tcltest 2.2
@@ -76,7 +76,7 @@ proc relationMatch {expected actual} {
 }
 
 proc ::bgerror msg {
-    puts $::errorInfo
+    #puts $::errorInfo
     #puts stderr $msg
     set ::sync $msg
 }
@@ -152,6 +152,7 @@ namespace eval ::raloo::test {
 
     proc syncSleep {} {
 	vwait ::sync
+	#puts "syncSleep: $::sync"
 	return $::sync
     }
 
@@ -250,7 +251,7 @@ namespace eval ::raloo::test {
 		Dog insert DogName $name Breed $breed
 	    }
 	    SyncService getDogBreed {name} {
-		set dog [Dog selectOne DogName $name]
+		set dog [Dog new DogName $name]
 		return [$dog readAttr Breed]
 	    }
 	}
@@ -806,7 +807,7 @@ tuple {DogName Fred} is not referenced by any tuple
     } -cleanup {
 	C destroy
     } -body {
-	set r [C::Dog selectOne Name Rover]
+	set r [C::Dog new Name Rover]
 	$r cardinality
     } -result {1}
 
@@ -1047,7 +1048,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	$dog destroy
 	A destroy
     } -body {
-	set dog [A::Dog selectOne DogName Fred]
+	set dog [A::Dog new DogName Fred]
 	set phone [$dog selectRelated R1 ~R2]
 	$phone readAttr Number
     } -result {555-1212}
@@ -1075,7 +1076,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	$prevphone destroy
 	A destroy
     } -body {
-	set phone [A::Phone selectOne Number 555-1213]
+	set phone [A::Phone new Number 555-1213]
 	set prevphone [$phone selectRelated R1]
 	$prevphone readAttr Number
     } -result {555-1212}
@@ -1103,7 +1104,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	$nextphone destroy
 	A destroy
     } -body {
-	set phone [A::Phone selectOne Number 555-1212]
+	set phone [A::Phone new Number 555-1212]
 	set nextphone [$phone selectRelated ~R1]
 	$nextphone readAttr Number
     } -result {555-1213}
@@ -1141,7 +1142,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	$sdog destroy
 	A destroy
     } -body {
-	set sdog [A::SmallDog selectOne Name Fred]
+	set sdog [A::SmallDog new Name Fred]
 	set dog [$sdog selectRelated R1]
 	$dog readAttr Name
     } -result {Fred}
@@ -1179,7 +1180,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	$sdog destroy
 	A destroy
     } -body {
-	set dog [A::Dog selectOne Name Fred]
+	set dog [A::Dog new Name Fred]
 	set sdog [$dog selectRelated ~R1.SmallDog]
 	$sdog readAttr Name
     } -result {Fred}
@@ -1217,7 +1218,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	$sdog destroy
 	A destroy
     } -body {
-	set dog [A::Dog selectOne Name Fred]
+	set dog [A::Dog new Name Fred]
 	set sdog [$dog selectRelated R1.SmallDog]
 	$sdog readAttr Name
     } -result {Fred}
@@ -1236,7 +1237,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	$dog destroy
 	cleanupDogOwnerOwnership
     } -body {
-	set dog [A::Dog selectOne DogName Fido]
+	set dog [A::Dog new DogName Fido]
 	set owner [$dog selectRelated R1]
 	$owner readAttr OwnerName
     } -result {John}
@@ -1255,7 +1256,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	$dog destroy
 	cleanupDogOwnerOwnership
     } -body {
-	set owner [A::Owner selectOne OwnerName John]
+	set owner [A::Owner new OwnerName John]
 	set dog [$owner selectRelated ~R1]
 	$dog readAttr DogName
     } -result {Fido}
@@ -1274,7 +1275,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	$dog destroy
 	cleanupDogOwnerOwnership
     } -body {
-	set dog [A::Dog selectOne DogName Fido]
+	set dog [A::Dog new DogName Fido]
 	set ownership [$dog selectRelated R1.Ownership]
 	$ownership readAttr OwnerName
     } -result {John}
@@ -1293,7 +1294,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	$ownership destroy
 	cleanupDogOwnerOwnership
     } -body {
-	set owner [A::Owner selectOne OwnerName John]
+	set owner [A::Owner new OwnerName John]
 	set ownership [$owner selectRelated ~R1.Ownership]
 	$ownership readAttr DogName
     } -result {Fido}
@@ -1307,7 +1308,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	$players destroy
 	cleanupDogPlays
     } -body {
-	set dog [A::Dog selectOne DogName Fido]
+	set dog [A::Dog new DogName Fido]
 	set players [$dog selectRelated R1]
 	$players get
     } -result {
@@ -1331,7 +1332,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	$dog destroy
 	cleanupDogPlays
     } -body {
-	set playmate [A::Dog selectOne DogName Fred]
+	set playmate [A::Dog new DogName Fred]
 	set dog [$playmate selectRelated ~R1]
 	$dog get
     } -result {
@@ -1354,7 +1355,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	$plays destroy
 	cleanupDogPlays
     } -body {
-	set playmate [A::Dog selectOne DogName Fred]
+	set playmate [A::Dog new DogName Fred]
 	set plays [$playmate selectRelated ~R1.Plays]
 	$plays get
     } -result {
@@ -1378,7 +1379,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	$plays destroy
 	cleanupDogPlays
     } -body {
-	set dog [A::Dog selectOne DogName Fred]
+	set dog [A::Dog new DogName Fred]
 	set plays [$dog selectRelated R1.Plays]
 	$plays get
     } -result {
@@ -1884,7 +1885,7 @@ tuple {DogName Fred} is not referenced by any tuple
 
 		Lifecycle {
 		    State born {date} {
-			puts born
+			#puts born
 		    }
 		    Transition born - E1 -> born
 		}
@@ -1907,7 +1908,7 @@ tuple {DogName Fred} is not referenced by any tuple
 
 		Lifecycle {
 		    State born {date} {
-			puts born
+			#puts born
 		    }
 		    Transition @ - E1 -> born
 		}
@@ -1931,7 +1932,7 @@ tuple {DogName Fred} is not referenced by any tuple
 
 		Lifecycle {
 		    State born {date} {
-			puts born
+			#puts born
 		    }
 		    Transition @ - E1 -> born
 		    DefaultTransition IG
@@ -1961,7 +1962,7 @@ tuple {DogName Fred} is not referenced by any tuple
 
 		Lifecycle {
 		    State born {date} {
-			puts born
+			#puts born
 		    }
 		    Transition @ - E1 -> born
 		    DefaultTransition XX
@@ -1985,7 +1986,7 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState born DefaultTrans XX}
 
 		Lifecycle {
 		    State born {date} {
-			puts born
+			#puts born
 		    }
 		    Transition born - E1 -> born
 		    DefaultInitialState foo
@@ -2009,10 +2010,10 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 
 		Lifecycle {
 		    State born {date} {
-			puts born
+			#puts born
 		    }
 		    State grow {} {
-			puts grow
+			#puts grow
 		    }
 		    Transition born - E1 -> grow
 		    Transition grow - E1 -> born
@@ -2033,14 +2034,14 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 
 		Lifecycle {
 		    State born {date} {
-			puts "born: $date"
+			#puts "born: $date"
+			set ::sync born
 		    }
 		    Transition born - E1 -> born
 		}
 	    }
 	    DomainOp start {} {
-		Foo insert Id 1
-		set n [Foo new Id 1]
+		set n [Foo newInsert Id 1]
 		#puts [relformat $::raloo::test::A::Foo Foo]
 		$n generate E1 date [clock format [clock seconds]]
 	    }
@@ -2049,8 +2050,8 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 	A destroy
     } -body {
 	A start
-	update idletasks
-    } -result {}
+	syncSleep
+    } -result {born}
 
     test Lifecycle-1.6 {
 	active class -- generating self directed events
@@ -2064,12 +2065,14 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 
 		Lifecycle {
 		    State grow {date} {
-			puts "grow: $date"
+			#puts "grow: $date"
 			my with Count {
 			    incr Count
 			    my writeAttr Count $Count
 			    if {$Count == 1} {
 				my generate E1 date epoch
+			    } else {
+				set ::sync born
 			    }
 			}
 		    }
@@ -2077,8 +2080,7 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		}
 	    }
 	    DomainOp start {} {
-		Foo insert Id 1 Count 0
-		set n [Foo new Id 1]
+		set n [Foo newInsert Id 1 Count 0]
 		#puts [relformat $::raloo::test::A::Foo Foo]
 		$n generate E1 date [clock format [clock seconds]]
 	    }
@@ -2087,8 +2089,8 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 	A destroy
     } -body {
 	A start
-	update idletasks
-    } -result {}
+	syncSleep
+    } -result {born}
 
     test Lifecycle-1.7 {
 	active class -- generating delayed events
@@ -2101,8 +2103,8 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 
 		Lifecycle {
 		    State born {date} {
-			puts "born: $date"
-			set ::sync 1
+			#puts "born: $date"
+			set ::sync born
 		    }
 		    Transition born - E1 -> born
 		}
@@ -2118,7 +2120,7 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
     } -body {
 	A start
 	syncSleep
-    } -result {1}
+    } -result {born}
 
     test Lifecycle-2.1 {
 	polymorphic event
@@ -2135,8 +2137,8 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		}
 		Lifecycle {
 		    State barking {} {
-			puts "SmallDog: bark"
-			set ::out SmallDog
+			#puts "SmallDog: bark"
+			set ::sync SmallDog
 		    }
 		    Transition barking - taunt -> barking
 		}
@@ -2147,8 +2149,8 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		}
 		Lifecycle {
 		    State barking {} {
-			puts "BigDog: bark"
-			set ::out BigDog
+			#puts "BigDog: bark"
+			set ::sync BigDog
 		    }
 		    Transition barking - taunt -> barking
 		}
@@ -2174,8 +2176,7 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 	A destroy
     } -body {
 	A start
-	update idletasks
-	set ::out
+	syncSleep
     } -result {SmallDog}
 
     test Lifecycle-2.2 {
@@ -2193,8 +2194,8 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		}
 		Lifecycle {
 		    State barking {} {
-			puts "SmallDog: bark"
-			set ::out SmallDog
+			#puts "SmallDog: bark"
+			set ::sync SmallDog
 		    }
 		    Transition barking - taunt -> barking
 		}
@@ -2210,8 +2211,8 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		}
 		Lifecycle {
 		    State barking {} {
-			puts "WorkingDog: bark"
-			set ::out WorkingDog
+			#puts "WorkingDog: bark"
+			set ::sync WorkingDog
 		    }
 		    Transition barking - taunt -> barking
 		}
@@ -2222,8 +2223,8 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		}
 		Lifecycle {
 		    State barking {} {
-			puts "ShowDog: bark"
-			set ::out ShowDog
+			#puts "ShowDog: bark"
+			set ::sync ShowDog
 		    }
 		    Transition barking - taunt -> barking
 		}
@@ -2254,8 +2255,7 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 	A destroy
     } -body {
 	A start
-	update idletasks
-	set ::out
+	syncSleep
     } -result {ShowDog}
 
     test Lifecycle-3.1 {
@@ -2318,8 +2318,8 @@ tuple {DogName Fred} is not referenced by any tuple
 
 		Lifecycle {
 		    State A {} {
-			puts "A"
-			set ::sync 4
+			#puts "A"
+			set ::sync A
 		    }
 		    Transition @ - E1 -> A
 		}
@@ -2333,7 +2333,7 @@ tuple {DogName Fred} is not referenced by any tuple
     } -body {
 	A startFoo
 	syncSleep
-    } -result {4}
+    } -result {A}
 
     test Polymorphic-1.1 {
 	polymorphic event
@@ -2350,7 +2350,7 @@ tuple {DogName Fred} is not referenced by any tuple
 		}
 		Lifecycle {
 		    State s1 {} {
-			puts "in s1"
+			#puts "in s1"
 		    }
 		    Transition s1 - E1 -> s1
 		}
@@ -2361,7 +2361,7 @@ tuple {DogName Fred} is not referenced by any tuple
 		}
 		Lifecycle {
 		    State s1 {} {
-			puts "in s1"
+			#puts "in s1"
 		    }
 		    Transition s1 - E1 -> s1
 		}
@@ -2404,10 +2404,10 @@ tuple {DogName Fred} is not referenced by any tuple
 	    AssocRelationship R1 Dog +-Ownership->+ Owner {
 		Assigner {
 		    State s1 {p1} {
-			puts "s1: $p1"
+			#puts "s1: $p1"
 		    }
 		    State s2 {} {
-			puts "s2"
+			#puts "s2"
 		    }
 		    Transition s1 - e1 -> s2
 		    Transition s2 - e2 -> s1
@@ -2439,10 +2439,11 @@ tuple {DogName Fred} is not referenced by any tuple
 	    Relationship R1 Dog +-->1 Owner {
 		Assigner {
 		    State s1 {p1} {
-			puts "s1: $p1"
+			#puts "s1: $p1"
+			set ::sync s1
 		    }
 		    State s2 {} {
-			puts "s2"
+			#puts "s2"
 			set ::sync s2
 		    }
 		    Transition s1 - e1 -> s2
@@ -2479,10 +2480,11 @@ tuple {DogName Fred} is not referenced by any tuple
 		Assigner {
 		    IdentifyBy Dog
 		    State s1 {p1} {
-			puts "s1: $p1"
+			#puts "s1: $p1"
+			set ::sync s1
 		    }
 		    State s2 {} {
-			puts "s2"
+			#puts "s2"
 			set ::sync s2
 		    }
 		    Transition s1 - e1 -> s2

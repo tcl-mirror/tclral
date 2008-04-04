@@ -48,8 +48,8 @@
 #  capabilities of TclOO.
 # 
 # $RCSfile: raloo.tcl,v $
-# $Revision: 1.15 $
-# $Date: 2008/03/31 01:52:00 $
+# $Revision: 1.16 $
+# $Date: 2008/04/04 15:33:32 $
 #  *--
 
 package require Tcl 8.5
@@ -2385,13 +2385,8 @@ oo::class create ::raloo::RelvarClass {
 	$obj set $relValue
 	return $obj
     }
-    method selectOne {args} {
-	set obj [my new]
-	$obj set [::ralutil::pipe {
-	    relvar set [self] |
-	    relation choose ~ {*}$args
-	}]
-	return $obj
+    method newInsert {args} {
+	return [my newFromRelation [my insert {*}$args]]
     }
 }
 
@@ -2590,6 +2585,9 @@ oo::class create ::raloo::ActiveEntity {
 	lappend args __CS__ $state
 	relvar insert [self] $args
     }
+    method newInsertInState {state args} {
+	return [my newFromRelation [my insertInState $state {*}$args]]
+    }
 }
 
 oo::class create ::raloo::ActiveRelvarClass {
@@ -2740,6 +2738,10 @@ oo::class create ::raloo::RelvarRef {
 	    relvar set $relvarName |
 	    relation choose ~ {*}$args
 	}]
+    }
+    method selectAll {} {
+	my variable relvarName
+	my set [relvar set $relvarName]
     }
     method selectWhere {expr} {
 	my variable relvarName

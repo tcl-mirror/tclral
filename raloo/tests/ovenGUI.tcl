@@ -1,3 +1,5 @@
+#!/usr/bin/env wish
+
 package require Tk
 
 source ovenMgmt.tcl
@@ -27,7 +29,7 @@ proc toggleDoor {} {
 
 proc updateTimer {op relvarName oldTuple newTuple} {
     tuple assign $newTuple
-    if {$OvenId == 1} {
+    if {$TimerId == 1} {
 	set ::timerTime [format "%02d:%02d" $Minutes $Seconds]
     }
     return $newTuple
@@ -35,7 +37,7 @@ proc updateTimer {op relvarName oldTuple newTuple} {
 
 proc updateLight {op relvarName oldTuple newTuple} {
     tuple assign $newTuple
-    if {$OvenId == 1} {
+    if {$LightId == 1} {
 	.light configure -background\
 	    [expr {$__CS__ eq "on" ? "white" : "black"}]
     }
@@ -44,9 +46,9 @@ proc updateLight {op relvarName oldTuple newTuple} {
 
 proc updateTube {op relvarName oldTuple newTuple} {
     tuple assign $newTuple
-    if {$OvenId == 1} {
+    if {$TubeId == 1} {
 	.tube configure -background\
-	    [expr {$__CS__ eq "energized" ? "red" : "white"}]
+	    [expr {$__CS__ eq "energized" ? "red" : "black"}]
     }
     return $newTuple
 }
@@ -66,16 +68,16 @@ relvar trace add variable ::OvenMgmt::PowerTube update updateTube
 
 label .time -textvariable ::timerTime
 
-button .ctrlButton -text Button -command {OvenMgmt buttonPushed 1}
+button .ctrlButton -text Start/Add -command {OvenMgmt buttonPushed 1}
 
 button .doorButton -textvariable ::doorState -command {toggleDoor}
 
 label .light -background black
 
-label .tube -background white
+label .tube -background black
 
-grid .time .ctrlButton .doorButton
-grid .light .tube x -sticky ew
+grid .time .ctrlButton .doorButton -padx 3 -pady 3
+grid .light .tube x -sticky ew -padx 3 -pady 3
 
 wm protocol . WM_DELETE_WINDOW exit
 

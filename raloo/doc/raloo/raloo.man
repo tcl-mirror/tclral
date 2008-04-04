@@ -1,6 +1,6 @@
 [manpage_begin raloo n 0.1]
 [comment {
-# This software is copyrighted 2003 by G. Andrew Mangogna.
+# This software is copyrighted 2008 by G. Andrew Mangogna.
 # The following terms apply to all files associated with the software unless
 # explicitly disclaimed in individual files.
 # 
@@ -47,8 +47,8 @@
 #   This package is part of TclRAL. This file is in Tcl Markup Language
 #   format.
 # $RCSfile: raloo.man,v $
-# $Revision: 1.3 $
-# $Date: 2008/02/28 02:27:16 $
+# $Revision: 1.4 $
+# $Date: 2008/04/04 15:33:32 $
 #  *--
 }]
 [moddesc "raloo"]
@@ -58,17 +58,33 @@
 [description]
 
 [package raloo] is a relation oriented programming extention to Tcl.
-It combines the relational algebra of TclRAL with TclOO to create an
-object oriented programming system that relies heavily on relational
-algebra to structure the class data.
+It uses the relational algebra of TclRAL along with the object oriented
+facilities of TclOO to create a
+relation oriented programming system that emphasizes
+strongly structured, transactionally consistent data,
+an event driven, state machine execution architecture
+and a Tcl object oriented command style for computations.
+[package raloo] is patterned after the execution semantics of
+Executable UML (see Mellor, Stephen J. and Balcer, Marc J.,
+[emph "Executable UML: A Foundation for Model-Driven Architecture"],
+Addison-Wesley, 2002, ISBN: 0-201-74804-5).
+[package raloo] contains a number of concepts that enable programming at
+a higher level of abstraction. However this manual page does not explain
+all these concepts in detail. It is primarily a reference to the
+commands of the [package raloo] package.
 
 [para]
 The [package raloo] package exports one command, [cmd Domain].
-[cmd Domain] is a TclOO class which exports the [cmd create] method
+[cmd Domain] is a TclOO class which exports the [cmd create] method.
 [cmd Domain] does not export the [cmd new] method as we insist that all
 domains be given an explicit name.
 
-[section "Exported Domain Methods"]
+[section "Domain Methods"]
+A [emph Domain] is the unit of encapsulation in [package raloo].
+A Domain is intended to deal with a single, cohesive subject matter,
+however, the precise contents of a Domain are an element of the design.
+The [cmd Domain] class exports a few methods, the most important of
+which is the [cmd create] command.
 
 [list_begin definitions]
 
@@ -84,6 +100,9 @@ fully qualified.
 A Domain can be incrementally defined by invoking the [cmd define] method.
 This method evaluates [arg script] in the same context as the script
 evaluation is done when a Domain is created.
+This allows large domains to be defined in more managable pieces.
+In particular, the [cmd define] method makes it possible to separate the
+definition of the domain from one if its potential instance populations.
 
 [call [arg domain] [cmd transaction] [arg [opt script]]]
 
@@ -94,31 +113,39 @@ of its component classes and relationships.
 [list_end]
 
 [subsection "Domain Definition"]
-During Domain creation or when executing the [cmd define] method for a domain,
-the [arg script] argument is evaluated in a context where the following
-definition commands are available.
 Domains consist of the following entities:
 [list_begin item]
 [item] Domain Operations
+[item] Synchonous Services
 [item] Classes
 [item] Relationships
-[item] Generalizations
 [item] Associative Relationships
+[item] Generalizations
 [list_end]
+During Domain creation or when executing the [cmd define] method for a domain,
+the [arg script] argument is evaluated in a context where the following
+definition commands are available.
 
 [list_begin definitions]
+
 [call [cmd DomainOp] [arg name] [arg argList] [arg body]]
 The [cmd DomainOp] command defines [arg name] as a domain-based operation.
 [arg name] appears as an exported method of the domain.
-Domain operations are the only exported aspects of a domain
-and constitute the primary external interface of the domain.
 The [arg argList] argument gives the formal parameters of the operation
 in the same way as for the [cmd proc] command.
 The [arg body] argument is the body of the domain operation.
-Domain operations are executed as a transaction against the relvars
-defined by the classes of the domain.
-At the end of a domain, the referential integrity of the underlying
-relvar constraints is evaluated and must be found consistent.
+Domain operations begin a new thread of control
+(see [sectref "Threads of Control"], below).
+This implies that domain operations always return immediately and have
+not return value.
+The [arg body] of the domain operation is executed asynchronously to
+begin the thread of control.
+
+[call [cmd SyncService] [arg name] [arg argList] [arg body]]
+The [cmd SyncService] command defines [arg name] as a synchronous service
+of the domain.
+Synchronous services execute as a transaction on the class data, but do not
+start a thread of control.
 
 [call [cmd Class] [arg name] [arg script]]
 The [cmd Class] command defines a class within a Domain.
@@ -128,24 +155,29 @@ In addition, a [emph relvar] by the same name is created.
 The [arg script] argument is evaluated in a context where procedures
 that define the properties of class are available
 (see [sectref "Class Definition"], below).
+Each class defined with the [cmd Class] command becomes a TclOO class
+command.
+See [sectref "Class Methods"] below for the method of the created class.
 
-[call [cmd Relationship] [arg name] [arg refngClass] [arg relSpec]\
+[call [cmd Relationship] [arg relName] [arg refngClass] [arg relSpec]\
 	[arg refToClass] [opt [arg script]]]
-The [cmd Relationship] command defines a relationship named [arg name]
+The [cmd Relationship] command defines a relationship named [arg relName]
 within the defined Domain.
 A Relationship is a referential association between a Referring Class
-named [arg refngClass] and a Referred-To Class named [arg refToClass].
+named [arg refngClass] and a Referred-To Class named [arg refToClass]
+(not necessarily distinct).
 The cardinality of the reference is given by [arg relSpec].
 [arg relSpec] is of the form "f->t", where [emph f] is one
-of *, +, ? or 1 and [emph t] is one of ? or 1. The arbitrary number of
-hyphens (-) and the single greater than (>) characters are
-ignored syntactic sugar and are optional.
+of *, +, ? or 1 and [emph t] is one of ? or 1.
+An arbitrary number of hyphens (-) and the single greater than (>) characters
+are ignored syntactic sugar and are optional.
 The direction of the relationship is taken to left to right or from
 [arg refngClass] to [arg refToClass].
 The direction is significant in the reflexive case ([emph i.e.] when
 [arg refngClass] is the same as [arg refToClass]).
-The [arg script] argument, if present gives the detailed enumeration of
-attribute references.
+The [arg script] argument, if present is evaluated in a context
+where the specifics of the referential attribute mapping can be specified
+(see [sectref "Relationship Definition"] below).
 The [cmd Relationship] command establishes that one or more attributes
 in the [arg refngClass] class have values that are the same as
 a corresponding set of attributes in the [arg refToClass] class.
@@ -166,31 +198,44 @@ If no [arg script] is given,
 then it is assumed that [arg refngClass] contains referring
 attributes that have the same name as the selected identifying attributes
 of [arg refToClass].
-Otherwise, [arg script] must be present and consists of a set of triples
-of the form: refngAttrName -> refToAttrName.
-Here, [arg refngAttrName] is the name of an attribute in [arg refngClass] and
-[arg refToAttrName] is the name of an attribute in [arg refToClass].
-The [arg ->] argument is syntactic sugar and its value is ignored.
-Each triple in [arg script] establishes a referential attribute
-correspondence.
-The set of [arg refToAttrName] attributes in [arg script] must constitute
-and the selected identifier of [arg refToClass].
+
+[call [cmd AssocRelationship] [arg name] [arg source] [arg assocSpec]\
+	[arg target] [opt [arg script]]]
+The [cmd AssocRelationship] command defines an associative relationship
+named [arg name] within the Domain.
+An Associative Relationship is a referential association between two classes
+(not necessarily distinct)
+where the referring attributes are held in a third class
+(which must be distinct from the participating classes).
+The direction of the relationship is taken to be from left [arg source] class
+to the right [arg target] class.
+The [arg assocSpec] is of the form "f-A->t", where both [emph f] and [emph t]
+are indications of the cardinality of the relationship and
+are one of *, +, ?, or 1 and [emph A] is the name of the associative class.
+An arbitrary number of hyphens (-) and the single greater than (>) characters
+are ignored syntactic sugar and are optional.
+The cardinality characters are interpreted the same as for the
+[cmd Relationship] command.
+If [arg script] is absent, then the attribute references are determined by
+name as for [cmd Relationship].
+In this case, the referring attributes are members of the Associative Class
+and there are referred to attributes in both of the participating classes.
+In the reflexive case, ([emph i.e.] when [arg source] and [arg target] are
+the same),
+[arg script] must be present to resolve the attribute naming ambiguity.
+The [arg script] may contain commands as given in the
+[sectref "Associative Relationship Definition"] section below.
 
 
 [call [cmd Generalization] [arg name] [arg supertype] [arg script]]
 The [cmd Generalization] command defines a generalization
 relationship named [arg name] within the defined Domain.
 A Generalization Relationship is a referential association between a
-[arg supertype] class and a set of [arg subtype] classes that completely
+[arg supertype] class and a set of [emph subtype] classes that completely
 partitions [arg supertype] into disjoint subtypes.
 The [arg script] argument is executed in a context where the
-[cmd SubType] command is defined.
-The [cmd SubType] command is used to define the set of classes that
-are subtypes of [arg supertype] and to define the referential attribute
-associations between the subtypes and [arg supertype].
-
-[call [cmd AssocRelationship] [arg name] [arg source] [arg assocSpec]\
-	[arg target] [opt [arg fwrdscript]] [opt [arg backscript]]]
+the subtype classes and referential attribute mapping may be defined
+(see [sectref "Generalization Relationship Definition"] below).
 
 [list_end]
 
@@ -198,17 +243,274 @@ associations between the subtypes and [arg supertype].
 Classes consist of the following entities:
 [list_begin item]
 [item] Attributes
-[item] Lifecycles
 [item] Class-based Operations
 [item] Instance-based Operations
+[item] Lifecycles
+[list_end]
+
+The class definition [arg script] is executed in a context where the
+following commands may be used to define the characteristics of the class.
+
+[list_begin definitions]
+[call [cmd Attribute] [arg name-type-list]]
+The [cmd Attribute] defines the attributes of the class.
+[cmd Attribute] may be invoked multple times and the effect is cumulative.
+The [arg name-type-list] is a list of doubles giving the name of the
+attribute and its data type.
+The data type must be a valid Tcl type (e.g. string, int, list ...).
+If the attribute name is preceded by and asterisk (*) or an asterisk and
+a single decimal digit ([emph e.g.] *2),
+then that attribute is designated an identifying attribute.
+The set of attributes designated by asterisks constitute an identifier
+for the class.
+Each class must have at least one identifier.
+Classes may have multiple identifiers and attributes may be identifying
+attributes in multiple identifiers.
+However, no identifier may be a subset of another identifier.
+Instances of the any class must be unique in the values of all their
+identifiers.
+An asterisk without a decimal number is taken to signify identifier 1
+([emph i.e.] * ==> *1).
+If an attribute belongs to muliple identifiers, then the asterisk notation
+is simply concatenated together.
+For example:
+[example {
+    Attribute {
+	*Name string
+	*2Id int
+	Color string
+    }
+}]
+defines three attributes, two of which are identifying attributes.
+Two identifiers are given, each of which has one identifying attribute.
+The case of :
+[example {
+    Attribute {
+	*Group string
+	**2Name string
+	*2Section int
+	Size double
+    }
+}]
+defines four attributes with two identifiers.
+Identifier 1 consists of [emph Group] and [emph Name].
+Identifier 2 consists of [emph Name] and [emph Section].
+Notice that [emph Name] is an attribute in both identifiers.
+
+[call [cmd ClassOp] [arg name] [arg argList] [arg body]]
+The [cmd ClassOp] command defines a class based operation called [arg name].
+The [arg argList] argument gives the argument list for the operation
+and the [arg body] argument gives the Tcl script for the operation.
+These arguments have the same meaning as for the [cmd proc] command.
+This command creates a class based method for the class being defined.
+
+[call [cmd InstOp] [arg name] [arg argList] [arg body]]
+The [cmd InstOp] command define an instance based operation called [arg name].
+The [arg argList] argument gives the argument list for the operation
+and the [arg body] argument gives the Tcl script for the operation.
+These arguments have the same meaning as for the [cmd proc] command.
+This command creates a object method for the class being defined.
+
+[call [cmd Lifecycle] [arg script]]
+The [cmd Lifecycle] command specifies that the class being defined will
+be associated with a state machine and will respond to events sent to it.
+The [arg script] argument is evaluated in a context where commands are
+available to specify the states and transition of the state machine.
+See the [sectref "Lifecycle Definition"] section below.
+
 [list_end]
 
 [subsection "Relationship Definition"]
+The [arg script] argument of the [cmd Relationship] command is evaluated
+in a context where the following commands may be invoked to
+specify further the details of the relationship.
 
-[subsection "Class Methods"]
 [list_begin definitions]
-[call [arg class] [cmd new] [arg "attr1 value1"] [arg "attr2 value2"]\
-    [arg ...]]
+[call [cmd RefMap] [arg refAttrMappingList]]
+The [cmd RefMap] command takes a single argument that is a list of triples
+of the form: refngAttrName -> refToAttrName.
+Here, [arg refngAttrName] is the name of an attribute in [arg refngClass] and
+[arg refToAttrName] is the name of an attribute in [arg refToClass].
+The [arg ->] argument is syntactic sugar and its value is ignored.
+Each triple in [arg script] establishes a referential attribute
+correspondence.
+The set of [arg refToAttrName] attributes in [arg refAttrMappingList]
+must constitute the selected identifier of [arg refToClass].
+
+[call [cmd Assigner] [arg script]]
+The [cmd Assigner] command specifies that the relationship is competitive
+and requires a state machine to arbitrate its instances.
+The [arg script] argument is evaluated in a context where commands
+can be used to specify the competitive relationship state machine
+(see [sectref "Assigner Definition"] below).
+
+[list_end]
+
+[subsection "Associative Relationship Definition"]
+Since the associative class in an associative relationship has referential
+attributes referring to both the target and source classes, two
+commands are available to specify those referential attribute mappings.
+
+The [arg script] argument of the [cmd Relationship] command is evaluated
+in a context where the following commands may be invoked to
+specify further the details of the associative relationship.
+[list_begin definitions]
+[call [cmd FwrdRefMap] [arg refAttrMappingList]]
+The [cmd FwrdRefMap] command specifies the referential mapping in the
+forward direction of the relationship.
+The [arg refAttrMappingList] is a list of triples in the same form as
+for the [cmd RefMap] command.
+This mapping specifies the attributes in the associative class that
+reference attributes in the target class of the associative relationship.
+
+[call [cmd BackRefMap] [arg refAttrMappingList]]
+The [cmd BackRefMap] command specifies the referential mapping in the
+backward direction of the relationship.
+The [arg refAttrMappingList] is a list of triples in the same form as
+for the [cmd RefMap] command.
+This mapping specifies the attributes in the associative class that
+reference attributes in the source class of the associative relationship.
+
+[call [cmd Assigner] [arg script]]
+The [cmd Assigner] command specifies that the associative relationship
+is competitive and requires a state machine to arbitrate its instances.
+The [arg script] argument is evaluated in a context where commands
+can be used to specify the competitive relationship state machine
+(see [sectref "Assigner Definition"] below).
+[list_end]
+
+[subsection "Generalization Relationship Definition"]
+[list_begin definitions]
+[call [cmd SubType] [arg subtypeName] [arg [opt attrRefMappingList]]]
+[list_end]
+The [cmd SubType] command defines a class named [arg subtypeName] to be
+a subtypes of [arg supertype].
+The [arg attrRefMappingList] argument, if present, is a list of triples
+of the form: refngAttrName -> refToAttrName.
+This list is interpreted in the same manner as for the
+[cmd RefMap], [cmd FwrdRefMap] and [cmd BackRefMap] commands above,
+namely as the explicit enumeration of the attributes in the subtype
+which refer to the corresponding attributes in the supertype.
+If the [arg attrRefMappingList] argument is not present, then the referential
+attributes are assumed to have the same name.
+
+[subsection "Lifecycle Definition"]
+The lifecycles of classes are specified as Moore type state machines.
+This means that processing is associated with the state and is executed
+upon entry into the a state.
+[emph Events] cause transitions between states and may also carry parameters.
+Those parameters are then given to the state action when it is executed.
+It is necessary that the parameter signature of an event match that of the
+state into which it causes a transition.
+The lifecycle definition script defines the state and transitions for the
+state machine.
+No separate event defintions are required since the events can be
+deduced from the transition definitions.
+However, states must be defined before they can be mentioned in a transition
+definition.
+
+[list_begin definitions]
+[call [cmd State] [arg name] [arg argList] [arg body]]
+The [cmd State] command defines a state in the state machine for the
+class being defined.
+The state is named [arg name] and has a parameter signature given
+by [arg argList].
+Any event causing a transition into this state is presumed to have the
+same parameter signature and it is an error for the same event to cause
+transitions to states that differ in their parameter signatures.
+Upon the transition into the state, [arg body] is executed.
+The state machine is not considered to be in a state until the
+action has been completed.
+The action [arg body] must not block or wait
+since this will prevent the dispatch of other events.
+
+[call [cmd Transition] [arg state] - [arg event] -> [arg newState]]
+The [cmd Transition] command defines a transition of the state machine for
+the class being defined.
+This command specifies that when the state machine is in state [arg state]
+and the event called [arg event] is received that the machine enter
+the state [arg newState].
+Any action associated with [arg newState] is executed as the transition
+occurs.
+If [arg state] is the at sign (@),
+then the transition is a [emph creation] transition and [arg event]
+is known as a creation event.
+Generating creation events provide a means to asynchronously
+create class instances.
+The second (-) and fourth (->) arguments are syntactic sugar and the actual
+parameter values are ignored.
+Conceptually, the lifecycle state machine is governed by a transition
+matrix mapping current state and event to a new state.
+Each [cmd Transition] command specifies one cell in the conceptual
+transition matrix.
+
+[call [cmd DefaultInitialState] [arg state]]
+The [cmd DefaultInitialState] command specifies that state that serves
+as the initial state of the state machine if no other initial state
+is specified when an instance is created.
+If the [cmd DefaultInitialState] command does not appear in the lifecycle
+definition, then the first state defined by a [cmd State] command is take
+as the default initial state.
+[emph N.B.] that no state action is executed when instances are synchronously
+created.
+It follows then that the action code of any default initial state that
+has no incoming transitions is unreachable.
+
+[call [cmd DefaultTransition] [arg "IG | CH"]]
+The [cmd DefaultTransition] command specifies what is to be done for
+all transitions that are not specified by a [cmd Transition] command.
+The choices are to ignore the event (IG) or to specify that receiving
+the event is can't happen (CH) and therefore is an error.
+By default, all transitions not mentioned in [cmd Transition] commands
+are deemed to be "CH".
+This command may be used to change that default.
+
+[list_end]
+
+[subsection "Assigner Definition"]
+The definition of an Assigner uses the same commands as the definition
+of a Class Lifecycle, namely, [cmd State], [cmd Transition],
+[cmd DefaultInitialState] and [cmd DefaultTransition].
+Note that the Assigner state machines are distinct from class state machines
+and is associated with the competitive Relationship.
+However, Assigners may be either Single Assigners or Multiple Assigners.
+For Single Assigners, only a single instance of the state machine is created
+and Multiple Assigners my have many instances.
+So in addition to the Lifecycle commands, one addition command is available
+for an Assigner to declare whether it is a Multiple Assigner.
+
+[list_begin definitions]
+
+[call [cmd IdentifyBy] [arg className]]
+If the [arg script] of an [cmd Assigner] includes the invocation of the
+[cmd IdentifyBy] command, then the [cmd Assigner] is a [emph Multiple]
+[cmd Assigner].
+The [arg className] argument give the name of a Class whose identifier will
+specify the identifier of the Multiple Assigner.
+The identifying Class may be considered to partition the classes that
+participate in the relationship in to a set of equivalence classes
+for the purpose of controlling the relationship instances.
+The [arg className] may use the asterisk (*) notation to specify which
+of the identifiers of the class is to be used as the identifier for the
+Multiple Assigner.
+
+[list_end]
+
+[section "Class Methods"]
+The objects created from the classes of a Domain are unusual in many respects
+for object created in convention object oriented schemes.
+In [package raloo] all the object instance data is stored as tuples in a
+relvar.
+Thus classes have a very close correspondence to relvars and objects
+of the class refer to a set of tuples in the relvar.
+That set may be empty or refer to one or more tuples in the relvar.
+
+[list_begin definitions]
+[call [arg class] [method new] [arg [opt "attr1 value1 attr2 value2 ..."]]]
+The [method new] method creates an instance reference set of
+[arg class].
+
+
 [call [arg class] [cmd insert] [arg "attr1 value1"] [arg "attr2 value2"]\
     [arg ...]]
 [call [arg class] [cmd delete] [arg "attr1 value1"] [arg "attr2 value2"]\
@@ -220,11 +522,21 @@ Classes consist of the following entities:
 [call [arg class] [cmd degree]]
 [call [arg class] [cmd format] [arg [opt sortAttrList]] [arg [opt title]]]
 [call [arg class] [cmd newFromRelation] [arg relValue]]
-[call [arg class] [cmd selectOne] [arg "attr1 value1"] [arg "attr2 value2"]\
+[call [arg class] [cmd newInsert] [arg "attr1 value1"] [arg "attr2 value2"]\
     [arg ...]]
 [list_end]
 
-[subsection "Instance References"]
+[section "Active Class Methods"]
+[list_begin definitions]
+[call [arg class] [cmd generate] [arg attrValueList] [arg event]\
+    [arg [opt "param1 param2 ..."]]]
+[call [arg class] [cmd insertInState] [arg state]\
+    [arg [opt "attr1 value1 attr2 value2 ..."]]]
+[call [arg class] [cmd newInsertInState] [arg state]\
+    [arg [opt "attr1 value1 attr2 value2 ..."]]]
+[list_end]
+
+[section "Instance References"]
 [list_begin definitions]
 [call [arg inst] [cmd set] [arg relValue]]
 [call [arg inst] [cmd get]]
@@ -249,7 +561,47 @@ Classes consist of the following entities:
     [arg [opt "attr1 value1"]] [arg [opt "attr2 value2"]] [arg ...]]
 [list_end]
 
+[section "Active Instance References"]
+[list_begin definitions]
+[call [arg inst] [cmd generate] [arg event] [arg [opt "param1 param2 ..."]]]
+[list_end]
+
 [para]
+
+[section "Threads of Control"]
+The [package raloo] package supports both synchronous processing and
+asynchronous processing.
+Asynchronous processing is captured in state machines which have the ability
+to resume a sequence of computation at a later time.
+As state machines interact, one generating events to others, the concept
+of a thread of control arises.
+A thread of control starts when upon invocation of a Domain Operation
+or when a Delayed Event is dispatched.
+The thread of control is the evolving tree of class state machine interactions.
+Each node in the tree represents one instance of a class generating an
+event to another instance of a class (not necessarily distinct).
+As events are dispatched and the transitions occur, other events are generated
+by state machine actions.
+At some point the tree stops growing (assuming the computation is bounded)
+and the all of the transitions and their corresponding actions will execute.
+At this time the thread of control is considered completed.
+The underlying state machine execution engine in [package raloo]
+insures that only one thread of control executes at any time.
+Any thread of control that is starting as part of the execution of the current
+thread of control is deferred until the current thread terminates.
+
+[para]
+The [package raloo] state machine execution engine uses the Tcl event
+loop in order to sequence threads of control.
+This implies that when a Domain is used in an application and that domain
+contains asynchronous processing, that the Tcl event loop must be entered
+in order for the thread of control execution to take place.
+This is the natural order of things when Tk is used as part of the
+application.
+However, for ordinary Tcl script based application, it implies the the
+[cmd vwait] command must be executed and the use of a Domain that does
+asynchronous processing in an application will demand that the application
+be event driven in its entity.
 
 [see_also TclRAL tuple relation]
 
