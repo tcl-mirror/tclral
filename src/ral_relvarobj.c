@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.33 $
-$Date: 2008/01/19 20:51:16 $
+$Revision: 1.34 $
+$Date: 2008/04/04 00:55:53 $
  *--
  */
 
@@ -151,7 +151,7 @@ static const struct traceOpsMap {
 } ;
 static const char specErrMsg[] = "multiplicity specification" ;
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.33 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.34 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -221,11 +221,11 @@ Ral_RelvarObjDelete(
     char *fullName ;
     Ral_Relvar relvar ;
     /*
-     * Deleting a relvar is not allowed during an "eval" script.
+     * Unsetting a relvar is not allowed during an "eval" script.
      */
     if (Ral_RelvarIsTransOnGoing(info)) {
-	Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptDelete,
-	    RAL_ERR_BAD_TRANS_OP, "delete") ;
+	Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptUnset,
+	    RAL_ERR_BAD_TRANS_OP, "unset") ;
 	return TCL_ERROR ;
     }
 
