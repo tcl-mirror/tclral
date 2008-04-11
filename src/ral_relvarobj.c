@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.34 $
-$Date: 2008/04/04 00:55:53 $
+$Revision: 1.35 $
+$Date: 2008/04/11 03:50:27 $
  *--
  */
 
@@ -151,7 +151,7 @@ static const struct traceOpsMap {
 } ;
 static const char specErrMsg[] = "multiplicity specification" ;
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.34 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.35 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -365,6 +365,11 @@ Ral_RelvarObjInsertTuple(
      * Set the values of the attributes from the list of attribute / value
      * pairs.
      */
+    /*
+     * HERE -- Ral_TupleSetFromObj() insists that all attributes be set.
+     * Need something that is not so strict so that the insert traces
+     * can fill out the rest of the heading.
+     */
     if (Ral_TupleSetFromObj(tuple, interp, nameValueObj, errInfo) != TCL_OK) {
 	Ral_TupleDelete(tuple) ;
 	return NULL ;
@@ -381,6 +386,10 @@ Ral_RelvarObjInsertTuple(
 	 */
 	assert(resultObj->typePtr == &Ral_TupleObjType) ;
 	tuple = resultObj->internalRep.otherValuePtr ;
+	/*
+	 * HERE -- check that the tuple heading did not change after
+	 * the traces. Ral_RelationPushBack() only asserts that.
+	 */
 	if (!Ral_RelationPushBack(relation, tuple, NULL)) {
 	    Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_DUPLICATE_TUPLE,
 		resultObj) ;

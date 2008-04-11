@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.40 $
-# $Date: 2008/02/15 02:24:36 $
+# $Revision: 1.41 $
+# $Date: 2008/04/11 03:50:27 $
 #  *--
 
 package require tcltest 2.2
@@ -2306,6 +2306,28 @@ namespace eval ::ral::test {
 	    }
 	}
 	relation is $r1 == $r2
+    } -result 1
+
+    test relation-is-equal-9.0 {double representation} -body {
+	set r1 {
+	    Relation {
+		Name string Age double City string
+	    } {
+		Name
+	    } {
+		{Name Andrew Age 30 City Sunnyvale}
+	    }
+	}
+	set r2 {
+	    Relation {
+		Name string Age double City string
+	    } {
+		Name
+	    } {
+		{Name Andrew Age 30.0 City Sunnyvale}
+	    }
+	}
+	relation is $r1 equal $r2
     } -result 1
 
     # relation notequal operator

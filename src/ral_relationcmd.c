@@ -46,8 +46,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.38 $
-$Date: 2008/02/09 19:42:33 $
+$Revision: 1.39 $
+$Date: 2008/04/11 03:50:27 $
  *--
  */
 
@@ -61,6 +61,7 @@ INCLUDE FILES
 #include <assert.h>
 #include <string.h>
 #include "tcl.h"
+#include "ral_attribute.h"
 #include "ral_relation.h"
 #include "ral_relationobj.h"
 #include "ral_tupleobj.h"
@@ -148,7 +149,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.38 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.39 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -1934,11 +1935,6 @@ RelationRankCmd(
     Ral_RelationHeading newHeading ;
     Ral_Relation newRelation ;
     enum Ordering order = SORT_ASCENDING ;
-    enum RankType {
-	RANK_INT,
-	RANK_DOUBLE,
-	RANK_STRING,
-    } rankType ;
     Ral_RelationIter rIter ;
     Ral_RelationIter rEnd ;
 
@@ -1967,21 +1963,6 @@ RelationRankCmd(
 	return TCL_ERROR ;
     }
     rankAttr = *rankAttrIter ;
-    if (rankAttr->attrType != Tcl_Type) {
-	Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptRank,
-	    RAL_ERR_BAD_RANK_TYPE, rankAttrName) ;
-	return TCL_ERROR ;
-    } else if (strcmp(rankAttr->heading.tclType->name, "int") == 0) {
-	rankType = RANK_INT ;
-    } else if (strcmp(rankAttr->heading.tclType->name, "double") == 0) {
-	rankType = RANK_DOUBLE ;
-    } else if (strcmp(rankAttr->heading.tclType->name, "string") == 0) {
-	rankType = RANK_STRING ;
-    } else {
-	Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptRank,
-	    RAL_ERR_BAD_RANK_TYPE, rankAttrName) ;
-	return TCL_ERROR ;
-    }
     rankAttrIndex = rankAttrIter - Ral_TupleHeadingBegin(tupleHeading) ;
     /*
      * Create the new ranked relation, extending it by the "newAttr".
@@ -2025,48 +2006,11 @@ RelationRankCmd(
 	Ral_TupleIter newIter ;
 	int status ;
 
-	if (Tcl_ConvertToType(interp, rankObj, rankAttr->heading.tclType)
-		!= TCL_OK) {
-	    Ral_RelationDelete(newRelation) ;
-	    return TCL_ERROR ;
-	}
-
 	for (tIter = Ral_RelationBegin(relation) ; tIter != rEnd ; ++tIter) {
 	    Tcl_Obj *cmpObj = *(Ral_TupleBegin(*tIter) + rankAttrIndex) ;
 
-	    if (Tcl_ConvertToType(interp, cmpObj, rankAttr->heading.tclType)
-		!= TCL_OK) {
-		Ral_RelationDelete(newRelation) ;
-		return TCL_ERROR ;
-	    }
-
-	    switch (rankType) {
-	    case RANK_INT:
-		rankCount += order == SORT_DESCENDING ?
-		    cmpObj->internalRep.longValue >
-			rankObj->internalRep.longValue :
-		    cmpObj->internalRep.longValue <
-			rankObj->internalRep.longValue ;
-		break ;
-
-	    case RANK_DOUBLE:
-		rankCount += order == SORT_DESCENDING ?
-		    cmpObj->internalRep.doubleValue >
-			rankObj->internalRep.doubleValue :
-		    cmpObj->internalRep.doubleValue <
-			rankObj->internalRep.doubleValue ;
-		break ;
-
-	    case RANK_STRING:
-		rankCount += order == SORT_DESCENDING ?
-		    strcmp(Tcl_GetString(cmpObj), Tcl_GetString(rankObj)) > 0 :
-		    strcmp(Tcl_GetString(cmpObj), Tcl_GetString(rankObj)) < 0 ;
-		break ;
-
-	    default:
-		Tcl_Panic("Ral_RelationRankCmd: unknown rank type, %d",
-		    rankType) ;
-	    }
+	    int cmp = Ral_AttributeValueCompare(rankAttr, cmpObj, rankObj) ;
+	    rankCount += order == SORT_DESCENDING ? cmp > 0 : cmp < 0 ;
 	}
 
 	newTuple = Ral_TupleNew(newTupleHeading) ;

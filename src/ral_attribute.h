@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.h,v $
-$Revision: 1.13 $
-$Date: 2008/01/19 19:16:45 $
+$Revision: 1.14 $
+$Date: 2008/04/11 03:50:27 $
  *--
  */
 #ifndef _ral_attribute_h_
@@ -99,7 +99,6 @@ typedef struct Ral_Attribute {
     char const *typeName ;	    /* data type name */
     Ral_AttrDataType attrType ;	    /* encoding to distinguish the union */
     union {
-	Tcl_ObjType *tclType ;
 	struct Ral_TupleHeading *tupleHeading ;
 	struct Ral_RelationHeading *relationHeading ;
     } heading ;

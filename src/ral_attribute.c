@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.c,v $
-$Revision: 1.19 $
-$Date: 2008/02/15 02:06:55 $
+$Revision: 1.20 $
+$Date: 2008/04/11 03:50:27 $
  *--
  */
 
@@ -57,6 +57,7 @@ PRAGMAS
 /*
 INCLUDE FILES
 */
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -66,14 +67,27 @@ INCLUDE FILES
 #include "ral_relationheading.h"
 #include "ral_tupleobj.h"
 #include "ral_relationobj.h"
+#ifdef Tcl_GetBignumFromObj_TCL_DECLARED
+#   include "tclTomMath.h"
+#endif
 
 /*
 MACRO DEFINITIONS
 */
+#define	COUNTOF(a)  (sizeof(a) / sizeof(a[0]))
 
 /*
 TYPE DEFINITIONS
 */
+typedef int (*IsATypeFunc)(Tcl_Interp *, Tcl_Obj *) ;
+typedef bool (*IsEqualFunc)(Tcl_Obj *, Tcl_Obj *) ;
+typedef int (*CompareFunc)(Tcl_Obj *, Tcl_Obj *) ;
+struct ral_type {
+    char const *typeName ;
+    IsATypeFunc isa ;
+    IsEqualFunc isequal ;
+    CompareFunc compare ;
+} ;
 
 /*
 EXTERNAL FUNCTION REFERENCES
@@ -82,6 +96,47 @@ EXTERNAL FUNCTION REFERENCES
 /*
 FORWARD FUNCTION REFERENCES
 */
+static struct ral_type *findRalType(char const *) ;
+
+static int isABoolean(Tcl_Interp *, Tcl_Obj *) ;
+static bool booleanEqual(Tcl_Obj *, Tcl_Obj *) ;
+static int booleanCompare(Tcl_Obj *, Tcl_Obj *) ;
+
+static int isAnInt(Tcl_Interp *, Tcl_Obj *) ;
+static bool intEqual(Tcl_Obj *, Tcl_Obj *) ;
+static int intCompare(Tcl_Obj *, Tcl_Obj *) ;
+
+static int isALong(Tcl_Interp *, Tcl_Obj *) ;
+static bool longEqual(Tcl_Obj *, Tcl_Obj *) ;
+static int longCompare(Tcl_Obj *, Tcl_Obj *) ;
+
+static int isADouble(Tcl_Interp *, Tcl_Obj *) ;
+static bool doubleEqual(Tcl_Obj *, Tcl_Obj *) ;
+static int doubleCompare(Tcl_Obj *, Tcl_Obj *) ;
+
+#ifdef Tcl_GetBignumFromObj_TCL_DECLARED
+static int isABignum(Tcl_Interp *, Tcl_Obj *) ;
+static bool bignumEqual(Tcl_Obj *, Tcl_Obj *) ;
+static int bignumCompare(Tcl_Obj *, Tcl_Obj *) ;
+#endif
+
+#   ifndef NO_WIDE_TYPE
+static int isAWideInt(Tcl_Interp *, Tcl_Obj *) ;
+static bool wideIntEqual(Tcl_Obj *, Tcl_Obj *) ;
+static int wideIntCompare(Tcl_Obj *, Tcl_Obj *) ;
+#   endif
+
+static int isAList(Tcl_Interp *, Tcl_Obj *) ;
+static bool listEqual(Tcl_Obj *, Tcl_Obj *) ;
+static int listCompare(Tcl_Obj *, Tcl_Obj *) ;
+
+static int isADict(Tcl_Interp *, Tcl_Obj *) ;
+static bool dictEqual(Tcl_Obj *, Tcl_Obj *) ;
+static int dictCompare(Tcl_Obj *, Tcl_Obj *) ;
+
+static int isAString(Tcl_Interp *, Tcl_Obj *) ;
+static bool stringEqual(Tcl_Obj *, Tcl_Obj *) ;
+static int stringCompare(Tcl_Obj *, Tcl_Obj *) ;
 
 /*
 EXTERNAL DATA REFERENCES
@@ -96,9 +151,27 @@ char relationKeyword[] = "Relation" ;
 /*
 STATIC DATA ALLOCATION
 */
-static const char openList = '{' ;
-static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.19 $" ;
+static struct ral_type const Ral_Types[] = {
+#	ifdef Tcl_GetBignumFromObj_TCL_DECLARED
+    {"bignum", isABignum, bignumEqual, bignumCompare},
+#	endif
+    {"boolean", isABoolean, booleanEqual, booleanCompare},
+#	ifdef Tcl_DictObjSize_TCL_DECLARED
+    {"dict", isADict, dictEqual, dictCompare},
+#	endif
+    {"double", isADouble, doubleEqual, doubleCompare},
+    {"int", isAnInt, intEqual, intCompare},
+    {"list", isAList, listEqual, listCompare},
+    {"long", isALong, longEqual, longCompare},
+    {"string", isAString, stringEqual, stringCompare},
+#	ifndef NO_WIDE_TYPE
+    {"wideInt", isAWideInt, wideIntEqual, wideIntCompare},
+#	endif
+} ;
+
+static char const openList = '{' ;
+static char const closeList = '}' ;
+static char const rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.20 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -110,17 +183,16 @@ Ral_AttributeNewTclType(
     char const *typeName)
 {
     Ral_Attribute a ;
-    Tcl_ObjType *tclType = Tcl_GetObjType(typeName) ;
+    struct ral_type *ralType = findRalType(typeName) ;
 
-    if (tclType == NULL) {
+    if (ralType == NULL) {
 	return NULL ;
     }
     /* +1 for the NUL terminator */
     a = (Ral_Attribute)ckalloc(sizeof(*a) + strlen(name) + 1) ;
     a->name = strcpy((char *)(a + 1), name) ;
-    a->typeName = tclType->name ;
+    a->typeName = ralType->typeName ;
     a->attrType = Tcl_Type ;
-    a->heading.tclType = tclType ;
 
     return a ;
 }
@@ -262,7 +334,7 @@ Ral_AttributeTypeEqual(
 
     switch (a1->attrType) {
     case Tcl_Type:
-	result = a1->heading.tclType == a2->heading.tclType ;
+	result = strcmp(a1->typeName, a2->typeName) == 0 ;
 	break ;
 
     case Tuple_Type:
@@ -288,59 +360,41 @@ Ral_AttributeValueEqual(
     Tcl_Obj *v1,
     Tcl_Obj *v2)
 {
+    int isEqual = 0 ;
+
     switch (a->attrType) {
     case Tcl_Type:
 	if (strlen(Tcl_GetString(v1)) == 0 && strlen(Tcl_GetString(v2)) == 0) {
-	    return 1 ;
+	    isEqual = 1 ;
+	} else {
+	    struct ral_type *type = findRalType(a->typeName) ;
+	    isEqual = type ?  type->isequal(v1, v2) : stringEqual(v1, v2) ;
 	}
-	if (Tcl_ConvertToType(NULL, v1, a->heading.tclType) != TCL_OK ||
-	    Tcl_ConvertToType(NULL, v2, a->heading.tclType) != TCL_OK) {
-	    return 0 ;
-	}
-	if (strcmp(a->typeName, "int") == 0 ||
-	    strcmp(a->typeName, "boolean") == 0 ||
-	    strcmp(a->typeName, "booleanString") == 0) {
-	    return v1->internalRep.longValue == v2->internalRep.longValue ;
-	} else if (strcmp(a->typeName, "double") == 0) {
-	    return v1->internalRep.doubleValue == v2->internalRep.doubleValue ;
-	} 
-
-#	ifndef NO_WIDE_TYPE
-	  else if (strcmp(a->typeName, "wideInt") == 0) {
-	    return v1->internalRep.wideValue == v2->internalRep.wideValue ;
-	}
-#	endif
-
-	else {
-	    /*
-	     * If we're not one of the numeric types we can handle,
-	     * then just do a string compare.
-	     */
-	    return strcmp(Tcl_GetString(v1), Tcl_GetString(v2)) == 0 ;
-	}
+	break ;
 
     case Tuple_Type:
 	if (Tcl_ConvertToType(NULL, v1, &Ral_TupleObjType) != TCL_OK ||
 	    Tcl_ConvertToType(NULL, v2, &Ral_TupleObjType) != TCL_OK) {
 	    Tcl_Panic("Ral_AttributeValueEqual: cannot convert to tuple") ;
 	}
-	return Ral_TupleEqual(v1->internalRep.otherValuePtr,
+	isEqual = Ral_TupleEqual(v1->internalRep.otherValuePtr,
 	    v2->internalRep.otherValuePtr) ;
+	break ;
 
     case Relation_Type:
 	if (Tcl_ConvertToType(NULL, v1, &Ral_RelationObjType) != TCL_OK ||
 	    Tcl_ConvertToType(NULL, v2, &Ral_RelationObjType) != TCL_OK) {
 	    Tcl_Panic("Ral_AttributeValueEqual: cannot convert to relation") ;
 	}
-	return Ral_RelationEqual(v1->internalRep.otherValuePtr,
+	isEqual = Ral_RelationEqual(v1->internalRep.otherValuePtr,
 	    v2->internalRep.otherValuePtr) ;
+	break ;
 
     default:
 	Tcl_Panic("Ral_AttributeValueEqual: unknown attribute type: %d",
 	    a->attrType) ;
     }
-    /* Not reached */
-    return 1 ;
+    return isEqual ;
 }
 
 int
@@ -352,34 +406,10 @@ Ral_AttributeValueCompare(
     int result = 0 ;
 
     switch (a->attrType) {
-    case Tcl_Type:
-	if (Tcl_ConvertToType(NULL, v1, a->heading.tclType) != TCL_OK ||
-	    Tcl_ConvertToType(NULL, v2, a->heading.tclType) != TCL_OK) {
-	    Tcl_Panic("Ral_AttributeValueCompare: cannot convert to %s",
-		a->typeName) ;
-	}
-	if (strcmp(a->typeName, "int") == 0 ||
-	    strcmp(a->typeName, "boolean") == 0 ||
-	    strcmp(a->typeName, "booleanString") == 0) {
-	    result = v1->internalRep.longValue - v2->internalRep.longValue ;
-	} else if (strcmp(a->typeName, "double") == 0) {
-	    result =  v1->internalRep.doubleValue -
-		v2->internalRep.doubleValue ;
-	}
-
-#		ifndef NO_WIDE_TYPE
-	  else if (strcmp(a->typeName, "wideInt") == 0) {
-	    result = v1->internalRep.wideValue - v2->internalRep.wideValue ;
-	}
-#		endif
-
-	else {
-	    /*
-	     * If we're not one of the numeric types we can handle,
-	     * then just do a string compare.
-	     */
-	    result = strcmp(Tcl_GetString(v1), Tcl_GetString(v2)) ;
-	}
+    case Tcl_Type: {
+	struct ral_type *type = findRalType(a->typeName) ;
+	result = type ?  type->compare(v1, v2) : stringCompare(v1, v2) ;
+    }
 	break ;
 
     case Tuple_Type:
@@ -539,32 +569,34 @@ Ral_AttributeConvertValueToType(
     switch (attr->attrType) {
     case Tcl_Type:
 	/*
-	 * For simple Tcl types, attempt to convert the Tcl object
-	 * to the type for the attribute. It is possible for the
-	 * type convertion to succeed, but that the type be assigned
-	 * something other than the requested one. This happens when
-	 * "0" and "1" are used for boolean values. In this case the
-	 * type ends up being "int". This means that "0" and "1" are
-	 * NOT valid boolean values.
+	 * For simple Tcl types, attempt to convert the Tcl object to the type
+	 * for the attribute. It is possible for the type convertion to
+	 * succeed, but that the type be assigned something other than the one
+	 * associated with the attribute.  Tcl type conversions, especially for
+	 * numeric types, stops at the first type that can represent the
+	 * number. For example, converting "30" to a double will end up as an
+	 * "int" internally. This prevents excessive round off and other
+	 * issues. It is okay that this happens, as the "shadow" typing system
+	 * handles the conversion to an actual double value when necessary.
 	 *
 	 * Also, we deem the empty string to be a valid value for any
 	 * simple Tcl type.
 	 */
 	if (strlen(Tcl_GetString(objPtr)) != 0) {
-	    result = Tcl_ConvertToType(interp, objPtr, attr->heading.tclType) ;
-	    if (result != TCL_OK || objPtr->typePtr != attr->heading.tclType) {
+	    struct ral_type *type = findRalType(attr->typeName) ;
+	    result = type ? type->isa(interp, objPtr) :
+		    isAString(interp, objPtr) ;
+	    if (result != TCL_OK) {
 		Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_BAD_VALUE, objPtr) ;
 		Ral_InterpSetError(interp, errInfo) ;
-	    } else if (strcmp(attr->heading.tclType->name, "string") != 0 &&
-		attr->heading.tclType->updateStringProc != NULL) {
+	    } else if (strcmp(attr->typeName, "string") != 0) {
 		/*
 		 * We also want to generate the canonical form of the string
 		 * representation so that string hashes, etc work properly.
-		 * We only do this on non-string types and on those types
-		 * that can actually regenerate a string rep once invalidated.
+		 * We only do this on non-string types.
 		 */
 		Tcl_InvalidateStringRep(objPtr) ;
-		(*attr->heading.tclType->updateStringProc)(objPtr) ;
+		Tcl_GetString(objPtr) ;
 	    }
 	}
 	break ;
@@ -590,6 +622,358 @@ Ral_AttributeConvertValueToType(
     }
 
     return result ;
+}
+
+static int cmpTypeNames(
+    void const *n1,
+    void const *n2)
+{
+    struct ral_type const *t1 = n1 ;
+    struct ral_type const *t2 = n2 ;
+    return strcmp(t1->typeName, t2->typeName) ;
+}
+
+static struct ral_type *
+findRalType(char const *typeName)
+{
+    struct ral_type key ;
+
+    key.typeName = typeName ;
+    return bsearch(&key, Ral_Types, COUNTOF(Ral_Types), sizeof(struct ral_type),
+	    cmpTypeNames) ;
+}
+
+static int
+isABoolean(
+    Tcl_Interp *interp,
+    Tcl_Obj *boolObj)
+{
+    int b ;
+    return Tcl_GetBooleanFromObj(interp, boolObj, &b) ;
+}
+
+static bool
+booleanEqual(
+    Tcl_Obj *v1,
+    Tcl_Obj *v2)
+{
+    int b1 ;
+    int b2 ;
+
+    return (Tcl_GetBooleanFromObj(NULL, v1, &b1) == TCL_OK &&
+		Tcl_GetBooleanFromObj(NULL, v2, &b2) == TCL_OK) ?
+	    b1 == b2 : false ;
+}
+
+static int
+booleanCompare(
+    Tcl_Obj *v1,
+    Tcl_Obj *v2)
+{
+    int b1 ;
+    int b2 ;
+
+    if (Tcl_GetBooleanFromObj(NULL, v1, &b1) == TCL_OK &&
+	    Tcl_GetBooleanFromObj(NULL, v2, &b2) == TCL_OK) {
+	return b1 - b2 ;
+    }
+    Tcl_Panic("booleanCompare: cannot convert values to \"boolean\"") ;
+    return -1 ;
+}
+
+static int
+isAnInt(
+    Tcl_Interp *interp,
+    Tcl_Obj *intObj)
+{
+    int i ;
+    return Tcl_GetIntFromObj(interp, intObj, &i) ;
+}
+
+static bool
+intEqual(
+    Tcl_Obj *v1,
+    Tcl_Obj *v2)
+{
+    int int1 ;
+    int int2 ;
+
+    return (Tcl_GetIntFromObj(NULL, v1, &int1) == TCL_OK &&
+		Tcl_GetIntFromObj(NULL, v2, &int2) == TCL_OK) ?
+	    int1 == int2 : false ;
+}
+
+static int
+intCompare(
+    Tcl_Obj *v1,
+    Tcl_Obj *v2)
+{
+    int int1 ;
+    int int2 ;
+
+    if (Tcl_GetIntFromObj(NULL, v1, &int1) == TCL_OK &&
+	    Tcl_GetIntFromObj(NULL, v2, &int2) == TCL_OK) {
+	return int1 - int2 ;
+    }
+    Tcl_Panic("intCompare: cannot convert values to \"int\"") ;
+    return -1 ;
+}
+
+static int
+isALong(
+    Tcl_Interp *interp,
+    Tcl_Obj *longObj)
+{
+    long l ;
+    return Tcl_GetLongFromObj(interp, longObj, &l) ;
+}
+
+static bool
+longEqual(
+    Tcl_Obj *v1,
+    Tcl_Obj *v2)
+{
+    long l1 ;
+    long l2 ;
+
+    return (Tcl_GetLongFromObj(NULL, v1, &l1) == TCL_OK &&
+		Tcl_GetLongFromObj(NULL, v2, &l2) == TCL_OK) ?
+	    l1 == l2 : false ;
+}
+
+static int
+longCompare(
+    Tcl_Obj *v1,
+    Tcl_Obj *v2)
+{
+    long l1 ;
+    long l2 ;
+
+    if (Tcl_GetLongFromObj(NULL, v1, &l1) == TCL_OK &&
+	    Tcl_GetLongFromObj(NULL, v2, &l2) == TCL_OK) {
+	return l1 - l2 ;
+    }
+    Tcl_Panic("longCompare: cannot convert values to \"long\"") ;
+    return -1 ;
+}
+
+static int
+isADouble(
+    Tcl_Interp *interp,
+    Tcl_Obj *dblObj)
+{
+    double d ;
+    return Tcl_GetDoubleFromObj(interp, dblObj, &d) ;
+}
+
+static bool
+doubleEqual(
+    Tcl_Obj *v1,
+    Tcl_Obj *v2)
+{
+    double d1 ;
+    double d2 ;
+
+    return (Tcl_GetDoubleFromObj(NULL, v1, &d1) == TCL_OK &&
+		Tcl_GetDoubleFromObj(NULL, v2, &d2) == TCL_OK) ?
+	    d1 == d2 : false ;
+}
+
+static int
+doubleCompare(
+    Tcl_Obj *v1,
+    Tcl_Obj *v2)
+{
+    double double1 ;
+    double double2 ;
+
+    if (Tcl_GetDoubleFromObj(NULL, v1, &double1) == TCL_OK &&
+	    Tcl_GetDoubleFromObj(NULL, v2, &double2) == TCL_OK) {
+	if (double1 > double2) {
+	    return 1 ;
+	} else if (double1 < double2) {
+	    return -1 ;
+	} else {
+	    return 0 ;
+	}
+    }
+    Tcl_Panic("doubleCompare: cannot convert values to \"double\"") ;
+    return -1 ;
+}
+
+#   ifndef NO_WIDE_TYPE
+static int
+isAWideInt(
+    Tcl_Interp *interp,
+    Tcl_Obj *wintObj)
+{
+    Tcl_WideInt wint ;
+    return Tcl_GetWideIntFromObj(interp, wintObj, &wint) ;
+}
+
+static bool
+wideIntEqual(
+    Tcl_Obj *v1,
+    Tcl_Obj *v2)
+{
+    Tcl_WideInt wint1 ;
+    Tcl_WideInt wint2 ;
+
+    return (Tcl_GetWideIntFromObj(NULL, v1, &wint1) == TCL_OK &&
+		Tcl_GetWideIntFromObj(NULL, v2, &wint2) == TCL_OK) ?
+	    wint1 == wint2 : false ;
+}
+
+static int
+wideIntCompare(
+    Tcl_Obj *v1,
+    Tcl_Obj *v2)
+{
+    Tcl_WideInt wint1 ;
+    Tcl_WideInt wint2 ;
+
+    if (Tcl_GetWideIntFromObj(NULL, v1, &wint1) == TCL_OK &&
+		Tcl_GetWideIntFromObj(NULL, v2, &wint2) == TCL_OK) {
+	if (wint1 > wint2) {
+	    return 1 ;
+	} else if (wint1 < wint2) {
+	    return -1 ;
+	} else {
+	    return 0 ;
+	}
+    }
+    Tcl_Panic("wideIntCompare: cannot convert values to \"wideInt\"") ;
+    return -1 ;
+}
+#   endif
+
+#   ifdef Tcl_GetBignumFromObj_TCL_DECLARED
+static int
+isABignum(
+    Tcl_Interp *interp,
+    Tcl_Obj *bnObj)
+{
+    mp_int bn ;
+    int result = Tcl_GetBignumFromObj(interp, bnObj, &bn) ;
+    mp_clear(&bn) ;
+
+    return result ;
+}
+
+static bool
+bignumEqual(
+    Tcl_Obj *v1,
+    Tcl_Obj *v2)
+{
+    mp_int bn1 ;
+    mp_int bn2 ;
+    bool result = false ;
+
+    if (Tcl_GetBignumFromObj(NULL, v1, &bn1) == TCL_OK) {
+	if (Tcl_GetBignumFromObj(NULL, v2, &bn2) == TCL_OK) {
+	    result = mp_cmp(&bn1, &bn2) == 0 ;
+	    mp_clear(&bn2) ;
+	}
+	mp_clear(&bn1) ;
+    }
+
+    return result ;
+}
+
+static int
+bignumCompare(
+    Tcl_Obj *v1,
+    Tcl_Obj *v2)
+{
+    mp_int bn1 ;
+    mp_int bn2 ;
+    int result = -1 ;
+
+    if (Tcl_GetBignumFromObj(NULL, v1, &bn1) == TCL_OK) {
+	if (Tcl_GetBignumFromObj(NULL, v2, &bn2) == TCL_OK) {
+	    result = mp_cmp(&bn1, &bn2) ;
+	    mp_clear(&bn2) ;
+	}
+	mp_clear(&bn1) ;
+    }
+
+    return result ;
+}
+#   endif
+
+static int
+isAList(
+    Tcl_Interp *interp,
+    Tcl_Obj *listObj)
+{
+    int elemc ;
+    Tcl_Obj **elemv ;
+    return Tcl_ListObjGetElements(interp, listObj, &elemc, &elemv) ;
+}
+
+static bool
+listEqual(
+    Tcl_Obj *v1,
+    Tcl_Obj *v2)
+{
+    return stringEqual(v1, v2) ;
+}
+
+static int
+listCompare(
+    Tcl_Obj *v1,
+    Tcl_Obj *v2)
+{
+    return stringCompare(v1, v2) ;
+}
+
+static int
+isADict(
+    Tcl_Interp *interp,
+    Tcl_Obj *dictObj)
+{
+    int size ;
+    return Tcl_DictObjSize(interp, dictObj, &size) ;
+}
+
+static bool
+dictEqual(
+    Tcl_Obj *v1,
+    Tcl_Obj *v2)
+{
+    return stringEqual(v1, v2) ;
+}
+
+static int
+dictCompare(
+    Tcl_Obj *v1,
+    Tcl_Obj *v2)
+{
+    return stringCompare(v1, v2) ;
+}
+
+static int
+isAString(
+    Tcl_Interp *interp,
+    Tcl_Obj *objPtr)
+{
+    return TCL_OK ;
+}
+
+static bool
+stringEqual(
+    Tcl_Obj *v1,
+    Tcl_Obj *v2)
+{
+    return strcmp(Tcl_GetString(v1), Tcl_GetString(v2)) == 0 ;
+}
+
+static int
+stringCompare(
+    Tcl_Obj *v1,
+    Tcl_Obj *v2)
+{
+    return strcmp(Tcl_GetString(v1), Tcl_GetString(v2)) ;
 }
 
 int
@@ -620,8 +1004,7 @@ Ral_AttributeScanType(
     flags->attrType = a->attrType ;
     switch (a->attrType) {
     case Tcl_Type:
-	length = Tcl_ScanElement(a->heading.tclType->name,
-		&flags->flags.simpleFlags) ;
+	length = Tcl_ScanElement(a->typeName, &flags->flags.simpleFlags) ;
 	break ;
 
     case Tuple_Type:
@@ -652,7 +1035,7 @@ Ral_AttributeConvertType(
 
     switch (a->attrType) {
     case Tcl_Type:
-	length = Tcl_ConvertElement(a->heading.tclType->name, dst,
+	length = Tcl_ConvertElement(a->typeName, dst,
 		flags->flags.simpleFlags) ;
 	break ;
 

@@ -49,8 +49,8 @@ ABSTRACT:
     Algebra.
 
 $RCSfile: ral.c,v $
-$Revision: 1.39 $
-$Date: 2008/02/09 19:42:33 $
+$Revision: 1.40 $
+$Date: 2008/04/11 03:50:27 $
  *--
  */
 
@@ -105,7 +105,7 @@ STATIC DATA ALLOCATION
 static char const ral_pkgname[] = PACKAGE_NAME ;
 static char const ral_version[] = PACKAGE_VERSION ;
 static char const ral_rcsid[] =
-    "$Id: ral.c,v 1.39 2008/02/09 19:42:33 mangoa01 Exp $" ;
+    "$Id: ral.c,v 1.40 2008/04/11 03:50:27 mangoa01 Exp $" ;
 static char const ral_copyright[] =
     "This software is copyrighted 2004, 2005, 2006, 2007 by G. Andrew Mangogna."
     " Terms and conditions for use are distributed with the source code." ;
@@ -146,11 +146,6 @@ Ral_Init(
 
     Tcl_InitStubs(interp, TCL_VERSION, 0) ;
 
-    /*
-     * Register the new data types that this package defines.
-     */
-    Tcl_RegisterObjType(&Ral_TupleObjType) ;
-    Tcl_RegisterObjType(&Ral_RelationObjType) ;
     /*
      * Create the namespace in which the package command reside.
      */
