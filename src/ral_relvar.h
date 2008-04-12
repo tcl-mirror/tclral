@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.h,v $
-$Revision: 1.11 $
-$Date: 2008/01/19 20:51:16 $
+$Revision: 1.12 $
+$Date: 2008/04/12 22:53:59 $
  *--
  */
 #ifndef _ral_relvar_h_
@@ -164,12 +164,12 @@ DATA DECLARATIONS
 FUNCTION DECLARATIONS
 */
 
-extern Ral_Relvar Ral_RelvarNew(Ral_RelvarInfo, const char *,
+extern Ral_Relvar Ral_RelvarNew(Ral_RelvarInfo, char const *,
     Ral_RelationHeading) ;
-extern void Ral_RelvarDelete(Ral_RelvarInfo, const char *) ;
-extern Ral_Relvar Ral_RelvarFind(Ral_RelvarInfo, const char *) ;
+extern void Ral_RelvarDelete(Ral_RelvarInfo, char const *) ;
+extern Ral_Relvar Ral_RelvarFind(Ral_RelvarInfo, char const *) ;
 
-extern ClientData Ral_RelvarNewInfo(const char *, Tcl_Interp *) ;
+extern ClientData Ral_RelvarNewInfo(char const *, Tcl_Interp *) ;
 extern void Ral_RelvarDeleteInfo(ClientData, Tcl_Interp *) ;
 extern Ral_Relvar Ral_RelvarLookupRelvar(Tcl_Interp *, Ral_RelvarInfo,
     Tcl_Obj *) ;
@@ -185,17 +185,17 @@ extern int Ral_RelvarEndCommand(Ral_RelvarInfo, int, Tcl_DString *) ;
 extern Ral_RelvarTransaction Ral_RelvarNewTransaction(void) ;
 extern void Ral_RelvarDeleteTransaction(Ral_RelvarTransaction) ;
 
-extern Ral_Constraint Ral_ConstraintAssocCreate(const char *, Ral_RelvarInfo) ;
-extern Ral_Constraint Ral_ConstraintPartitionCreate(const char *,
+extern Ral_Constraint Ral_ConstraintAssocCreate(char const *, Ral_RelvarInfo) ;
+extern Ral_Constraint Ral_ConstraintPartitionCreate(char const *,
     Ral_RelvarInfo) ;
-extern Ral_Constraint Ral_ConstraintCorrelationCreate(const char *,
+extern Ral_Constraint Ral_ConstraintCorrelationCreate(char const *,
     Ral_RelvarInfo) ;
 
-extern int Ral_ConstraintDeleteByName(const char *, Ral_RelvarInfo) ;
-extern Ral_Constraint Ral_ConstraintFindByName(const char *, Ral_RelvarInfo) ;
-extern Ral_Constraint Ral_ConstraintNewAssociation(const char *) ;
-extern Ral_Constraint Ral_ConstraintNewPartition(const char *) ;
-extern Ral_Constraint Ral_ConstraintNewCorrelation(const char *) ;
+extern int Ral_ConstraintDeleteByName(char const *, Ral_RelvarInfo) ;
+extern Ral_Constraint Ral_ConstraintFindByName(char const *, Ral_RelvarInfo) ;
+extern Ral_Constraint Ral_ConstraintNewAssociation(char const *) ;
+extern Ral_Constraint Ral_ConstraintNewPartition(char const *) ;
+extern Ral_Constraint Ral_ConstraintNewCorrelation(char const *) ;
 extern void Ral_ConstraintDelete(Ral_Constraint) ;
 extern int Ral_RelvarConstraintEval(Ral_Constraint, Tcl_DString *) ;
 

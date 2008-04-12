@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.c,v $
-$Revision: 1.16 $
-$Date: 2008/01/19 20:51:16 $
+$Revision: 1.17 $
+$Date: 2008/04/12 22:53:59 $
  *--
  */
 
@@ -82,27 +82,27 @@ static void relvarCleanup(Ral_Relvar) ;
 static void relvarConstraintCleanup(Ral_Constraint) ;
 static void relvarTraceCleanup(Ral_TraceInfo) ;
 static void relvarSetIntRep(Ral_Relvar, Ral_Relation) ;
-static int relvarAssocConstraintEval(const char *, Ral_AssociationConstraint,
+static int relvarAssocConstraintEval(char const *, Ral_AssociationConstraint,
     Tcl_DString *) ;
-static int relvarPartitionConstraintEval(const char *,
+static int relvarPartitionConstraintEval(char const *,
     Ral_PartitionConstraint, Tcl_DString *) ;
-static int relvarCorrelationConstraintEval(const char *,
+static int relvarCorrelationConstraintEval(char const *,
     Ral_CorrelationConstraint, Tcl_DString *) ;
 static int relvarEvalAssocTupleCounts(Ral_IntVector, int, int, Ral_IntVector,
     Ral_IntVector) ;
-static void relvarAssocConstraintErrorMsg(Tcl_DString *, const char *,
-    Ral_AssociationConstraint, Ral_Relvar, Ral_IntVector, const char *) ;
-static void relvarPartitionConstraintErrorMsg(Tcl_DString *, const char *,
-    Ral_PartitionConstraint, Ral_Relvar, Ral_IntVector, const char *) ;
-static void relvarCorrelationConstraintErrorMsg(Tcl_DString *, const char *,
-    Ral_CorrelationConstraint, Ral_Relvar, Ral_IntVector, const char *) ;
-static void relvarConstraintErrorMsg(Tcl_DString *, const char *, Ral_Relation,
-    Ral_IntVector, const char *) ;
-static void relvarAssocConstraintToString(const char *,
+static void relvarAssocConstraintErrorMsg(Tcl_DString *, char const *,
+    Ral_AssociationConstraint, Ral_Relvar, Ral_IntVector, char const *) ;
+static void relvarPartitionConstraintErrorMsg(Tcl_DString *, char const *,
+    Ral_PartitionConstraint, Ral_Relvar, Ral_IntVector, char const *) ;
+static void relvarCorrelationConstraintErrorMsg(Tcl_DString *, char const *,
+    Ral_CorrelationConstraint, Ral_Relvar, Ral_IntVector, char const *) ;
+static void relvarConstraintErrorMsg(Tcl_DString *, char const *, Ral_Relation,
+    Ral_IntVector, char const *) ;
+static void relvarAssocConstraintToString(char const *,
     Ral_AssociationConstraint, Tcl_DString *) ;
-static void relvarPartitionConstraintToString(const char *,
+static void relvarPartitionConstraintToString(char const *,
     Ral_PartitionConstraint, Tcl_DString *) ;
-static void relvarCorrelationConstraintToString(const char *,
+static void relvarCorrelationConstraintToString(char const *,
     Ral_CorrelationConstraint, Tcl_DString *) ;
 
 /*
@@ -120,7 +120,7 @@ static char const * const condMultStrings[2][2] = {
     {"1", "+"},
     {"?", "*"}
 } ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.16 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.17 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -129,7 +129,7 @@ FUNCTION DEFINITIONS
 Ral_Relvar
 Ral_RelvarNew(
     Ral_RelvarInfo info,
-    const char *name,
+    char const *name,
     Ral_RelationHeading heading)
 {
     int newPtr ;
@@ -157,7 +157,7 @@ Ral_RelvarNew(
 void
 Ral_RelvarDelete(
     Ral_RelvarInfo info,
-    const char *name)
+    char const *name)
 {
     Tcl_HashEntry *entry ;
     Ral_Relvar relvar ;
@@ -179,7 +179,7 @@ Ral_RelvarDelete(
 Ral_Relvar
 Ral_RelvarFind(
     Ral_RelvarInfo info,
-    const char *name)
+    char const *name)
 {
     Tcl_HashEntry *entry ;
     Ral_Relvar relvar = NULL ;
@@ -200,7 +200,7 @@ Ral_RelvarFind(
  */
 ClientData
 Ral_RelvarNewInfo(
-    const char *name,
+    char const *name,
     Tcl_Interp *interp)
 {
     Ral_RelvarInfo info = (Ral_RelvarInfo)ckalloc(sizeof(*info)) ;
@@ -448,7 +448,7 @@ Ral_RelvarDeleteTransaction(
 
 Ral_Constraint
 Ral_ConstraintAssocCreate(
-    const char *name,
+    char const *name,
     Ral_RelvarInfo info)
 {
     int newPtr ;
@@ -466,7 +466,7 @@ Ral_ConstraintAssocCreate(
 
 Ral_Constraint
 Ral_ConstraintPartitionCreate(
-    const char *name,
+    char const *name,
     Ral_RelvarInfo info)
 {
     int newPtr ;
@@ -484,7 +484,7 @@ Ral_ConstraintPartitionCreate(
 
 Ral_Constraint
 Ral_ConstraintCorrelationCreate(
-    const char *name,
+    char const *name,
     Ral_RelvarInfo info)
 {
     int newPtr ;
@@ -502,7 +502,7 @@ Ral_ConstraintCorrelationCreate(
 
 int
 Ral_ConstraintDeleteByName(
-    const char *name,
+    char const *name,
     Ral_RelvarInfo info)
 {
     int deleted = 0 ;
@@ -520,7 +520,7 @@ Ral_ConstraintDeleteByName(
 
 Ral_Constraint
 Ral_ConstraintFindByName(
-    const char *name,
+    char const *name,
     Ral_RelvarInfo info)
 {
     Tcl_HashEntry *entry ;
@@ -536,7 +536,7 @@ Ral_ConstraintFindByName(
 
 static Ral_Constraint
 Ral_ConstraintNew(
-    const char *name)
+    char const *name)
 {
     Ral_Constraint constraint ;
 
@@ -550,7 +550,7 @@ Ral_ConstraintNew(
 
 Ral_Constraint
 Ral_ConstraintNewAssociation(
-    const char *name)
+    char const *name)
 {
     Ral_Constraint constraint = Ral_ConstraintNew(name) ;
 
@@ -565,7 +565,7 @@ Ral_ConstraintNewAssociation(
 
 Ral_Constraint
 Ral_ConstraintNewPartition(
-    const char *name)
+    char const *name)
 {
     Ral_Constraint constraint = Ral_ConstraintNew(name) ;
 
@@ -579,7 +579,7 @@ Ral_ConstraintNewPartition(
 
 Ral_Constraint
 Ral_ConstraintNewCorrelation(
-    const char *name)
+    char const *name)
 {
     Ral_Constraint constraint = Ral_ConstraintNew(name) ;
 
@@ -834,7 +834,7 @@ Ral_RelvarTraceRemove(
 {
     Ral_TraceInfo prev = NULL ;
     Ral_TraceInfo trace = relvar->traces ;
-    const char *cmdString = Tcl_GetString(command) ;
+    char const *cmdString = Tcl_GetString(command) ;
     int nRemoved = 0 ;
 
     /*
@@ -989,7 +989,7 @@ relvarSetIntRep(
  */
 static int
 relvarAssocConstraintEval(
-    const char *name,			    /* name of constraint */
+    char const *name,			    /* name of constraint */
     Ral_AssociationConstraint association,  /* association constraint */
     Tcl_DString *errMsg)		    /* error message left here */
 {
@@ -1080,7 +1080,7 @@ relvarAssocConstraintEval(
  */
 static int
 relvarPartitionConstraintEval(
-    const char *name,
+    char const *name,
     Ral_PartitionConstraint partition,
     Tcl_DString *errMsg)
 {
@@ -1196,7 +1196,7 @@ relvarPartitionConstraintEval(
  */
 static int
 relvarCorrelationConstraintEval(
-    const char *name,
+    char const *name,
     Ral_CorrelationConstraint correlation,
     Tcl_DString *errMsg)
 {
@@ -1402,11 +1402,11 @@ relvarEvalAssocTupleCounts(
 static void
 relvarAssocConstraintErrorMsg(
     Tcl_DString *msg,		    /* error text appended here */
-    const char *name,		    /* constraint name */
+    char const *name,		    /* constraint name */
     Ral_AssociationConstraint assoc,/* association contraint in error */
     Ral_Relvar relvar,		    /* the relvar in error */
     Ral_IntVector violations,	    /* a list of tuple indices in error */
-    const char *detail)		    /* text detail for the error */
+    char const *detail)		    /* text detail for the error */
 {
     Ral_Relation rel ;
 
@@ -1425,11 +1425,11 @@ relvarAssocConstraintErrorMsg(
 static void
 relvarPartitionConstraintErrorMsg(
     Tcl_DString *msg,		    /* error text appended here */
-    const char *name,		    /* constraint name */
+    char const *name,		    /* constraint name */
     Ral_PartitionConstraint partition,/* partition contraint in error */
     Ral_Relvar relvar,		    /* the relvar in error */
     Ral_IntVector violations,	    /* a list of tuple indices in error */
-    const char *detail)		    /* text detail for the error */
+    char const *detail)		    /* text detail for the error */
 {
     Ral_Relation rel ;
 
@@ -1448,11 +1448,11 @@ relvarPartitionConstraintErrorMsg(
 static void
 relvarCorrelationConstraintErrorMsg(
     Tcl_DString *msg,		    /* error text appended here */
-    const char *name,		    /* constraint name */
+    char const *name,		    /* constraint name */
     Ral_CorrelationConstraint correlation,/* correlation contraint in error */
     Ral_Relvar relvar,		    /* the relvar in error */
     Ral_IntVector violations,	    /* a list of tuple indices in error */
-    const char *detail)		    /* text detail for the error */
+    char const *detail)		    /* text detail for the error */
 {
     Ral_Relation rel ;
 
@@ -1471,10 +1471,10 @@ relvarCorrelationConstraintErrorMsg(
 static void
 relvarConstraintErrorMsg(
     Tcl_DString *msg,
-    const char *relvarName,
+    char const *relvarName,
     Ral_Relation rel,
     Ral_IntVector violations,
-    const char *detail)
+    char const *detail)
 {
     Ral_IntVectorIter vEnd = Ral_IntVectorEnd(violations) ;
     Ral_IntVectorIter vIter ;
@@ -1498,7 +1498,7 @@ relvarConstraintErrorMsg(
 
 static void
 relvarAssocConstraintToString(
-    const char *name,
+    char const *name,
     Ral_AssociationConstraint assoc,
     Tcl_DString *result)
 {
@@ -1521,7 +1521,7 @@ relvarAssocConstraintToString(
 
 static void
 relvarPartitionConstraintToString(
-    const char *name,
+    char const *name,
     Ral_PartitionConstraint partition,
     Tcl_DString *result)
 {
@@ -1551,7 +1551,7 @@ relvarPartitionConstraintToString(
 
 static void
 relvarCorrelationConstraintToString(
-    const char *name,
+    char const *name,
     Ral_CorrelationConstraint correlation,
     Tcl_DString *result)
 {
