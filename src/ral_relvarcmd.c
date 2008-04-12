@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.30 $
-$Date: 2008/01/10 16:43:11 $
+$Revision: 1.31 $
+$Date: 2008/04/12 23:00:42 $
  *--
  */
 
@@ -122,7 +122,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.30 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.31 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -136,7 +136,7 @@ relvarCmd(
     Tcl_Obj *const*objv)
 {
     static const struct cmdMap {
-	const char *cmdName ;
+	char const *cmdName ;
 	int (*cmdFunc)(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
     } cmdTable[] = {
 	{"association", RelvarAssociationCmd},
@@ -177,7 +177,7 @@ relvarCmd(
 	(Ral_RelvarInfo)clientData) ;
 }
 
-const char *
+char const *
 Ral_RelvarCmdVersion(void)
 {
     return rcsid ;
@@ -268,7 +268,7 @@ RelvarConstraintCmd(
     /* relvar constraint names ?pattern? */
     case ConstraintNames:
     {
-	const char *pattern ;
+	char const *pattern ;
 
 	if (objc > 4) {
 	    Tcl_WrongNumArgs(interp, 3, objv, "?pattern?") ;
@@ -385,13 +385,13 @@ RelvarDeleteCmd(
 	Tcl_WrongNumArgs(interp, 2, objv, "relvarName tupleVarName expr") ;
 	return TCL_ERROR ;
     }
-    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2]),
-	NULL) ;
+    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2])) ;
     if (relvar == NULL) {
 	return TCL_ERROR ;
     }
     if (Tcl_ConvertToType(interp, relvar->relObj, &Ral_RelationObjType)
-	!= TCL_OK) {
+		!= TCL_OK ||
+	    Ral_RelvarObjCopyOnShared(interp, rInfo, relvar) != TCL_OK) {
 	return TCL_ERROR ;
     }
     relation = relvar->relObj->internalRep.otherValuePtr ;
@@ -471,13 +471,13 @@ RelvarDeleteOneCmd(
 	return TCL_ERROR ;
     }
 
-    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2]),
-	NULL) ;
+    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2])) ;
     if (relvar == NULL) {
 	return TCL_ERROR ;
     }
     if (Tcl_ConvertToType(interp, relvar->relObj, &Ral_RelationObjType)
-	!= TCL_OK) {
+		!= TCL_OK ||
+	    Ral_RelvarObjCopyOnShared(interp, rInfo, relvar) != TCL_OK) {
 	return TCL_ERROR ;
     }
     relation = relvar->relObj->internalRep.otherValuePtr ;
@@ -587,13 +587,13 @@ RelvarInsertCmd(
 	return TCL_ERROR ;
     }
 
-    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2]),
-	NULL) ;
+    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2])) ;
     if (relvar == NULL) {
 	return TCL_ERROR ;
     }
     if (Tcl_ConvertToType(interp, relvar->relObj, &Ral_RelationObjType)
-	!= TCL_OK) {
+		!= TCL_OK ||
+	    Ral_RelvarObjCopyOnShared(interp, rInfo, relvar) != TCL_OK) {
 	return TCL_ERROR ;
     }
 
@@ -666,13 +666,13 @@ RelvarIntersectCmd(
 	return TCL_ERROR ;
     }
 
-    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2]),
-	NULL) ;
+    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2])) ;
     if (relvar == NULL) {
 	return TCL_ERROR ;
     }
     if (Tcl_ConvertToType(interp, relvar->relObj, &Ral_RelationObjType)
-	!= TCL_OK) {
+		!= TCL_OK ||
+	    Ral_RelvarObjCopyOnShared(interp, rInfo, relvar) != TCL_OK) {
 	return TCL_ERROR ;
     }
     intersectRel = relvalue = relvar->relObj->internalRep.otherValuePtr ;
@@ -758,13 +758,13 @@ RelvarMinusCmd(
 	return TCL_ERROR ;
     }
 
-    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2]),
-	NULL) ;
+    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2])) ;
     if (relvar == NULL) {
 	return TCL_ERROR ;
     }
     if (Tcl_ConvertToType(interp, relvar->relObj, &Ral_RelationObjType)
-	!= TCL_OK) {
+		!= TCL_OK ||
+	    Ral_RelvarObjCopyOnShared(interp, rInfo, relvar) != TCL_OK) {
 	return TCL_ERROR ;
     }
     relvalue = relvar->relObj->internalRep.otherValuePtr ;
@@ -822,7 +822,7 @@ RelvarNamesCmd(
     Tcl_Obj *const*objv,
     Ral_RelvarInfo rInfo)
 {
-    const char *pattern ;
+    char const *pattern ;
     Tcl_Obj *nameList ;
     Tcl_HashEntry *entry ;
     Tcl_HashSearch search ;
@@ -839,9 +839,9 @@ RelvarNamesCmd(
 
     for (entry = Tcl_FirstHashEntry(relvarMap, &search) ; entry ;
 	entry = Tcl_NextHashEntry(&search)) {
-	const char *relvarName ;
+	char const *relvarName ;
 
-	relvarName = (const char *)Tcl_GetHashKey(relvarMap, entry) ;
+	relvarName = (char const *)Tcl_GetHashKey(relvarMap, entry) ;
 	if (pattern && !Tcl_StringMatch(relvarName, pattern)) {
 	    continue ;
 	}
@@ -889,20 +889,17 @@ RelvarPathCmd(
     Ral_RelvarInfo rInfo)
 {
     Ral_Relvar relvar ;
-    char *fullName ;
 
     /* relvar path relvarName */
     if (objc != 3) {
 	Tcl_WrongNumArgs(interp, 2, objv, "relvarName") ;
 	return TCL_ERROR ;
     }
-    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2]),
-	&fullName) ;
+    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2])) ;
     if (relvar == NULL) {
 	return TCL_ERROR ;
     }
-    Tcl_SetObjResult(interp, Tcl_NewStringObj(fullName, -1)) ;
-    ckfree(fullName) ;
+    Tcl_SetObjResult(interp, Tcl_NewStringObj(relvar->name, -1)) ;
     /*
      * Creating a partition is an implicit transaction as each
      * relvar participating in the association is treated as modified.
@@ -929,13 +926,13 @@ RelvarSetCmd(
 	return TCL_ERROR ;
     }
 
-    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2]),
-	NULL) ;
+    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2])) ;
     if (relvar == NULL) {
 	return TCL_ERROR ;
     }
     if (Tcl_ConvertToType(interp, relvar->relObj, &Ral_RelationObjType)
-	!= TCL_OK) {
+		!= TCL_OK ||
+	    Ral_RelvarObjCopyOnShared(interp, rInfo, relvar) != TCL_OK) {
 	return TCL_ERROR ;
     }
     relvalue = relvar->relObj->internalRep.otherValuePtr ;
@@ -1051,8 +1048,8 @@ RelvarTraceCmd(
      * Deal with variable tracing first.
      */
     if ((enum TraceType)type == TraceVariable) {
-	relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[4]),
-	    NULL) ;
+	relvar = Ral_RelvarObjFindRelvar(interp, rInfo,
+		Tcl_GetString(objv[4])) ;
 	if (relvar == NULL) {
 	    return TCL_ERROR ;
 	}
@@ -1217,13 +1214,13 @@ RelvarUnionCmd(
 	return TCL_ERROR ;
     }
 
-    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2]),
-	NULL) ;
+    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2])) ;
     if (relvar == NULL) {
 	return TCL_ERROR ;
     }
     if (Tcl_ConvertToType(interp, relvar->relObj, &Ral_RelationObjType)
-	!= TCL_OK) {
+		!= TCL_OK ||
+	    Ral_RelvarObjCopyOnShared(interp, rInfo, relvar) != TCL_OK) {
 	return TCL_ERROR ;
     }
     unionRel = relvalue = relvar->relObj->internalRep.otherValuePtr ;
@@ -1342,13 +1339,13 @@ RelvarUpdateCmd(
 	return TCL_ERROR ;
     }
 
-    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2]),
-	NULL) ;
+    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2])) ;
     if (relvar == NULL) {
 	return TCL_ERROR ;
     }
     if (Tcl_ConvertToType(interp, relvar->relObj, &Ral_RelationObjType)
-	!= TCL_OK) {
+		!= TCL_OK ||
+	    Ral_RelvarObjCopyOnShared(interp, rInfo, relvar) != TCL_OK) {
 	return TCL_ERROR ;
     }
     relation = relvar->relObj->internalRep.otherValuePtr ;
@@ -1462,13 +1459,13 @@ RelvarUpdateOneCmd(
 	return TCL_ERROR ;
     }
 
-    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2]),
-	NULL) ;
+    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2])) ;
     if (relvar == NULL) {
 	return TCL_ERROR ;
     }
     if (Tcl_ConvertToType(interp, relvar->relObj, &Ral_RelationObjType)
-	!= TCL_OK) {
+		!= TCL_OK ||
+	    Ral_RelvarObjCopyOnShared(interp, rInfo, relvar) != TCL_OK) {
 	return TCL_ERROR ;
     }
     relation = relvar->relObj->internalRep.otherValuePtr ;
