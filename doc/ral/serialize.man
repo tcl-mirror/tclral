@@ -1,4 +1,4 @@
-[manpage_begin serialize n 0.8.7]
+[manpage_begin serialize n 0.8.8]
 [comment {
 # This software is copyrighted 2004, 2005, 2006, 2007 by G. Andrew Mangogna.
 # The following terms apply to all files associated with the software unless
@@ -45,14 +45,14 @@
 # ABSTRACT:
 # 
 # $RCSfile: serialize.man,v $
-# $Revision: 1.11 $
-# $Date: 2008/01/31 02:15:30 $
+# $Revision: 1.12 $
+# $Date: 2008/04/12 23:29:59 $
 #  *--
 }]
 [moddesc "Relation persistence"]
 [titledesc "Persistent storage for relations"]
 [copyright "2004, 2005, 2006, 2007 by G. Andrew Mangogna"]
-[require ral [opt 0.8.7]]
+[require ral [opt 0.8.8]]
 [description]
 This manpage describes a set of commands that are used for
 saving the values of relvars on external storage.
@@ -127,67 +127,67 @@ resulting script to the file given by [arg fileName].
 The format used for serialization of a set of relvars consists of a Tcl list
 with four elements.
 
-[list_begin bullet]
-[bullet]
+[list_begin itemized]
+[item]
 Version information.
-    [list_begin bullet]
-    [bullet]
+    [list_begin itemized]
+    [item]
     Version
-    [bullet]
+    [item]
     <library version>
     [list_end]
-[bullet]
+[item]
 Relvar definition.
-    [list_begin bullet]
-    [bullet]
+    [list_begin itemized]
+    [item]
     Relvars
-    [bullet]
+    [item]
     <list of relvar defs>
-	[list_begin bullet]
-	[bullet]
+	[list_begin itemized]
+	[item]
 	<relvar name>
-	[bullet]
+	[item]
 	<relvar heading>
 	[list_end]
     [list_end]
-[bullet]
+[item]
 Constraint definition.
-    [list_begin bullet]
-    [bullet]
+    [list_begin itemized]
+    [item]
     Constraints
-    [bullet]
+    [item]
     <list of constraints>
-	[list_begin bullet]
-	[bullet]
+	[list_begin itemized]
+	[item]
 	association | partition | correlation
-	[bullet]
+	[item]
 	<constraint definition>
-	    [list_begin bullet]
-	    [bullet]
+	    [list_begin itemized]
+	    [item]
 	    <association constraint definition>
-	    [nl]
+	    [para]
 	    <association name> <relvar name> <attribute list> <mult/cond>
 		<relvar name> <attribute list> <mult/cond>
-	    [bullet]
+	    [item]
 	    <partition constraint definition>
-	    [nl]
+	    [para]
 	    <partition name> <superset> <attribute list>
 		<subset1> <attribute list> <subset2> <attribute list> ...
-	    [bullet]
+	    [item]
 	    <correlation constraint definition>
-	    [nl]
+	    [para]
 	    <?-complete?> <correlation name> <relvar name>
 		<attribute list> <mult/cond> <relvar name> <attribute list>
 		<attribute list> <mult/cond> <relvar name> <attribute list>
 	    [list_end]
 	[list_end]
     [list_end]
-[bullet]
+[item]
 Relvar values.
-    [list_begin bullet]
-    [bullet]
+    [list_begin itemized]
+    [item]
     <relvar name>
-    [bullet]
+    [item]
     <tuple list>
     [list_end]
 [list_end]

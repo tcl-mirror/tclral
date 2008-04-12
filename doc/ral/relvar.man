@@ -1,4 +1,4 @@
-[manpage_begin relvar n 0.8.7]
+[manpage_begin relvar n 0.8.8]
 [comment {
 # This software is copyrighted 2004, 2005, 2006, 2007 by G. Andrew Mangogna.
 # The following terms apply to all files associated with the software unless
@@ -47,14 +47,14 @@
 #   This command is part of TclRAL. This file is in Tcl Markup Language
 #   format.
 # $RCSfile: relvar.man,v $
-# $Revision: 1.24 $
-# $Date: 2008/01/31 02:15:30 $
+# $Revision: 1.25 $
+# $Date: 2008/04/12 23:29:59 $
 #  *--
 }]
 [moddesc "Relvar Operators"]
 [titledesc "Operators for Relation Variables"]
 [copyright "2004, 2005, 2006, 2007 by G. Andrew Mangogna"]
-[require ral [opt 0.8.7]]
+[require ral [opt 0.8.8]]
 [description]
 This manpage describes the [cmd relvar] command.
 The [cmd relvar] command is part of the Tcl Relational Algebra Library
@@ -119,7 +119,7 @@ There are many types of constraints that might be used to insure integrity,
 but TclRAL supports three types of declarative constraints.
 [list_begin definitions]
 
-[lst_item Association]
+[def Association]
 Association constraints define a referential association between two relvars.
 In this context,
 an association declares that a set of attributes in one relvar refers to
@@ -130,7 +130,7 @@ of the identifier of the associated relvar.
 The association also declares the number of times that such matches may
 occur and if it is allowed not to match at all.
 
-[lst_item Partition]
+[def Partition]
 Partition constraints define a complete and disjoint
 referential partitioning between one relvar,
 known as the super set,
@@ -140,7 +140,7 @@ This constraint declares that every tuple of the super set relvar is
 referred to by exactly one tuple from among all the tuples in the
 sub set relvars.
 
-[lst_item Correlation]
+[def Correlation]
 Correlation constraints define a referential association between two
 relvars that is mediated by a third relvar.
 The third relvar, the correlation relvar, contains attributes that
@@ -195,19 +195,19 @@ It can be one of:
 
 [list_begin definitions]
 
-[lst_item *]
+[def *]
 Each tuple in [arg refToRelvar] is referred to zero or more times by
 the tuples in [arg refrngRelvar].
 
-[lst_item +]
+[def +]
 Each tuple in [arg refToRelvar] is referred to one or more times by
 the tuples in [arg refrngRelvar].
 
-[lst_item 1]
+[def 1]
 Each tuple in [arg refToRelvar] is referred to exactly once by
 the tuples in [arg refrngRelvar].
 
-[lst_item ?]
+[def ?]
 Each tuple in [arg refToRelvar] is referred to zero or one times by
 the tuples in [arg refrngRelvar].
 
@@ -218,11 +218,11 @@ associated with the references to [arg refToRelvar].
 Necessarily, [arg refrngSpec] may only be "1" or "?" implying:
 [list_begin definitions]
 
-[lst_item 1]
+[def 1]
 Each tuple in [arg refrngRelvar] refers to exactly one tuple in
 [arg refToRelvar].
 
-[lst_item ?]
+[def ?]
 Each tuple in [arg refrngRelvar] refers to at most one tuple
 (and possibly none at all) in [arg refToRelvar].
 
@@ -621,10 +621,10 @@ relation value contained in [arg relvarName] with the given
 [arg relationValueN] arguments and assigns the result back into
 [arg relvarName].
 This command is shorthand for:
-[nl]
+[para]
 relvar set <relvarName> [lb]relation intersect [lb]relvar set <relvarName>[rb]
 <relationValue1> ...[rb]
-[nl]
+[para]
 The headings of each [arg relationValueN] must match that of the value
 contained in [arg relvarName].
 Since the intersect operation is commutative, the order of the
@@ -639,10 +639,10 @@ relation value contained in [arg relvarName] with
 the [arg relationValue] argument and assigns the result back into
 [arg relvarName].
 This command is shorthand for:
-[nl]
+[para]
 relvar set <relvarName> [lb]relation minus [lb]relvar set <relvarName>[rb]
 <relationValue1>[rb]
-[nl]
+[para]
 The headings of [arg relationValue] must match that of the value
 contained in [arg relvarName].
 Note that this operation is not commutative.
@@ -767,25 +767,25 @@ headings not equal, "Relation {DogName string Breed string} DogName"
 
 [call [cmd "::ral::relvar trace"] [arg option] [arg type] [opt [arg args]]]
 [list_begin definitions]
-[lst_item "[cmd {::ral::relvar trace add variable}] [arg relvarName]\
+[def "[cmd {::ral::relvar trace add variable}] [arg relvarName]\
     [arg traceops] [arg cmdPrefix]"]
-[lst_item "[cmd {::ral::relvar trace remove variable}] [arg relvarName]\
+[def "[cmd {::ral::relvar trace remove variable}] [arg relvarName]\
     [arg traceops] [arg cmdPrefix]"]
-[lst_item "[cmd {::ral::relvar trace info variable}] [arg relvarName]"]
-[lst_item "[cmd {::ral::relvar trace add eval}] [arg cmdPrefix]"]
-[lst_item "[cmd {::ral::relvar trace remove eval}] [arg cmdPrefix]"]
-[lst_item "[cmd {::ral::relvar trace info eval}]"]
+[def "[cmd {::ral::relvar trace info variable}] [arg relvarName]"]
+[def "[cmd {::ral::relvar trace add eval}] [arg cmdPrefix]"]
+[def "[cmd {::ral::relvar trace remove eval}] [arg cmdPrefix]"]
+[def "[cmd {::ral::relvar trace info eval}]"]
 [list_end]
 
 The [cmd "trace add variable"] subcommand adds a trace to [arg relvarName].
 The [arg traceops] argument is a list of one or more trace operation keywords
 from the list:
 [list_begin definitions]
-[lst_item delete]
-[lst_item insert]
-[lst_item set]
-[lst_item unset]
-[lst_item update]
+[def delete]
+[def insert]
+[def set]
+[def unset]
+[def update]
 [list_end]
 
 The [cmd "trace remove variable"] subcommand deletes any trace on
@@ -809,9 +809,9 @@ See the [emph "RELVAR TRACES"] section below for further details.
 
 [call [cmd "::ral::relvar transaction"] [arg option]]
 [list_begin definitions]
-[lst_item "[cmd {::ral::relvar transaction begin}]"]
-[lst_item "[cmd {::ral::relvar transaction end}]"]
-[lst_item "[cmd {::ral::relvar transaction rollback}]"]
+[def "[cmd {::ral::relvar transaction begin}]"]
+[def "[cmd {::ral::relvar transaction end}]"]
+[def "[cmd {::ral::relvar transaction rollback}]"]
 [list_end]
 The [cmd transaction] subcommand controls the evaluation of relvar
 constraints.
@@ -842,10 +842,10 @@ relation value contained in [arg relvarName] with the given
 [arg relationValueN] arguments and assigns the result back into
 [arg relvarName].
 This command is shorthand for:
-[nl]
+[para]
 relvar set <relvarName> [lb]relation union [lb]relvar set <relvarName>[rb]
 <relationValue1> ...[rb]
-[nl]
+[para]
 The headings of each [arg relationValueN] must match that of the value
 contained in [arg relvarName].
 Since the union operation is commutative, the order of the
@@ -1022,14 +1022,14 @@ If multiple traces have been added to a relvar,
 the traces are invoked in the order of most recent first to oldest last.
 
 [list_begin definitions]
-[lst_item delete]
+[def delete]
 A delete trace is invoked for each tuple in a relvar that is deleted.
 Tuples are deleted from relvars by invocations of [cmd "relvar delete"]
 or [cmd "relvar deleteone"].
 The delete trace command is invoked as:
-[nl]
+[para]
 [cmd cmdPrefix] [cmd delete] [arg relvarName] [arg tupleValue]
-[nl]
+[para]
 where [cmd cmdPrefix] is the command prefix of the trace as given
 in [cmd "relvar trace add variable"],
 the string [cmd delete] indicates that a tuple is to be deleted from the relvar,
@@ -1041,13 +1041,13 @@ If [cmd cmdPrefix] throws an error, then no other delete traces in the chain of
 delete traces for the relvar are invoked and [arg tupleValue] is not removed
 from the relvar value.
 
-[lst_item insert]
+[def insert]
 An insert trace is invoked for each tuple in a relvar that is inserted.
 Tuples are inserted into relvars by invocations of [cmd "relvar insert"].
 The insert trace command is invoked as:
-[nl]
+[para]
 [cmd cmdPrefix] [cmd insert] [arg relvarName] [arg tupleValue]
-[nl]
+[para]
 where [cmd cmdPrefix] is the command prefix of the trace as given
 in [cmd "relvar trace add variable"],
 the string [cmd insert] indicates that a tuple
@@ -1068,7 +1068,7 @@ If [cmd cmdPrefix] throws an error, then no other insert traces in the chain of
 insert traces for the relvar are invoked and [arg tupleValue] is not inserted
 into the relvar value.
 
-[lst_item set]
+[def set]
 A set trace is invoked each time that the relation value held in a relvar
 is assigned.
 Relations values are assigned to relvars by invocation of the
@@ -1079,9 +1079,9 @@ or
 [cmd "relvar minus"]
 command.
 The set trace command is invoked as:
-[nl]
+[para]
 [cmd cmdPrefix] [cmd set] [arg relvarName] [arg relationValue]
-[nl]
+[para]
 where [cmd cmdPrefix] is the command prefix of the trace as given
 in [cmd "relvar trace add variable"],
 the string [cmd set] indicates that a relation value
@@ -1104,15 +1104,15 @@ If [cmd cmdPrefix] throws an error, then no other set traces in the chain of
 set traces for the relvar are invoked and [arg relationValue] is not assigned
 to the relvar.
 
-[lst_item unset]
+[def unset]
 An unset trace is invoked each time a relvar is destroyed.
 Relvars are destroyed by the invocation of the [cmd "relvar unset"] command.
 Note that due to a limitation of Tcl,
 relvar unset traces are not invoked when an interpreter is deleted.
 The unset trace command is invoked as:
-[nl]
+[para]
 [cmd cmdPrefix] [cmd unset] [arg relvarName]
-[nl]
+[para]
 where [cmd cmdPrefix] is the command prefix of the trace as given
 in [cmd "relvar trace add variable"],
 the string [cmd unset] indicates that the relvar
@@ -1123,15 +1123,15 @@ The trace command is invoked before the relvar is actually destroyed so
 the relation value stored in the relvar is still intact.
 Any errors thown by [cmd cmdPrefix] are ignored.
 
-[lst_item update]
+[def update]
 An update trace is invoked for each tuple in a relvar that is updated.
 Tuples are updated into relvars by invocations of [cmd "relvar update"]
 or [cmd "relvar updateone"].
 The update trace command is invoked as:
-[nl]
+[para]
 [cmd cmdPrefix] [cmd update] [arg relvarName] [arg oldTupleValue]
     [arg newTupleValue]
-[nl]
+[para]
 where [cmd cmdPrefix] is the command prefix of the trace as given
 in [cmd "relvar trace add variable"],
 the string [cmd update] indicates that a tuple
@@ -1154,16 +1154,16 @@ If [cmd cmdPrefix] throws an error, then no other update traces in the chain of
 update traces for the relvar are invoked and [arg tupleValue] is not updated
 into the relvar value.
 
-[lst_item eval]
+[def eval]
 An eval trace is invoked each time that a [cmd "relvar eval"] begins and
 ends or when [cmd "relvar transaction"] commands are invoked.
 Eval traces are different from other relvar traces in that they provide a
 means of determining the boundaries of a transaction rather than specific
 operations on a relvar.
 The eval trace command is invoked as:
-[nl]
+[para]
 [cmd cmdPrefix] [cmd eval] [arg op] [arg level]
-[nl]
+[para]
 where [cmd cmdPrefix] is the command prefix of the trace as given
 in [cmd "relvar trace add eval"], 
 the string [cmd eval] indicates that the relvar transaction is in progress,

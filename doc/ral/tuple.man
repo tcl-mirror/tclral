@@ -1,4 +1,4 @@
-[manpage_begin tuple n 0.8.7]
+[manpage_begin tuple n 0.8.8]
 [comment {
 # This software is copyrighted 2004, 2005, 2006, 2007 by G. Andrew Mangogna.
 # The following terms apply to all files associated with the software unless
@@ -45,14 +45,14 @@
 # ABSTRACT:
 # 
 # $RCSfile: tuple.man,v $
-# $Revision: 1.14 $
-# $Date: 2008/01/31 02:15:30 $
+# $Revision: 1.15 $
+# $Date: 2008/04/12 23:29:59 $
 #  *--
 }]
 [moddesc "Tuple Operators"]
 [titledesc "Operators for the Tuple data type"]
-[copyright "2004, 2005, 2006, 2007 by G. Andrew Mangogna"]
-[require ral [opt 0.8.7]]
+[copyright "2004, 2005, 2006, 2007, 2008 by G. Andrew Mangogna"]
+[require ral [opt 0.8.8]]
 [description]
 This manpage describes the
 [cmd tuple]
@@ -63,34 +63,52 @@ command is part of the Tcl Relational Algebra Library (ral) package.
 The ral package introduces an new Tcl data type called
 [emph Tuple]
 and this command provides the operators for the Tuple data type.
-[section OVERVIEW]
 
-Formally,
-a tuple is a set of components.
+[section OVERVIEW]
+Formally, a tuple is a set of components.
 Each component consists of an attribute name, an attribute data type
 and an attribute value.
 The attribute name may be any Tcl string, although attribute names that
 contain embedded blanks are particularly inconvenient.
-The attribute data type may be any valid Tcl internal data type.
-Tcl uses many different internal types for many different purposes.
-Some common ones are:
+The attribute data type must be one of the types listed below:
 
-[list_begin bullet]
-[bullet]
+[list_begin itemized]
+[item]
 string
-[bullet]
+[item]
 int
-[bullet]
-double
-[bullet]
+[item]
+long
+[item]
 wideInt
-[bullet]
+[item]
+bignum
+[item]
+double
+[item]
 boolean
-[bullet]
+[item]
 list
-[bullet]
+[item]
+dict
+[item]
 bytearray
 [list_end]
+
+[para]
+These types have the same name as the corresponding Tcl type
+and the Tcl type is used for the values.
+The [emph bignum] and [emph dict] types are only available in Tcl 8.5.
+Any value associated with an attribute must be coercible to the stated
+type.
+Since [emph string] is the univeral Tcl type,
+then any attribute of type [emph string] effectively has not type check.
+Some Tuple operations result in expressions being evaluated on the
+attribute value.
+All operations are carried out in the stated data type.
+So for example, determining the relative order of two attributes whose type
+is [emph double] will be carried out in double arithmetic even if the
+string representation of the value could be construed to be a different type.
 
 [para]
 
@@ -102,17 +120,17 @@ types do not have.
 
 Tuples are sets of components and as such have the following rules.
 
-[list_begin bullet]
-[bullet]
+[list_begin itemized]
+[item]
 All attribute names must be unique.
 
-[bullet]
+[item]
 Any attribute value assigned to a particular attribute is coerced into the
 attribute data type for that attribute and it is an error if the value
 string assigned to an attribute does not represent a valid value of the
 attribute data type.
 
-[bullet]
+[item]
 The is no inherent left to right ordering in tuples.
 Clearly, the implementation may store components in a particular order
 and any string representation must have some left to right ordering to it
