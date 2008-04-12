@@ -49,11 +49,11 @@
 # without cluttering the TclRAL package proper.
 # 
 # $RCSfile: ralutil.tcl,v $
-# $Revision: 1.13 $
-# $Date: 2008/04/02 01:21:27 $
+# $Revision: 1.14 $
+# $Date: 2008/04/12 23:01:02 $
 #  *--
 
-package provide ralutil 0.8.7
+package provide ralutil 0.8.8
 
 package require ral
 

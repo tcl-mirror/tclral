@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.h,v $
-$Revision: 1.16 $
-$Date: 2007/02/24 20:34:51 $
+$Revision: 1.17 $
+$Date: 2008/04/12 23:01:01 $
  *--
  */
 #ifndef _ral_relvarobj_h_
@@ -82,26 +82,28 @@ EXTERNAL DATA REFERENCES
 /*
 FUNCTION DECLARATIONS
 */
-extern int Ral_RelvarObjNew(Tcl_Interp *, Ral_RelvarInfo, const char *,
+extern int Ral_RelvarObjNew(Tcl_Interp *, Ral_RelvarInfo, char const *,
     Ral_RelationHeading) ;
 extern int Ral_RelvarObjDelete(Tcl_Interp *, Ral_RelvarInfo, Tcl_Obj *) ;
+extern int Ral_RelvarObjCopyOnShared(Tcl_Interp *, Ral_RelvarInfo, Ral_Relvar) ;
 extern Ral_Relvar Ral_RelvarObjFindRelvar(Tcl_Interp *, Ral_RelvarInfo,
-    const char *, char **) ;
+    char const *) ;
 extern Tcl_Obj *Ral_RelvarObjInsertTuple(Tcl_Interp *, Ral_Relvar, Tcl_Obj *,
     Ral_ErrorInfo *) ;
 extern int Ral_RelvarObjUpdateTuple(Tcl_Interp *, Ral_Relvar, Ral_Relation,
     Ral_RelationIter, Tcl_Obj *, Tcl_Obj *, Ral_Relation, Ral_ErrorInfo *) ;
+
 extern int Ral_RelvarObjCreateAssoc(Tcl_Interp *, Tcl_Obj *const*,
     Ral_RelvarInfo) ;
 extern int Ral_RelvarObjCreatePartition(Tcl_Interp *, int, Tcl_Obj *const*,
     Ral_RelvarInfo) ;
 extern int Ral_RelvarObjCreateCorrelation(Tcl_Interp *, Tcl_Obj *const*,
     Ral_RelvarInfo) ;
-extern int Ral_RelvarObjConstraintDelete(Tcl_Interp *, const char *,
+extern int Ral_RelvarObjConstraintDelete(Tcl_Interp *, char const *,
     Ral_RelvarInfo) ;
 extern int Ral_RelvarObjConstraintInfo(Tcl_Interp *, Tcl_Obj * const,
     Ral_RelvarInfo) ;
-extern int Ral_RelvarObjConstraintNames(Tcl_Interp *, const char *,
+extern int Ral_RelvarObjConstraintNames(Tcl_Interp *, char const *,
     Ral_RelvarInfo) ;
 extern int Ral_RelvarObjConstraintMember(Tcl_Interp *, Tcl_Obj * const,
     Ral_RelvarInfo) ;

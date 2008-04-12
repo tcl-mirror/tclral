@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.41 $
-# $Date: 2008/04/11 03:50:27 $
+# $Revision: 1.42 $
+# $Date: 2008/04/12 23:01:03 $
 #  *--
 
 package require tcltest 2.2
@@ -4981,6 +4981,59 @@ tuple {C1 c C2 42} references no tuple
     } -result {attributes do not constitute an identifier, "during identifier construction operation"}\
     -returnCodes error
 
+    test relvar-deleteone-4.0 {deleting and iterating on same relvar} -setup {
+	relvar create Foo {
+	    Relation {
+		A string
+		B int
+	    } {
+		A
+	    }
+	}
+	relvar insert Foo {
+	    A a1 B 1
+	} {
+	    A a2 B 2
+	} {
+	    A a3 B 3
+	}
+    } -cleanup {
+	relvar unset Foo
+    } -body {
+	set aValues [list]
+	relation foreach f [relvar set Foo] {
+	    lappend aValues [relation extract $f A]
+	    relvar deleteone Foo A [relation extract $f A]
+	}
+	set aValues
+    } -result {a1 a2 a3}
+
+    test relvar-deleteone-4.1 {deleting and iterating on same relvar} -setup {
+	relvar create Foo {
+	    Relation {
+		A string
+		B int
+	    } {
+		A
+	    }
+	}
+	relvar insert Foo {
+	    A a1 B 1
+	} {
+	    A a2 B 2
+	} {
+	    A a3 B 3
+	}
+    } -cleanup {
+	relvar unset Foo
+    } -body {
+	relation foreach f [relvar set Foo] {
+	    lappend aValues [relation extract $f A]
+	    relvar deleteone Foo A [relation extract $f A]
+	}
+	relation list [relvar set Foo] A
+    } -result {}
+
     # relvar partition subcommand
     test relvar-partition-1.1 {simple partition} -setup {
 	relvar create A {Relation {A1 string} A1}
@@ -5412,6 +5465,19 @@ tuple {A1 c} is not referred to by any tuple
     } -cleanup {
 	relvar unset SV PV SPV
     } -result {::ral::test::PV ::ral::test::SPV ::ral::test::SV}
+
+    # relvar path subcommand
+    test relvar-path-1.0 {path name} -setup {
+	relvar create R {
+	    Relation
+	    {S# string SNAME string STATUS int CITY string}
+	    S#
+	}
+    } -body {
+	relvar path R
+    } -cleanup {
+	relvar unset R
+    } -result {::ral::test::R}
 
     test relvar-union-1.0 {union single relation} -setup {
 	relvar create X {

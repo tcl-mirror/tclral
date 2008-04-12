@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.h,v $
-$Revision: 1.1 $
-$Date: 2006/04/16 19:00:12 $
+$Revision: 1.2 $
+$Date: 2008/04/12 23:01:00 $
  *--
  */
 #ifndef _ral_relvarcmd_h_
@@ -77,7 +77,7 @@ TYPE DECLARATIONS
 FUNCTION DECLARATIONS
 */
 extern int relvarCmd(ClientData, Tcl_Interp *, int, Tcl_Obj *const*) ;
-extern const char *Ral_RelvarCmdVersion(void) ;
+extern char const *Ral_RelvarCmdVersion(void) ;
 
 
 #endif /* _ral_relvarcmd_h_ */

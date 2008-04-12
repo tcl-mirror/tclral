@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.35 $
-$Date: 2008/04/11 03:50:27 $
+$Revision: 1.36 $
+$Date: 2008/04/12 23:01:01 $
  *--
  */
 
@@ -99,17 +99,17 @@ EXTERNAL FUNCTION REFERENCES
 /*
 FORWARD FUNCTION REFERENCES
 */
-static char *relvarTraceProc(ClientData, Tcl_Interp *, const char *,
-    const char *, int) ;
-static const char *relvarResolveName(Tcl_Interp *, const char *,
+static char *relvarTraceProc(ClientData, Tcl_Interp *, char const *,
+    char const *, int) ;
+static char const *relvarResolveName(Tcl_Interp *, char const *,
     Tcl_DString *) ;
-static int relvarNameIsAbsName(const char *) ;
-static int relvarGetNamespaceName(Tcl_Interp *, const char *, Tcl_DString *) ;
+static int relvarNameIsAbsName(char const *) ;
+static int relvarGetNamespaceName(Tcl_Interp *, char const *, Tcl_DString *) ;
 static Tcl_Obj *relvarConstraintAttrNames(Tcl_Interp *, Ral_Relvar,
     Ral_JoinMap, int) ;
 static Tcl_Obj *relvarAssocSpec(int, int) ;
 static Ral_Constraint Ral_RelvarObjFindConstraint(Tcl_Interp *, Ral_RelvarInfo,
-    const char *, char **) ;
+    char const *) ;
 static int Ral_RelvarObjDecodeTraceOps(Tcl_Interp *, Tcl_Obj *, int *) ;
 static int Ral_RelvarObjEncodeTraceFlag(Tcl_Interp *, int, Tcl_Obj **) ;
 static Tcl_Obj *Ral_RelvarObjExecTraces(Tcl_Interp *, Ral_Relvar, Tcl_ObjType *,
@@ -127,7 +127,7 @@ EXTERNAL DATA DEFINITIONS
 STATIC DATA ALLOCATION
 */
 static struct {
-    const char *specString ;
+    char const *specString ;
     int conditionality ;
     int multiplicity ;
 } specTable[] = {
@@ -139,7 +139,7 @@ static struct {
 } ;
 
 static const struct traceOpsMap {
-    const char *opName ;
+    char const *opName ;
     int opFlag ;
 } opsTable[] = {
     {"delete", TRACEOP_DELETE_FLAG},
@@ -151,7 +151,7 @@ static const struct traceOpsMap {
 } ;
 static const char specErrMsg[] = "multiplicity specification" ;
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.35 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.36 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -161,11 +161,11 @@ int
 Ral_RelvarObjNew(
     Tcl_Interp *interp,
     Ral_RelvarInfo info,
-    const char *name,
+    char const *name,
     Ral_RelationHeading heading)
 {
     Tcl_DString resolve ;
-    const char *resolvedName ;
+    char const *resolvedName ;
     Ral_Relvar relvar ;
     int status ;
 
@@ -218,7 +218,6 @@ Ral_RelvarObjDelete(
     Ral_RelvarInfo info,
     Tcl_Obj *nameObj)
 {
-    char *fullName ;
     Ral_Relvar relvar ;
     /*
      * Unsetting a relvar is not allowed during an "eval" script.
@@ -229,14 +228,12 @@ Ral_RelvarObjDelete(
 	return TCL_ERROR ;
     }
 
-    relvar = Ral_RelvarObjFindRelvar(interp, info, Tcl_GetString(nameObj),
-	&fullName) ;
+    relvar = Ral_RelvarObjFindRelvar(interp, info, Tcl_GetString(nameObj)) ;
     if (relvar == NULL) {
 	return TCL_ERROR ;
     }
     if (Tcl_ConvertToType(interp, relvar->relObj, &Ral_RelationObjType)
 	!= TCL_OK) {
-	ckfree(fullName) ;
 	return TCL_ERROR ;
     }
     /*
@@ -246,8 +243,7 @@ Ral_RelvarObjDelete(
      */
     if (Ral_PtrVectorSize(relvar->constraints) != 0) {
 	Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptDelete,
-	    RAL_ERR_CONSTRAINTS_PRESENT, fullName) ;
-	ckfree(fullName) ;
+	    RAL_ERR_CONSTRAINTS_PRESENT, relvar->name) ;
 	return TCL_ERROR ;
     }
     /*
@@ -257,21 +253,73 @@ Ral_RelvarObjDelete(
     /*
      * Remove the trace.
      */
-    Tcl_UntraceVar(interp, fullName, relvarTraceFlags, relvarTraceProc,
+    Tcl_UntraceVar(interp, relvar->name, relvarTraceFlags, relvarTraceProc,
 	info) ;
     /*
      * Remove the variable.
      */
-    if (Tcl_UnsetVar(interp, fullName, TCL_LEAVE_ERR_MSG) != TCL_OK) {
-	ckfree(fullName) ;
+    if (Tcl_UnsetVar(interp, relvar->name, TCL_LEAVE_ERR_MSG) != TCL_OK) {
 	return TCL_ERROR ;
     }
 
-    Ral_RelvarDelete(info, fullName) ;
+    Ral_RelvarDelete(info, relvar->name) ;
 
-    ckfree(fullName) ;
     Tcl_ResetResult(interp) ;
     return TCL_OK ;
+}
+
+/*
+ * Determine if the relation value stored in the relvar is being shared and
+ * if so enforce the copy on write rules. This function must be called before
+ * modifying the relation value stored in a relvar. It may change the
+ * value of the Tcl_Obj * that is the relation value stored in the relvar.
+ * Return TCL_OK if the relation value is not shared or was copied without
+ * error and TCL_ERROR otherwise, leaving an error message in the interpreter.
+ */
+int
+Ral_RelvarObjCopyOnShared(
+    Tcl_Interp *interp,
+    Ral_RelvarInfo info,
+    Ral_Relvar relvar)
+{
+    int result = TCL_OK ;
+
+    Tcl_Obj *relObj = relvar->relObj ;
+    assert(relObj->typePtr == &Ral_RelationObjType) ;
+
+    /*
+     * For relation values stored in relvars, we expect the reference count
+     * to be at least 2, since we have one reference in the relvar and
+     * another in the Tcl variable that shadows the relvar. Sharing is
+     * determined then when the reference count is greater than 2.
+     */
+    assert(relObj->refCount > 1) ;
+    if (relObj->refCount > 2) {
+	/*
+	 * If we are sharing, then we duplicate the relation value and store it
+	 * back into the relvar. We also need to change the Tcl_Obj that the
+	 * variable is referencing. This is slightly more complicated by virtue
+	 * of the fact that we have to remove and then replace the write trace
+	 * on that variable. Recall that relvars have a corresponding Tcl
+	 * variable and we put a write trace on it to make the Tcl variable
+	 * read only since all relvar modification should come via the
+	 * relvar commands.
+	 */
+	Tcl_IncrRefCount(relvar->relObj = Tcl_DuplicateObj(relObj)) ;
+	assert(relObj->typePtr == &Ral_RelationObjType) ;
+	Tcl_UntraceVar(interp, relvar->name, relvarTraceFlags, relvarTraceProc,
+	    info) ;
+	if (Tcl_SetVar2Ex(interp, relvar->name, NULL, relvar->relObj,
+	    TCL_LEAVE_ERR_MSG) == NULL) {
+	    result = TCL_ERROR ;
+	}
+	int status = Tcl_TraceVar(interp, relvar->name, relvarTraceFlags,
+	    relvarTraceProc, info) ;
+	assert(status == TCL_OK) ;
+    }
+    assert(relvar->relObj->refCount == 2) ;
+
+    return result ;
 }
 
 /*
@@ -286,8 +334,7 @@ Ral_Relvar
 Ral_RelvarObjFindRelvar(
     Tcl_Interp *interp,
     Ral_RelvarInfo info,
-    const char *name,
-    char **fullName)
+    char const *name)
 {
     Ral_Relvar relvar ;
 
@@ -296,17 +343,13 @@ Ral_RelvarObjFindRelvar(
 	 * Absolute name.
 	 */
 	relvar = Ral_RelvarFind(info, name) ;
-	if (relvar && fullName) {
-	    *fullName = ckalloc(strlen(name) + 1) ;
-	    strcpy(*fullName, name) ;
-	}
     } else {
 	/*
 	 * Relative name. First try the current namespace.
 	 */
 	Tcl_DString resolve ;
 	int globalName ;
-	const char *resolvedName ;
+	char const *resolvedName ;
 
 	globalName = relvarGetNamespaceName(interp, name, &resolve) ;
 	resolvedName = Tcl_DStringValue(&resolve) ;
@@ -325,10 +368,6 @@ Ral_RelvarObjFindRelvar(
 	    relvar = Ral_RelvarFind(info, resolvedName) ;
 	}
 
-	if (relvar && fullName) {
-	    *fullName = ckalloc(strlen(resolvedName) + 1) ;
-	    strcpy(*fullName, resolvedName) ;
-	}
 	Tcl_DStringFree(&resolve) ;
     }
 
@@ -508,7 +547,7 @@ Ral_RelvarObjCreateAssoc(
     int elemc2 ;
     Tcl_Obj **elemv2 ;
     int specIndex2 ;
-    const char *name ;
+    char const *name ;
     Tcl_DString resolve ;
     Ral_JoinMap refMap ;
     Ral_TupleHeading th1 ;
@@ -532,8 +571,7 @@ Ral_RelvarObjCreateAssoc(
      * Look up the relvars and make sure that the values are truly a
      * relation.
      */
-    relvar1 = Ral_RelvarObjFindRelvar(interp, info, Tcl_GetString(objv[1]),
-	NULL) ;
+    relvar1 = Ral_RelvarObjFindRelvar(interp, info, Tcl_GetString(objv[1])) ;
     if (relvar1 == NULL) {
 	return TCL_ERROR ;
     }
@@ -556,8 +594,7 @@ Ral_RelvarObjCreateAssoc(
 	return TCL_ERROR ;
     }
 
-    relvar2 = Ral_RelvarObjFindRelvar(interp, info, Tcl_GetString(objv[4]),
-	NULL) ;
+    relvar2 = Ral_RelvarObjFindRelvar(interp, info, Tcl_GetString(objv[4])) ;
     if (relvar2 == NULL) {
 	return TCL_ERROR ;
     }
@@ -701,7 +738,7 @@ Ral_RelvarObjCreatePartition(
     Ral_IntVector superAttrs ;
     int nSupAttrs ;
     Ral_TupleHeading supth ;
-    const char *partName ;
+    char const *partName ;
     Tcl_DString resolve ;
     Tcl_DString errMsg ;
     Ral_Constraint constraint ;
@@ -721,7 +758,7 @@ Ral_RelvarObjCreatePartition(
      * Look up the supertype and make sure that the value is truly a relation.
      */
     superName = Tcl_GetString(objv[1]) ;
-    super = Ral_RelvarObjFindRelvar(interp, info, superName, NULL) ;
+    super = Ral_RelvarObjFindRelvar(interp, info, superName) ;
     if (super == NULL) {
 	return TCL_ERROR ;
     }
@@ -745,7 +782,7 @@ Ral_RelvarObjCreatePartition(
     superAttrs = Ral_IntVectorNewEmpty(supElemc) ;
     supth = superRel->heading->tupleHeading ;
     while (supElemc-- > 0) {
-	const char *attrName = Tcl_GetString(*supElemv++) ;
+	char const *attrName = Tcl_GetString(*supElemv++) ;
 	int attrIndex = Ral_TupleHeadingIndexOf(supth, attrName) ;
 	int status ;
 
@@ -817,7 +854,7 @@ Ral_RelvarObjCreatePartition(
 		RAL_ERR_DUP_NAME, subName) ;
 	    goto errorOut ;
 	}
-	sub = Ral_RelvarObjFindRelvar(interp, info, subName, NULL) ;
+	sub = Ral_RelvarObjFindRelvar(interp, info, subName) ;
 	if (sub == NULL) {
 	    goto errorOut ;
 	}
@@ -851,7 +888,7 @@ Ral_RelvarObjCreatePartition(
 	subth = subRel->heading->tupleHeading ;
 	supAttrIter = Ral_IntVectorBegin(superAttrs) ;
 	while (subElemc-- > 0) {
-	    const char *attrName = Tcl_GetString(*subElemv++) ;
+	    char const *attrName = Tcl_GetString(*subElemv++) ;
 	    int attrIndex = Ral_TupleHeadingIndexOf(subth, attrName) ;
 
 	    if (attrIndex < 0) {
@@ -924,7 +961,7 @@ Ral_RelvarObjCreateCorrelation(
     Tcl_Obj **elemv2 ;
     int specIndex2 ;
 
-    const char *name ;
+    char const *name ;
     Tcl_DString resolve ;
     Ral_JoinMap refMap ;
     Ral_TupleHeading thC ;
@@ -955,8 +992,7 @@ Ral_RelvarObjCreateCorrelation(
     /*
      * Look up the correlation relvar.
      */
-    relvarC = Ral_RelvarObjFindRelvar(interp, info, Tcl_GetString(objv[1]),
-	NULL) ;
+    relvarC = Ral_RelvarObjFindRelvar(interp, info, Tcl_GetString(objv[1])) ;
     if (relvarC == NULL) {
 	return TCL_ERROR ;
     }
@@ -1002,8 +1038,7 @@ Ral_RelvarObjCreateCorrelation(
     /*
      * Look up relvar 1.
      */
-    relvar1 = Ral_RelvarObjFindRelvar(interp, info, Tcl_GetString(objv[4]),
-	NULL) ;
+    relvar1 = Ral_RelvarObjFindRelvar(interp, info, Tcl_GetString(objv[4])) ;
     if (relvar1 == NULL) {
 	return TCL_ERROR ;
     }
@@ -1019,8 +1054,7 @@ Ral_RelvarObjCreateCorrelation(
 	return TCL_ERROR ;
     }
 
-    relvar2 = Ral_RelvarObjFindRelvar(interp, info, Tcl_GetString(objv[8]),
-	NULL) ;
+    relvar2 = Ral_RelvarObjFindRelvar(interp, info, Tcl_GetString(objv[8])) ;
     if (relvar2 == NULL) {
 	return TCL_ERROR ;
     }
@@ -1189,22 +1223,20 @@ errorOut:
 int
 Ral_RelvarObjConstraintDelete(
     Tcl_Interp *interp,
-    const char *name,
+    char const *name,
     Ral_RelvarInfo info)
 {
     Ral_Constraint constraint ;
-    char *fullName ;
     int status ;
 
-    constraint = Ral_RelvarObjFindConstraint(interp, info, name, &fullName) ;
+    constraint = Ral_RelvarObjFindConstraint(interp, info, name) ;
     if (constraint == NULL) {
 	Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptConstraint,
 	    RAL_ERR_UNKNOWN_CONSTRAINT, name) ;
 	return TCL_ERROR ;
     }
-    status = Ral_ConstraintDeleteByName(fullName, info) ;
+    status = Ral_ConstraintDeleteByName(constraint->name, info) ;
     assert(status != 0) ;
-    ckfree(fullName) ;
     return TCL_OK ;
 }
 
@@ -1215,7 +1247,6 @@ Ral_RelvarObjConstraintInfo(
     Ral_RelvarInfo info)
 {
     Ral_Constraint constraint ;
-    char *fullName ;
     Tcl_Obj *resultObj ;
     Tcl_Obj *attrList ;
 
@@ -1223,7 +1254,7 @@ Ral_RelvarObjConstraintInfo(
      * Look up the constraint by it name.
      */
     constraint = Ral_RelvarObjFindConstraint(interp, info,
-	Tcl_GetString(nameObj), &fullName) ;
+	    Tcl_GetString(nameObj)) ;
     if (constraint == NULL) {
 	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptConstraint,
 	    RAL_ERR_UNKNOWN_CONSTRAINT, nameObj) ;
@@ -1245,7 +1276,7 @@ Ral_RelvarObjConstraintInfo(
 	    goto errorOut ;
 	}
 	if (Tcl_ListObjAppendElement(interp, resultObj,
-	    Tcl_NewStringObj(fullName, -1)) != TCL_OK) {
+	    Tcl_NewStringObj(constraint->name, -1)) != TCL_OK) {
 	    goto errorOut ;
 	}
 	/*
@@ -1309,7 +1340,7 @@ Ral_RelvarObjConstraintInfo(
 	    goto errorOut ;
 	}
 	if (Tcl_ListObjAppendElement(interp, resultObj,
-	    Tcl_NewStringObj(fullName, -1)) != TCL_OK) {
+	    Tcl_NewStringObj(constraint->name, -1)) != TCL_OK) {
 	    goto errorOut ;
 	}
 	/*
@@ -1373,7 +1404,7 @@ Ral_RelvarObjConstraintInfo(
 	    goto errorOut ;
 	}
 	if (Tcl_ListObjAppendElement(interp, resultObj,
-	    Tcl_NewStringObj(fullName, -1)) != TCL_OK) {
+	    Tcl_NewStringObj(constraint->name, -1)) != TCL_OK) {
 	    goto errorOut ;
 	}
 	/*
@@ -1445,20 +1476,18 @@ Ral_RelvarObjConstraintInfo(
 	    constraint->type) ;
     }
 
-    ckfree(fullName) ;
     Tcl_SetObjResult(interp, resultObj) ;
     return TCL_OK ;
 
 errorOut:
     Tcl_DecrRefCount(resultObj) ;
-    ckfree(fullName) ;
     return TCL_ERROR ;
 }
 
 int
 Ral_RelvarObjConstraintNames(
     Tcl_Interp *interp,
-    const char *pattern,
+    char const *pattern,
     Ral_RelvarInfo info)
 {
     Tcl_Obj *nameList ;
@@ -1468,7 +1497,7 @@ Ral_RelvarObjConstraintNames(
     nameList = Tcl_NewListObj(0, NULL) ;
     for (entry = Tcl_FirstHashEntry(&info->constraints, &search) ; entry ;
 	entry = Tcl_NextHashEntry(&search)) {
-	const char *name = (const char *)Tcl_GetHashKey(&info->constraints,
+	char const *name = (char const *)Tcl_GetHashKey(&info->constraints,
 	    entry) ;
 
 	if (Tcl_StringMatch(name, pattern) &&
@@ -1498,8 +1527,7 @@ Ral_RelvarObjConstraintMember(
     Ral_PtrVectorIter iter ;
     Ral_PtrVectorIter end ;
 
-    relvar = Ral_RelvarObjFindRelvar(interp, info, Tcl_GetString(relvarName),
-	NULL) ;
+    relvar = Ral_RelvarObjFindRelvar(interp, info, Tcl_GetString(relvarName)) ;
     if (relvar == NULL) {
 	return TCL_ERROR ;
     }
@@ -1529,16 +1557,14 @@ Ral_RelvarObjConstraintPath(
 {
     Ral_Constraint constraint ;
     char *name = Tcl_GetString(constraintName) ;
-    char *fullName ;
 
-    constraint = Ral_RelvarObjFindConstraint(interp, info, name, &fullName) ;
+    constraint = Ral_RelvarObjFindConstraint(interp, info, name) ;
     if (constraint == NULL) {
 	Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptConstraint,
 	    RAL_ERR_UNKNOWN_CONSTRAINT, name) ;
 	return TCL_ERROR ;
     }
-    Tcl_SetObjResult(interp, Tcl_NewStringObj(fullName, -1)) ;
-    ckfree(fullName) ;
+    Tcl_SetObjResult(interp, Tcl_NewStringObj(constraint->name, -1)) ;
     return TCL_OK ;
 }
 
@@ -1674,7 +1700,7 @@ Ral_RelvarObjTraceEvalRemove(
 {
     Ral_TraceInfo prev = NULL ;
     Ral_TraceInfo trace = rInfo->traces ;
-    const char *cmdString = Tcl_GetString(cmdPrefix) ;
+    char const *cmdString = Tcl_GetString(cmdPrefix) ;
     int flags = TRACEOP_EVAL_FLAG ;
 
     /*
@@ -1920,8 +1946,8 @@ static char *
 relvarTraceProc(
     ClientData clientData,
     Tcl_Interp *interp,
-    const char *name1,
-    const char *name2,
+    char const *name1,
+    char const *name2,
     int flags)
 {
     char *result = NULL ;
@@ -1933,7 +1959,7 @@ relvarTraceProc(
     if (flags & TCL_TRACE_WRITES) {
 	Ral_RelvarInfo info = (Ral_RelvarInfo) clientData ;
 	Tcl_DString resolve ;
-	const char *resolvedName =
+	char const *resolvedName =
 	    relvarResolveName(interp, name1, &resolve) ;
 	Ral_Relvar relvar = Ral_RelvarFind(info, resolvedName) ;
 	Tcl_Obj *newValue ;
@@ -1954,10 +1980,10 @@ relvarTraceProc(
     return result ;
 }
 
-static const char *
+static char const *
 relvarResolveName(
     Tcl_Interp *interp,
-    const char *name,
+    char const *name,
     Tcl_DString *resolvedName)
 {
     if (relvarNameIsAbsName(name)) {
@@ -1975,7 +2001,7 @@ relvarResolveName(
 
 static int
 relvarNameIsAbsName(
-    const char *name)
+    char const *name)
 {
     return strlen(name) >= 2 && name[0] == ':' && name[1] == ':' ;
 }
@@ -1987,7 +2013,7 @@ relvarNameIsAbsName(
 static int
 relvarGetNamespaceName(
     Tcl_Interp *interp,
-    const char *name,
+    char const *name,
     Tcl_DString *nsVarName)
 {
     int isGlobal = 1 ;
@@ -2065,8 +2091,7 @@ static Ral_Constraint
 Ral_RelvarObjFindConstraint(
     Tcl_Interp *interp,
     Ral_RelvarInfo info,
-    const char *name,
-    char **fullName)
+    char const *name)
 {
     Ral_Constraint constraint ;
 
@@ -2075,17 +2100,13 @@ Ral_RelvarObjFindConstraint(
 	 * Absolute name.
 	 */
 	constraint = Ral_ConstraintFindByName(name, info) ;
-	if (constraint && fullName) {
-	    *fullName = ckalloc(strlen(name) + 1) ;
-	    strcpy(*fullName, name) ;
-	}
     } else {
 	/*
 	 * Relative name. First try the current namespace.
 	 */
 	Tcl_DString resolve ;
 	int globalName ;
-	const char *resolvedName ;
+	char const *resolvedName ;
 
 	globalName = relvarGetNamespaceName(interp, name, &resolve) ;
 	resolvedName = Tcl_DStringValue(&resolve) ;
@@ -2104,10 +2125,6 @@ Ral_RelvarObjFindConstraint(
 	    constraint = Ral_ConstraintFindByName(resolvedName, info) ;
 	}
 
-	if (constraint && fullName) {
-	    *fullName = ckalloc(strlen(resolvedName) + 1) ;
-	    strcpy(*fullName, resolvedName) ;
-	}
 	Tcl_DStringFree(&resolve) ;
     }
 
