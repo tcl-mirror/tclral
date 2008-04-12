@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.c,v $
-$Revision: 1.20 $
-$Date: 2008/04/11 03:50:27 $
+$Revision: 1.21 $
+$Date: 2008/04/12 20:01:46 $
  *--
  */
 
@@ -79,6 +79,27 @@ MACRO DEFINITIONS
 /*
 TYPE DEFINITIONS
 */
+/*
+ * These declarations and the forward function references below form a "shadow"
+ * typing system that is used by TclRAL. The idea here is to divorce TclRAL
+ * from the internals of Tcl types. This is done by eliminating the use of
+ * Tcl_ObjType and removing all the calls to Tcl_ConvertToType() for ordinary
+ * Tcl types. Tcl_ConvertToType() is used for "Relation" and "Tuple" types, but
+ * then we are priviledged to know the internals of those types, after all this
+ * package creates those types. In order to remove the knowledge of Tcl type
+ * internals, the Tcl_GetXXXFromObj() functions are used to retrieve values. It
+ * turns out that TclRAL only uses three aspects of types, is a string
+ * coercible to a type, are two values equal and what is the relative order of
+ * two values (assuming the domain of the values is fully ordered).
+ *
+ * The type names chosen for the TclRAL types are the same as those used
+ * for Tcl native types, just to avoid (or perhaps create) confusion. Not
+ * all Tcl types are supported. The supported types are the important ones,
+ * e.g. the numeric and string types. Lists and Dicts are supported but
+ * ordering and equality are a bit less well defined for those types.
+ * Each type supplies three functions to perform the require tests and all
+ * of this is assembled into a table sorted by type name.
+ */
 typedef int (*IsATypeFunc)(Tcl_Interp *, Tcl_Obj *) ;
 typedef bool (*IsEqualFunc)(Tcl_Obj *, Tcl_Obj *) ;
 typedef int (*CompareFunc)(Tcl_Obj *, Tcl_Obj *) ;
@@ -151,6 +172,10 @@ char relationKeyword[] = "Relation" ;
 /*
 STATIC DATA ALLOCATION
 */
+/*
+ * This table must be in "typeName" order as "bsearch()" is used to
+ * find entries.
+ */
 static struct ral_type const Ral_Types[] = {
 #	ifdef Tcl_GetBignumFromObj_TCL_DECLARED
     {"bignum", isABignum, bignumEqual, bignumCompare},
@@ -171,7 +196,7 @@ static struct ral_type const Ral_Types[] = {
 
 static char const openList = '{' ;
 static char const closeList = '}' ;
-static char const rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.20 $" ;
+static char const rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.21 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -975,6 +1000,15 @@ stringCompare(
 {
     return strcmp(Tcl_GetString(v1), Tcl_GetString(v2)) ;
 }
+
+/*
+ * The functions below deal with converting attributes from internal to
+ * external form. The follow the traditional Tcl "scan / convert" approach
+ * where the attribute is "scanned" to determine how much space it will take
+ * and then "converted" to transform it into a string. The complicated part is
+ * dealing with possible recursive aspects of Tuples and Relations, i.e. Tuple
+ * and Relations can have Tuple valued or Relation valued attributes.
+ */
 
 int
 Ral_AttributeScanName(
