@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.36 $
-$Date: 2008/04/12 23:01:01 $
+$Revision: 1.37 $
+$Date: 2008/04/13 00:27:45 $
  *--
  */
 
@@ -64,14 +64,6 @@ INCLUDE FILES
 #include "ral_tupleobj.h"
 #include "ral_relationobj.h"
 #include "ral_utils.h"
-
-/*
- * We use Tcl_GetCurrentNamespace()
- * Before 8.5, they not part of the supported external interface.
- */
-#if TCL_MINOR_VERSION <= 4
-#   include "tclInt.h"
-#endif
 
 /*
 MACRO DEFINITIONS
@@ -151,7 +143,7 @@ static const struct traceOpsMap {
 } ;
 static const char specErrMsg[] = "multiplicity specification" ;
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.36 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.37 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -2017,13 +2009,25 @@ relvarGetNamespaceName(
     Tcl_DString *nsVarName)
 {
     int isGlobal = 1 ;
+    Tcl_DStringInit(nsVarName) ;
+
+#	ifdef Tcl_GetCurrentNamespace_TCL_DECLARED
     Tcl_Namespace *curr = Tcl_GetCurrentNamespace(interp) ;
 
-    Tcl_DStringInit(nsVarName) ;
     if (curr->parentPtr) {
 	Tcl_DStringAppend(nsVarName, curr->fullName, -1) ;
 	isGlobal = 0 ;
     }
+#	else
+    if (Tcl_Eval(interp, "namespace qualifiers [namespace current]")
+	    == TCL_OK) {
+	char const *result = Tcl_GetStringResult(interp) ;
+	if (strlen(result)) {
+	    Tcl_DStringAppend(nsVarName, result, -1) ;
+	    isGlobal = 0 ;
+	}
+    }
+#	endif
     Tcl_DStringAppend(nsVarName, "::", -1) ;
     Tcl_DStringAppend(nsVarName, name, -1) ;
 

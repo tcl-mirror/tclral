@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.c,v $
-$Revision: 1.21 $
-$Date: 2008/04/12 20:01:46 $
+$Revision: 1.22 $
+$Date: 2008/04/13 00:27:45 $
  *--
  */
 
@@ -151,9 +151,11 @@ static int isAList(Tcl_Interp *, Tcl_Obj *) ;
 static bool listEqual(Tcl_Obj *, Tcl_Obj *) ;
 static int listCompare(Tcl_Obj *, Tcl_Obj *) ;
 
+#   ifdef Tcl_DictObjSize_TCL_DECLARED
 static int isADict(Tcl_Interp *, Tcl_Obj *) ;
 static bool dictEqual(Tcl_Obj *, Tcl_Obj *) ;
 static int dictCompare(Tcl_Obj *, Tcl_Obj *) ;
+#   endif
 
 static int isAString(Tcl_Interp *, Tcl_Obj *) ;
 static bool stringEqual(Tcl_Obj *, Tcl_Obj *) ;
@@ -196,7 +198,7 @@ static struct ral_type const Ral_Types[] = {
 
 static char const openList = '{' ;
 static char const closeList = '}' ;
-static char const rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.21 $" ;
+static char const rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.22 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -952,6 +954,7 @@ listCompare(
     return stringCompare(v1, v2) ;
 }
 
+#   ifdef Tcl_DictObjSize_TCL_DECLARED
 static int
 isADict(
     Tcl_Interp *interp,
@@ -976,6 +979,7 @@ dictCompare(
 {
     return stringCompare(v1, v2) ;
 }
+#	endif
 
 static int
 isAString(

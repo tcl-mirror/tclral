@@ -49,8 +49,8 @@ ABSTRACT:
     Algebra.
 
 $RCSfile: ral.c,v $
-$Revision: 1.40 $
-$Date: 2008/04/11 03:50:27 $
+$Revision: 1.41 $
+$Date: 2008/04/13 00:27:45 $
  *--
  */
 
@@ -70,14 +70,6 @@ INCLUDE FILES
 #include "ral_relvar.h"
 #include "ral_relvarobj.h"
 #include "ral_relvarcmd.h"
-
-/*
- * We use Tcl_CreateNamespace() and Tcl_Export().
- * Before 8.5, they not part of the supported external interface.
- */
-#if TCL_MINOR_VERSION <= 4
-#   include "tclInt.h"
-#endif
 
 /*
 MACRO DEFINITIONS
@@ -105,7 +97,7 @@ STATIC DATA ALLOCATION
 static char const ral_pkgname[] = PACKAGE_NAME ;
 static char const ral_version[] = PACKAGE_VERSION ;
 static char const ral_rcsid[] =
-    "$Id: ral.c,v 1.40 2008/04/11 03:50:27 mangoa01 Exp $" ;
+    "$Id: ral.c,v 1.41 2008/04/13 00:27:45 mangoa01 Exp $" ;
 static char const ral_copyright[] =
     "This software is copyrighted 2004, 2005, 2006, 2007 by G. Andrew Mangogna."
     " Terms and conditions for use are distributed with the source code." ;
@@ -140,7 +132,6 @@ Ral_Init(
     static char const relvarCmdName[] = "relvar" ;
 
     Tcl_DString cmdName ;
-    Tcl_Namespace *ralNs ;
     Ral_RelvarInfo rInfo ;
     int baseLen;
 
@@ -152,8 +143,14 @@ Ral_Init(
     Tcl_DStringInit(&cmdName) ;
     Tcl_DStringAppend(&cmdName, nsSep, -1) ;
     Tcl_DStringAppend(&cmdName, ral_pkgname, -1) ;
-    ralNs = Tcl_CreateNamespace(interp, Tcl_DStringValue(&cmdName),
-	    NULL, NULL) ;
+#   ifdef Tcl_CreateNamespace_TCL_DECLARED
+    Tcl_Namespace *ralNs = Tcl_CreateNamespace(interp,
+	    Tcl_DStringValue(&cmdName), NULL, NULL) ;
+#	else
+    if (Tcl_Eval(interp, "namespace eval ::ral {}") != TCL_OK) {
+	return TCL_ERROR ;
+    }
+#	endif
     /*
      * Create the package commands.
      */
@@ -162,26 +159,47 @@ Ral_Init(
     Tcl_DStringAppend(&cmdName, tupleCmdName, -1) ;
     Tcl_CreateObjCommand(interp, Tcl_DStringValue(&cmdName), tupleCmd,
 	    NULL, NULL) ;
+#   ifdef Tcl_Export_TCL_DECLARED
     if (Tcl_Export(interp, ralNs, tupleCmdName, 0) != TCL_OK) {
 	return TCL_ERROR ;
     }
+#	else
+    if (Tcl_Eval(interp, "namespace eval ::ral namespace export tuple")
+	    != TCL_OK) {
+	return TCL_ERROR ;
+    }
+#	endif
 
     Tcl_DStringSetLength(&cmdName, baseLen) ;
     Tcl_DStringAppend(&cmdName, relationCmdName, -1) ;
     Tcl_CreateObjCommand(interp, Tcl_DStringValue(&cmdName), relationCmd,
 	    NULL, NULL) ;
+#   ifdef Tcl_Export_TCL_DECLARED
     if (Tcl_Export(interp, ralNs, relationCmdName, 0) != TCL_OK) {
 	return TCL_ERROR ;
     }
+#	else
+    if (Tcl_Eval(interp, "namespace eval ::ral namespace export relation")
+	    != TCL_OK) {
+	return TCL_ERROR ;
+    }
+#	endif
 
     Tcl_DStringSetLength(&cmdName, baseLen) ;
     Tcl_DStringAppend(&cmdName, relvarCmdName, -1) ;
     rInfo = Ral_RelvarNewInfo(ral_pkgname, interp) ;
     Tcl_CreateObjCommand(interp, Tcl_DStringValue(&cmdName), relvarCmd, rInfo,
 	    NULL) ;
+#   ifdef Tcl_Export_TCL_DECLARED
     if (Tcl_Export(interp, ralNs, relvarCmdName, 0) != TCL_OK) {
 	return TCL_ERROR ;
     }
+#	else
+    if (Tcl_Eval(interp, "namespace eval ::ral namespace export relvar")
+	    != TCL_OK) {
+	return TCL_ERROR ;
+    }
+#	endif
 
 #   ifdef Tcl_RegisterConfig_TCL_DECLARED
     Tcl_RegisterConfig(interp, ral_pkgname, ral_config, "iso8859-1") ;
