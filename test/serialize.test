@@ -42,14 +42,14 @@ exec tclsh "$0" "$@"
 # 
 #  *++
 # MODULE:
-#   trace.test -- test cases for relvar tracing the Tcl Relational Algebra
-#   Library
+#   serialize.test -- test cases for serializing relvars in the
+#	Tcl Relational Algebra Library
 # 
 # ABSTRACT:
 # 
 # $RCSfile: serialize.test,v $
-# $Revision: 1.3 $
-# $Date: 2007/06/23 18:50:03 $
+# $Revision: 1.4 $
+# $Date: 2008/04/13 00:28:53 $
 #  *--
 
 set ::auto_path [linsert $::auto_path 0\
