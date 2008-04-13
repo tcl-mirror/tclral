@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.37 $
-$Date: 2008/04/13 00:27:45 $
+$Revision: 1.38 $
+$Date: 2008/04/13 21:02:35 $
  *--
  */
 
@@ -143,7 +143,7 @@ static const struct traceOpsMap {
 } ;
 static const char specErrMsg[] = "multiplicity specification" ;
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.37 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.38 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -305,7 +305,8 @@ Ral_RelvarObjCopyOnShared(
 	    TCL_LEAVE_ERR_MSG) == NULL) {
 	    result = TCL_ERROR ;
 	}
-	int status = Tcl_TraceVar(interp, relvar->name, relvarTraceFlags,
+	int status ;
+	status = Tcl_TraceVar(interp, relvar->name, relvarTraceFlags,
 	    relvarTraceProc, info) ;
 	assert(status == TCL_OK) ;
     }
