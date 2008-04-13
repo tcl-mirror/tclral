@@ -1,3 +1,103 @@
+========= ral 0.8.8 =========
+2008/04/13 mangoa01
+
+	* test/serialize.test:
+	  Documentation change.
+
+	* src/ral.c:
+	* src/ral_attribute.c:
+	* src/ral_relvarobj.c:
+	  Removed all the dependencies on "tclInt.h" for the Tcl 8.4 builds.
+
+2008/04/12 mangoa01
+
+	* configure:
+	* configure.in:
+	* src/ral.tcl:
+	* src/ral_relvarcmd.c:
+	* src/ral_relvarcmd.h:
+	* src/ral_relvarobj.c:
+	* src/ral_relvarobj.h:
+	* src/ralutil.tcl:
+	* test/ral.test:
+	  Bug #1939872
+	  Corrected an error where copy on write rules were not properly
+	  enforced when the relation values stored in a relvar are
+	  modified. Added a check if the underlying relation value is
+	  being shared and if so, then a copy is made to prevent stomping
+	  on the reference.
+
+	* src/ral_attribute.c:
+	  Improved comments in code.
+
+	* doc/ral/relation.man:
+	* doc/ral/relformat.man:
+	* doc/ral/relvar.man:
+	* doc/ral/serialize.man:
+	* doc/ral/tuple.man:
+	  Removed deprecated doctools commands.
+	  Added more explanation of data types in the "Tuple" man page.
+	  Make ready for 0.8.8. release.
+
+	* src/ral_relvar.c:
+	* src/ral_relvar.h:
+	  Source code clean up.
+
+2008/04/11 mangoa01
+
+	* src/ral.c:
+	* src/ral_attribute.c:
+	* src/ral_attribute.h:
+	* src/ral_relationcmd.c:
+	* src/ral_relvarobj.c:
+	* test/ral.test:
+	  Bug #1923541.
+	  Corrected an error where copy on write rules were not properly
+	  enforced when the relation values stored in a relvar are
+	  modified. Added a check if the underlying relation value is
+	  being shared and if so, then a copy is made to prevent stomping
+	  on the reference.
+
+2008/04/04 mangoa01
+
+	* src/ral_relvarobj.c:
+	* src/ral_utils.c:
+	* src/ral_utils.h:
+	  Changed confusing error message when a relvar is "unset"
+	  during a transaction.
+
+2008/04/02 mangoa01
+
+	* src/ralutil.tcl:
+	  Fix to bug #1931572.
+	  Added "package require ral" to make sure "ralutil.tcl" is explicit
+	  about all of its package dependencies.
+
+2008/02/15 mangoa01
+
+	* test/ral.test:
+	  Added tests for fix to bug # 1893238.
+
+	* src/ral_attribute.c:
+	  Fixed: 1893238
+	  The empty string represents something else for relation valued
+	  attributes and so the test for the empty string was moved to
+	  apply only to Tcl types.
+
+2008/02/09 mangoa01
+
+	* src/ral.c:
+	* src/ral_relation.c:
+	* src/ral_relationcmd.c:
+	* src/ral_relationheading.c:
+	* src/ral_tuplecmd.c:
+	* src/ral_tupleheading.c:
+	* src/ral_vector.c:
+	  Added patch from Andreas Kupries to resolve problems in the code base
+	  for native HPUX and AIX compilers. A number of C99 and GCC specific
+	  constructs had crept into the code base.
+
+
 ========= ral 0.8.7 =========
 Version 0.8.7 is a bug fix release.
 
