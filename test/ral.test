@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.42 $
-# $Date: 2008/04/12 23:01:03 $
+# $Revision: 1.43 $
+# $Date: 2008/04/14 00:12:04 $
 #  *--
 
 package require tcltest 2.2
@@ -1491,6 +1491,17 @@ namespace eval ::ral::test {
 	set dend [relation project $S S#]
 	set dsor [relation project $P P#]
 	set med [relation project $SP S#]
+    } -body {
+	relation divide $dend $dsor $med
+    } -result {mediator heading must be a union of the dividend and divisor headings, "while computing quotient"}\
+    -returnCodes error
+
+    test relation-divide-5.1 {
+	mediator larger than union dividend and divsor
+    } -setup {
+	set dend [relation project $S S#]
+	set dsor [relation project $P P#]
+	set med [relation extend $SP sp Other int {"1"}]
     } -body {
 	relation divide $dend $dsor $med
     } -result {mediator heading must be a union of the dividend and divisor headings, "while computing quotient"}\

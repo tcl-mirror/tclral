@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.32 $
-$Date: 2008/02/09 19:42:33 $
+$Revision: 1.33 $
+$Date: 2008/04/14 00:12:04 $
  *--
  */
 
@@ -116,7 +116,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.32 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.33 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -1429,11 +1429,14 @@ Ral_RelationDivide(
 {
     Ral_RelationHeading dendHeading = dend->heading ;
     Ral_TupleHeading dendTupleHeading = dendHeading->tupleHeading ;
+    int dendHeadingSize = Ral_TupleHeadingSize(dendTupleHeading) ;
     Ral_RelationHeading dsorHeading = dsor->heading ;
     Ral_TupleHeading dsorTupleHeading = dsorHeading->tupleHeading ;
+    int dsorHeadingSize = Ral_TupleHeadingSize(dsorTupleHeading) ;
     int dsorCard = Ral_RelationCardinality(dsor) ;
     Ral_RelationHeading medHeading = med->heading ;
     Ral_TupleHeading medTupleHeading = medHeading->tupleHeading ;
+    int medHeadingSize = Ral_TupleHeadingSize(medTupleHeading) ;
     Ral_Relation quot ;
     Ral_TupleHeading trialTupleHeading ;
     Ral_Tuple trialTuple ;
@@ -1463,9 +1466,10 @@ Ral_RelationDivide(
 	return NULL ;
     }
     if (Ral_TupleHeadingCommonAttributes(dendTupleHeading, medTupleHeading,
-	NULL) != Ral_TupleHeadingSize(dendTupleHeading) ||
+		NULL) != dendHeadingSize ||
 	Ral_TupleHeadingCommonAttributes(dsorTupleHeading, medTupleHeading,
-	NULL) != Ral_TupleHeadingSize(dsorTupleHeading)) {
+		NULL) != dsorHeadingSize ||
+	dendHeadingSize + dsorHeadingSize != medHeadingSize) {
 	Ral_ErrorInfoSetError(errInfo, RAL_ERR_NOT_UNION,
 	    "while computing quotient") ;
 	return NULL ;
