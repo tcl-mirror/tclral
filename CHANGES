@@ -1,13 +1,46 @@
 ========= ral 0.8.8 =========
+2008/04/15 mangoa01
+
+	* src/ral_attribute.c:
+	* src/ral_relationobj.c:
+	* src/ral_relvar.c:
+	* src/ral_relvarcmd.c:
+	* src/ral_relvarobj.c:
+	* src/ral_tupleobj.c:
+	* test/ral.test:
+	  Cleaned up several aspects dealing with the lifetimes of the
+	  internal representation. There were places in the code where
+	  the string representation was being invalidated when it should
+	  not have been. In particular, the string rep of "literals" was
+	  occasionally invalidated and this causes Tcl to panic when the
+	  literal table is cleaned up when an interpreter is destroyed.
+
+2008/04/14 mangoa01
+
+	* src/ral_relation.c:
+	* test/ral.test:
+	  Corrected a problem with "relation divide". In divide the
+	  heading of the mediator relation must be the union of the
+	  headings of the dividend and divisor. The code as written
+	  failed to insure that the mediator heading was not a super
+	  set of the union of the dividend and divisor headings.
+
 2008/04/13 mangoa01
 
 	* test/serialize.test:
 	  Documentation change.
 
+	* src/ral_relvarobj.c:
+	  Remove an unused variable warning when assertions are compiled out.
+
 	* src/ral.c:
 	* src/ral_attribute.c:
 	* src/ral_relvarobj.c:
 	  Removed all the dependencies on "tclInt.h" for the Tcl 8.4 builds.
+
+	* CHANGES:
+	* README:
+	  Updates preparing for 0.8.8 release.
 
 2008/04/12 mangoa01
 
@@ -52,11 +85,17 @@
 	* src/ral_relvarobj.c:
 	* test/ral.test:
 	  Bug #1923541.
-	  Corrected an error where copy on write rules were not properly
-	  enforced when the relation values stored in a relvar are
-	  modified. Added a check if the underlying relation value is
-	  being shared and if so, then a copy is made to prevent stomping
-	  on the reference.
+	  This set of changes removes the dependency on the internal
+	  representation of Tcl objects. Now, there is a "shadow" type
+	  system that is internally maintained. The interface to Tcl
+	  uses the "Tcl_GetXXXFromObj()" functions that are part of
+	  the recognized public interface. The "Relation" and "Tuple"
+	  object types are no longer registered in keep with the general
+	  consensus that "Tcl_RegisterObjType()" is a design misfeature.
+	  Now, attributes may not have an arbitrary Tcl type associated
+	  with them, but instead there are a set of Tcl types, mainly the
+	  numeric ones, that are recognized and for which the necessary
+	  type operations are supported.
 
 2008/04/04 mangoa01
 
@@ -96,7 +135,6 @@
 	  Added patch from Andreas Kupries to resolve problems in the code base
 	  for native HPUX and AIX compilers. A number of C99 and GCC specific
 	  constructs had crept into the code base.
-
 
 ========= ral 0.8.7 =========
 Version 0.8.7 is a bug fix release.
