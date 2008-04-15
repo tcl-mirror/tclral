@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.c,v $
-$Revision: 1.22 $
-$Date: 2008/04/13 00:27:45 $
+$Revision: 1.23 $
+$Date: 2008/04/15 01:10:53 $
  *--
  */
 
@@ -198,7 +198,7 @@ static struct ral_type const Ral_Types[] = {
 
 static char const openList = '{' ;
 static char const closeList = '}' ;
-static char const rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.22 $" ;
+static char const rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.23 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -600,9 +600,9 @@ Ral_AttributeConvertValueToType(
 	 * for the attribute. It is possible for the type convertion to
 	 * succeed, but that the type be assigned something other than the one
 	 * associated with the attribute.  Tcl type conversions, especially for
-	 * numeric types, stops at the first type that can represent the
-	 * number. For example, converting "30" to a double will end up as an
-	 * "int" internally. This prevents excessive round off and other
+	 * numeric types, stop at the first type that can represent the number.
+	 * For example, converting "30" to a double will end up as an "int"
+	 * internally. This prevents excessive round off (I guess) and other
 	 * issues. It is okay that this happens, as the "shadow" typing system
 	 * handles the conversion to an actual double value when necessary.
 	 *
@@ -616,14 +616,6 @@ Ral_AttributeConvertValueToType(
 	    if (result != TCL_OK) {
 		Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_BAD_VALUE, objPtr) ;
 		Ral_InterpSetError(interp, errInfo) ;
-	    } else if (strcmp(attr->typeName, "string") != 0) {
-		/*
-		 * We also want to generate the canonical form of the string
-		 * representation so that string hashes, etc work properly.
-		 * We only do this on non-string types.
-		 */
-		Tcl_InvalidateStringRep(objPtr) ;
-		Tcl_GetString(objPtr) ;
 	    }
 	}
 	break ;

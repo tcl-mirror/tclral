@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationobj.c,v $
-$Revision: 1.22 $
-$Date: 2007/02/24 20:34:51 $
+$Revision: 1.23 $
+$Date: 2008/04/15 01:10:53 $
  *--
  */
 
@@ -108,7 +108,7 @@ Tcl_ObjType Ral_RelationObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.22 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.23 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -166,13 +166,6 @@ Ral_RelationObjConvert(
     if (objPtr->typePtr && objPtr->typePtr->freeIntRepProc) {
 	objPtr->typePtr->freeIntRepProc(objPtr) ;
     }
-    /*
-     * Invalidate the string representation.  There are several string reps
-     * that will map to the same relation and we want to force a new string rep
-     * to be generated in order to obtain the canonical string form.
-     */
-    Tcl_InvalidateStringRep(objPtr) ;
-    objPtr->length = 0 ;
     /*
      * Install the new internal representation.
      */
@@ -585,7 +578,11 @@ static void
 FreeRelationInternalRep(
     Tcl_Obj *objPtr)
 {
-    assert(objPtr->typePtr == &Ral_RelationObjType) ;
+    /*
+     * Removed the assertion that objPtr->typePtr == &Ral_RelationObjType.
+     * When cleaning up the literal table, Tcl calls this function after
+     * purposely setting the typePtr to NULL. Not sure why, but it does.
+     */
     Ral_RelationDelete(objPtr->internalRep.otherValuePtr) ;
     objPtr->typePtr = objPtr->internalRep.otherValuePtr = NULL ;
 }

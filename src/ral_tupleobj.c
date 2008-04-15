@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleobj.c,v $
-$Revision: 1.12 $
-$Date: 2006/11/05 00:15:59 $
+$Revision: 1.13 $
+$Date: 2008/04/15 01:10:54 $
  *--
  */
 
@@ -109,7 +109,7 @@ Tcl_ObjType Ral_TupleObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tupleobj.c,v $ $Revision: 1.12 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tupleobj.c,v $ $Revision: 1.13 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -147,13 +147,6 @@ Ral_TupleObjConvert(
     if (objPtr->typePtr && objPtr->typePtr->freeIntRepProc) {
 	objPtr->typePtr->freeIntRepProc(objPtr) ;
     }
-    /*
-     * Invalidate the string representation.  There are several string reps
-     * that will map to the same tuple and we want to force a new string rep to
-     * be generated in order to obtain the canonical string form.
-     */
-    Tcl_InvalidateStringRep(objPtr) ;
-    objPtr->length = 0 ;
     /*
      * Install the new internal representation.
      */
@@ -490,7 +483,11 @@ static void
 FreeTupleInternalRep(
     Tcl_Obj *objPtr)
 {
-    assert(objPtr->typePtr == &Ral_TupleObjType) ;
+    /*
+     * Removed the assertion that objPtr->typePtr == &Ral_TupleObjType.
+     * When cleaning up the literal table, Tcl calls this function after
+     * purposely setting the typePtr to NULL. Not sure why, but it does.
+     */
     Ral_TupleUnreference(objPtr->internalRep.otherValuePtr) ;
     objPtr->typePtr = objPtr->internalRep.otherValuePtr = NULL ;
 }

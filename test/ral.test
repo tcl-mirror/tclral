@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.43 $
-# $Date: 2008/04/14 00:12:04 $
+# $Revision: 1.44 $
+# $Date: 2008/04/15 01:10:54 $
 #  *--
 
 package require tcltest 2.2
@@ -1591,7 +1591,15 @@ namespace eval ::ral::test {
 	    }
 	}
 	relation extract $t Size
-    } -result {relation must have cardinality of one, "Relation {Name string Age int Size double} Name {{Name Andrew Age 20 Size 1.3} {Name Bob Age 30 Size 4.3}}"} -returnCodes error
+    } -result {relation must have cardinality of one, "
+	    Relation
+	    {Name string Age int Size double}
+	    Name
+	    {
+		{Name Andrew Age 20 Size 1.3}
+		{Name Bob Age 30 Size 4.3}
+	    }
+	"} -returnCodes error
 
     # relation foreach subcommand
     test relation-foreach-1.0 {simple visit of suppliers} -body {
@@ -2122,7 +2130,7 @@ namespace eval ::ral::test {
 	    {Name Andrew Status 30 City Sunnyvale}\
 	    {City Saratoga Status 10 Name Fred}}}
 	relation is $r1 equal $r2
-    } -result {headings not equal, "Relation {Name string Status int City string} Name {{Name George Status 20 City {San Jose}} {Name Andrew Status 30 City Sunnyvale} {Name Fred Status 10 City Saratoga}}"}\
+    } -result {headings not equal, "Relation {Name string Status int City string} Name {{Status 20 Name George City {San Jose}} {Name Andrew Status 30 City Sunnyvale} {City Saratoga Status 10 Name Fred}}"}\
     -returnCodes error
 
     test relation-is-equal-7.0 {tuple valued attributes} -body {
@@ -3491,6 +3499,47 @@ in expression "_@_< 20"} -returnCodes error
 	    {DomainId 1 ClassId 3 ClassName c3 Line 23 StorageSlots 2}
 	    {DomainId 1 ClassId 4 ClassName c4 Line 24 StorageSlots 3}
 	    {DomainId 1 ClassId 5 ClassName c5 Line 25 StorageSlots 4}
+	}
+    } -match relation
+
+    test relation-semijoin-5.4 {
+	common attributes not all in identifiers
+    } -setup {
+	set r1 {
+	    Relation {
+		Attr1 string Attr2 int Attr3 string
+	    } {
+		{Attr1 Attr2}
+	    } {
+		{Attr1 a1 Attr2 1 Attr3 a4}
+		{Attr1 a2 Attr2 2 Attr3 a5}
+		{Attr1 a3 Attr2 3 Attr3 a6}
+	    }
+	}
+	set r2 {
+	    Relation {
+		Bttr1 string Attr1 string
+	    } {
+		Bttr1
+	    } {
+		{Bttr1 b1 Attr1 a1}
+		{Bttr1 b3 Attr1 a33}
+		{Bttr1 b2 Attr1 a3}
+		{Bttr1 b4 Attr1 a44}
+	    }
+	}
+    } -cleanup {
+	unset r1 r2
+    } -body {
+	relation semijoin $r1 $r2
+    } -result {
+	Relation {
+	    Bttr1 string Attr1 string
+	} {
+	    Bttr1
+	} {
+	    {Bttr1 b1 Attr1 a1}
+	    {Bttr1 b2 Attr1 a3}
 	}
     } -match relation
 

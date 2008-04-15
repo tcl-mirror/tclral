@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.31 $
-$Date: 2008/04/12 23:00:42 $
+$Revision: 1.32 $
+$Date: 2008/04/15 01:10:53 $
  *--
  */
 
@@ -122,7 +122,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.31 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.32 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -441,7 +441,6 @@ RelvarDeleteCmd(
     if (result == TCL_OK) {
 	if (deleted) {
 	    Tcl_InvalidateStringRep(relvar->relObj) ;
-	    relvar->relObj->length = 0 ;
 	}
 	Tcl_SetObjResult(interp, Tcl_NewIntObj(deleted)) ;
     }
@@ -507,16 +506,12 @@ RelvarDeleteOneCmd(
 	if (Ral_RelvarObjExecDeleteTraces(interp, relvar, tupleObj) == TCL_OK) {
 	    Ral_RelationErase(relation, found, found + 1) ;
 	    deleted = 1 ;
+	    Tcl_InvalidateStringRep(relvar->relObj) ;
 	}
 	Tcl_DecrRefCount(tupleObj) ;
     }
 
     Ral_TupleDelete(key) ;
-
-    if (deleted) {
-	Tcl_InvalidateStringRep(relvar->relObj) ;
-	relvar->relObj->length = 0 ;
-    }
 
     result = Ral_RelvarObjEndCmd(interp, rInfo, 0) ;
     if (result == TCL_OK) {
@@ -638,7 +633,6 @@ RelvarInsertCmd(
     if (result == TCL_OK) {
 	if (inserted) {
 	    Tcl_InvalidateStringRep(relvar->relObj) ;
-	    relvar->relObj->length = 0 ;
 	}
 	Tcl_SetObjResult(interp, Ral_RelationObjNew(resultRel)) ;
     } else {
@@ -1417,7 +1411,6 @@ RelvarUpdateCmd(
 
     if (Ral_RelationCardinality(updatedTuples)) {
 	Tcl_InvalidateStringRep(relvar->relObj) ;
-	relvar->relObj->length = 0 ;
     }
 
     Tcl_UnsetVar(interp, Tcl_GetString(tupleVarNameObj), 0) ;
@@ -1517,7 +1510,6 @@ RelvarUpdateOneCmd(
 	    objv[5], tupleVarNameObj, updatedTuples, &errInfo) ;
 	if (result == TCL_OK) {
 	    Tcl_InvalidateStringRep(relvar->relObj) ;
-	    relvar->relObj->length = 0 ;
 	}
 
 	result = Ral_RelvarObjEndCmd(interp, rInfo, result == TCL_ERROR)
@@ -1526,11 +1518,6 @@ RelvarUpdateOneCmd(
 	 * Delete the variable.
 	 */
 	Tcl_UnsetVar(interp, Tcl_GetString(tupleVarNameObj), 0) ;
-    }
-
-    if (Ral_RelationCardinality(updatedTuples)) {
-	Tcl_InvalidateStringRep(relvar->relObj) ;
-	relvar->relObj->length = 0 ;
     }
 
     if (result == TCL_OK) {

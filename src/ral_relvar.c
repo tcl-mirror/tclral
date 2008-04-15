@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.c,v $
-$Revision: 1.17 $
-$Date: 2008/04/12 22:53:59 $
+$Revision: 1.18 $
+$Date: 2008/04/15 01:10:53 $
  *--
  */
 
@@ -120,7 +120,7 @@ static char const * const condMultStrings[2][2] = {
     {"1", "+"},
     {"?", "*"}
 } ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.17 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.18 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -978,7 +978,6 @@ relvarSetIntRep(
     relvar->relObj->internalRep.otherValuePtr = relation ;
     relvar->relObj->typePtr = &Ral_RelationObjType ;
     Tcl_InvalidateStringRep(relvar->relObj) ;
-    relvar->relObj->length = 0 ;
 }
 
 /*
