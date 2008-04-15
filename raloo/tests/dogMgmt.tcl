@@ -193,7 +193,7 @@ DogMgmt define {
     # be referred to without any qualification.
 
     SyncService firstPurchase {ownerName age area phone dogName} {
-	set dog [Dog selectOne Name $dogName]
+	set dog [Dog new Name $dogName]
 	if {[$dog isempty]} {
 	    error "no such dog, \"$dogName\""
 	}

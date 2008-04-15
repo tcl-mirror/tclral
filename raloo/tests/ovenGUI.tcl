@@ -1,84 +1,194 @@
-#!/usr/bin/env wish
-
 package require Tk
+package require raloo
 
-source ovenMgmt.tcl
+Domain create OvenGUI {
+    SyncService newOven {id} {
+	OvenMgmt newOven $id
+	Oven createWidget $id
+    }
 
-OvenMgmt newOven 1
+    SyncService destroyOven {id} {
+	OvenMgmt destroyOven $id
+	set oven [Oven new OvenId $id]
+	destroy [$oven readAttr OvenWidget]
+	$oven delete
+    }
 
-::raloo::arch::logLevel info
+    SyncService updateTimerTime {id min sec} {
+	set guiTimer [OvenGUI::Timer new TimerId $id]
+	$guiTimer updateTime $min $sec
+    }
 
-namespace import ::ral::*
+    DomainOp doorButton {id} {
+	set door [Door new DoorId $id]
+	$door generate Pressed
+    }
 
-set ::timerTime 00:00
-set ::doorState Closed
+    DomainOp turnOnLight {id} {
+	set light [Light new LightId $id]
+	$light generate TurnOn
+    }
 
-proc ::bgerror {msg} {
-    puts stderr "*** Background: $::errorInfo"
-}
+    DomainOp turnOffLight {id} {
+	set light [Light new LightId $id]
+	$light generate TurnOff
+    }
 
-proc toggleDoor {} {
-    if {$::doorState eq "Closed"} {
-	set ::doorState Open
-	OvenMgmt doorOpened 1
-    } else {
-	set ::doorState Closed
-	OvenMgmt doorClosed 1
+    DomainOp energizeTube {id} {
+	set tube [Tube new TubeId $id]
+	$tube generate Energize
+    }
+
+    DomainOp deenergizeTube {id} {
+	set tube [Tube new TubeId $id]
+	$tube generate De-energize
+    }
+
+    Class Oven {
+	package require img::png
+	image create photo ovenOff -file mw-off.png
+	image create photo ovenCook -file mw-cook.png
+
+	Attribute {
+	    *OvenId string
+	    *2OvenWidget string
+	}
+
+	ClassOp createWidget {id} {
+	    toplevel .$id
+	    wm title .$id "One Button Microwave $id"
+	    my insert OvenId $id OvenWidget .$id
+	    wm protocol .$id WM_DELETE_WINDOW [list OvenGUI destroyOven $id]
+	    button .$id.ctrlButton -text Start/Add\
+		-command [list OvenMgmt buttonPushed $id]
+	    label .$id.ovenImage -image ovenOff
+
+	    grid\
+		[Timer createWidget $id .$id]\
+		.$id.ctrlButton\
+		[Door createWidget $id .$id]\
+		-padx 3 -pady 3
+	    grid\
+		[Light createWidget $id .$id]\
+		[Tube createWidget $id .$id]\
+		-sticky ew -padx 3 -pady 3
+	    grid\
+		.$id.ovenImage
+	}
+    }
+
+    Class Door {
+	Attribute {
+	    *DoorId string
+	    *2DoorWidget string
+	}
+
+	ClassOp createWidget {id parent} {
+	    button $parent.door\
+		-text Closed\
+		-command [list OvenGUI doorButton $id]
+	    my insert DoorId $id DoorWidget $parent.door
+	    return $parent.door
+	}
+
+	Lifecycle {
+	    State doorClosed {} {
+		my with {DoorId DoorWidget} {
+		    $DoorWidget configure -text Closed
+		    OvenMgmt doorClosed $DoorId
+		}
+	    }
+
+	    State doorOpen {} {
+		my with {DoorId DoorWidget} {
+		    $DoorWidget configure -text Open
+		    OvenMgmt doorOpened $DoorId
+		}
+	    }
+
+	    Transition doorClosed - Pressed -> doorOpen
+	    Transition doorOpen - Pressed -> doorClosed
+
+	    DefaultInitialState doorClosed
+	}
+    }
+
+    Class Light {
+	Attribute {
+	    *LightId string
+	    *2LightWidget string
+	}
+
+	ClassOp createWidget {id parent} {
+	    label $parent.light -bg black
+	    my insert LightId $id LightWidget $parent.light
+	    return $parent.light
+	}
+	Lifecycle {
+	    State on {} {
+		my with LightWidget {
+		    $LightWidget configure -bg white
+		}
+	    }
+	    State off {} {
+		my with LightWidget {
+		    $LightWidget configure -bg black
+		}
+	    }
+	    Transition on - TurnOff -> off
+	    Transition off - TurnOn -> on
+
+	    DefaultInitialState off
+	}
+    }
+
+    Class Tube {
+	Attribute {
+	    *TubeId string
+	    *2TubeWidget string
+	}
+
+	ClassOp createWidget {id parent} {
+	    label $parent.tube -bg black
+	    my insert TubeId $id TubeWidget $parent.tube
+	    return $parent.tube
+	}
+
+	Lifecycle {
+	    State energized {} {
+		my with TubeWidget {
+		    $TubeWidget configure -bg red
+		}
+		.[my readAttr TubeId].ovenImage configure -image ovenCook
+	    }
+	    State de-energized {} {
+		my with TubeWidget {
+		    $TubeWidget configure -bg black
+		}
+		.[my readAttr TubeId].ovenImage configure -image ovenOff
+	    }
+	    Transition energized - De-energize -> de-energized
+	    Transition de-energized - Energize -> energized
+
+	    DefaultInitialState de-energized
+	}
+    }
+
+    Class Timer {
+	Attribute {
+	    *TimerId string
+	    *2TimerWidget string
+	}
+
+	ClassOp createWidget {id parent} {
+	    label $parent.timer -text 00:00
+	    my insert TimerId $id TimerWidget $parent.timer
+	    return $parent.timer
+	}
+
+	InstOp updateTime {min sec} {
+	    set w [my readAttr TimerWidget]
+	    $w configure -text [format %02d:%02d $min $sec]
+	}
     }
 }
-
-proc updateTimer {op relvarName oldTuple newTuple} {
-    tuple assign $newTuple
-    if {$TimerId == 1} {
-	set ::timerTime [format "%02d:%02d" $Minutes $Seconds]
-    }
-    return $newTuple
-}
-
-proc updateLight {op relvarName oldTuple newTuple} {
-    tuple assign $newTuple
-    if {$LightId == 1} {
-	.light configure -background\
-	    [expr {$__CS__ eq "on" ? "white" : "black"}]
-    }
-    return $newTuple
-}
-
-proc updateTube {op relvarName oldTuple newTuple} {
-    tuple assign $newTuple
-    if {$TubeId == 1} {
-	.tube configure -background\
-	    [expr {$__CS__ eq "energized" ? "red" : "black"}]
-    }
-    return $newTuple
-}
-
-proc center_window {w} {
-    wm withdraw $w
-    update idletasks
-    set x [expr {[winfo screenwidth $w] / 2 - [winfo reqwidth $w] / 2}]
-    set y [expr {[winfo screenheight $w] / 2 - [winfo reqheight $w] / 2}]
-    wm geom $w +$x+$y
-    wm deiconify $w
-}
-
-relvar trace add variable ::OvenMgmt::Timer update updateTimer
-relvar trace add variable ::OvenMgmt::Light update updateLight
-relvar trace add variable ::OvenMgmt::PowerTube update updateTube
-
-label .time -textvariable ::timerTime
-
-button .ctrlButton -text Start/Add -command {OvenMgmt buttonPushed 1}
-
-button .doorButton -textvariable ::doorState -command {toggleDoor}
-
-label .light -background black
-
-label .tube -background black
-
-grid .time .ctrlButton .doorButton -padx 3 -pady 3
-grid .light .tube x -sticky ew -padx 3 -pady 3
-
-wm protocol . WM_DELETE_WINDOW exit
-
-center_window .

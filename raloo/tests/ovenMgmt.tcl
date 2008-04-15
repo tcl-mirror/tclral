@@ -45,16 +45,11 @@
 # ABSTRACT:
 # 
 # $RCSfile: ovenMgmt.tcl,v $
-# $Revision: 1.2 $
-# $Date: 2008/04/04 15:33:32 $
+# $Revision: 1.3 $
+# $Date: 2008/04/15 15:35:15 $
 #  *--
 
-if {[file exists ../raloo.tcl]} {
-    source ../raloo.tcl
-} else {
-    package require raloo
-}
-
+package require raloo
 namespace import ::raloo::*
 
 Domain create OvenMgmt {
@@ -66,6 +61,13 @@ Domain create OvenMgmt {
 	PowerTube insert TubeId $ovenId
 	Light insert LightId $ovenId
 	Timer insert TimerId $ovenId Minutes 0 Seconds 0
+    }
+
+    SyncService destroyOven {ovenId} {
+	Oven delete [list [list OvenId $ovenId]]
+	PowerTube delete [list [list TubeId $ovenId]]
+	Light delete [list [list LightId $ovenId]]
+	Timer delete [list [list TimerId $ovenId]]
     }
     # Signal that the control button has been pressed.
     DomainOp buttonPushed {ovenId} {
