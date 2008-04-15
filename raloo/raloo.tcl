@@ -48,8 +48,8 @@
 #  capabilities of TclOO.
 # 
 # $RCSfile: raloo.tcl,v $
-# $Revision: 1.16 $
-# $Date: 2008/04/04 15:33:32 $
+# $Revision: 1.17 $
+# $Date: 2008/04/15 15:33:26 $
 #  *--
 
 package require Tcl 8.5
@@ -932,8 +932,14 @@ namespace eval ::raloo::mm {
     proc sameSig {op relvarName tupleValue} {
 	set trans [tuple relation $tupleValue\
 		{{DomName ModelName EventName StateName}}]
+	#puts [relformat $trans trans]
+
+	# See what we get if we just directly semijoin across the composite
+	# relationship.
 	set transSig [relation semijoin $trans $::raloo::mm::Signature]
 	#puts [relformat $transSig transSig]
+
+	# Now traverse the R45+R41+R50+R63 path
 	set eventSig [relation semijoin $trans\
 	    $::raloo::mm::TransitionPlace\
 	    $::raloo::mm::EffectiveEvent\
@@ -941,10 +947,14 @@ namespace eval ::raloo::mm {
 	    $::raloo::mm::Signature\
 	]
 	#puts [relformat $eventSig eventSig]
-	# HERE -- shouldn't need the "-using"
+
+	# Now traverse the R46+R64 path
+	# N.B. be careful here. The join is to the destination of the
+	# transition, i.e. from State Trans.NewState -> State.StateName
 	set stateSig [relation semijoin $trans\
 	    $::raloo::mm::State\
-		-using {DomName DomName ModelName ModelName SigId SigId}\
+		-using {DomName DomName ModelName ModelName NewState StateName\
+		    SigId SigId}\
 	    $::raloo::mm::Signature\
 	]
 	#puts [relformat $stateSig stateSig]
@@ -952,6 +962,9 @@ namespace eval ::raloo::mm {
 	#puts [relformat $::raloo::mm::SignatureParam SignatureParam]
 	#puts [relformat $::raloo::mm::Event Event]
 	#puts [relformat $::raloo::mm::State State]
+
+	# Now compare to see if we got the same instance regardless of
+	# the path by which we got there.
 	if {[relation is $eventSig != $transSig]} {
 	    #puts [relformat $::raloo::mm::TransitionPlace TransitionPlace]
 	    #puts [relformat $::raloo::mm::EffectiveEvent EffectiveEvent]
@@ -2689,10 +2702,10 @@ oo::class create ::raloo::RelvarRef {
     # readAttr attr1 ?att2 ...?
     method readAttr {args} {
 	set instValue [my get]
-	set attrValue [list]
 	if {[llength $args] == 1} {
 	    set attrValue [relation extract $instValue [lindex $args 0]]
 	} else {
+	    set attrValue [list]
 	    foreach attrName $args {
 		lappend attrValue [relation extract $instValue $attrName]
 	    }
@@ -3989,7 +4002,9 @@ proc ::raloo::arch::newTOC {domName modelName inst script params} {
 	params $params\
     ]
 
-    stepEngine
+    if {[llength $controlTree] == 1} {
+	stepEngine
+    }
 
     return
 }
@@ -4114,8 +4129,6 @@ proc ::raloo::arch::queueEvent {domName modelName instRef eventName params} {
 	params $params\
 	type N\
     ]
-
-    stepEngine
 }
 
 proc ::raloo::arch::queueCreationEvent {domName modelName attrs eventName\
@@ -4143,16 +4156,21 @@ proc ::raloo::arch::queueCreationEvent {domName modelName attrs eventName\
 	params $params\
 	type C\
     ]
-
-    stepEngine
 }
 
 # The idle callbacks come here to cause the next event in the thread of
 # control to be dispatched.
 proc ::raloo::arch::dispatchEvent {} {
-    setupTOC tocTree dstNode tocQueue
+    variable controlTree
+    if {[llength $controlTree] == 0} {
+	log::debug "empty control tree"
+	return
+    }
+    set tocTree [lindex $controlTree 0]
+    set dstNode [$tocTree get root currNode]
     set event [$tocTree get $dstNode event]
     log::debug "dispatchEvent: $dstNode \"$event\""
+
     set domName [dict get $event domName]
     set modelName [dict get $event modelName]
     # Threads of control begin at the "root" node of the tree. Here there are
@@ -4183,6 +4201,8 @@ proc ::raloo::arch::dispatchEvent {} {
 	    dict set event inst [idProject\
 		[relvar insert ${domName}::${modelName} $instValue]]
 	}
+	# Measure the execution time of the state action and record that
+	# in the thread of control tree.
 	set startTime [clock microseconds]
 	set tocError [catch {
 	    deliverEvent [$tocTree get [$tocTree parent $dstNode] event] $event
@@ -4216,6 +4236,7 @@ proc ::raloo::arch::dispatchEvent {} {
 	    # the next event.
 	    $tocTree set root currNode [lindex $tocQueue 0]
 	    $tocTree set root queue [lrange $tocQueue 1 end]
+	    stepEngine
 	}
     }
 }
@@ -4267,6 +4288,13 @@ proc ::raloo::arch::deliverEffEvent {srcEvent dstEvent} {
     set relvarName ${domName}::${dstModel}
     set instValue [relation choose [relvar set $relvarName]\
 	    {*}[lindex [relation body $dstRef] 0]]
+    # Detect the event in flight error
+    if {[relation isempty $instValue]} {
+	set msg "In Flight Error:\
+	    [formatEvent $domName $srcModel $srcInst $dstModel $dstRef]"
+	log::error $msg
+	error $msg
+    }
     # We need the current state to compute the transition.
     set cs [relation extract $instValue __CS__]
     # Find the transition and the new state to which we are headed.
@@ -4420,14 +4448,18 @@ proc ::raloo::arch::deliverDefEvent {srcEvent dstEvent} {
 	    }
 	}
 	# It is possible to get here without actually dispatching the event
-	# if we fail to find a related subtype in the above loop. This amount
+	# if we fail to find a related subtype in the above loop. This amounts
 	# to an "event in flight" error, i.e. an event was sent to the
 	# supertype at some point in the thread of control, but the
 	# corresponding subtype was deleted before the event was taken off
 	# the queue to be delivered. This is deemed an analysis error,so
 	# we whine about it here.
+	# HERE -- do better with this error message
 	if {!$dispatched} {
-	    error "failed to find subtype related to:\n[relformat $superRole]"
+	    set msg "In Flight Error:\
+		failed to find subtype related to:\n[relformat $superRole]"
+	    log::error $msg
+	    error $msg
 	}
     }
 }
@@ -4664,8 +4696,10 @@ proc ::raloo::arch::serviceDelayedQueue {} {
 # the "singleStep" variable.
 proc ::raloo::arch::stepEngine {} {
     variable singleStep
+    variable controlTree
     if {!$singleStep} {
 	after idle [list ::raloo::arch::dispatchEvent]
+	log::debug "generated idle dispatch"
     }
 }
 
@@ -4674,8 +4708,8 @@ proc ::raloo::arch::setupTOC {treeRef nodeRef queueRef} {
     upvar 1 $nodeRef tocNode
     upvar 1 $queueRef tocQueue
     variable controlTree
-    if {[llength $controlTree] eq 0} {
-	error "attempt to generate an event, \"$event\", outside of\
+    if {[llength $controlTree] == 0} {
+	error "attempt to generate an event outside of\
 	    a thread of control"
     }
     set tocTree [lindex $controlTree 0]
@@ -4689,6 +4723,9 @@ proc ::raloo::arch::endTOC {} {
     $tocTree destroy
     set controlTree [lrange $controlTree 1 end]
     cleanupRefs
+    if {[llength $controlTree] != 0} {
+	stepEngine
+    }
 }
 
 proc ::raloo::arch::cleanupRefs {} {
