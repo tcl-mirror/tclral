@@ -9,38 +9,38 @@ Domain create OvenGUI {
 
     SyncService destroyOven {id} {
 	OvenMgmt destroyOven $id
-	set oven [Oven new OvenId $id]
+	set oven [Oven selectOne OvenId $id]
 	destroy [$oven readAttr OvenWidget]
 	$oven delete
     }
 
     SyncService updateTimerTime {id min sec} {
-	set guiTimer [OvenGUI::Timer new TimerId $id]
+	set guiTimer [OvenGUI::Timer selectOne TimerId $id]
 	$guiTimer updateTime $min $sec
     }
 
     DomainOp doorButton {id} {
-	set door [Door new DoorId $id]
+	set door [Door selectOne DoorId $id]
 	$door generate Pressed
     }
 
     DomainOp turnOnLight {id} {
-	set light [Light new LightId $id]
+	set light [Light selectOne LightId $id]
 	$light generate TurnOn
     }
 
     DomainOp turnOffLight {id} {
-	set light [Light new LightId $id]
+	set light [Light selectOne LightId $id]
 	$light generate TurnOff
     }
 
     DomainOp energizeTube {id} {
-	set tube [Tube new TubeId $id]
+	set tube [Tube selectOne TubeId $id]
 	$tube generate Energize
     }
 
     DomainOp deenergizeTube {id} {
-	set tube [Tube new TubeId $id]
+	set tube [Tube selectOne TubeId $id]
 	$tube generate De-energize
     }
 

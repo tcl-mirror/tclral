@@ -48,8 +48,8 @@
 #  capabilities of TclOO.
 # 
 # $RCSfile: raloo.tcl,v $
-# $Revision: 1.17 $
-# $Date: 2008/04/15 15:33:26 $
+# $Revision: 1.18 $
+# $Date: 2008/04/20 19:20:16 $
 #  *--
 
 package require Tcl 8.5
@@ -2393,19 +2393,40 @@ oo::class create ::raloo::RelvarClass {
     method format {args} {
 	relformat [relvar set [self]] [self] {*}$args
     }
+    method relvarName {} {
+	return [self]
+    }
+    method selectOne {args} {
+	return [my new {*}$args]
+    }
+    method selectWhere {expr} {
+	my variable relvarName
+	::ralutil::pipe {
+	    relvar set $relvarName |
+	    relation restrictwith ~ [list $expr]
+	} cmd
+	my newFromRelation [uplevel 1 $cmd]
+    }
     method newFromRelation {relValue} {
 	set obj [my new]
 	$obj set $relValue
 	return $obj
     }
-    method newInsert {args} {
-	return [my newFromRelation [my insert {*}$args]]
+    method createInstance {args} {
+	return [my new {*}[ralutil::pipe {
+	    my insert {*}$args |
+	    ::raloo::InstRef idProjection |
+	    relation tuple |
+	    tuple get
+	}]]
     }
 }
 
 # This is a meta-class for classes based on relvars.
 oo::class create ::raloo::PasvRelvarClass {
     superclass ::raloo::RelvarClass ::oo::class
+    unexport new
+    unexport create
     self.unexport new
     constructor {} {
 	namespace import ::ral::*
@@ -2462,6 +2483,8 @@ oo::class create ::raloo::PasvRelvarClass {
 
 	oo::define [self] {
 	    superclass ::raloo::RelvarRef
+	    unexport new
+	    unexport create
 	    constructor {args} {
 		set relvarName [self class]
 		next $relvarName {*}$args
@@ -2525,6 +2548,8 @@ oo::class create ::raloo::PasvRelvarClass {
 }
 
 oo::class create ::raloo::ActiveSingleton {
+    unexport new
+    unexport create
     constructor {} {
 	# Define an unexported method for each state, prepending "__" to
 	# prevent name conflicts.
@@ -2598,7 +2623,7 @@ oo::class create ::raloo::ActiveEntity {
 	lappend args __CS__ $state
 	relvar insert [self] $args
     }
-    method newInsertInState {state args} {
+    method createInstanceInState {state args} {
 	return [my newFromRelation [my insertInState $state {*}$args]]
     }
 }
@@ -2678,6 +2703,8 @@ oo::class create ::raloo::InstRef {
 
 # Tuples in relvars are referenced by objects of the RelvarRef class.
 oo::class create ::raloo::RelvarRef {
+    unexport new
+    unexport create
     superclass ::raloo::InstRef
     constructor {name args} {
 	namespace import ::ral::*
@@ -2890,9 +2917,9 @@ oo::class create ::raloo::RelvarRef {
 	dict for {refto refng} $targetAttrMap {
 	    dict set assocTuple $refng [dict get $reftoDict $refto]
 	}
-	set assocInst [$assocClassName new]
-	$assocInst set [relvar insert [$assocInst relvarName]\
-	    [concat $assocTuple $args]]
+	set assocInst [$assocClassName newFromRelation\
+	    [relvar insert [$assocClassName relvarName]\
+	    [concat $assocTuple $args]]]
 	return $assocInst
     }
     method unrelate {rship target} {
@@ -2966,8 +2993,7 @@ oo::class create ::raloo::RelvarRef {
 	my variable relvarName
 	relvar eval {
 	    my delete
-	    $targetClass insert {*}[concat $avList $args]
-	    set subObj [$targetClass new {*}$avList]
+	    set subObj [$targetClass createInstance {*}[concat $avList $args]]
 	}
 	return $subObj
     }
@@ -3751,6 +3777,9 @@ oo::class create ::raloo::SingleAssigner {
 	::raloo::arch::genToInsts $domName $relName $ref $eventName $args
 	return
     }
+    method selectOne {args} {
+	return [my new {*}$args]
+    }
 }
 
 oo::class create ::raloo::SingleAssignerRel {
@@ -3842,6 +3871,9 @@ oo::class create ::raloo::MultipleAssigner {
     method insert {args} {
 	relvar insert [self] $args
     }
+    method selectOne {args} {
+	return [my new {*}$args]
+    }
 }
 
 oo::class create ::raloo::MultipleAssignerRel {
@@ -3877,8 +3909,11 @@ oo::class create ::raloo::MultipleAssignerRef {
 	if {$nArgs == 0} {
 	    set ref [relation emptyof [relvar set $relvarName]]
 	} else {
-	    set ref [::raloo::InstRef idProjection\
-		[relvar insert $relvarName $args]]
+	    set ref [::ralutil::pipe {
+		relvar set $relvarName |
+		relation choose ~ {*}$args |
+		::raloo::InstRef idProjection
+	    }]
 	}
 	next
     }
@@ -4319,8 +4354,8 @@ proc ::raloo::arch::deliverEffEvent {srcEvent dstEvent} {
 	    # unexported method for an object. A bit clever perhaps, but it
 	    # allows us to have state actions as unexported methods and still
 	    # have the software architecture invoke the action.
-	    set inst [$relvarName new]
-	    $inst set $instValue
+	    set inst [$relvarName selectOne\
+		    {*}[lindex [relation body $dstRef] 0]]
 	    if {[catch {namespace inscope $inst [list my __$newStateName]\
 		    {*}$params} result options]} {
 		log::error $result

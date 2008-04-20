@@ -45,8 +45,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: ovenMgmt.tcl,v $
-# $Revision: 1.3 $
-# $Date: 2008/04/15 15:35:15 $
+# $Revision: 1.4 $
+# $Date: 2008/04/20 19:20:17 $
 #  *--
 
 package require raloo
@@ -71,17 +71,17 @@ Domain create OvenMgmt {
     }
     # Signal that the control button has been pressed.
     DomainOp buttonPushed {ovenId} {
-	set oven [Oven new OvenId $ovenId]
+	set oven [Oven selectOne OvenId $ovenId]
 	$oven generate ButtonPushed
     }
     # Signal that the oven door has been opened.
     DomainOp doorOpened {ovenId} {
-	set oven [Oven new OvenId $ovenId]
+	set oven [Oven selectOne OvenId $ovenId]
 	$oven generate DoorOpened
     }
     # Signal that the oven door has been closed.
     DomainOp doorClosed {ovenId} {
-	set oven [Oven new OvenId $ovenId]
+	set oven [Oven selectOne OvenId $ovenId]
 	$oven generate DoorClosed
     }
 
