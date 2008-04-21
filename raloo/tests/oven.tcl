@@ -14,7 +14,7 @@ source ovenBridge.tcl
 
 set ovenId 1
 proc newOven {} {
-    OvenGUI newOven $::ovenId
+    OvenMgmt newOven $::ovenId
     incr ::ovenId
 }
 

@@ -1,6 +1,19 @@
 
 # Bridging
 
+oo::define OvenMgmt {
+    filter ovenmgmt
+
+    method ovenmgmt {args} {
+	#puts "ovenmgmt: [self target] $args"
+	next {*}$args
+
+	if {[lindex [self target] 1] eq "newOven"} {
+	    OvenGUI newOven {*}$args
+	}
+    }
+}
+
 # Wire the GUI light to the oven light
 oo::define OvenMgmt::Light {
     filter ovengui_light

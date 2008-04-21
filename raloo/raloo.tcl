@@ -48,8 +48,8 @@
 #  capabilities of TclOO.
 # 
 # $RCSfile: raloo.tcl,v $
-# $Revision: 1.18 $
-# $Date: 2008/04/20 19:20:16 $
+# $Revision: 1.19 $
+# $Date: 2008/04/21 00:01:55 $
 #  *--
 
 package require Tcl 8.5
@@ -1276,10 +1276,27 @@ oo::class create ::raloo::Domain {
 	    OpBody $body\
 	]
 
-	oo::define [self] method $name $argList [format {
-	    ::raloo::arch::newTOC %1$s [self] {Relation {} {{}} {{}}}\
-		[list my __%2$s] [lrange [info level 0] 2 end]
-	} [self] $name]
+	# This is tricky! The idea is define the actual domain operation to
+	# start a thread of control. That thread of control then executes the
+	# body supplied with the DomainOp definition passing the arguments. We
+	# use "info level" to determine how we were invoked.  Now you might
+	# think that this would be invoked the same way all the time, i.e.
+	# "Domname opname ...". However, if it is invoked via a filter then
+	# "info level 0" returns "next ...".  So to peel off the arguments
+	# correctly we need to count from the "end" by the number of argument.
+	# Hence the strange machinations around the "lrange [info level 0] ..."
+	set nargs [llength $argList]
+	if {$nargs == 0} {
+	    oo::define [self] method $name $argList [format {
+		::raloo::arch::newTOC %1$s [self] {Relation {} {{}} {{}}}\
+		    [list my __%2$s] {}
+	    } [self] $name]
+	} else {
+	    oo::define [self] method $name $argList [format {
+		::raloo::arch::newTOC %1$s [self] {Relation {} {{}} {{}}}\
+		    [list my __%2$s] [lrange [info level 0] end-%3$d end]
+	    } [self] $name [expr {$nargs - 1}]]
+	}
 	oo::define [self] export $name
 
 	oo::define [self] method __$name $argList $body

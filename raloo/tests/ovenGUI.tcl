@@ -1,9 +1,8 @@
-package require Tk
+package require Tk 8.5
 package require raloo
 
 Domain create OvenGUI {
     SyncService newOven {id} {
-	OvenMgmt newOven $id
 	Oven createWidget $id
     }
 
@@ -24,30 +23,31 @@ Domain create OvenGUI {
 	$door generate Pressed
     }
 
-    DomainOp turnOnLight {id} {
+    SyncService turnOnLight {id} {
 	set light [Light selectOne LightId $id]
-	$light generate TurnOn
+	$light on
     }
 
-    DomainOp turnOffLight {id} {
+    SyncService turnOffLight {id} {
 	set light [Light selectOne LightId $id]
-	$light generate TurnOff
+	$light off
     }
 
-    DomainOp energizeTube {id} {
+    SyncService energizeTube {id} {
 	set tube [Tube selectOne TubeId $id]
-	$tube generate Energize
+	$tube energize
     }
 
-    DomainOp deenergizeTube {id} {
+    SyncService deenergizeTube {id} {
 	set tube [Tube selectOne TubeId $id]
-	$tube generate De-energize
+	$tube deenergize
     }
 
     Class Oven {
 	package require img::png
 	image create photo ovenOff -file mw-off.png
 	image create photo ovenCook -file mw-cook.png
+	image create photo ovenOpen -file mw-open.png
 
 	Attribute {
 	    *OvenId string
@@ -63,17 +63,18 @@ Domain create OvenGUI {
 		-command [list OvenMgmt buttonPushed $id]
 	    label .$id.ovenImage -image ovenOff
 
-	    grid\
-		[Timer createWidget $id .$id]\
-		.$id.ctrlButton\
-		[Door createWidget $id .$id]\
-		-padx 3 -pady 3
-	    grid\
-		[Light createWidget $id .$id]\
-		[Tube createWidget $id .$id]\
-		-sticky ew -padx 3 -pady 3
-	    grid\
-		.$id.ovenImage
+	    grid .$id.ovenImage [Timer createWidget $id .$id] -padx 3 -pady 3
+	    grid ^              .$id.ctrlButton -padx 3 -pady 3
+	    grid ^              [Door createWidget $id .$id] -padx 3 -pady 3
+	    grid ^              [Light createWidget $id .$id]\
+				-sticky ew -padx 3 -pady 3
+	    grid ^              [Tube createWidget $id .$id]\
+				-sticky ew -padx 3 -pady 3
+	}
+
+	InstOp showImage {which} {
+	    set ow [my readAttr OvenWidget]
+	    $ow.ovenImage configure -image $which
 	}
     }
 
@@ -96,6 +97,8 @@ Domain create OvenGUI {
 		my with {DoorId DoorWidget} {
 		    $DoorWidget configure -text Closed
 		    OvenMgmt doorClosed $DoorId
+		    set oven [Oven selectOne OvenId $DoorId]
+		    $oven showImage ovenOff
 		}
 	    }
 
@@ -103,6 +106,8 @@ Domain create OvenGUI {
 		my with {DoorId DoorWidget} {
 		    $DoorWidget configure -text Open
 		    OvenMgmt doorOpened $DoorId
+		    set oven [Oven selectOne OvenId $DoorId]
+		    $oven showImage ovenOpen
 		}
 	    }
 
@@ -120,25 +125,15 @@ Domain create OvenGUI {
 	}
 
 	ClassOp createWidget {id parent} {
-	    label $parent.light -bg black
+	    label $parent.light -text LIGHT -fg white -bg black
 	    my insert LightId $id LightWidget $parent.light
 	    return $parent.light
 	}
-	Lifecycle {
-	    State on {} {
-		my with LightWidget {
-		    $LightWidget configure -bg white
-		}
-	    }
-	    State off {} {
-		my with LightWidget {
-		    $LightWidget configure -bg black
-		}
-	    }
-	    Transition on - TurnOff -> off
-	    Transition off - TurnOn -> on
-
-	    DefaultInitialState off
+	InstOp on {} {
+	    [my readAttr LightWidget] configure -fg black -bg white
+	}
+	InstOp off {} {
+	    [my readAttr LightWidget] configure -fg white -bg black
 	}
     }
 
@@ -149,28 +144,28 @@ Domain create OvenGUI {
 	}
 
 	ClassOp createWidget {id parent} {
-	    label $parent.tube -bg black
+	    label $parent.tube -text TUBE -fg red -bg black
 	    my insert TubeId $id TubeWidget $parent.tube
 	    return $parent.tube
 	}
 
-	Lifecycle {
-	    State energized {} {
-		my with TubeWidget {
-		    $TubeWidget configure -bg red
-		}
-		.[my readAttr TubeId].ovenImage configure -image ovenCook
+	InstOp energize {} {
+	    my with {TubeId TubeWidget} {
+		$TubeWidget configure -fg black -bg red
+		set oven [Oven selectOne OvenId $TubeId]
+		$oven showImage ovenCook
 	    }
-	    State de-energized {} {
-		my with TubeWidget {
-		    $TubeWidget configure -bg black
+	}
+	InstOp deenergize {} {
+	    my with {TubeId TubeWidget} {
+		$TubeWidget configure -fg red -bg black
+		set oven [Oven selectOne OvenId $TubeId]
+		# This is a hack!
+		if {[[$oven readAttr OvenWidget].ovenImage cget -image] eq\
+			"ovenCook"} {
+		    $oven showImage ovenOff
 		}
-		.[my readAttr TubeId].ovenImage configure -image ovenOff
 	    }
-	    Transition energized - De-energize -> de-energized
-	    Transition de-energized - Energize -> energized
-
-	    DefaultInitialState de-energized
 	}
     }
 
