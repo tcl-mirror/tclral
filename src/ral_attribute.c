@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.c,v $
-$Revision: 1.23 $
-$Date: 2008/04/15 01:10:53 $
+$Revision: 1.24 $
+$Date: 2008/04/22 01:41:08 $
  *--
  */
 
@@ -57,7 +57,6 @@ PRAGMAS
 /*
 INCLUDE FILES
 */
-#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -101,7 +100,7 @@ TYPE DEFINITIONS
  * of this is assembled into a table sorted by type name.
  */
 typedef int (*IsATypeFunc)(Tcl_Interp *, Tcl_Obj *) ;
-typedef bool (*IsEqualFunc)(Tcl_Obj *, Tcl_Obj *) ;
+typedef int (*IsEqualFunc)(Tcl_Obj *, Tcl_Obj *) ;
 typedef int (*CompareFunc)(Tcl_Obj *, Tcl_Obj *) ;
 struct ral_type {
     char const *typeName ;
@@ -120,45 +119,45 @@ FORWARD FUNCTION REFERENCES
 static struct ral_type *findRalType(char const *) ;
 
 static int isABoolean(Tcl_Interp *, Tcl_Obj *) ;
-static bool booleanEqual(Tcl_Obj *, Tcl_Obj *) ;
+static int booleanEqual(Tcl_Obj *, Tcl_Obj *) ;
 static int booleanCompare(Tcl_Obj *, Tcl_Obj *) ;
 
 static int isAnInt(Tcl_Interp *, Tcl_Obj *) ;
-static bool intEqual(Tcl_Obj *, Tcl_Obj *) ;
+static int intEqual(Tcl_Obj *, Tcl_Obj *) ;
 static int intCompare(Tcl_Obj *, Tcl_Obj *) ;
 
 static int isALong(Tcl_Interp *, Tcl_Obj *) ;
-static bool longEqual(Tcl_Obj *, Tcl_Obj *) ;
+static int longEqual(Tcl_Obj *, Tcl_Obj *) ;
 static int longCompare(Tcl_Obj *, Tcl_Obj *) ;
 
 static int isADouble(Tcl_Interp *, Tcl_Obj *) ;
-static bool doubleEqual(Tcl_Obj *, Tcl_Obj *) ;
+static int doubleEqual(Tcl_Obj *, Tcl_Obj *) ;
 static int doubleCompare(Tcl_Obj *, Tcl_Obj *) ;
 
 #ifdef Tcl_GetBignumFromObj_TCL_DECLARED
 static int isABignum(Tcl_Interp *, Tcl_Obj *) ;
-static bool bignumEqual(Tcl_Obj *, Tcl_Obj *) ;
+static int bignumEqual(Tcl_Obj *, Tcl_Obj *) ;
 static int bignumCompare(Tcl_Obj *, Tcl_Obj *) ;
 #endif
 
 #   ifndef NO_WIDE_TYPE
 static int isAWideInt(Tcl_Interp *, Tcl_Obj *) ;
-static bool wideIntEqual(Tcl_Obj *, Tcl_Obj *) ;
+static int wideIntEqual(Tcl_Obj *, Tcl_Obj *) ;
 static int wideIntCompare(Tcl_Obj *, Tcl_Obj *) ;
 #   endif
 
 static int isAList(Tcl_Interp *, Tcl_Obj *) ;
-static bool listEqual(Tcl_Obj *, Tcl_Obj *) ;
+static int listEqual(Tcl_Obj *, Tcl_Obj *) ;
 static int listCompare(Tcl_Obj *, Tcl_Obj *) ;
 
 #   ifdef Tcl_DictObjSize_TCL_DECLARED
 static int isADict(Tcl_Interp *, Tcl_Obj *) ;
-static bool dictEqual(Tcl_Obj *, Tcl_Obj *) ;
+static int dictEqual(Tcl_Obj *, Tcl_Obj *) ;
 static int dictCompare(Tcl_Obj *, Tcl_Obj *) ;
 #   endif
 
 static int isAString(Tcl_Interp *, Tcl_Obj *) ;
-static bool stringEqual(Tcl_Obj *, Tcl_Obj *) ;
+static int stringEqual(Tcl_Obj *, Tcl_Obj *) ;
 static int stringCompare(Tcl_Obj *, Tcl_Obj *) ;
 
 /*
@@ -198,7 +197,7 @@ static struct ral_type const Ral_Types[] = {
 
 static char const openList = '{' ;
 static char const closeList = '}' ;
-static char const rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.23 $" ;
+static char const rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.24 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -671,7 +670,7 @@ isABoolean(
     return Tcl_GetBooleanFromObj(interp, boolObj, &b) ;
 }
 
-static bool
+static int
 booleanEqual(
     Tcl_Obj *v1,
     Tcl_Obj *v2)
@@ -681,7 +680,7 @@ booleanEqual(
 
     return (Tcl_GetBooleanFromObj(NULL, v1, &b1) == TCL_OK &&
 		Tcl_GetBooleanFromObj(NULL, v2, &b2) == TCL_OK) ?
-	    b1 == b2 : false ;
+	    b1 == b2 : 0 ;
 }
 
 static int
@@ -709,7 +708,7 @@ isAnInt(
     return Tcl_GetIntFromObj(interp, intObj, &i) ;
 }
 
-static bool
+static int
 intEqual(
     Tcl_Obj *v1,
     Tcl_Obj *v2)
@@ -719,7 +718,7 @@ intEqual(
 
     return (Tcl_GetIntFromObj(NULL, v1, &int1) == TCL_OK &&
 		Tcl_GetIntFromObj(NULL, v2, &int2) == TCL_OK) ?
-	    int1 == int2 : false ;
+	    int1 == int2 : 0 ;
 }
 
 static int
@@ -747,7 +746,7 @@ isALong(
     return Tcl_GetLongFromObj(interp, longObj, &l) ;
 }
 
-static bool
+static int
 longEqual(
     Tcl_Obj *v1,
     Tcl_Obj *v2)
@@ -757,7 +756,7 @@ longEqual(
 
     return (Tcl_GetLongFromObj(NULL, v1, &l1) == TCL_OK &&
 		Tcl_GetLongFromObj(NULL, v2, &l2) == TCL_OK) ?
-	    l1 == l2 : false ;
+	    l1 == l2 : 0 ;
 }
 
 static int
@@ -785,7 +784,7 @@ isADouble(
     return Tcl_GetDoubleFromObj(interp, dblObj, &d) ;
 }
 
-static bool
+static int
 doubleEqual(
     Tcl_Obj *v1,
     Tcl_Obj *v2)
@@ -795,7 +794,7 @@ doubleEqual(
 
     return (Tcl_GetDoubleFromObj(NULL, v1, &d1) == TCL_OK &&
 		Tcl_GetDoubleFromObj(NULL, v2, &d2) == TCL_OK) ?
-	    d1 == d2 : false ;
+	    d1 == d2 : 0 ;
 }
 
 static int
@@ -830,7 +829,7 @@ isAWideInt(
     return Tcl_GetWideIntFromObj(interp, wintObj, &wint) ;
 }
 
-static bool
+static int
 wideIntEqual(
     Tcl_Obj *v1,
     Tcl_Obj *v2)
@@ -840,7 +839,7 @@ wideIntEqual(
 
     return (Tcl_GetWideIntFromObj(NULL, v1, &wint1) == TCL_OK &&
 		Tcl_GetWideIntFromObj(NULL, v2, &wint2) == TCL_OK) ?
-	    wint1 == wint2 : false ;
+	    wint1 == wint2 : 0 ;
 }
 
 static int
@@ -879,14 +878,14 @@ isABignum(
     return result ;
 }
 
-static bool
+static int
 bignumEqual(
     Tcl_Obj *v1,
     Tcl_Obj *v2)
 {
     mp_int bn1 ;
     mp_int bn2 ;
-    bool result = false ;
+    int result = 0 ;
 
     if (Tcl_GetBignumFromObj(NULL, v1, &bn1) == TCL_OK) {
 	if (Tcl_GetBignumFromObj(NULL, v2, &bn2) == TCL_OK) {
@@ -930,7 +929,7 @@ isAList(
     return Tcl_ListObjGetElements(interp, listObj, &elemc, &elemv) ;
 }
 
-static bool
+static int
 listEqual(
     Tcl_Obj *v1,
     Tcl_Obj *v2)
@@ -956,7 +955,7 @@ isADict(
     return Tcl_DictObjSize(interp, dictObj, &size) ;
 }
 
-static bool
+static int
 dictEqual(
     Tcl_Obj *v1,
     Tcl_Obj *v2)
@@ -981,7 +980,7 @@ isAString(
     return TCL_OK ;
 }
 
-static bool
+static int
 stringEqual(
     Tcl_Obj *v1,
     Tcl_Obj *v2)
