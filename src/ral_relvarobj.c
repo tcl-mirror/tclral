@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.39 $
-$Date: 2008/04/15 01:10:53 $
+$Revision: 1.40 $
+$Date: 2008/04/26 16:50:17 $
  *--
  */
 
@@ -143,7 +143,7 @@ static const struct traceOpsMap {
 } ;
 static const char specErrMsg[] = "multiplicity specification" ;
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.39 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.40 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -287,6 +287,7 @@ Ral_RelvarObjCopyOnShared(
      */
     assert(relObj->refCount > 1) ;
     if (relObj->refCount > 2) {
+	int status ;
 	/*
 	 * If we are sharing, then we duplicate the relation value and store it
 	 * back into the relvar. We also need to change the Tcl_Obj that the
@@ -306,7 +307,6 @@ Ral_RelvarObjCopyOnShared(
 	    TCL_LEAVE_ERR_MSG) == NULL) {
 	    result = TCL_ERROR ;
 	}
-	int status ;
 	status = Tcl_TraceVar(interp, relvar->name, relvarTraceFlags,
 	    relvarTraceProc, info) ;
 	assert(status == TCL_OK) ;
