@@ -47,8 +47,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: raloo.test,v $
-# $Revision: 1.16 $
-# $Date: 2008/04/20 19:20:18 $
+# $Revision: 1.17 $
+# $Date: 2008/04/27 23:52:40 $
 #  *--
 
 package require tcltest 2.2
@@ -2040,7 +2040,7 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		    Transition born - E1 -> born
 		}
 	    }
-	    DomainOp start {} {
+	    AsyncService start {} {
 		set n [Foo createInstance Id 1]
 		#puts [relformat $::raloo::test::A::Foo Foo]
 		$n generate E1 date [clock format [clock seconds]]
@@ -2079,7 +2079,7 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		    Transition grow - E1 -> grow
 		}
 	    }
-	    DomainOp start {} {
+	    AsyncService start {} {
 		set n [Foo createInstance Id 1 Count 0]
 		#puts [relformat $::raloo::test::A::Foo Foo]
 		$n generate E1 date [clock format [clock seconds]]
@@ -2109,7 +2109,7 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		    Transition born - E1 -> born
 		}
 	    }
-	    DomainOp start {} {
+	    AsyncService start {} {
 		Foo insert Id 1
 		set n [Foo selectOne Id 1]
 		$n generateDelayed 100 E1 date [clock format [clock seconds]]
@@ -2160,7 +2160,7 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		SubType BigDog
 	    }
 	    Polymorphic Dog taunt {}
-	    DomainOp start {} {
+	    AsyncService start {} {
 		set sd [Dog selectOne Name Poopsy]
 		$sd generate taunt
 	    }
@@ -2237,7 +2237,7 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		SubType ShowDog
 	    }
 	    Polymorphic Dog taunt {}
-	    DomainOp start {} {
+	    AsyncService start {} {
 		set sd [Dog selectOne Name Rover]
 		$sd generate taunt
 	    }
@@ -2277,7 +2277,7 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		}
 	    }
 	    AssocRelationship R1 Dog +-Ownership->+ Owner
-	    DomainOp newDog {name} {
+	    AsyncService newDog {name} {
 		Dog insert DogName $name
 	    }
 	}
@@ -2294,7 +2294,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	thread of control creates an error
     } -setup {
 	Domain create A {
-	    DomainOp op {} {
+	    AsyncService op {} {
 		error "thread of control error"
 	    }
 	}
@@ -2321,7 +2321,7 @@ tuple {DogName Fred} is not referenced by any tuple
 		    }
 		    Transition @ - E1 -> A
 		}
-		DomainOp startFoo {} {
+		AsyncService startFoo {} {
 		    Foo generate {Id 1} E1
 		}
 	    }
@@ -2448,7 +2448,7 @@ tuple {DogName Fred} is not referenced by any tuple
 		    Transition s2 - e2 -> s1
 		}
 	    }
-	    DomainOp assignR1 {p} {
+	    AsyncService assignR1 {p} {
 		R1 generate e1
 	    }
 	}
@@ -2489,7 +2489,7 @@ tuple {DogName Fred} is not referenced by any tuple
 		    Transition s2 - e2 -> s1
 		}
 	    }
-	    DomainOp assignR1 {p} {
+	    AsyncService assignR1 {p} {
 		set r1a [R1 selectOne DogName Fido]
 		$r1a generate e1
 	    }

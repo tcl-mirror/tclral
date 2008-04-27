@@ -48,8 +48,8 @@
 #  capabilities of TclOO.
 # 
 # $RCSfile: raloo.tcl,v $
-# $Revision: 1.19 $
-# $Date: 2008/04/21 00:01:55 $
+# $Revision: 1.20 $
+# $Date: 2008/04/27 23:52:40 $
 #  *--
 
 package require Tcl 8.5
@@ -141,7 +141,7 @@ namespace eval ::raloo::mm {
 	{DomName ClassName IdNum} + Identifier {DomName ClassName IdNum}\
 	{DomName ClassName AttrName} * Attribute {DomName ClassName AttrName}
 
-    relvar create DomainOp {
+    relvar create AsyncService {
 	Relation {
 	    DomName string
 	    OpName string
@@ -153,7 +153,7 @@ namespace eval ::raloo::mm {
     }
 
     relvar association R5\
-	DomainOp DomName *\
+	AsyncService DomName *\
 	Domain DomName 1
 
     relvar create SyncService {
@@ -1219,7 +1219,7 @@ oo::class create ::raloo::Domain {
 	# Clean up the meta-model data
 	if {[catch {
 	    relvar eval {
-		relvar delete ::raloo::mm::DomainOp d {
+		relvar delete ::raloo::mm::AsyncService d {
 		    [tuple extract $d DomName] eq [self]
 		}
 		relvar delete ::raloo::mm::SyncService d {
@@ -1237,7 +1237,7 @@ oo::class create ::raloo::Domain {
 	# so that the definition script does not have to contain a set of
 	# "my" commands preceding the definition procs.
 	my DefineWith Domain $script\
-	    DomainOp\
+	    AsyncService\
 	    SyncService\
 	    Class\
 	    Relationship\
@@ -1268,8 +1268,8 @@ oo::class create ::raloo::Domain {
 	oo::define [self] export $name
     }
     # Methods that are used in the definition of a domain during construction.
-    method DomainOp {name argList body} {
-	relvar insert ::raloo::mm::DomainOp [list\
+    method AsyncService {name argList body} {
+	relvar insert ::raloo::mm::AsyncService [list\
 	    DomName [self]\
 	    OpName $name\
 	    OpParams $argList\
@@ -1278,8 +1278,8 @@ oo::class create ::raloo::Domain {
 
 	# This is tricky! The idea is define the actual domain operation to
 	# start a thread of control. That thread of control then executes the
-	# body supplied with the DomainOp definition passing the arguments. We
-	# use "info level" to determine how we were invoked.  Now you might
+	# body supplied with the AsyncService definition passing the arguments.
+	# We use "info level" to determine how we were invoked.  Now you might
 	# think that this would be invoked the same way all the time, i.e.
 	# "Domname opname ...". However, if it is invoked via a filter then
 	# "info level 0" returns "next ...".  So to peel off the arguments
@@ -2422,9 +2422,9 @@ oo::class create ::raloo::RelvarClass {
 	    relvar set $relvarName |
 	    relation restrictwith ~ [list $expr]
 	} cmd
-	my newFromRelation [uplevel 1 $cmd]
+	my selectByRelation [uplevel 1 $cmd]
     }
-    method newFromRelation {relValue} {
+    method selectByRelation {relValue} {
 	set obj [my new]
 	$obj set $relValue
 	return $obj
@@ -2627,7 +2627,7 @@ oo::class create ::raloo::ActiveEntity {
     # "args" must be a set of attribute name / value pairs.
     method insert {args} {
 	# Add in the default initial state
-	lappend args __CS__ [my defaultInitialState]
+	dict set args __CS__ [my defaultInitialState]
 	relvar insert [self] $args
     }
     # Insert a single tuple specifying the initial state
@@ -2641,7 +2641,7 @@ oo::class create ::raloo::ActiveEntity {
 	relvar insert [self] $args
     }
     method createInstanceInState {state args} {
-	return [my newFromRelation [my insertInState $state {*}$args]]
+	return [my selectByRelation [my insertInState $state {*}$args]]
     }
 }
 
@@ -2847,7 +2847,7 @@ oo::class create ::raloo::RelvarRef {
 	    set srcClass $dstClass
 	}
 	#puts $sjCmd
-	return [$dstClass newFromRelation [eval $sjCmd]]
+	return [$dstClass selectByRelation [eval $sjCmd]]
     }
     method relate {rship target} {
 	lassign [::raloo::RelBase parseRelate $rship] dirMark rName
@@ -2934,7 +2934,7 @@ oo::class create ::raloo::RelvarRef {
 	dict for {refto refng} $targetAttrMap {
 	    dict set assocTuple $refng [dict get $reftoDict $refto]
 	}
-	set assocInst [$assocClassName newFromRelation\
+	set assocInst [$assocClassName selectByRelation\
 	    [relvar insert [$assocClassName relvarName]\
 	    [concat $assocTuple $args]]]
 	return $assocInst
@@ -3961,7 +3961,7 @@ oo::class create ::raloo::MultipleAssignerRef {
 #
 # These procs form the state machine execution engine that drives execution in
 # raloo. The engine supports the notion of a thread of control.  A thread of
-# control is started by a DomainOp or when a delayed event is dispatched. It
+# control is started by a AsyncService or when a delayed event is dispatched. It
 # evolves as a tree to record the events generated as the state machines of a
 # domain interact with each other. The evolving tree is traversed in breadth
 # first order for dispatching events. This gives the proper ordering of event
@@ -4032,7 +4032,7 @@ proc ::raloo::arch::trace {status} {
 #
 # domName -- name of the domain starting the thread of control
 # modelName -- name of the class/namespace starting the thread. When a
-#   DomainOp starts the thread, it should be set to the domain name itself.
+#   AsyncService starts the thread, it should be set to the domain name itself.
 #   When a delayed event starts the thread, it should be the class which
 #   delayed the event.
 # inst -- a dictionary corresponding to an identifier of "modelName". If
@@ -4671,8 +4671,8 @@ proc ::raloo::arch::cancelDelayedEvent {domName srcModel srcRef dstModel dstRef\
 	    set toc [lindex $controlTree $tocIndex]
 	    set event [$toc get root event]
 	    catch {relation is [dict get $event inst] == $srcRef} sameRef
-	    if {[dict get $event DomName] eq $domName &&\
-		[dict get $event ModelName eq $srcModel] &&\
+	    if {[dict get $event domName] eq $domName &&\
+		[dict get $event modelName eq $srcModel] &&\
 		[string is true -strict $sameRef] &&\
 		[dict get $event script] eq "::raloo::arch::queueEvent"} {
 		$toc destroy

@@ -18,7 +18,7 @@ Domain create OvenGUI {
 	$guiTimer updateTime $min $sec
     }
 
-    DomainOp doorButton {id} {
+    AsyncService doorButton {id} {
 	set door [Door selectOne DoorId $id]
 	$door generate Pressed
     }

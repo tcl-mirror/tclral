@@ -47,8 +47,8 @@
 #   This package is part of TclRAL. This file is in Tcl Markup Language
 #   format.
 # $RCSfile: raloo.man,v $
-# $Revision: 1.4 $
-# $Date: 2008/04/04 15:33:32 $
+# $Revision: 1.5 $
+# $Date: 2008/04/27 23:52:40 $
 #  *--
 }]
 [moddesc "raloo"]
@@ -115,7 +115,7 @@ of its component classes and relationships.
 [subsection "Domain Definition"]
 Domains consist of the following entities:
 [list_begin item]
-[item] Domain Operations
+[item] Asynchonous Services
 [item] Synchonous Services
 [item] Classes
 [item] Relationships
@@ -128,18 +128,19 @@ definition commands are available.
 
 [list_begin definitions]
 
-[call [cmd DomainOp] [arg name] [arg argList] [arg body]]
-The [cmd DomainOp] command defines [arg name] as a domain-based operation.
+[call [cmd AsyncService] [arg name] [arg argList] [arg body]]
+The [cmd AsyncService] command defines [arg name] as an asynchronous
+service of the domain.
 [arg name] appears as an exported method of the domain.
 The [arg argList] argument gives the formal parameters of the operation
 in the same way as for the [cmd proc] command.
-The [arg body] argument is the body of the domain operation.
-Domain operations begin a new thread of control
+The [arg body] argument is the body of the asynchronous service.
+Asynchronous services begin a new thread of control
 (see [sectref "Threads of Control"], below).
-This implies that domain operations always return immediately and have
-not return value.
-The [arg body] of the domain operation is executed asynchronously to
-begin the thread of control.
+This implies that asynchronous services always return immediately and have
+no return value.
+The [arg body] of the asynchronous service is executed when the
+thread of control is started.
 
 [call [cmd SyncService] [arg name] [arg argList] [arg body]]
 The [cmd SyncService] command defines [arg name] as a synchronous service
@@ -502,28 +503,80 @@ for object created in convention object oriented schemes.
 In [package raloo] all the object instance data is stored as tuples in a
 relvar.
 Thus classes have a very close correspondence to relvars and objects
-of the class refer to a set of tuples in the relvar.
-That set may be empty or refer to one or more tuples in the relvar.
+of a class refer to a set of tuples in the relvar and those objects are
+sometimes referred to as instance reference sets.
+An instance reference set, like any set,
+may be empty or refer to one or more tuples in the relvar.
+However, an instance reference set may only refer to tuples of the
+class from which it was created.
 
 [list_begin definitions]
-[call [arg class] [method new] [arg [opt "attr1 value1 attr2 value2 ..."]]]
-The [method new] method creates an instance reference set of
-[arg class].
+[call [arg class] [method selectOne]\
+    [arg [opt "attr1 value1 attr2 value2 ..."]]]
+The [method selectOne] method creates an object of [arg class] containing
+an instance reference set
+that refers to at most one tuple in class [arg class] which has
+the same value for one of its identifiers as the given attribute values.
+The set of [arg "attrN valueN"] arguments must constitute an identifier
+of [arg class].
+The cardinality of the object refence is either zero or one.
 
+[example {
+set fred [Owner selectOne OwnerName Fred]
+}]
+
+[call [arg class] [method selectWhere] [arg expression]]
+The [method selectWhere] method creates an object of [arg class]
+containing an instance reference set that refer to those tuples of [arg class]
+where [arg expression] evaluates to true.
+The [arg expression] argument is an ordinary Tcl expression.
+Each tuple attribute is placed in a Tcl variable by the same name.
+
+[example {
+set oldDogs [Dog selectWhere {$Age > 12}]
+}]
+
+[call [arg class] [cmd createInstance] [arg "attr1 value1"]\
+    [arg "attr2 value2"] [arg ...]]
+The [method createInstance] inserts a tuple into relvar represented by
+[arg class] and returns an object that references the newly inserted instance.
+The set of [arg "attrN valueN"] arguments must specify a value for all
+attributes of [arg class].
+
+[example {
+set ginger [Dog createInstance Name Ginger Age 3 Breed Poodle]
+}]
 
 [call [arg class] [cmd insert] [arg "attr1 value1"] [arg "attr2 value2"]\
     [arg ...]]
+The [method insert] inserts a tuple into the relvar represented by [arg class].
+No object command is created by this method.
+The return value is a relation value of cardinality one that contains the
+inserted tuple.
+The set of [arg "attrN valueN"] arguments must specify a value for all
+attributes of [arg class].
+
 [call [arg class] [cmd delete] [arg "attr1 value1"] [arg "attr2 value2"]\
     [arg ...]]
+The [method delete] deletes at most one tuple from the relvar represented
+by [arg class].
+The set of [arg "attrN valueN"] arguments must constitute an identifier
+of [arg class].
+
 [call [arg class] [cmd update] [arg attrValueList] [arg attrName] [arg value]]
+[call [arg class] [cmd cardinality]]
+The [method cardinality] returns the number of tuples in the relvar
+represented by [arg class].
+[call [arg class] [cmd degree]]
+The [method degree] returns the number of attributes in the relvar
+represented by [arg class].
+[call [arg class] [cmd format] [arg [opt sortAttrList]] [arg [opt title]]]
+The [method format] returns a string that is a printable tabular
+representation of the [arg class].
+If given, the table is sorted by the attributes of [arg sortAttrList].
+If given, the [arg title] is used as a caption for the table.
 [call [arg class] [cmd set] [arg relValue]]
 [call [arg class] [cmd get]]
-[call [arg class] [cmd cardinality]]
-[call [arg class] [cmd degree]]
-[call [arg class] [cmd format] [arg [opt sortAttrList]] [arg [opt title]]]
-[call [arg class] [cmd newFromRelation] [arg relValue]]
-[call [arg class] [cmd newInsert] [arg "attr1 value1"] [arg "attr2 value2"]\
-    [arg ...]]
 [list_end]
 
 [section "Active Class Methods"]
@@ -532,33 +585,82 @@ The [method new] method creates an instance reference set of
     [arg [opt "param1 param2 ..."]]]
 [call [arg class] [cmd insertInState] [arg state]\
     [arg [opt "attr1 value1 attr2 value2 ..."]]]
-[call [arg class] [cmd newInsertInState] [arg state]\
+[call [arg class] [cmd createInstanceInState] [arg state]\
     [arg [opt "attr1 value1 attr2 value2 ..."]]]
 [list_end]
 
 [section "Instance References"]
+The objects of raloo classes hold references to a subset of tuples in
+the [class class] from which they were created.
+Instances have a set of methods themselves.
+
 [list_begin definitions]
-[call [arg inst] [cmd set] [arg relValue]]
-[call [arg inst] [cmd get]]
-[call [arg inst] [cmd classOf]]
-[call [arg inst] [cmd relvarName]]
-[call [arg inst] [cmd ref]]
-[call [arg inst] [cmd delete]]
-[call [arg inst] [cmd cardinality]]
-[call [arg inst] [cmd isempty]]
-[call [arg inst] [cmd isnotempty]]
-[call [arg inst] [cmd format] [arg [opt sortAttrList]] [arg [opt title]]]
 [call [arg inst] [cmd selectOne] [arg "attr1 value1"] [arg "attr2 value2"]\
     [arg ...]]
+The [method selectOne] replaces the reference of [arg inst] with a
+new one that refers to the tuple whose attribute match those of the
+[arg "attrN valueN"] arguments.
+The set of [arg "attrN valueN"] arguments must constitute an identifier
+of [arg class].
+[emph N.B.] that this method operates the same as the [method selectOne]
+method for classes except the reference of the object is modified rather than
+creating a new object.
+
 [call [arg inst] [cmd selectWhere] [arg expr]]
 [call [arg inst] [cmd selectAny] [arg expr]]
 [call [arg inst] [cmd selectRelated] [arg relName1] [arg relName2] [arg ...]]
+The [method selectRelated] method creates a new instance reference set
+of the class at the end of the referential chain given by the
+[arg relNameN] arguments.
+The [arg relNameN] arguments are the names of relationships defined with
+the current Domain.
+Relationship traversal may be in the forward direction of the relationship
+or in the backward direction by placing a tilde (~) character immediately
+before the relationship name.
+Relationship [arg relName1] must originate at the class of which [arg inst]
+is an object and the path defined by the [arg relNameX] arguments must
+exist.
+The resulting object references tuples in the class that terminates the
+traversal given the [arg relnameN].
+
+[example {
+set owner [Owner selectOne OwnerName Fred]
+set freddogs [$owner selectedRelated R1]
+}]
+
 [call [arg inst] [cmd relate] [arg relName] [arg targetInst]]
 [call [arg inst] [cmd relateAssoc] [arg rship] [arg targetInst]\
     [arg [opt "attr1 value1"]] [arg [opt "attr2 value2"]] [arg ...]]
 [call [arg inst] [cmd unrelate] [arg relName] [arg targetInst]]
 [call [arg inst] [cmd migrate] [arg relName] [arg targetClass]\
     [arg [opt "attr1 value1"]] [arg [opt "attr2 value2"]] [arg ...]]
+[call [arg inst] [cmd set] [arg relValue]]
+[call [arg inst] [cmd get]]
+[call [arg inst] [cmd classOf]]
+[call [arg inst] [cmd relvarName]]
+[call [arg inst] [cmd ref]]
+
+[call [arg inst] [cmd delete]]
+The [method delete] method deletes all the tuples referenced by [arg inst].
+After the method completes, the cardinality of [arg inst] is zero.
+
+[call [arg inst] [cmd cardinality]]
+Returns the number of tuple referenced by [arg inst].
+
+[call [arg inst] [cmd isempty]]
+Returns a boolean value of true if [arg inst] references no tuple
+and false otherwise.
+
+[call [arg inst] [cmd isnotempty]]
+Return a boolean valueof true if [arg inst] references at least one tuple
+and false otherwise.
+
+[call [arg inst] [cmd format] [arg [opt sortAttrList]] [arg [opt title]]]
+Returns a printable string giving a tablular representation of the tuples
+referenced by [arg inst].
+If given, the table is sorted by the attributes of [arg sortAttrList].
+If given, the [arg title] is used as a caption for the table.
+
 [list_end]
 
 [section "Active Instance References"]
@@ -572,36 +674,37 @@ The [method new] method creates an instance reference set of
 The [package raloo] package supports both synchronous processing and
 asynchronous processing.
 Asynchronous processing is captured in state machines which have the ability
-to resume a sequence of computation at a later time.
+to suspend a sequence of computations and resume them at a later time.
 As state machines interact, one generating events to others, the concept
 of a thread of control arises.
-A thread of control starts when upon invocation of a Domain Operation
+A thread of control starts when upon invocation of an Asynchronous Service
 or when a Delayed Event is dispatched.
-The thread of control is the evolving tree of class state machine interactions.
+The thread of control is the time evolving tree of class state
+machine interactions.
 Each node in the tree represents one instance of a class generating an
 event to another instance of a class (not necessarily distinct).
-As events are dispatched and the transitions occur, other events are generated
-by state machine actions.
+As events are dispatched, transitions occur, the state actions are executed
+and other may events be generated.
 At some point the tree stops growing (assuming the computation is bounded)
 and the all of the transitions and their corresponding actions will execute.
 At this time the thread of control is considered completed.
 The underlying state machine execution engine in [package raloo]
 insures that only one thread of control executes at any time.
-Any thread of control that is starting as part of the execution of the current
-thread of control is deferred until the current thread terminates.
+Any new thread of control that is starting as part of the execution of the
+current thread of control is deferred until the current thread terminates.
 
 [para]
 The [package raloo] state machine execution engine uses the Tcl event
 loop in order to sequence threads of control.
-This implies that when a Domain is used in an application and that domain
-contains asynchronous processing, that the Tcl event loop must be entered
+This implies that when a Domain is used in an application and the domain
+contains asynchronous processing, the Tcl event loop must be entered
 in order for the thread of control execution to take place.
 This is the natural order of things when Tk is used as part of the
 application.
 However, for ordinary Tcl script based application, it implies the the
 [cmd vwait] command must be executed and the use of a Domain that does
 asynchronous processing in an application will demand that the application
-be event driven in its entity.
+be event driven in its entirity.
 
 [see_also TclRAL tuple relation]
 
