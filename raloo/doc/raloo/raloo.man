@@ -47,8 +47,8 @@
 #   This package is part of TclRAL. This file is in Tcl Markup Language
 #   format.
 # $RCSfile: raloo.man,v $
-# $Revision: 1.5 $
-# $Date: 2008/04/27 23:52:40 $
+# $Revision: 1.6 $
+# $Date: 2008/04/30 03:30:49 $
 #  *--
 }]
 [moddesc "raloo"]
@@ -542,6 +542,11 @@ The [method createInstance] inserts a tuple into relvar represented by
 [arg class] and returns an object that references the newly inserted instance.
 The set of [arg "attrN valueN"] arguments must specify a value for all
 attributes of [arg class].
+If [arg class] is an active class ([emph i.e.] it has a lifecycle),
+then the instances placed in the default initial state.
+[emph N.B.] it is a corrollary of the state machine execution rules that
+any code associated with an initial state that has no incoming transitions
+will never be executed.
 
 [example {
 set ginger [Dog createInstance Name Ginger Age 3 Breed Poodle]
@@ -564,29 +569,53 @@ The set of [arg "attrN valueN"] arguments must constitute an identifier
 of [arg class].
 
 [call [arg class] [cmd update] [arg attrValueList] [arg attrName] [arg value]]
+The [method update] method modifies the value of the attribute [arg attrName]
+to be [arg value] for that tuple whose identifier matches the attribute
+value pairs in [arg attrValueList].
+If no tuple matches [arg attrValueList] then the relvar associated with
+the class is unmodified.
+
 [call [arg class] [cmd cardinality]]
 The [method cardinality] returns the number of tuples in the relvar
 represented by [arg class].
+
 [call [arg class] [cmd degree]]
 The [method degree] returns the number of attributes in the relvar
 represented by [arg class].
+
 [call [arg class] [cmd format] [arg [opt sortAttrList]] [arg [opt title]]]
 The [method format] returns a string that is a printable tabular
 representation of the [arg class].
 If given, the table is sorted by the attributes of [arg sortAttrList].
 If given, the [arg title] is used as a caption for the table.
-[call [arg class] [cmd set] [arg relValue]]
-[call [arg class] [cmd get]]
 [list_end]
 
 [section "Active Class Methods"]
 [list_begin definitions]
 [call [arg class] [cmd generate] [arg attrValueList] [arg event]\
     [arg [opt "param1 param2 ..."]]]
+If the lifecycle of a class defines a creation event, ([emph i.e.] and
+event from the pseudo-initial state),
+then the class [method generate] method is the means of delivering
+the creation event.
+[example {
+set ginger [Dog createInstance Name Ginger Age 3 Breed Poodle]
+$ginger generate Bark Volume 27
+}]
+
+[call [arg class] [method createInstanceInState] [arg state]\
+    [arg [opt "attr1 value1 attr2 value2 ..."]]]
+Active classes allow instances to be created in any state.
+The [method createInstanceInState] operates like the [method createInstance]
+method but allows the initial state to be specified.
+If [method createInstance] is invoked on an active class,
+then the instance is created in the default initial state.
+
 [call [arg class] [cmd insertInState] [arg state]\
     [arg [opt "attr1 value1 attr2 value2 ..."]]]
-[call [arg class] [cmd createInstanceInState] [arg state]\
-    [arg [opt "attr1 value1 attr2 value2 ..."]]]
+The [method insertInState] method is analogous to the [method insert] and
+provides a means of inserting an instance in a particular state.
+
 [list_end]
 
 [section "Instance References"]
@@ -597,7 +626,7 @@ Instances have a set of methods themselves.
 [list_begin definitions]
 [call [arg inst] [cmd selectOne] [arg "attr1 value1"] [arg "attr2 value2"]\
     [arg ...]]
-The [method selectOne] replaces the reference of [arg inst] with a
+The [method selectOne] method replaces the reference of [arg inst] with a
 new one that refers to the tuple whose attribute match those of the
 [arg "attrN valueN"] arguments.
 The set of [arg "attrN valueN"] arguments must constitute an identifier
@@ -606,8 +635,18 @@ of [arg class].
 method for classes except the reference of the object is modified rather than
 creating a new object.
 
-[call [arg inst] [cmd selectWhere] [arg expr]]
-[call [arg inst] [cmd selectAny] [arg expr]]
+[call [arg inst] [cmd selectWhere] [arg expression]]
+The [method selectWhere] method replaces the reference of [arg inst] with a
+new one that refers to the tuples where the [arg expression] evaluates to true.
+The [arg expression] argument may refer to variable that have the same
+name as the attributes of [arg inst].
+
+[call [arg inst] [cmd selectAny] [arg expression]]
+The [method selectAny] method replaces the reference of [arg inst] with a
+new one that refers to an arbitrarily selected instance from the set
+of instances where [arg expression] evaluates to true.
+The cardinality of [arg inst] after the method will be either zero or one.
+
 [call [arg inst] [cmd selectRelated] [arg relName1] [arg relName2] [arg ...]]
 The [method selectRelated] method creates a new instance reference set
 of the class at the end of the referential chain given by the
@@ -628,17 +667,69 @@ set owner [Owner selectOne OwnerName Fred]
 set freddogs [$owner selectedRelated R1]
 }]
 
+[call [arg inst] [cmd readAttr] [arg attr1] [arg [opt "attr2 ..."]]]
+The [method readAttr] returns the values of the attributes given by
+the [arg attrN] arguments.
+If only one attribute name is given, then it is returned as a simple value.
+If multiple attribute names are given, then the values are returned as a list.
+
+[call [arg inst] [cmd writeAttr] [arg "attr1 value1"]\
+	[arg [opt "attr2 value2 ..."]]]
+[call [arg inst] [method with] [arg attrList] [arg script]]
+The [method with] method assigns the values of the attributes in
+[arg attrList] to variables of the same name as the attributes and
+executes script.
+The [arg script] may then refer to variables that have the same name as the
+attributes of [arg inst].
+The cardinality of [arg inst] must be 1.
+
+[call [arg inst] [method assign] [arg attr] [arg expression]]
+The [method assign] sets the current value of [arg attr] to a variable
+by the same name and evaluates [arg expression] via the [cmd expr] command.
+The result of the expression evaluation is then
+assigned to the attribute.
+
 [call [arg inst] [cmd relate] [arg relName] [arg targetInst]]
-[call [arg inst] [cmd relateAssoc] [arg rship] [arg targetInst]\
+The [method relate] method sets the referential attributes of [arg inst]
+and [arg targetInst] in such a manner so that the two instances are
+now related by the relationship given by [arg relName].
+Both [arg inst] and [arg targetInst] must be from classes that participate
+in [arg relName].
+If the relationship traversal from [arg inst] to [arg targetInst] is in the
+reverse direction of the relationship definition, then [arg relName] must
+be preceeded by a tilde character (~).
+
+[call [arg inst] [cmd relateAssoc] [arg relName] [arg targetInst]\
     [arg [opt "attr1 value1"]] [arg [opt "attr2 value2"]] [arg ...]]
+The [method relateAssoc] method creates an instance of the associative
+class of the relationship [arg relName] and
+sets the referential attributes of the new instance so as to relate
+[arg inst] and [arg targetInst].
+If the associative class has attributes other than then referential
+attributes of the relationship,
+then these additional attributes are supplied by the [arg "attrN valueN"]
+arguments.
+If the relationship traversal from [arg inst] to [arg targetInst] is in the
+reverse direction of the relationship definition, then [arg relName] must
+be preceeded by a tilde character (~).
+
 [call [arg inst] [cmd unrelate] [arg relName] [arg targetInst]]
-[call [arg inst] [cmd migrate] [arg relName] [arg targetClass]\
+The [method unrelate] method sets the referential attributes of [arg inst]
+and [arg targetInst] so that they are no longer related to each other
+by the relationship given by [arg relName].
+
+[call [arg inst] [cmd reclassify] [arg relName] [arg targetClass]\
     [arg [opt "attr1 value1"]] [arg [opt "attr2 value2"]] [arg ...]]
-[call [arg inst] [cmd set] [arg relValue]]
-[call [arg inst] [cmd get]]
-[call [arg inst] [cmd classOf]]
-[call [arg inst] [cmd relvarName]]
-[call [arg inst] [cmd ref]]
+The [method reclassify] method changes the subtype of [arg inst] to be
+that of [arg targetClass].
+The return value is the object command of the new subtype.
+Conceptually, [arg inst] is deleted and a new instance of [arg targetClass]
+is created and related to the same supertype instance that was related
+to [arg inst].
+After the method, the cardinality of [arg inst] is zero.
+If instances of [arg targetClass] have any attribute other than the referential
+attributes of [arg relName],
+they must be supplied in the [arg "attrN valueN"] arguments.
 
 [call [arg inst] [cmd delete]]
 The [method delete] method deletes all the tuples referenced by [arg inst].
@@ -652,7 +743,7 @@ Returns a boolean value of true if [arg inst] references no tuple
 and false otherwise.
 
 [call [arg inst] [cmd isnotempty]]
-Return a boolean valueof true if [arg inst] references at least one tuple
+Return a boolean value of true if [arg inst] references at least one tuple
 and false otherwise.
 
 [call [arg inst] [cmd format] [arg [opt sortAttrList]] [arg [opt title]]]
@@ -664,8 +755,36 @@ If given, the [arg title] is used as a caption for the table.
 [list_end]
 
 [section "Active Instance References"]
+Objects of classes that have a lifecycle are considered to be [emph active].
+Active instances can receive events and their behavior depends upon the
+sequence of events they have received.
+
 [list_begin definitions]
-[call [arg inst] [cmd generate] [arg event] [arg [opt "param1 param2 ..."]]]
+[call [arg inst] [cmd generate] [arg event]\
+    [arg [opt "name1 value1 name2 value2 ..."]]]
+The [method generate] delivers the [arg event] event to [arg inst].
+If the event carries supplimental data, then event data must be given
+as a set of name / value pairs.
+
+[call [arg inst] [cmd generateDelayed] [arg time] [arg event]\
+    [arg [opt "name1 value1 name2 value2 ..."]]]
+The [method generateDelayed] method arranges for the event, [arg event], to be
+delivered to [arg inst] after at least [arg time] milliseconds have
+elapsed.
+Any supplimental data associated with [arg event] must be specified in
+the [arg "nameN valueN"] arguments.
+Delivery of a delayed event starts a new thread of control in the domain
+(see [sectref "Threads of Control"]).
+Only one delayed event may be outstanding for any given [arg event] and
+sender / receiver instance pair.
+If [method generateDelayed] is invoked when there is already an outstanding
+delayed event for [arg event] with the same sender / receiver pair,
+then the previous event is cancelled and the new delayed event replaces it.
+
+[call [arg inst] [cmd cancelDelayed] [arg event]]
+
+[call [arg inst] [cmd delayedRemaining] [arg event]]
+
 [list_end]
 
 [para]

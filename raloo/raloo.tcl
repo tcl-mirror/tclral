@@ -48,8 +48,8 @@
 #  capabilities of TclOO.
 # 
 # $RCSfile: raloo.tcl,v $
-# $Revision: 1.20 $
-# $Date: 2008/04/27 23:52:40 $
+# $Revision: 1.21 $
+# $Date: 2008/04/30 03:30:49 $
 #  *--
 
 package require Tcl 8.5
@@ -2767,9 +2767,9 @@ oo::class create ::raloo::RelvarRef {
 	uplevel 1 [list lassign [my readAttr {*}$attrList] {*}$attrList]
 	uplevel 1 $script
     }
-    method assign {attr cmd} {
+    method assign {attr expression} {
 	uplevel 1 [list set $attr [my readAttr $attr]]
-	my writeAttr $attr [uplevel 1 [list expr $cmd]]
+	my writeAttr $attr [uplevel 1 [list expr $expression]]
 	uplevel 1 [list unset $attr]
     }
     method cardinality {} {
