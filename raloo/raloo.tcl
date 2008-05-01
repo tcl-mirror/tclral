@@ -48,8 +48,8 @@
 #  capabilities of TclOO.
 # 
 # $RCSfile: raloo.tcl,v $
-# $Revision: 1.21 $
-# $Date: 2008/04/30 03:30:49 $
+# $Revision: 1.22 $
+# $Date: 2008/05/01 15:15:33 $
 #  *--
 
 package require Tcl 8.5
@@ -4646,7 +4646,7 @@ proc ::raloo::arch::cancelDelayedEvent {domName srcModel srcRef dstModel dstRef\
 	variable DelayQueue
 	set DelayQueue [lreplace $DelayQueue $evtIndex $evtIndex]
 	log::info "delayed cancelled:\
-	    [formatEvent $domName $srcModel $srcRef dstModel $dstRef]:\
+	    [formatEvent $domName $srcModel $srcRef $dstModel $dstRef]:\
 	    $eventName"
     } else {
 	# If we did not find the event in the delay queue, then we search for
@@ -4678,13 +4678,13 @@ proc ::raloo::arch::cancelDelayedEvent {domName srcModel srcRef dstModel dstRef\
 		$toc destroy
 		set controlTree [lreplace $controlTree $tocIndex $tocIndex]
 		log::info "delayed cancelled ToC:\
-		    [formatEvent $domName $srcModel $srcRef dstModel $dstRef]:\
+		    [formatEvent $domName $srcModel $srcRef $dstModel $dstRef]:\
 		    $eventName"
 		return
 	    }
 	}
 	log::notice "delayed cancelled failed:\
-	    [formatEvent $domName $srcModel $srcRef dstModel $dstRef]:\
+	    [formatEvent $domName $srcModel $srcRef $dstModel $dstRef]:\
 	    $eventName"
     }
 }

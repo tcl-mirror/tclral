@@ -47,8 +47,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: raloo.test,v $
-# $Revision: 1.17 $
-# $Date: 2008/04/27 23:52:40 $
+# $Revision: 1.18 $
+# $Date: 2008/05/01 15:15:33 $
 #  *--
 
 package require tcltest 2.2
@@ -2110,8 +2110,7 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		}
 	    }
 	    AsyncService start {} {
-		Foo insert Id 1
-		set n [Foo selectOne Id 1]
+		set n [Foo createInstance Id 1]
 		$n generateDelayed 100 E1 date [clock format [clock seconds]]
 	    }
 	}
@@ -2121,6 +2120,68 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 	A start
 	syncSleep
     } -result {born}
+
+    test Lifecycle-1.8 {
+	active class -- cancelling delayed events
+    } -setup {
+	Domain create A {
+	    Class Foo {
+		Attribute {
+		    *Id int
+		}
+
+		Lifecycle {
+		    State born {date} {
+			#puts "born: $date"
+			set ::sync born
+		    }
+		    Transition born - E1 -> born
+		}
+	    }
+	    SyncService start {} {
+		set n [Foo createInstance Id 1]
+		$n generateDelayed 100 E1 date [clock format [clock seconds]]
+	    }
+	    SyncService stop {} {
+		set n [Foo selectOne Id 1]
+		$n cancelDelayed E1
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	A start
+	A stop
+	llength $::raloo::arch::DelayQueue
+    } -result {0}
+
+    test Lifecycle-1.9 {
+	active class -- query remaining time of event
+    } -setup {
+	Domain create A {
+	    Class Foo {
+		Attribute {
+		    *Id int
+		}
+
+		Lifecycle {
+		    State s1 {} {
+			set ::sync done
+		    }
+		    Transition s1 - E1 -> s1
+		}
+	    }
+	    SyncService start {} {
+		set f1 [Foo createInstance Id 1]
+		$f1 generateDelayed 100 E1
+		return [$f1 delayedRemaining E1]
+	    }
+	}
+    } -cleanup {
+	A destroy
+    } -body {
+	A start
+    } -result {100}
 
     test Lifecycle-2.1 {
 	polymorphic event
