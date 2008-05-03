@@ -47,8 +47,8 @@
 #   This package is part of TclRAL. This file is in Tcl Markup Language
 #   format.
 # $RCSfile: raloo.man,v $
-# $Revision: 1.6 $
-# $Date: 2008/04/30 03:30:49 $
+# $Revision: 1.7 $
+# $Date: 2008/05/03 17:37:20 $
 #  *--
 }]
 [moddesc "raloo"]
@@ -782,8 +782,14 @@ delayed event for [arg event] with the same sender / receiver pair,
 then the previous event is cancelled and the new delayed event replaces it.
 
 [call [arg inst] [cmd cancelDelayed] [arg event]]
+The [method cancelDelayed] method cancels any outstanding delayed event of
+type [arg event] directed to [arg inst].
 
 [call [arg inst] [cmd delayedRemaining] [arg event]]
+The [method delayedRemaining] method returns the number of milliseconds
+that remaining before [arg event] is dispatched to [arg inst].
+Returns 0 if the event has already been dispatched or no such delayed event
+was found.
 
 [list_end]
 
@@ -823,7 +829,7 @@ application.
 However, for ordinary Tcl script based application, it implies the the
 [cmd vwait] command must be executed and the use of a Domain that does
 asynchronous processing in an application will demand that the application
-be event driven in its entirity.
+be event driven in its entirety.
 
 [see_also TclRAL tuple relation]
 
