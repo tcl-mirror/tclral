@@ -48,8 +48,8 @@
 #  capabilities of TclOO.
 # 
 # $RCSfile: raloo.tcl,v $
-# $Revision: 1.22 $
-# $Date: 2008/05/01 15:15:33 $
+# $Revision: 1.23 $
+# $Date: 2008/05/18 22:51:53 $
 #  *--
 
 package require Tcl 8.5
@@ -4750,7 +4750,7 @@ proc ::raloo::arch::stepEngine {} {
     variable singleStep
     variable controlTree
     if {!$singleStep} {
-	after idle [list ::raloo::arch::dispatchEvent]
+	after 0 [list ::raloo::arch::dispatchEvent]
 	log::debug "generated idle dispatch"
     }
 }
