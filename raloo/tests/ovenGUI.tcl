@@ -2,43 +2,43 @@ package require Tk 8.5
 package require raloo
 
 Domain create OvenGUI {
-    SyncService newOven {id} {
+    DomainOp newOven {id} {
 	Oven createWidget $id
     }
 
-    SyncService destroyOven {id} {
+    DomainOp destroyOven {id} {
 	OvenMgmt destroyOven $id
 	set oven [Oven selectOne OvenId $id]
 	destroy [$oven readAttr OvenWidget]
 	$oven delete
     }
 
-    SyncService updateTimerTime {id min sec} {
+    DomainOp updateTimerTime {id min sec} {
 	set guiTimer [OvenGUI::Timer selectOne TimerId $id]
 	$guiTimer updateTime $min $sec
     }
 
-    AsyncService doorButton {id} {
+    DomainOp doorButton {id} {
 	set door [Door selectOne DoorId $id]
 	$door generate Pressed
     }
 
-    SyncService turnOnLight {id} {
+    DomainOp turnOnLight {id} {
 	set light [Light selectOne LightId $id]
 	$light on
     }
 
-    SyncService turnOffLight {id} {
+    DomainOp turnOffLight {id} {
 	set light [Light selectOne LightId $id]
 	$light off
     }
 
-    SyncService energizeTube {id} {
+    DomainOp energizeTube {id} {
 	set tube [Tube selectOne TubeId $id]
 	$tube energize
     }
 
-    SyncService deenergizeTube {id} {
+    DomainOp deenergizeTube {id} {
 	set tube [Tube selectOne TubeId $id]
 	$tube deenergize
     }

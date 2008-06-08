@@ -47,8 +47,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: raloo.test,v $
-# $Revision: 1.18 $
-# $Date: 2008/05/01 15:15:33 $
+# $Revision: 1.19 $
+# $Date: 2008/06/08 22:51:46 $
 #  *--
 
 package require tcltest 2.2
@@ -194,7 +194,7 @@ namespace eval ::raloo::test {
 	domain with domain operation
     } -setup {
 	Domain create A {
-	    SyncService echo {a} {
+	    DomainOp echo {a} {
 		return $a
 	    }
 	}
@@ -208,7 +208,7 @@ namespace eval ::raloo::test {
 	failure in a domain operation invocation
     } -setup {
 	Domain create A {
-	    SyncService echo {a} {
+	    DomainOp echo {a} {
 		return [$a]
 	    }
 	}
@@ -222,7 +222,7 @@ namespace eval ::raloo::test {
 	incrementally define a domain
     } -setup {
 	Domain create A {
-	    SyncService echo {a} {
+	    DomainOp echo {a} {
 		return $a
 	    }
 	}
@@ -230,7 +230,7 @@ namespace eval ::raloo::test {
 	A destroy
     } -body {
 	A define {
-	    SyncService repeat {str cnt} {
+	    DomainOp repeat {str cnt} {
 		return [string repeat $str $cnt]
 	    }
 	}
@@ -238,7 +238,7 @@ namespace eval ::raloo::test {
     } -result {aaa}
 
     test Domain-2.4 {
-	class reference within a SyncService
+	class reference within a DomainOp
     } -setup {
 	Domain create A {
 	    Class Dog {
@@ -247,10 +247,10 @@ namespace eval ::raloo::test {
 		    Breed string
 		}
 	    }
-	    SyncService newDog {name breed} {
+	    DomainOp newDog {name breed} {
 		Dog insert DogName $name Breed $breed
 	    }
-	    SyncService getDogBreed {name} {
+	    DomainOp getDogBreed {name} {
 		set dog [Dog selectOne DogName $name]
 		return [$dog readAttr Breed]
 	    }
@@ -283,7 +283,7 @@ namespace eval ::raloo::test {
 		}
 	    }
 	    AssocRelationship R1 Dog +-Ownership->+ Owner
-	    SyncService newDog {name} {
+	    DomainOp newDog {name} {
 		Dog insert DogName $name
 	    }
 	}
@@ -2040,7 +2040,7 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		    Transition born - E1 -> born
 		}
 	    }
-	    AsyncService start {} {
+	    DomainOp start {} {
 		set n [Foo createInstance Id 1]
 		#puts [relformat $::raloo::test::A::Foo Foo]
 		$n generate E1 date [clock format [clock seconds]]
@@ -2079,7 +2079,7 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		    Transition grow - E1 -> grow
 		}
 	    }
-	    AsyncService start {} {
+	    DomainOp start {} {
 		set n [Foo createInstance Id 1 Count 0]
 		#puts [relformat $::raloo::test::A::Foo Foo]
 		$n generate E1 date [clock format [clock seconds]]
@@ -2109,7 +2109,7 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		    Transition born - E1 -> born
 		}
 	    }
-	    AsyncService start {} {
+	    DomainOp start {} {
 		set n [Foo createInstance Id 1]
 		$n generateDelayed 100 E1 date [clock format [clock seconds]]
 	    }
@@ -2138,11 +2138,11 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		    Transition born - E1 -> born
 		}
 	    }
-	    SyncService start {} {
+	    DomainOp start {} {
 		set n [Foo createInstance Id 1]
 		$n generateDelayed 100 E1 date [clock format [clock seconds]]
 	    }
-	    SyncService stop {} {
+	    DomainOp stop {} {
 		set n [Foo selectOne Id 1]
 		$n cancelDelayed E1
 	    }
@@ -2171,7 +2171,7 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		    Transition s1 - E1 -> s1
 		}
 	    }
-	    SyncService start {} {
+	    DomainOp start {} {
 		set f1 [Foo createInstance Id 1]
 		$f1 generateDelayed 100 E1
 		return [$f1 delayedRemaining E1]
@@ -2221,7 +2221,7 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		SubType BigDog
 	    }
 	    Polymorphic Dog taunt {}
-	    AsyncService start {} {
+	    DomainOp start {} {
 		set sd [Dog selectOne Name Poopsy]
 		$sd generate taunt
 	    }
@@ -2298,7 +2298,7 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		SubType ShowDog
 	    }
 	    Polymorphic Dog taunt {}
-	    AsyncService start {} {
+	    DomainOp start {} {
 		set sd [Dog selectOne Name Rover]
 		$sd generate taunt
 	    }
@@ -2338,7 +2338,7 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		}
 	    }
 	    AssocRelationship R1 Dog +-Ownership->+ Owner
-	    AsyncService newDog {name} {
+	    DomainOp newDog {name} {
 		Dog insert DogName $name
 	    }
 	}
@@ -2349,13 +2349,13 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 	syncSleep
     } -result {for correlation ::raloo::test::A::R1(::raloo::test::A::Dog <== [+] ::raloo::test::A::Ownership [+] ==> ::raloo::test::A::Owner), in relvar ::raloo::test::A::Dog
 tuple {DogName Fred} is not referenced by any tuple
-}
+} -returnCodes error
 
     test Lifecycle-3.2 {
 	thread of control creates an error
     } -setup {
 	Domain create A {
-	    AsyncService op {} {
+	    DomainOp op {} {
 		error "thread of control error"
 	    }
 	}
@@ -2364,7 +2364,7 @@ tuple {DogName Fred} is not referenced by any tuple
     } -body {
 	A op
 	syncSleep
-    } -result {thread of control error}
+    } -result {thread of control error} -returnCodes error
 
     test Lifecycle-4.1 {
 	creation events
@@ -2382,7 +2382,7 @@ tuple {DogName Fred} is not referenced by any tuple
 		    }
 		    Transition @ - E1 -> A
 		}
-		AsyncService startFoo {} {
+		DomainOp startFoo {} {
 		    Foo generate {Id 1} E1
 		}
 	    }
@@ -2509,7 +2509,7 @@ tuple {DogName Fred} is not referenced by any tuple
 		    Transition s2 - e2 -> s1
 		}
 	    }
-	    AsyncService assignR1 {p} {
+	    DomainOp assignR1 {p} {
 		R1 generate e1
 	    }
 	}
@@ -2550,7 +2550,7 @@ tuple {DogName Fred} is not referenced by any tuple
 		    Transition s2 - e2 -> s1
 		}
 	    }
-	    AsyncService assignR1 {p} {
+	    DomainOp assignR1 {p} {
 		set r1a [R1 selectOne DogName Fido]
 		$r1a generate e1
 	    }

@@ -45,8 +45,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: ovenMgmt.tcl,v $
-# $Revision: 1.5 $
-# $Date: 2008/04/27 23:52:40 $
+# $Revision: 1.6 $
+# $Date: 2008/06/08 22:51:46 $
 #  *--
 
 package require raloo
@@ -56,31 +56,31 @@ Domain create OvenMgmt {
     # "newOven" creates a new one button microwave oven along with all
     # of its component parts. This service provides an easy method of
     # populating the domain.
-    SyncService newOven {ovenId} {
+    DomainOp newOven {ovenId} {
 	Oven insert OvenId $ovenId
 	PowerTube insert TubeId $ovenId
 	Light insert LightId $ovenId
 	Timer insert TimerId $ovenId Minutes 0 Seconds 0
     }
 
-    SyncService destroyOven {ovenId} {
+    DomainOp destroyOven {ovenId} {
 	Oven delete [list [list OvenId $ovenId]]
 	PowerTube delete [list [list TubeId $ovenId]]
 	Light delete [list [list LightId $ovenId]]
 	Timer delete [list [list TimerId $ovenId]]
     }
     # Signal that the control button has been pressed.
-    AsyncService buttonPushed {ovenId} {
+    DomainOp buttonPushed {ovenId} {
 	set oven [Oven selectOne OvenId $ovenId]
 	$oven generate ButtonPushed
     }
     # Signal that the oven door has been opened.
-    AsyncService doorOpened {ovenId} {
+    DomainOp doorOpened {ovenId} {
 	set oven [Oven selectOne OvenId $ovenId]
 	$oven generate DoorOpened
     }
     # Signal that the oven door has been closed.
-    AsyncService doorClosed {ovenId} {
+    DomainOp doorClosed {ovenId} {
 	set oven [Oven selectOne OvenId $ovenId]
 	$oven generate DoorClosed
     }

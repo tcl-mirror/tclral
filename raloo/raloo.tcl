@@ -48,8 +48,8 @@
 #  capabilities of TclOO.
 # 
 # $RCSfile: raloo.tcl,v $
-# $Revision: 1.23 $
-# $Date: 2008/05/18 22:51:53 $
+# $Revision: 1.24 $
+# $Date: 2008/06/08 22:51:46 $
 #  *--
 
 package require Tcl 8.5
@@ -141,22 +141,7 @@ namespace eval ::raloo::mm {
 	{DomName ClassName IdNum} + Identifier {DomName ClassName IdNum}\
 	{DomName ClassName AttrName} * Attribute {DomName ClassName AttrName}
 
-    relvar create AsyncService {
-	Relation {
-	    DomName string
-	    OpName string
-	    OpParams list
-	    OpBody string
-	} {
-	    {DomName OpName}
-	}
-    }
-
-    relvar association R5\
-	AsyncService DomName *\
-	Domain DomName 1
-
-    relvar create SyncService {
+    relvar create DomainOp {
 	Relation {
 	    DomName string
 	    ServiceName string
@@ -167,8 +152,8 @@ namespace eval ::raloo::mm {
 	}
     }
 
-    relvar association R24\
-	SyncService DomName *\
+    relvar association R5\
+	DomainOp DomName *\
 	Domain DomName 1
 
     relvar create ClassOp {
@@ -1219,10 +1204,7 @@ oo::class create ::raloo::Domain {
 	# Clean up the meta-model data
 	if {[catch {
 	    relvar eval {
-		relvar delete ::raloo::mm::AsyncService d {
-		    [tuple extract $d DomName] eq [self]
-		}
-		relvar delete ::raloo::mm::SyncService d {
+		relvar delete ::raloo::mm::DomainOp d {
 		    [tuple extract $d DomName] eq [self]
 		}
 		relvar deleteone ::raloo::mm::Domain DomName [self]
@@ -1237,8 +1219,7 @@ oo::class create ::raloo::Domain {
 	# so that the definition script does not have to contain a set of
 	# "my" commands preceding the definition procs.
 	my DefineWith Domain $script\
-	    AsyncService\
-	    SyncService\
+	    DomainOp\
 	    Class\
 	    Relationship\
 	    Generalization\
@@ -1257,8 +1238,9 @@ oo::class create ::raloo::Domain {
 	::raloo::arch::cleanupRefs
 	return -options $options $result
     }
-    method SyncService {name argList body} {
-	relvar insert ::raloo::mm::SyncService [list\
+    # Methods that are used in the definition of a domain during construction.
+    method DomainOp {name argList body} {
+	relvar insert ::raloo::mm::DomainOp [list\
 	    DomName [self]\
 	    ServiceName $name\
 	    Params $argList\
@@ -1266,42 +1248,6 @@ oo::class create ::raloo::Domain {
 	]
 	oo::define [self] method $name $argList [list my Transact $body]
 	oo::define [self] export $name
-    }
-    # Methods that are used in the definition of a domain during construction.
-    method AsyncService {name argList body} {
-	relvar insert ::raloo::mm::AsyncService [list\
-	    DomName [self]\
-	    OpName $name\
-	    OpParams $argList\
-	    OpBody $body\
-	]
-
-	# This is tricky! The idea is define the actual domain operation to
-	# start a thread of control. That thread of control then executes the
-	# body supplied with the AsyncService definition passing the arguments.
-	# We use "info level" to determine how we were invoked.  Now you might
-	# think that this would be invoked the same way all the time, i.e.
-	# "Domname opname ...". However, if it is invoked via a filter then
-	# "info level 0" returns "next ...".  So to peel off the arguments
-	# correctly we need to count from the "end" by the number of argument.
-	# Hence the strange machinations around the "lrange [info level 0] ..."
-	set nargs [llength $argList]
-	if {$nargs == 0} {
-	    oo::define [self] method $name $argList [format {
-		::raloo::arch::newTOC %1$s [self] {Relation {} {{}} {{}}}\
-		    [list my __%2$s] {}
-	    } [self] $name]
-	} else {
-	    oo::define [self] method $name $argList [format {
-		::raloo::arch::newTOC %1$s [self] {Relation {} {{}} {{}}}\
-		    [list my __%2$s] [lrange [info level 0] end-%3$d end]
-	    } [self] $name [expr {$nargs - 1}]]
-	}
-	oo::define [self] export $name
-
-	oo::define [self] method __$name $argList $body
-	oo::define [self] unexport __$name
-	return
     }
     # Interpret the definition of a class.
     method Class {name script} {
@@ -2620,7 +2566,17 @@ oo::class create ::raloo::ActiveEntity {
     method generate {avList eventName args} {
 	my variable domName
 	my variable modelName
-	::raloo::arch::genCreation $domName $modelName $avList $eventName $args
+        lassign [::raloo::arch::callerSource] srcModel srcRef
+        if {[relation degree $srcRef] == 0} {
+            set params [::raloo::arch::buildArguments\
+                [::raloo::arch::lookUpEvent $domName $modelName $eventName]\
+                $args]
+            ::raloo::arch::newTOC $domName $srcModel $srcRef $modelName\
+                $avList $eventName C $params
+        } else {
+            ::raloo::arch::genCreation $domName $modelName $avList $eventName\
+                $args
+        }
 	return
     }
     # Insert a single tuple into the backing relvar.
@@ -3040,8 +2996,15 @@ oo::class create ::raloo::ActiveInstRef {
     method generate {eventName args} {
 	my variable relvarName
 	my variable ref
-	::raloo::arch::genToInsts [namespace qualifiers $relvarName]\
-	    [namespace tail $relvarName] $ref $eventName $args
+        lassign [::raloo::arch::callerSource] srcModel srcRef
+        set domName [namespace qualifiers $relvarName]
+        set dstModel [namespace tail $relvarName]
+        if {[relation degree $srcRef] == 0} {
+            ::raloo::arch::genTOCs $domName $srcModel $srcRef $dstModel $ref\
+                $eventName N $args
+        } else {
+            ::raloo::arch::genToInsts $domName $dstModel $ref $eventName $args
+        }
 	return
     }
 }
@@ -3056,7 +3019,7 @@ oo::class create ::raloo::ActiveRelvarRef {
     method generateDelayed {time eventName args} {
 	my variable relvarName
 	my variable ref
-	my Source
+        lassign [::raloo::arch::callerSource] srcModel srcRef
 	::raloo::arch::genDelayedToInsts $time\
 	    [namespace qualifiers $relvarName] $srcModel $srcRef\
 	    [namespace tail $relvarName] $ref $eventName $args
@@ -3064,32 +3027,16 @@ oo::class create ::raloo::ActiveRelvarRef {
     method cancelDelayed {eventName} {
 	my variable relvarName
 	my variable ref
-	my Source
+        lassign [::raloo::arch::callerSource] srcModel srcRef
 	::raloo::arch::cancelDelayedToInsts [namespace qualifiers $relvarName]\
 	    $srcModel $srcRef [namespace tail $relvarName] $ref $eventName
     }
     method delayedRemaining {eventName} {
 	my variable relvarName
 	my variable ref
-	my Source
+        lassign [::raloo::arch::callerSource] srcModel srcRef
 	::raloo::arch::remainingDelayed [namespace qualifiers $relvarName]\
 	    $srcModel $srcRef [namespace tail $relvarName] $ref $eventName
-    }
-    method Source {{modelVar srcModel} {instVar srcRef}} {
-	upvar $modelVar srcModel
-	upvar $instVar srcRef
-	if {[catch {uplevel 1 self caller} caller]} {
-	    set srcModel [uplevel 2 namespace current]
-	    set srcRef {Relation {} {{}} {{}}}
-	} else {
-	    set obj [lindex $caller 1]
-	    if {[catch {$obj classOf} srcModel]} {
-		set srcModel $obj
-	    }
-	    if {[catch {$srcModel ref} srcRef]} {
-		set srcRef {Relation {} {{}} {{}}}
-	    }
-	}
     }
 }
 
@@ -3791,7 +3738,13 @@ oo::class create ::raloo::SingleAssigner {
 	my variable domName
 	my variable relName
 	set ref [::raloo::arch::idProject [relvar set ${domName}::${relName}]]
-	::raloo::arch::genToInsts $domName $relName $ref $eventName $args
+        lassign [::raloo::arch::callerSource] srcModel srcRef
+        if {[relation degree $srcRef] == 0} {
+            ::raloo::arch::genTOCs $domName $srcModel $srcRef $relName $ref\
+                $eventName N $args
+        } else {
+            ::raloo::arch::genToInsts $domName $relName $ref $eventName $args
+        }
 	return
     }
     method selectOne {args} {
@@ -3961,7 +3914,7 @@ oo::class create ::raloo::MultipleAssignerRef {
 #
 # These procs form the state machine execution engine that drives execution in
 # raloo. The engine supports the notion of a thread of control.  A thread of
-# control is started by a AsyncService or when a delayed event is dispatched. It
+# control is started by a DomainOp or when a delayed event is dispatched. It
 # evolves as a tree to record the events generated as the state machines of a
 # domain interact with each other. The evolving tree is traversed in breadth
 # first order for dispatching events. This gives the proper ordering of event
@@ -4031,27 +3984,43 @@ proc ::raloo::arch::trace {status} {
 # tree visits.
 #
 # domName -- name of the domain starting the thread of control
-# modelName -- name of the class/namespace starting the thread. When a
-#   AsyncService starts the thread, it should be set to the domain name itself.
+# srcModel -- name of the class/namespace starting the thread. When a
+#   DomainOp starts the thread, it should be set to the domain name itself.
 #   When a delayed event starts the thread, it should be the class which
 #   delayed the event.
-# inst -- a dictionary corresponding to an identifier of "modelName". If
-#   "modelName" is a domain name, then inst should be set to the empty list {}.
-# script -- a Tcl script that is run to kick off the thread of control.
-# params -- a list of paramters to be given to "script" when it is run.
+# srcInst -- the source instance reference -- DEE if from a DomainOp originates
+# dstInst -- the target instance reference
+# eventName -- the name of the event that starts the thread
+# eventType -- N or C depending upon "normal" or "creation"
+# params -- a list of parameters to be used as arguments to a state action.
 #
-proc ::raloo::arch::newTOC {domName modelName inst script params} {
+proc ::raloo::arch::newTOC {domName srcModel srcInst dstModel dstInst eventName\
+                            eventType params} {
+    # Add a new tree to the list of tread of control
     variable controlTree
     lappend controlTree [set tocTree [struct::tree]]
 
-    $tocTree set root currNode root
+    # The root node contains the source information.
     $tocTree set root queue [list]
     $tocTree set root event [dict create\
 	domName $domName\
-	modelName $modelName\
-	inst $inst\
-	script $script\
+	modelName $srcModel\
+	inst $srcInst\
+	eventName {}\
+	params {}\
+	type {}\
+    ]
+    # Insert the destination node. It is made the current node and will be
+    # first one processed when the tread is activated.
+    set dstNode [$tocTree insert root end]
+    $tocTree set root currNode $dstNode
+    $tocTree set $dstNode event [dict create\
+	domName $domName\
+	modelName $dstModel\
+	inst $dstInst\
+	eventName $eventName\
 	params $params\
+	type $eventType\
     ]
 
     if {[llength $controlTree] == 1} {
@@ -4059,6 +4028,18 @@ proc ::raloo::arch::newTOC {domName modelName inst script params} {
     }
 
     return
+}
+
+# Generate a set of threads of control. This is called from domain operations
+# via the "generate" methods to start a new set of threads of control.
+proc ::raloo::arch::genTOCs {domName srcModel srcInst dstModel refSet eventName\
+                             eventType argList} {
+    set event [lookUpEvent $domName $dstModel $eventName]
+    set params [buildArguments $event $argList]
+    relation foreach inst $refSet {
+        newTOC $domName $srcModel $srcInst $dstModel $inst $eventName\
+            $eventType $params
+    }
 }
 
 # Generate an event to a set of instances. This proc is the primary interface
@@ -4228,39 +4209,32 @@ proc ::raloo::arch::dispatchEvent {} {
     # Threads of control begin at the "root" node of the tree. Here there are
     # no events to deliver, but instead a script to execute to get things
     # started. Most important, the data transaction is begun here.
-    if {$dstNode eq "root"} {
+    set srcNode [$tocTree parent $dstNode]
+    if {$srcNode eq "root"} {
 	log::info "begin TOC: $domName"
 	relvar transaction begin
-	# Execute the script associated with thread of control. This gets
-	# things going.
-	set tocError [catch {
-	    namespace inscope $domName\
-		[dict get $event script] {*}[dict get $event params]
-	} result options]
-    } else {
-	set srcNode [$tocTree parent $dstNode]
-	# Check if we are dispatching a creation event. In that case, we
-	# must create the instance and set the current state to "@". After that
-	# it is an otherwise normal event dispatch.
-	if {[dict get $event type] eq "C"} {
-	    set instValue [dict get $event inst]
-	    log::info "creation event:\
-		${domName}::${modelName}.[list $instValue]"
-	    # For creation events the "inst" property is a dictionary of
-	    # attribute name / values for the new instance that is to be
-	    # created. Set the initial state to creation pseudo-state.
-	    dict set instValue __CS__ @
-	    dict set event inst [idProject\
-		[relvar insert ${domName}::${modelName} $instValue]]
-	}
-	# Measure the execution time of the state action and record that
-	# in the thread of control tree.
-	set startTime [clock microseconds]
-	set tocError [catch {
-	    deliverEvent [$tocTree get [$tocTree parent $dstNode] event] $event
-	} result options]
-	$tocTree set $dstNode time [expr {[clock microseconds] - $startTime}]
     }
+    # Check if we are dispatching a creation event. In that case, we
+    # must create the instance and set the current state to "@". After that
+    # it is an otherwise normal event dispatch.
+    if {[dict get $event type] eq "C"} {
+        set instValue [dict get $event inst]
+        log::info "creation event:\
+            ${domName}::${modelName}.[list $instValue]"
+        # For creation events the "inst" property is a dictionary of
+        # attribute name / values for the new instance that is to be
+        # created. Set the initial state to creation pseudo-state.
+        dict set instValue __CS__ @
+        dict set event inst [idProject\
+            [relvar insert ${domName}::${modelName} $instValue]]
+    }
+    # Measure the execution time of the state action and record that
+    # in the thread of control tree.
+    set startTime [clock microseconds]
+    set tocError [catch {
+        deliverEvent [$tocTree get $srcNode event] $event
+    } result options]
+    $tocTree set $dstNode time [expr {[clock microseconds] - $startTime}]
 
     if {$tocError} {
 	# Some error occurred while trying to propagate the thread of
@@ -4577,8 +4551,7 @@ proc ::raloo::arch::queueDelayedEvent {time domName srcModel srcRef\
     variable DelayQueue
     # See if we are already expired
     if {$time <= 0} {
-	newTOC $domName $srcModel $srcRef ::raloo::arch::queueEvent [list\
-		$domName $dstModel $dstRef $eventName $params]
+	newTOC $domName $srcModel $srcRef $dstModel $dstRef $eventName N $params
 	return
     }
 
@@ -4709,18 +4682,16 @@ proc ::raloo::arch::serviceDelayedQueue {} {
 	set time [expr {[dict get $event Time] - $delayTick}]
 	if {$time <= 0} {
 	    set DelayQueue [lreplace $DelayQueue $index $index]
+            log::debug "dispatching $event"
 	    newTOC\
 		[dict get $event DomName]\
 		[dict get $event SrcModel]\
 		[dict get $event SrcInst]\
-		::raloo::arch::queueEvent\
-		[list\
-		    [dict get $event DomName]\
-		    [dict get $event DstModel]\
-		    [dict get $event DstInst]\
-		    [dict get $event EventName]\
-		    [dict get $event Params]\
-		]
+                [dict get $event DstModel]\
+                [dict get $event DstInst]\
+                [dict get $event EventName]\
+                N\
+                [dict get $event Params]
 	    log::info "delayed queued($time):\
 		[formatEvent\
 		    [dict get $event DomName]\
@@ -4751,7 +4722,7 @@ proc ::raloo::arch::stepEngine {} {
     variable controlTree
     if {!$singleStep} {
 	after 0 [list ::raloo::arch::dispatchEvent]
-	log::debug "generated idle dispatch"
+	log::debug "added dispatch to Tcl event queue"
     }
 }
 
@@ -4794,6 +4765,21 @@ proc ::raloo::arch::cleanupRefs {} {
     foreach instref [info class instances ::raloo::ActiveRelvarRef] {
 	$instref destroy
     }
+}
+proc ::raloo::arch::callerSource {} {
+    if {[catch {uplevel 1 self caller} caller]} {
+        set srcModel [uplevel 2 namespace current]
+        set srcRef {Relation {} {{}} {{}}}
+    } else {
+        set obj [lindex $caller 1]
+        if {[catch {$obj classOf} srcModel]} {
+            set srcModel $obj
+        }
+        if {[catch {$obj ref} srcRef]} {
+            set srcRef {Relation {} {{}} {{}}}
+        }
+    }
+    return [list $srcModel $srcRef]
 }
 
 # Returns a relation value that consists of the projection of identifier 1.

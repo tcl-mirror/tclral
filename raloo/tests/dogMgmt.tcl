@@ -177,14 +177,14 @@ Domain create DogMgmt {
 # domain definitions into more manageable chunks.
 DogMgmt define {
     # Another type of component of a Domain is a synchronous service.  The
-    # "SyncService" command defines a synchronous service. Its interface is the
+    # "DomainOp" command defines a synchronous service. Its interface is the
     # same as the "proc" command. Synchronous services provide a procedural
     # interface to the Domain that leaves the class structure consistent. They
     # are run as a transaction on the data of the Domain, so at the end of each
     # domain operation the referential integrity of the domain data is
     # verified.
 
-    SyncService newDog {name breed age} {
+    DomainOp newDog {name breed age} {
 	Dog insert Name $name Id {} Breed $breed Age $age
 	return
     }
@@ -192,7 +192,7 @@ DogMgmt define {
     # Within a domain operation, classes and other domain components can
     # be referred to without any qualification.
 
-    SyncService firstPurchase {ownerName age area phone dogName} {
+    DomainOp firstPurchase {ownerName age area phone dogName} {
 	set dog [Dog selectOne Name $dogName]
 	if {[$dog isempty]} {
 	    error "no such dog, \"$dogName\""
@@ -206,11 +206,11 @@ DogMgmt define {
 	return
     }
 
-    SyncService ownerReport {} {
+    DomainOp ownerReport {} {
 	return [Ownership format OwnerName]
     }
 
-    SyncService dogList {} {
+    DomainOp dogList {} {
 	return [Dog dogList]
     }
 }
