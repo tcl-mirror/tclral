@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.40 $
-$Date: 2008/04/26 16:50:17 $
+$Revision: 1.41 $
+$Date: 2008/06/09 03:47:00 $
  *--
  */
 
@@ -143,7 +143,7 @@ static const struct traceOpsMap {
 } ;
 static const char specErrMsg[] = "multiplicity specification" ;
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.40 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.41 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -1572,9 +1572,19 @@ Ral_RelvarObjEndTrans(
     int success ;
 
     Tcl_DStringInit(&errMsg) ;
-    success = Ral_RelvarEndTransaction(info, failed, &errMsg) ;
-    if (!(failed || success)) {
-	Tcl_DStringResult(interp, &errMsg) ;
+    /*
+     * Guard against calling "transaction end" when there was not
+     * "transaction begin".
+     */
+    if (Ral_PtrVectorSize(info->transactions) > 0) {
+        success = Ral_RelvarEndTransaction(info, failed, &errMsg) ;
+        if (!(failed || success)) {
+            Tcl_DStringResult(interp, &errMsg) ;
+        }
+    } else {
+	Tcl_DStringAppend(&errMsg, "end transaction with no beginning", -1) ;
+        Tcl_DStringResult(interp, &errMsg) ;
+        success = 0 ;
     }
     Tcl_DStringFree(&errMsg) ;
 

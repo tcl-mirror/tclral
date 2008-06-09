@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.44 $
-# $Date: 2008/04/15 01:10:54 $
+# $Revision: 1.45 $
+# $Date: 2008/06/09 03:47:00 $
 #  *--
 
 package require tcltest 2.2
@@ -5775,6 +5775,13 @@ tuple {A1 c} is not referred to by any tuple
 	    {Name Fred Status 30}
 	}
     } -match relation
+
+    # relvar transaction tests
+    test relvar-transaction-1.0 {
+        ending a transaction that was not begun
+    } -body {
+        relvar transaction end
+    } -result {end transaction with no beginning} -returnCodes error
 
     # examples from the Date book
     test date-example-1.0 {Get suppliers who supply all parts} -body {
