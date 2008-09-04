@@ -47,8 +47,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: raloo.test,v $
-# $Revision: 1.19 $
-# $Date: 2008/06/08 22:51:46 $
+# $Revision: 1.20 $
+# $Date: 2008/09/04 14:15:55 $
 #  *--
 
 package require tcltest 2.2
@@ -75,10 +75,20 @@ proc relationMatch {expected actual} {
     return [::ral::relation is $expected == $actual]
 }
 
+proc syncSleep {} {
+    vwait ::sync
+    #puts "syncSleep: $::sync"
+    return $::sync
+}
+
+proc syncWake {{value 1}} {
+    set ::sync $value
+}
+
 proc ::bgerror msg {
     #puts $::errorInfo
     #puts stderr $msg
-    set ::sync $msg
+    syncWait $msg
 }
 
 namespace eval ::raloo::test {
@@ -148,16 +158,6 @@ namespace eval ::raloo::test {
     }
     proc cleanupDogPlays {} {
 	A destroy
-    }
-
-    proc syncSleep {} {
-	vwait ::sync
-	#puts "syncSleep: $::sync"
-	return $::sync
-    }
-
-    proc syncWake {{value 1}} {
-	set ::sync $value
     }
 
     test Domain-1.1 {
@@ -2035,7 +2035,7 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		Lifecycle {
 		    State born {date} {
 			#puts "born: $date"
-			set ::sync born
+                        syncWake born
 		    }
 		    Transition born - E1 -> born
 		}
@@ -2072,7 +2072,7 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 			    if {$Count == 1} {
 				my generate E1 date epoch
 			    } else {
-				set ::sync born
+                                syncWake born
 			    }
 			}
 		    }
@@ -2104,7 +2104,7 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		Lifecycle {
 		    State born {date} {
 			#puts "born: $date"
-			set ::sync born
+                        syncWake born
 		    }
 		    Transition born - E1 -> born
 		}
@@ -2133,7 +2133,7 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		Lifecycle {
 		    State born {date} {
 			#puts "born: $date"
-			set ::sync born
+                        syncWake born
 		    }
 		    Transition born - E1 -> born
 		}
@@ -2166,7 +2166,7 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 
 		Lifecycle {
 		    State s1 {} {
-			set ::sync done
+                        syncWake born
 		    }
 		    Transition s1 - E1 -> s1
 		}
@@ -2180,7 +2180,9 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
     } -cleanup {
 	A destroy
     } -body {
-	A start
+	set remain [A start]
+	syncSleep
+        set remain
     } -result {100}
 
     test Lifecycle-2.1 {
@@ -2199,7 +2201,7 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		Lifecycle {
 		    State barking {} {
 			#puts "SmallDog: bark"
-			set ::sync SmallDog
+                        syncWake SmallDog
 		    }
 		    Transition barking - taunt -> barking
 		}
@@ -2211,7 +2213,7 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		Lifecycle {
 		    State barking {} {
 			#puts "BigDog: bark"
-			set ::sync BigDog
+                        syncWake BigDog
 		    }
 		    Transition barking - taunt -> barking
 		}
@@ -2255,7 +2257,7 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		Lifecycle {
 		    State barking {} {
 			#puts "SmallDog: bark"
-			set ::sync SmallDog
+                        syncWake SmallDog
 		    }
 		    Transition barking - taunt -> barking
 		}
@@ -2272,7 +2274,7 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		Lifecycle {
 		    State barking {} {
 			#puts "WorkingDog: bark"
-			set ::sync WorkingDog
+                        syncWake WorkingDog
 		    }
 		    Transition barking - taunt -> barking
 		}
@@ -2284,7 +2286,7 @@ tuple {DomName ::raloo::test::A ModelName Foo InitialState foo DefaultTrans CH} 
 		Lifecycle {
 		    State barking {} {
 			#puts "ShowDog: bark"
-			set ::sync ShowDog
+                        syncWake ShowDog
 		    }
 		    Transition barking - taunt -> barking
 		}
@@ -2378,7 +2380,7 @@ tuple {DogName Fred} is not referenced by any tuple
 		Lifecycle {
 		    State A {} {
 			#puts "A"
-			set ::sync A
+                        syncWake A
 		    }
 		    Transition @ - E1 -> A
 		}
@@ -2499,11 +2501,11 @@ tuple {DogName Fred} is not referenced by any tuple
 		Assigner {
 		    State s1 {p1} {
 			#puts "s1: $p1"
-			set ::sync s1
+                        syncWake s1
 		    }
 		    State s2 {} {
 			#puts "s2"
-			set ::sync s2
+                        syncWake s2
 		    }
 		    Transition s1 - e1 -> s2
 		    Transition s2 - e2 -> s1
@@ -2540,11 +2542,11 @@ tuple {DogName Fred} is not referenced by any tuple
 		    IdentifyBy Dog
 		    State s1 {p1} {
 			#puts "s1: $p1"
-			set ::sync s1
+                        syncWake s1
 		    }
 		    State s2 {} {
 			#puts "s2"
-			set ::sync s2
+                        syncWake s2
 		    }
 		    Transition s1 - e1 -> s2
 		    Transition s2 - e2 -> s1

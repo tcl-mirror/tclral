@@ -48,8 +48,8 @@
 #  capabilities of TclOO.
 # 
 # $RCSfile: raloo.tcl,v $
-# $Revision: 1.24 $
-# $Date: 2008/06/08 22:51:46 $
+# $Revision: 1.25 $
+# $Date: 2008/09/04 14:15:54 $
 #  *--
 
 package require Tcl 8.5
@@ -1227,12 +1227,16 @@ oo::class create ::raloo::Domain {
 	    Polymorphic
     }
     method transaction {script} {
-	my Transact $script
+	catch {relvar eval $script} result options
+	::raloo::arch::cleanupRefs
+	return -options $options $result
     }
-    method Transact {script} {
+    method ExecOpScript {script} {
 	catch {
 	    relvar eval {
+                ::raloo::arch::initTOC [self] [self] {Relation {} {{}} {{}}}
 		uplevel 1 $script
+                ::raloo::arch::checkTOC
 	    }
 	} result options
 	::raloo::arch::cleanupRefs
@@ -1246,7 +1250,7 @@ oo::class create ::raloo::Domain {
 	    Params $argList\
 	    Body $body\
 	]
-	oo::define [self] method $name $argList [list my Transact $body]
+	oo::define [self] method $name $argList [list my ExecOpScript $body]
 	oo::define [self] export $name
     }
     # Interpret the definition of a class.
@@ -2566,17 +2570,7 @@ oo::class create ::raloo::ActiveEntity {
     method generate {avList eventName args} {
 	my variable domName
 	my variable modelName
-        lassign [::raloo::arch::callerSource] srcModel srcRef
-        if {[relation degree $srcRef] == 0} {
-            set params [::raloo::arch::buildArguments\
-                [::raloo::arch::lookUpEvent $domName $modelName $eventName]\
-                $args]
-            ::raloo::arch::newTOC $domName $srcModel $srcRef $modelName\
-                $avList $eventName C $params
-        } else {
-            ::raloo::arch::genCreation $domName $modelName $avList $eventName\
-                $args
-        }
+        ::raloo::arch::genCreation $domName $modelName $avList $eventName $args
 	return
     }
     # Insert a single tuple into the backing relvar.
@@ -2996,15 +2990,9 @@ oo::class create ::raloo::ActiveInstRef {
     method generate {eventName args} {
 	my variable relvarName
 	my variable ref
-        lassign [::raloo::arch::callerSource] srcModel srcRef
         set domName [namespace qualifiers $relvarName]
         set dstModel [namespace tail $relvarName]
-        if {[relation degree $srcRef] == 0} {
-            ::raloo::arch::genTOCs $domName $srcModel $srcRef $dstModel $ref\
-                $eventName N $args
-        } else {
-            ::raloo::arch::genToInsts $domName $dstModel $ref $eventName $args
-        }
+        ::raloo::arch::genToInsts $domName $dstModel $ref $eventName $args
 	return
     }
 }
@@ -3738,13 +3726,7 @@ oo::class create ::raloo::SingleAssigner {
 	my variable domName
 	my variable relName
 	set ref [::raloo::arch::idProject [relvar set ${domName}::${relName}]]
-        lassign [::raloo::arch::callerSource] srcModel srcRef
-        if {[relation degree $srcRef] == 0} {
-            ::raloo::arch::genTOCs $domName $srcModel $srcRef $relName $ref\
-                $eventName N $args
-        } else {
-            ::raloo::arch::genToInsts $domName $relName $ref $eventName $args
-        }
+        ::raloo::arch::genToInsts $domName $relName $ref $eventName $args
 	return
     }
     method selectOne {args} {
@@ -3942,7 +3924,7 @@ package require struct::tree
 namespace eval ::raloo::arch {
     namespace import ::ral::*
 
-    # The list of threads of control
+    # The list of threads of control. The list contains "struct::tree" trees.
     variable controlTree [list]
     # This variable controls whether or not we are "single" stepping the
     # thread of control. When single stepping, some supervisor part of the
@@ -3977,68 +3959,40 @@ proc ::raloo::arch::trace {status} {
     }
 }
 
-# Start a new Thread of Control. Threads of control are the implied tree of
-# event generation. This proc creates a new tree and adds it to the list of
-# threads of control that are to be executed.  The root node of a thread of
-# control keeps a list that is used to record the breadth first order of the
-# tree visits.
-#
-# domName -- name of the domain starting the thread of control
-# srcModel -- name of the class/namespace starting the thread. When a
-#   DomainOp starts the thread, it should be set to the domain name itself.
-#   When a delayed event starts the thread, it should be the class which
-#   delayed the event.
-# srcInst -- the source instance reference -- DEE if from a DomainOp originates
-# dstInst -- the target instance reference
-# eventName -- the name of the event that starts the thread
-# eventType -- N or C depending upon "normal" or "creation"
-# params -- a list of parameters to be used as arguments to a state action.
-#
-proc ::raloo::arch::newTOC {domName srcModel srcInst dstModel dstInst eventName\
-                            eventType params} {
-    # Add a new tree to the list of tread of control
+proc ::raloo::arch::initTOC {domName modelName inst} {
     variable controlTree
-    lappend controlTree [set tocTree [struct::tree]]
-
-    # The root node contains the source information.
-    $tocTree set root queue [list]
-    $tocTree set root event [dict create\
-	domName $domName\
-	modelName $srcModel\
-	inst $srcInst\
-	eventName {}\
-	params {}\
-	type {}\
-    ]
-    # Insert the destination node. It is made the current node and will be
-    # first one processed when the tread is activated.
-    set dstNode [$tocTree insert root end]
-    $tocTree set root currNode $dstNode
-    $tocTree set $dstNode event [dict create\
-	domName $domName\
-	modelName $dstModel\
-	inst $dstInst\
-	eventName $eventName\
-	params $params\
-	type $eventType\
-    ]
-
-    if {[llength $controlTree] == 1} {
-	stepEngine
+    log::debug "initTOC: $controlTree"
+    if {[llength $controlTree] == 0} {
+        log::debug "starting TOC: $domName $modelName $inst"
+        lappend controlTree [set tocTree [struct::tree]]
+        $tocTree set root queue [list]
+        $tocTree set root currNode root
+        $tocTree set root event [dict create\
+            domName $domName\
+            modelName $modelName\
+            inst $inst\
+            eventName {}\
+            params {}\
+            type {}\
+        ]
     }
-
-    return
 }
 
-# Generate a set of threads of control. This is called from domain operations
-# via the "generate" methods to start a new set of threads of control.
-proc ::raloo::arch::genTOCs {domName srcModel srcInst dstModel refSet eventName\
-                             eventType argList} {
-    set event [lookUpEvent $domName $dstModel $eventName]
-    set params [buildArguments $event $argList]
-    relation foreach inst $refSet {
-        newTOC $domName $srcModel $srcInst $dstModel $inst $eventName\
-            $eventType $params
+proc ::raloo::arch::checkTOC {} {
+    log::debug "checkTOC"
+    variable controlTree
+    if {[llength $controlTree] == 0} {
+	log::debug "checkTOC: empty control tree"
+	return
+    }
+    set tocTree [lindex $controlTree 0]
+    set queue [$tocTree get root queue]
+    if {[llength $queue] == 0} {
+        endTOC
+    } else {
+        $tocTree set root currNode [lindex $queue 0]
+        $tocTree set root queue [lrange $queue 1 end]
+        stepEngine
     }
 }
 
@@ -4196,7 +4150,7 @@ proc ::raloo::arch::queueCreationEvent {domName modelName attrs eventName\
 proc ::raloo::arch::dispatchEvent {} {
     variable controlTree
     if {[llength $controlTree] == 0} {
-	log::debug "empty control tree"
+	log::debug "dispatchEvent: empty control tree"
 	return
     }
     set tocTree [lindex $controlTree 0]
@@ -4551,7 +4505,7 @@ proc ::raloo::arch::queueDelayedEvent {time domName srcModel srcRef\
     variable DelayQueue
     # See if we are already expired
     if {$time <= 0} {
-	newTOC $domName $srcModel $srcRef $dstModel $dstRef $eventName N $params
+        queueEvent $domName $dstModel $dstRef $eventName $params
 	return
     }
 
@@ -4683,15 +4637,20 @@ proc ::raloo::arch::serviceDelayedQueue {} {
 	if {$time <= 0} {
 	    set DelayQueue [lreplace $DelayQueue $index $index]
             log::debug "dispatching $event"
-	    newTOC\
+            initTOC\
 		[dict get $event DomName]\
 		[dict get $event SrcModel]\
-		[dict get $event SrcInst]\
+		[dict get $event SrcInst]
+
+            queueEvent\
+		[dict get $event DomName]\
                 [dict get $event DstModel]\
                 [dict get $event DstInst]\
                 [dict get $event EventName]\
-                N\
                 [dict get $event Params]
+
+            checkTOC
+
 	    log::info "delayed queued($time):\
 		[formatEvent\
 		    [dict get $event DomName]\
@@ -4744,6 +4703,7 @@ proc ::raloo::arch::endTOC {} {
     variable controlTree
     set tocTree [lindex $controlTree 0]
     $tocTree destroy
+    log::debug "endTOC: $tocTree"
     set controlTree [lrange $controlTree 1 end]
     cleanupRefs
     if {[llength $controlTree] != 0} {
