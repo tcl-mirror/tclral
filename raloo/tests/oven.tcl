@@ -11,6 +11,12 @@ source ovenGUI.tcl
 source ovenBridge.tcl
 
 #::raloo::arch::logLevel info
+#::raloo::arch::trace true
+proc ovenBgerror {msg opts} {
+    puts stderr $msg
+    puts stderr $::errorInfo
+}
+interp bgerror {} ovenBgerror
 
 set ovenId 1
 proc newOven {} {

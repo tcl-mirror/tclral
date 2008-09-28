@@ -48,8 +48,8 @@
 #  capabilities of TclOO.
 # 
 # $RCSfile: raloo.tcl,v $
-# $Revision: 1.25 $
-# $Date: 2008/09/04 14:15:54 $
+# $Revision: 1.26 $
+# $Date: 2008/09/28 22:02:36 $
 #  *--
 
 package require Tcl 8.5
@@ -1235,11 +1235,11 @@ oo::class create ::raloo::Domain {
 	catch {
 	    relvar eval {
                 ::raloo::arch::initTOC [self] [self] {Relation {} {{}} {{}}}
-		uplevel 1 $script
+		catch {uplevel 1 $script} sresult soptions
                 ::raloo::arch::checkTOC
+                return -options $soptions $sresult
 	    }
 	} result options
-	::raloo::arch::cleanupRefs
 	return -options $options $result
     }
     # Methods that are used in the definition of a domain during construction.
@@ -3906,9 +3906,9 @@ oo::class create ::raloo::MultipleAssignerRef {
 # 1. Only one thread of control is operating at a time.
 # 2. If a new thread of control is started, then it is deferred and executed
 #    after any preceding threads are done.
-# 3. The engine interface to the Tcl event loop is via idle task events.
+# 3. The engine interface to the Tcl event loop is via "after 0" events.
 #    The starting of a thread of control or the generation of an event inserts
-#    an idle task event into the Tcl event loop which is then used to dispatch
+#    an event into the Tcl event loop which is then used to dispatch
 #    the next state machine event.
 # 4. Polymorphic events are synchonously mapped until they are consumed, i.e.
 #    the mapped event is not re-inserted into thread of control tree. If the
@@ -3926,11 +3926,12 @@ namespace eval ::raloo::arch {
 
     # The list of threads of control. The list contains "struct::tree" trees.
     variable controlTree [list]
+    variable depth 0
     # This variable controls whether or not we are "single" stepping the
     # thread of control. When single stepping, some supervisor part of the
     # program must call "dispatchEvent" to cause each event to be delivered.
     # Otherwise, the execution engine will drive itself by queuing calls to
-    # "dispatchEvent" as an idle task on the Tcl event queue.
+    # "dispatchEvent" as an "after 0" event on the Tcl event queue.
     variable singleStep 0
 
     logger::initNamespace ::raloo::arch
@@ -3960,39 +3961,79 @@ proc ::raloo::arch::trace {status} {
 }
 
 proc ::raloo::arch::initTOC {domName modelName inst} {
+    variable depth
+    incr depth
+    log::debug "[info level 0] $depth"
     variable controlTree
+    lappend controlTree [set tocTree [struct::tree]]
+    $tocTree set root queue [list]
+    $tocTree set root currNode root
+    $tocTree set root event [dict create\
+        domName $domName\
+        modelName $modelName\
+        inst $inst\
+        eventName {}\
+        params {}\
+        type {}\
+    ]
     log::debug "initTOC: $controlTree"
-    if {[llength $controlTree] == 0} {
-        log::debug "starting TOC: $domName $modelName $inst"
-        lappend controlTree [set tocTree [struct::tree]]
-        $tocTree set root queue [list]
-        $tocTree set root currNode root
-        $tocTree set root event [dict create\
-            domName $domName\
-            modelName $modelName\
-            inst $inst\
-            eventName {}\
-            params {}\
-            type {}\
-        ]
-    }
 }
 
 proc ::raloo::arch::checkTOC {} {
-    log::debug "checkTOC"
     variable controlTree
+    variable depth
+    incr depth -1
+    log::debug "checkTOC: $controlTree \"$depth\""
     if {[llength $controlTree] == 0} {
 	log::debug "checkTOC: empty control tree"
 	return
     }
+    if {$depth == 0} {
+        nextTOC
+    }
+}
+
+proc ::raloo::arch::nextTOC {} {
+    variable controlTree
     set tocTree [lindex $controlTree 0]
+    log::debug "nextTOC: tocTree: $tocTree"
     set queue [$tocTree get root queue]
+    log::debug "nextTOC: queue: $queue"
     if {[llength $queue] == 0} {
         endTOC
     } else {
+        log::debug "begin thread: $queue"
+	relvar transaction begin
         $tocTree set root currNode [lindex $queue 0]
         $tocTree set root queue [lrange $queue 1 end]
         stepEngine
+    }
+}
+
+proc ::raloo::arch::setupTOC {treeRef nodeRef queueRef} {
+    upvar 1 $treeRef tocTree
+    upvar 1 $nodeRef tocNode
+    upvar 1 $queueRef tocQueue
+    variable controlTree
+    if {[llength $controlTree] == 0} {
+	error "attempt to generate an event outside of\
+	    a thread of control"
+    }
+    set tocTree [lindex $controlTree end]
+    set tocNode [$tocTree get root currNode]
+    set tocQueue [$tocTree get root queue]
+    log::debug "setupTOC: \"$tocTree\" \"$tocNode\" \"$tocQueue\""
+}
+
+proc ::raloo::arch::endTOC {} {
+    variable controlTree
+    log::debug "endTOC: $controlTree"
+    set tocTree [lindex $controlTree 0]
+    $tocTree destroy
+    set controlTree [lrange $controlTree 1 end]
+    cleanupRefs
+    if {[llength $controlTree] != 0} {
+        nextTOC
     }
 }
 
@@ -4018,7 +4059,9 @@ proc ::raloo::arch::genToInsts {domName modelName refSet eventName argList} {
 
 proc ::raloo::arch::genDelayedToInsts {time domName srcModel srcRef\
 				       dstModel dstRef eventName argList} {
+    log::debug [info level 0]
     set event [lookUpEvent $domName $dstModel $eventName]
+    log::debug \n[relformat $event]
     set params [buildArguments $event $argList]
     # This reference may be multi-valued. Generate an event to each one.
     relation foreach inst $dstRef {
@@ -4145,14 +4188,16 @@ proc ::raloo::arch::queueCreationEvent {domName modelName attrs eventName\
     ]
 }
 
-# The idle callbacks come here to cause the next event in the thread of
+# The callbacks come here to cause the next event in the thread of
 # control to be dispatched.
 proc ::raloo::arch::dispatchEvent {} {
+    log::debug [info level 0]
     variable controlTree
     if {[llength $controlTree] == 0} {
 	log::debug "dispatchEvent: empty control tree"
 	return
     }
+    log::debug "dispatchEvent: $controlTree"
     set tocTree [lindex $controlTree 0]
     set dstNode [$tocTree get root currNode]
     set event [$tocTree get $dstNode event]
@@ -4160,14 +4205,7 @@ proc ::raloo::arch::dispatchEvent {} {
 
     set domName [dict get $event domName]
     set modelName [dict get $event modelName]
-    # Threads of control begin at the "root" node of the tree. Here there are
-    # no events to deliver, but instead a script to execute to get things
-    # started. Most important, the data transaction is begun here.
     set srcNode [$tocTree parent $dstNode]
-    if {$srcNode eq "root"} {
-	log::info "begin TOC: $domName"
-	relvar transaction begin
-    }
     # Check if we are dispatching a creation event. In that case, we
     # must create the instance and set the current state to "@". After that
     # it is an otherwise normal event dispatch.
@@ -4182,13 +4220,10 @@ proc ::raloo::arch::dispatchEvent {} {
         dict set event inst [idProject\
             [relvar insert ${domName}::${modelName} $instValue]]
     }
-    # Measure the execution time of the state action and record that
-    # in the thread of control tree.
     set startTime [clock microseconds]
     set tocError [catch {
         deliverEvent [$tocTree get $srcNode event] $event
     } result options]
-    $tocTree set $dstNode time [expr {[clock microseconds] - $startTime}]
 
     if {$tocError} {
 	# Some error occurred while trying to propagate the thread of
@@ -4199,12 +4234,15 @@ proc ::raloo::arch::dispatchEvent {} {
 	log::error "error TOC: $result"
 	return -options $options $result
     } else {
+        # Measure the execution time of the state action and record that
+        # in the thread of control tree.
+        $tocTree set $dstNode time [expr {[clock microseconds] - $startTime}]
 	# Fetch the queue again. It could have been modified when the
 	# event was delivered, e.g. another event could be generated.
 	set tocQueue [$tocTree get root queue]
 	# Check for the end of the thread of control.
 	if {[llength $tocQueue] == 0} {
-	    log::info "end TOC: $domName"
+	    log::info "end thread: $domName"
 	    endTOC
 	    # This needs to be last in case it throws an error. An error here
 	    # indicates that the thread of control did not leave the class
@@ -4629,6 +4667,7 @@ proc ::raloo::arch::remainingDelayed {domName srcModel srcRef dstModel dstRef\
 proc ::raloo::arch::serviceDelayedQueue {} {
     variable delayTick
     set tmr [after $delayTick ::raloo::arch::serviceDelayedQueue]
+    log::debug [info level 0]
 
     variable DelayQueue
     for {set index 0} {$index < [llength $DelayQueue]} {} {
@@ -4681,33 +4720,7 @@ proc ::raloo::arch::stepEngine {} {
     variable controlTree
     if {!$singleStep} {
 	after 0 [list ::raloo::arch::dispatchEvent]
-	log::debug "added dispatch to Tcl event queue"
-    }
-}
-
-proc ::raloo::arch::setupTOC {treeRef nodeRef queueRef} {
-    upvar 1 $treeRef tocTree
-    upvar 1 $nodeRef tocNode
-    upvar 1 $queueRef tocQueue
-    variable controlTree
-    if {[llength $controlTree] == 0} {
-	error "attempt to generate an event outside of\
-	    a thread of control"
-    }
-    set tocTree [lindex $controlTree 0]
-    set tocNode [$tocTree get root currNode]
-    set tocQueue [$tocTree get root queue]
-}
-
-proc ::raloo::arch::endTOC {} {
-    variable controlTree
-    set tocTree [lindex $controlTree 0]
-    $tocTree destroy
-    log::debug "endTOC: $tocTree"
-    set controlTree [lrange $controlTree 1 end]
-    cleanupRefs
-    if {[llength $controlTree] != 0} {
-	stepEngine
+	log::debug "stepEngine: added dispatch to Tcl event queue"
     }
 }
 

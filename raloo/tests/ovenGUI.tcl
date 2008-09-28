@@ -1,6 +1,8 @@
 package require Tk 8.5
 package require raloo
 
+package require logger
+
 Domain create OvenGUI {
     DomainOp newOven {id} {
 	Oven createWidget $id
@@ -14,6 +16,7 @@ Domain create OvenGUI {
     }
 
     DomainOp updateTimerTime {id min sec} {
+        log::debug [info level 0]
 	set guiTimer [OvenGUI::Timer selectOne TimerId $id]
 	$guiTimer updateTime $min $sec
     }
@@ -187,3 +190,5 @@ Domain create OvenGUI {
 	}
     }
 }
+
+logger::initNamespace ::OvenGUI

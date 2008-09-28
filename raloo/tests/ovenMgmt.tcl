@@ -45,12 +45,14 @@
 # ABSTRACT:
 # 
 # $RCSfile: ovenMgmt.tcl,v $
-# $Revision: 1.6 $
-# $Date: 2008/06/08 22:51:46 $
+# $Revision: 1.7 $
+# $Date: 2008/09/28 22:02:37 $
 #  *--
 
 package require raloo
 namespace import ::raloo::*
+
+package require logger
 
 Domain create OvenMgmt {
     # "newOven" creates a new one button microwave oven along with all
@@ -97,13 +99,16 @@ Domain create OvenMgmt {
 		$light generate TurnOff
 	    }
 	    State initialCookingPeriod {} {
+                log::debug "initialCookingPeriod 1"
 		# 1. Set timer for 1 minute
 		set timer [my selectRelated ~R3]
 		$timer setOneMin
 		# 2. Generate L1: Turn on light(light ID)
+                log::debug "initialCookingPeriod 2"
 		set light [my selectRelated ~R2]
 		$light generate TurnOn
 		# 3. Generate P1: Energize power tube(tube ID)
+                log::debug "initialCookingPeriod 3"
 		set tube [my selectRelated ~R1]
 		$tube generate Energize
 	    }
@@ -211,6 +216,7 @@ Domain create OvenMgmt {
 	    Seconds int
 	}
 	InstOp setOneMin {} {
+            log::debug Timer.setOneMin
 	    my writeAttr Minutes 1 Seconds 0
 	    my generateDelayed 1000 Tick
 	}
@@ -260,3 +266,5 @@ Domain create OvenMgmt {
 	RefMap {TimerId -> OvenId}
     }
 }
+
+logger::initNamespace ::OvenMgmt
