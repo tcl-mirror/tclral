@@ -10,7 +10,7 @@ source ovenMgmt.tcl
 source ovenGUI.tcl
 source ovenBridge.tcl
 
-#::raloo::arch::logLevel info
+::raloo::arch::logLevel info
 #::raloo::arch::trace true
 proc ovenBgerror {msg opts} {
     puts stderr $msg

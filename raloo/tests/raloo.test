@@ -47,8 +47,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: raloo.test,v $
-# $Revision: 1.20 $
-# $Date: 2008/09/04 14:15:55 $
+# $Revision: 1.21 $
+# $Date: 2008/10/05 20:12:33 $
 #  *--
 
 package require tcltest 2.2
@@ -85,11 +85,13 @@ proc syncWake {{value 1}} {
     set ::sync $value
 }
 
-proc ::bgerror msg {
-    #puts $::errorInfo
-    #puts stderr $msg
-    syncWait $msg
+proc syncerror {msg opts} {
+    puts stderr $::errorInfo
+    puts stderr $msg
+    syncWake $msg
 }
+
+interp bgerror {} syncerror
 
 namespace eval ::raloo::test {
     namespace import ::tcltest::*

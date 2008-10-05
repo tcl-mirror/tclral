@@ -1,7 +1,7 @@
 
 # Bridging
 
-oo::define OvenMgmt {
+oo::objdefine OvenMgmt {
     filter ovenmgmt
 
     method ovenmgmt {args} {

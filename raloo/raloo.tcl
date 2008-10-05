@@ -48,12 +48,12 @@
 #  capabilities of TclOO.
 # 
 # $RCSfile: raloo.tcl,v $
-# $Revision: 1.26 $
-# $Date: 2008/09/28 22:02:36 $
+# $Revision: 1.27 $
+# $Date: 2008/10/05 20:12:33 $
 #  *--
 
 package require Tcl 8.5
-package require TclOO
+package require -exact TclOO 0.5.1
 package require ral
 package require ralutil
 
@@ -1131,10 +1131,10 @@ namespace eval ::raloo::mm {
 # Domain Operations provide the explicit interface to a domain.
 oo::class create ::raloo::Domain {
     # We want all Domains to be given a name. No anonymous Domains.
-    self.unexport new
+    self unexport new
     # We overload the create method so that each domain may be created in
     # a namespace that corresponds to its name.
-    self.method create {name {script {}}} {
+    self method create {name {script {}}} {
 	# If the domain name is given as relative, make the domain in
 	# the namespace of the caller.
 	if {[string range $name 0 1] ne "::"} {
@@ -1250,8 +1250,8 @@ oo::class create ::raloo::Domain {
 	    Params $argList\
 	    Body $body\
 	]
-	oo::define [self] method $name $argList [list my ExecOpScript $body]
-	oo::define [self] export $name
+	oo::objdefine [self] method $name $argList [list my ExecOpScript $body]
+	oo::objdefine [self] export $name
     }
     # Interpret the definition of a class.
     method Class {name script} {
@@ -2328,8 +2328,8 @@ oo::class create ::raloo::Domain {
 # that will be provided to all relvar backed classes.
 oo::class create ::raloo::RelvarClass {
     # We do not want instances of this class created.
-    self.unexport new
-    self.unexport create
+    self unexport new
+    self unexport create
     # Insert a single tuple into the backing relvar.
     # "args" must be a set of attribute name / value pairs.
     method insert {args} {
@@ -2394,7 +2394,7 @@ oo::class create ::raloo::PasvRelvarClass {
     superclass ::raloo::RelvarClass ::oo::class
     unexport new
     unexport create
-    self.unexport new
+    self unexport new
     constructor {} {
 	namespace import ::ral::*
 
@@ -2465,7 +2465,7 @@ oo::class create ::raloo::PasvRelvarClass {
 	relation foreach op [relation restrictwith $::raloo::mm::ClassOp {
 		$DomName eq $domName && $ClassName eq $className}] {
 	    relation assign $op OpName OpParams OpBody
-	    oo::define [self] self.method $OpName $OpParams $OpBody
+	    oo::objdefine [self] method $OpName $OpParams $OpBody
 	}
 	# Instance operations are turned into ordinary methods.
 	relation foreach op [relation restrictwith $::raloo::mm::InstOp {
@@ -2625,7 +2625,7 @@ oo::class create ::raloo::ActiveRelvarClass {
 }
 
 oo::class create ::raloo::InstRef {
-    self.method idProjection {relValue {id 0}} {
+    self method idProjection {relValue {id 0}} {
 	::ral::relation project $relValue\
 	    {*}[lindex [::ral::relation identifiers $relValue] $id]
     }
@@ -3030,9 +3030,9 @@ oo::class create ::raloo::ActiveRelvarRef {
 
 # Base class for relationships.
 oo::class create ::raloo::RelBase {
-    self.unexport new
-    self.unexport create
-    self.method create {name} {
+    self unexport new
+    self unexport create
+    self method create {name} {
 	if {[string range $name 0 1] ne "::"} {
 	    set name [uplevel 1 namespace current]::$name
 	}
@@ -3075,16 +3075,15 @@ oo::class create ::raloo::RelBase {
 		} result]} {
 	    puts "RelBase: $result"
 	}
-	next
     }
-    self.method parseTraversal {rship} {
+    self method parseTraversal {rship} {
 	if {![regexp {\A(~)?([^.]+)\.?(.*)?\Z} $rship\
 		match dirMark rName endName]} {
 	    error "bad relationship syntax, \"$rship\""
 	}
 	return [list $dirMark $rName $endName]
     }
-    self.method parseRelate {rship} {
+    self method parseRelate {rship} {
 	if {![regexp {\A(~)?(.+)\Z} $rship match dirMark rName]} {
 	    error "bad relationship syntax, \"$rship\""
 	}
@@ -3101,7 +3100,7 @@ oo::class create ::raloo::RelBase {
 # The class that represents a simple relationship.
 oo::class create ::raloo::Relationship {
     superclass ::raloo::RelBase
-    self.unexport new
+    self unexport new
     constructor {} {
 	namespace import ::ral::*
 
@@ -3164,7 +3163,9 @@ oo::class create ::raloo::Relationship {
 	    lappend forwJoinAttrs $refng $refto
 	    lappend backJoinAttrs $refto $refng
 	}
-	next
+        if {[self next] ne ""} {
+            next
+        }
     }
     destructor {
 	#puts "Relationship destructor: \"[info level 0]\": \"[self next]\""
@@ -3258,7 +3259,7 @@ oo::class create ::raloo::Relationship {
 
 oo::class create ::raloo::Generalization {
     superclass ::raloo::RelBase
-    self.unexport new
+    self unexport new
     constructor {} {
 	namespace import ::ral::*
 
@@ -3471,7 +3472,7 @@ oo::class create ::raloo::Generalization {
 
 oo::class create ::raloo::AssocRelationship {
     superclass ::raloo::RelBase
-    self.unexport new
+    self unexport new
     constructor {} {
 	#puts "AssocRelationship constructor: \"[info level 0]\":\
 		\"[self next]\""
@@ -3552,7 +3553,9 @@ oo::class create ::raloo::AssocRelationship {
 	    lappend assocTargetJoinAttrs $refng $refto
 	    lappend targetAssocJoinAttrs $refto $refng
 	}
-	next
+        if {[self next] ne ""} {
+            next
+        }
     }
     destructor {
 	#puts "AssocRelationship destructor: \"[info level 0]\":\
@@ -3572,7 +3575,7 @@ oo::class create ::raloo::AssocRelationship {
 		relvar delete ::raloo::mm::AssocTarget r {
 		    [tuple extract $r DomName] eq $domName &&
 		    [tuple extract $r RelName] eq $relName}
-		next
+                next
 	    }} result]} {
 	    puts "AssocRelationship: $result"
 	}
@@ -3683,7 +3686,7 @@ oo::class create ::raloo::AssocRelationship {
 
 oo::class create ::raloo::SingleAssigner {
     superclass ::raloo::ActiveSingleton ::oo::class
-    self.unexport new
+    self unexport new
     constructor {} {
 	#puts "SingleAssigner constructor: \"[info level 0]\": \"[self next]\""
 	my variable domName
@@ -3691,7 +3694,7 @@ oo::class create ::raloo::SingleAssigner {
 	my variable modelName
 	set modelName $relName
 
-	next
+        next
 	namespace import ::ral::*
 	# Single assigners do create a relvar. It only has the current state as
 	# an attribute and will only ever have a cardinality of one.
@@ -3736,7 +3739,7 @@ oo::class create ::raloo::SingleAssigner {
 
 oo::class create ::raloo::SingleAssignerRel {
     superclass ::raloo::Relationship ::raloo::SingleAssigner
-    self.unexport new
+    self unexport new
     destructor {
 	relvar unset [self]
 	next
@@ -3745,7 +3748,7 @@ oo::class create ::raloo::SingleAssignerRel {
 
 oo::class create ::raloo::SingleAssignerAssocRel {
     superclass ::raloo::AssocRelationship ::raloo::SingleAssigner
-    self.unexport new
+    self unexport new
     destructor {
 	relvar unset [self]
 	next
@@ -3762,7 +3765,6 @@ oo::class create ::raloo::SingleAssignerRef {
 		[namespace qualifiers $relvarName]]
 	my variable ref
 	set ref [::raloo::InstRef idProjection [relvar set $relvarName]]
-	next
     }
     method set {relValue} {
     }
@@ -3770,7 +3772,7 @@ oo::class create ::raloo::SingleAssignerRef {
 
 oo::class create ::raloo::MultipleAssigner {
     superclass ::raloo::ActiveEntity ::oo::class
-    self.unexport new
+    self unexport new
     constructor {} {
 	my variable domName
 	my variable relName
@@ -3830,7 +3832,7 @@ oo::class create ::raloo::MultipleAssigner {
 
 oo::class create ::raloo::MultipleAssignerRel {
     superclass ::raloo::Relationship ::raloo::MultipleAssigner
-    self.unexport new
+    self unexport new
     destructor {
 	relvar unset [self]
 	next
@@ -3839,7 +3841,7 @@ oo::class create ::raloo::MultipleAssignerRel {
 
 oo::class create ::raloo::MultipleAssignerAssocRel {
     superclass ::raloo::AssocRelationship ::raloo::MultipleAssigner
-    self.unexport new
+    self unexport new
     destructor {
 	relvar unset [self]
 	next
@@ -3867,7 +3869,6 @@ oo::class create ::raloo::MultipleAssignerRef {
 		::raloo::InstRef idProjection
 	    }]
 	}
-	next
     }
     method set {relValue} {
 	my variable relvarName
@@ -4221,9 +4222,12 @@ proc ::raloo::arch::dispatchEvent {} {
             [relvar insert ${domName}::${modelName} $instValue]]
     }
     set startTime [clock microseconds]
+    variable depth
+    incr depth
     set tocError [catch {
         deliverEvent [$tocTree get $srcNode event] $event
     } result options]
+    incr depth -1
 
     if {$tocError} {
 	# Some error occurred while trying to propagate the thread of
@@ -4242,7 +4246,7 @@ proc ::raloo::arch::dispatchEvent {} {
 	set tocQueue [$tocTree get root queue]
 	# Check for the end of the thread of control.
 	if {[llength $tocQueue] == 0} {
-	    log::info "end thread: $domName"
+	    log::debug "end thread: $domName"
 	    endTOC
 	    # This needs to be last in case it throws an error. An error here
 	    # indicates that the thread of control did not leave the class
