@@ -48,8 +48,8 @@
 #  capabilities of TclOO.
 # 
 # $RCSfile: raloo.tcl,v $
-# $Revision: 1.28 $
-# $Date: 2008/10/12 18:11:38 $
+# $Revision: 1.29 $
+# $Date: 2008/10/12 18:20:54 $
 #  *--
 
 package require Tcl 8.5
@@ -57,7 +57,7 @@ package require -exact TclOO 0.5.1
 package require ral
 package require ralutil
 
-package provide raloo 0.1
+package provide raloo 0.2
 
 namespace eval ::raloo {
     namespace export Domain
