@@ -47,8 +47,8 @@
 #   This package is part of TclRAL. This file is in Tcl Markup Language
 #   format.
 # $RCSfile: raloo.man,v $
-# $Revision: 1.7 $
-# $Date: 2008/05/03 17:37:20 $
+# $Revision: 1.8 $
+# $Date: 2008/10/12 18:11:38 $
 #  *--
 }]
 [moddesc "raloo"]
@@ -115,8 +115,7 @@ of its component classes and relationships.
 [subsection "Domain Definition"]
 Domains consist of the following entities:
 [list_begin item]
-[item] Asynchonous Services
-[item] Synchonous Services
+[item] Domain Operations
 [item] Classes
 [item] Relationships
 [item] Associative Relationships
@@ -128,25 +127,15 @@ definition commands are available.
 
 [list_begin definitions]
 
-[call [cmd AsyncService] [arg name] [arg argList] [arg body]]
-The [cmd AsyncService] command defines [arg name] as an asynchronous
-service of the domain.
+[call [cmd DomainOp] [arg name] [arg argList] [arg body]]
+The [cmd DomainOp] command defines [arg name] as an domain operation
+of the domain.
 [arg name] appears as an exported method of the domain.
 The [arg argList] argument gives the formal parameters of the operation
 in the same way as for the [cmd proc] command.
 The [arg body] argument is the body of the asynchronous service.
-Asynchronous services begin a new thread of control
+Domain operations begin a new thread of control
 (see [sectref "Threads of Control"], below).
-This implies that asynchronous services always return immediately and have
-no return value.
-The [arg body] of the asynchronous service is executed when the
-thread of control is started.
-
-[call [cmd SyncService] [arg name] [arg argList] [arg body]]
-The [cmd SyncService] command defines [arg name] as a synchronous service
-of the domain.
-Synchronous services execute as a transaction on the class data, but do not
-start a thread of control.
 
 [call [cmd Class] [arg name] [arg script]]
 The [cmd Class] command defines a class within a Domain.
@@ -472,8 +461,8 @@ This command may be used to change that default.
 The definition of an Assigner uses the same commands as the definition
 of a Class Lifecycle, namely, [cmd State], [cmd Transition],
 [cmd DefaultInitialState] and [cmd DefaultTransition].
-Note that the Assigner state machines are distinct from class state machines
-and is associated with the competitive Relationship.
+Note that an Assigner state machine is distinct from any class state machine
+and is associated with its corresponding Relationship.
 However, Assigners may be either Single Assigners or Multiple Assigners.
 For Single Assigners, only a single instance of the state machine is created
 and Multiple Assigners my have many instances.
@@ -591,6 +580,9 @@ If given, the [arg title] is used as a caption for the table.
 [list_end]
 
 [section "Active Class Methods"]
+[para]
+For classes that have an associated state machine, the
+following methods are also available.
 [list_begin definitions]
 [call [arg class] [cmd generate] [arg attrValueList] [arg event]\
     [arg [opt "param1 param2 ..."]]]

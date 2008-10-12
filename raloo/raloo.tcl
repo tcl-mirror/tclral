@@ -48,8 +48,8 @@
 #  capabilities of TclOO.
 # 
 # $RCSfile: raloo.tcl,v $
-# $Revision: 1.27 $
-# $Date: 2008/10/05 20:12:33 $
+# $Revision: 1.28 $
+# $Date: 2008/10/12 18:11:38 $
 #  *--
 
 package require Tcl 8.5
@@ -4641,7 +4641,7 @@ proc ::raloo::arch::cancelDelayedEvent {domName srcModel srcRef dstModel dstRef\
 	    set event [$toc get root event]
 	    catch {relation is [dict get $event inst] == $srcRef} sameRef
 	    if {[dict get $event domName] eq $domName &&\
-		[dict get $event modelName eq $srcModel] &&\
+		[dict get $event modelName] eq $srcModel &&\
 		[string is true -strict $sameRef] &&\
 		[dict get $event script] eq "::raloo::arch::queueEvent"} {
 		$toc destroy
