@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_utils.c,v $
-$Revision: 1.17 $
-$Date: 2008/04/04 00:55:53 $
+$Revision: 1.18 $
+$Date: 2008/11/02 23:37:20 $
  *--
  */
 
@@ -59,6 +59,7 @@ INCLUDE FILES
 */
 #include "ral_utils.h"
 #include <string.h>
+#include <assert.h>
 
 /*
 MACRO DEFINITIONS
@@ -87,7 +88,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_utils.c,v $ $Revision: 1.17 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_utils.c,v $ $Revision: 1.18 $" ;
 
 static char const * const cmdStrings[] = {
     "unknown command",
@@ -215,6 +216,8 @@ static char const * const resultStrings[] = {
     "a super set relvar may not be named as one of its own sub sets",
     "correlation spec is not available for a \"-complete\" correlation",
     "recursively invoking a relvar command outside of a transaction",
+
+    "serious internal error",
 } ;
 
 static char const * const errorStrings[] = {
@@ -263,6 +266,8 @@ static char const * const errorStrings[] = {
     "SUPER_NAME",
     "INCOMPLETE_SPEC",
     "ONGOING_CMD",
+
+    "INTERNAL_ERROR",
 } ;
 /*
 FUNCTION DEFINITIONS
@@ -277,6 +282,7 @@ Ral_ErrorInfoSetCmd(
     if (info) {
 	info->cmd = cmd ;
 	info->opt = opt ;
+        info->errorCode = RAL_ERR_OK ;
     }
 }
 
@@ -312,6 +318,7 @@ Ral_InterpSetError(
     Ral_ErrorInfo *info)
 {
     if (interp && info) {
+        assert(info->errorCode < RAL_ERR_LAST_ERRORCODE) ;
 	const char *param = Tcl_DStringValue(&info->param) ;
 
 	Tcl_ResetResult(interp) ;
