@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.33 $
-$Date: 2008/04/14 00:12:04 $
+$Revision: 1.34 $
+$Date: 2008/11/03 00:50:18 $
  *--
  */
 
@@ -62,6 +62,7 @@ INCLUDE FILES
 #include "ral_relationheading.h"
 #include "ral_tupleheading.h"
 #include "ral_relationobj.h"
+#include "ral_tupleobj.h"
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -116,7 +117,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.33 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.34 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -1210,6 +1211,8 @@ Ral_RelationJoin(
 	if (status == 0) {
 	    Ral_RelationDelete(joinRel) ;
 	    Ral_IntVectorDelete(r2JoinAttrs) ;
+            Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_INTERNAL_ERROR,
+                    Ral_TupleObjNew(joinTuple)) ;
 	    return NULL ;
 	}
     }
@@ -2526,6 +2529,10 @@ Ral_RelationValueStringOf(
  * NULL it is used to reorder to attribute access in "tuple". This allows
  * "tuple" to be of a different order than the tuple heading to which "idMap"
  * applies.
+ *
+ * N.B. we separate each attribute of the identifier with a separator
+ * character. This is necessary so that those cases where multi-attribute
+ * identifiers might combine their values to yield the same ID key.
  */
 const char *
 Ral_RelationGetIdKey(
@@ -2536,12 +2543,18 @@ Ral_RelationGetIdKey(
 {
     Ral_IntVectorIter iter ;
     Ral_IntVectorIter end = Ral_IntVectorEnd(idMap) ;
+    unsigned i = 0 ;
 
     Tcl_DStringInit(idKey) ;
+
     for (iter = Ral_IntVectorBegin(idMap) ; iter != end ; ++iter) {
 	int attrIndex = orderMap ? Ral_IntVectorFetch(orderMap, *iter) : *iter ;
 	assert(attrIndex < Ral_TupleDegree(tuple)) ;
+        if (i > 0) {
+            Tcl_DStringAppend(idKey, "\0177", 1) ; // "DEL" as separator
+        }
 	Tcl_DStringAppend(idKey, Tcl_GetString(tuple->values[attrIndex]), -1) ;
+        ++i ;
     }
 
     return Tcl_DStringValue(idKey) ;

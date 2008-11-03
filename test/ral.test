@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.45 $
-# $Date: 2008/06/09 03:47:00 $
+# $Revision: 1.46 $
+# $Date: 2008/11/03 00:50:18 $
 #  *--
 
 package require tcltest 2.2
@@ -2890,6 +2890,46 @@ namespace eval ::ral::test {
     } -body {
 	relation join $r1 $r1 -using {A1 A1}
     } -result {duplicate attribute name, "A2"} -returnCodes error
+
+    test relation-join-10.0 {
+        multi-attribute identifier where concatenating values yields a duplicate
+    } -setup {
+        set r1 {
+            Relation {
+                ID1 int
+            } {
+                ID1
+            } {
+                {ID1 10}
+                {ID1 0}
+            }
+        }
+
+        set r2 {
+            Relation {
+                ID2 int
+            } {
+                ID2
+            } {
+                {ID2 2}
+                {ID2 21}
+            }
+        }
+    } -body {
+        relation join $r2 $r1
+    } -result {
+        Relation {
+            ID2 int
+            ID1 int
+        } {
+            {ID2 ID1}
+        } {
+            {ID2 2 ID1 10}
+            {ID2 2 ID1 0}
+            {ID2 21 ID1 10}
+            {ID2 21 ID1 0}
+        }
+    } -match relation
 
     # relation list subcommand
     test relation-list-1.0 {multiple tuples} -body {
