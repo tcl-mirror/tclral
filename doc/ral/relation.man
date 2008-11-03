@@ -1,4 +1,4 @@
-[manpage_begin relation n 0.8.8]
+[manpage_begin relation n 0.8.9]
 [comment {
 # This software is copyrighted 2004, 2005, 2006, 2007 by G. Andrew Mangogna.
 # The following terms apply to all files associated with the software unless
@@ -45,14 +45,14 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.27 $
-# $Date: 2008/04/12 23:29:59 $
+# $Revision: 1.28 $
+# $Date: 2008/11/03 00:26:27 $
 #  *--
 }]
 [moddesc "Relation Operators"]
 [titledesc "Operators for Relation Values"]
 [copyright "2004, 2005, 2006, 2007 by G. Andrew Mangogna"]
-[require ral [opt 0.8.8]]
+[require ral [opt 0.8.9]]
 [description]
 This manpage describes the [cmd relation] command.
 The [cmd relation]
@@ -134,7 +134,63 @@ one tuple in its body.
 {Relation {DogName string Breed string} DogName {{DogName Fido Breed Poodle}}}
 [example_end]
 
+[section "SET OPERATIONS"]
+[para]
+Several set-like operation are supported by TclRAL
+([emph e.g.] union and intersection).
+These operations work in much the same way as the familiar mathematical
+operations on sets.
+However, when applied to relations, there are some special considerations.
+First, in order to perform set-like operations on relations they must
+have the same heading.
+This means that the headings must have the same attribute names,
+the corresponding attributes must have the same data type and
+the identifiers must be the same for the two relations.
+The second consideration is that the identifying constraints of a relation
+value are always maintained, namely, that every tuple in a relation is
+distinctly identfied by the values of the identifying attributes and only
+those values.
+This makes it possible for two relations that differ only in the values
+of non-identifying attributes to have a conflict as to which tuples
+are included in the set operation result.
+Perhaps the easiest way to see this is with a small example.
+Consider:
+[example {
+set r1 {Relation {Id int Value int} {Id} {
+        {Id 1 Value 2}
+    }
+}
+set r2 {Relation {Id int Value int} {Id} {
+        {Id 1 Value 3}
+    }
+}
+}]
+These relation values both contain a single tuple and they are not equal
+because the tuples in each of the relations are not equal.
+Relation values are equal only if all the contained tuples are equal (and
+the equality can only be determined for relation values that have
+equal headings).
+Notice that for the above relation values
+the inequality of the tuples derives from the [cmd Value]
+attribute which is not part of the identifier of the relation.
+However, the union of these two relations can only have one tuple in the
+result since both relations have the same value for the identifier.
+It is implementation defined as to which tuple is included in the union.
+Thus when non-identifying attributes are involved the union operation is
+not, strictly speaking, commutative since the implementation may choose
+which tuple to include differently.
+So, in the descriptions below, the commutivity of set-like operations
+applies only to the extent that non-identifying attributes are not involved.
+Since the [cmd reidentify] command is available, then it is always possible
+to include in the identifier of a relation value all attributes necessary
+to distinguish the tuples as desired for the set-like operation.
+So in the above example,
+if it is necessary that both tuples be included in a union result,
+then both relations can be reidentified to include the [cmd Value] attribute
+in the identifier.
+
 [section EXAMPLE]
+[para]
 In the command descriptions that follow,
 we will often refer to the example data given below.
 We assume that the relation is contained in a Tcl variable with the
@@ -460,6 +516,10 @@ The returned result is a new relation that has the same heading as
 [arg dividend] and contains all the tuples from [arg dividend] whose
 corresponding tuples in [arg mediator] include all the tuples in
 [arg divisor].
+Stated another way,
+the result of [cmd divide] subcommand is the maximal set of tuples
+from [arg dividend] whose Cartesian product with [arg divisor] is
+completely contained in [arg mediator].
 Using the data from our ongoing example, then the following example shows
 how division can be used to find all the Dogs owned by both Sue and George.
 
