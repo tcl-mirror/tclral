@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.c,v $
-$Revision: 1.18 $
-$Date: 2008/04/15 01:10:53 $
+$Revision: 1.19 $
+$Date: 2008/11/03 01:05:53 $
  *--
  */
 
@@ -120,7 +120,7 @@ static char const * const condMultStrings[2][2] = {
     {"1", "+"},
     {"?", "*"}
 } ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.18 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.19 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -228,10 +228,12 @@ Ral_RelvarDeleteInfo(
     Ral_TraceInfo trace ;
 
     /*
-     * We should only be deleting the relvar info outside of a transaction.
+     * It is possible to delete the interpreter when there is an ongoing
+     * transaction, so we must clean them up.
      */
-    assert(Ral_PtrVectorSize(info->transactions) == 0) ;
-    Ral_PtrVectorDelete(info->transactions) ;
+    if (info->transactions) {
+        Ral_PtrVectorDelete(info->transactions) ;
+    }
 
     for (entry = Tcl_FirstHashEntry(&info->relvars, &search) ;
 	entry ; entry = Tcl_NextHashEntry(&search)) {
