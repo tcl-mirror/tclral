@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationobj.c,v $
-$Revision: 1.23 $
-$Date: 2008/04/15 01:10:53 $
+$Revision: 1.24 $
+$Date: 2008/11/10 01:25:12 $
  *--
  */
 
@@ -98,7 +98,7 @@ EXTERNAL DATA DEFINITIONS
 */
 
 Tcl_ObjType Ral_RelationObjType = {
-    relationKeyword,
+    ral_relationKeyword,
     FreeRelationInternalRep,
     DupRelationInternalRep,
     UpdateStringOfRelation,
@@ -108,7 +108,7 @@ Tcl_ObjType Ral_RelationObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.23 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.24 $" ;
 
 /*
 FUNCTION DEFINITIONS

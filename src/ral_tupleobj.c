@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleobj.c,v $
-$Revision: 1.13 $
-$Date: 2008/04/15 01:10:54 $
+$Revision: 1.14 $
+$Date: 2008/11/10 01:25:12 $
  *--
  */
 
@@ -99,7 +99,7 @@ EXTERNAL DATA REFERENCES
 EXTERNAL DATA DEFINITIONS
 */
 Tcl_ObjType Ral_TupleObjType = {
-    tupleKeyword,
+    ral_tupleKeyword,
     FreeTupleInternalRep,
     DupTupleInternalRep,
     UpdateStringOfTuple,
@@ -109,7 +109,7 @@ Tcl_ObjType Ral_TupleObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tupleobj.c,v $ $Revision: 1.13 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tupleobj.c,v $ $Revision: 1.14 $" ;
 
 /*
 FUNCTION DEFINITIONS

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.c,v $
-$Revision: 1.24 $
-$Date: 2008/04/22 01:41:08 $
+$Revision: 1.25 $
+$Date: 2008/11/10 01:25:12 $
  *--
  */
 
@@ -167,8 +167,8 @@ EXTERNAL DATA REFERENCES
 /*
 EXTERNAL DATA DEFINITIONS
 */
-char tupleKeyword[] = "Tuple" ;
-char relationKeyword[] = "Relation" ;
+char ral_tupleKeyword[] = "Tuple" ;
+char ral_relationKeyword[] = "Relation" ;
 
 /*
 STATIC DATA ALLOCATION
@@ -197,7 +197,7 @@ static struct ral_type const Ral_Types[] = {
 
 static char const openList = '{' ;
 static char const closeList = '}' ;
-static char const rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.24 $" ;
+static char const rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.25 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -232,7 +232,7 @@ Ral_AttributeNewTupleType(
 
     a = (Ral_Attribute)ckalloc(sizeof(*a) + strlen(name) + 1) ;
     a->name = strcpy((char *)(a + 1), name) ;
-    a->typeName = tupleKeyword ;
+    a->typeName = ral_tupleKeyword ;
     a->attrType = Tuple_Type ;
     Ral_TupleHeadingReference(a->heading.tupleHeading = heading) ;
 
@@ -248,7 +248,7 @@ Ral_AttributeNewRelationType(
 
     a = (Ral_Attribute)ckalloc(sizeof(*a) + strlen(name) + 1) ;
     a->name = strcpy((char *)(a + 1), name) ;
-    a->typeName = relationKeyword ;
+    a->typeName = ral_relationKeyword ;
     a->attrType = Relation_Type ;
     Ral_RelationHeadingReference(a->heading.relationHeading = heading) ;
 
@@ -539,7 +539,7 @@ Ral_AttributeNewFromObjs(
     }
     attrName = Tcl_GetString(nameObj) ;
     typeName = Tcl_GetString(*typev) ;
-    if (strcmp(tupleKeyword, typeName) == 0) {
+    if (strcmp(ral_tupleKeyword, typeName) == 0) {
 	if (typec == 2) {
 	    Ral_TupleHeading heading =
 		Ral_TupleHeadingNewFromObj(interp, *(typev + 1), errInfo) ;

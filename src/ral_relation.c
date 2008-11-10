@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.34 $
-$Date: 2008/11/03 00:50:18 $
+$Revision: 1.35 $
+$Date: 2008/11/10 01:25:12 $
  *--
  */
 
@@ -103,6 +103,7 @@ static void Ral_RelationRemoveTupleIndex(Ral_Relation, Ral_Tuple) ;
 static void Ral_RelationGetJoinMapKey(Ral_Tuple, Ral_JoinMap, int,
     Tcl_DString *) ;
 static int Ral_RelationFindJoinId(Ral_Relation, Ral_JoinMap, int) ;
+static void Ral_AppendKeyValue(Tcl_DString *, Ral_Attribute, Tcl_Obj *) ;
 
 /*
 EXTERNAL DATA REFERENCES
@@ -117,7 +118,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.34 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.35 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -2553,7 +2554,9 @@ Ral_RelationGetIdKey(
         if (i > 0) {
             Tcl_DStringAppend(idKey, "\0177", 1) ; // "DEL" as separator
         }
-	Tcl_DStringAppend(idKey, Tcl_GetString(tuple->values[attrIndex]), -1) ;
+        Ral_AppendKeyValue(idKey,
+                Ral_TupleHeadingFetch(tuple->heading, attrIndex),
+                tuple->values[attrIndex]) ;
         ++i ;
     }
 
@@ -2745,4 +2748,88 @@ Ral_RelationFindJoinId(
     int idNum = Ral_RelationHeadingFindIdentifier(rel->heading, mapAttrs) ;
     Ral_IntVectorDelete(mapAttrs) ;
     return idNum ;
+}
+
+/*
+ * Make a key value for a tuple.
+ */
+static void
+Ral_AppendTupleToKey(
+    Tcl_DString *idKey,
+    Ral_Tuple tuple)
+{
+    Ral_TupleIter iter ;
+    Ral_TupleIter end ;
+    unsigned i = 0 ;
+
+    end = Ral_TupleEnd(tuple) ;
+    for (iter = Ral_TupleBegin(tuple) ; iter != end ; ++iter) {
+        if (i > 0) {
+            Tcl_DStringAppend(idKey, "\0177", 1) ; // "DEL" as separator
+        }
+        Ral_AppendKeyValue(idKey, Ral_TupleHeadingFetch(tuple->heading, i),
+                *iter) ;
+        ++i ;
+    }
+}
+
+/*
+ * Construct a key value from an attribute. For simple types, the
+ * key is formed from the string representation of the attribute value.
+ * For Tuples, the key is the concatenation of the attribute string
+ * values (in heading order) separated by "DEL" characters. For Relations,
+ * it recurses one more level and is the concatenation of all the tuple
+ * key value of the relation.
+ */
+static void
+Ral_AppendKeyValue(
+    Tcl_DString *idKey,
+    Ral_Attribute attr,
+    Tcl_Obj *value)
+{
+    switch (attr->attrType) {
+    case Tcl_Type:
+        Tcl_DStringAppend(idKey, Tcl_GetString(value), -1) ;
+        break ;
+
+    case Tuple_Type: {
+        Ral_Tuple tuple ;
+
+        if (Tcl_ConvertToType(NULL, value, &Ral_TupleObjType) != TCL_OK) {
+            Tcl_Panic("appendKeyValue: unable to convert value to tuple") ;
+        }
+        tuple = value->internalRep.otherValuePtr ;
+        Ral_AppendTupleToKey(idKey, tuple) ;
+        break ;
+    }
+
+    /*
+     * Not clear that a Relation as an identfier makes much sense.
+     */
+    case Relation_Type: {
+        Ral_Relation relation ;
+        Ral_RelationIter iter ;
+        Ral_RelationIter end ;
+        unsigned i = 0 ;
+
+        if (Tcl_ConvertToType(NULL, value, &Ral_RelationObjType) != TCL_OK) {
+            Tcl_Panic("appendKeyValue: unable to convert value to relation") ;
+        }
+        relation = value->internalRep.otherValuePtr ;
+
+        end = Ral_RelationEnd(relation) ;
+        for (iter = Ral_RelationBegin(relation) ; iter != end ; ++iter) {
+            if (i > 0) {
+                Tcl_DStringAppend(idKey, "\0177", 1) ; // "DEL" as separator
+            }
+            Ral_AppendTupleToKey(idKey, *iter) ;
+            ++i ;
+        }
+        break ;
+    }
+
+    default:
+        Tcl_Panic("appendKeyValue: unknown attribute type: %d",
+                attr->attrType) ;
+    }
 }
