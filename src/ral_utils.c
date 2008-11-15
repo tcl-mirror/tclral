@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_utils.c,v $
-$Revision: 1.18 $
-$Date: 2008/11/02 23:37:20 $
+$Revision: 1.19 $
+$Date: 2008/11/15 02:38:56 $
  *--
  */
 
@@ -88,7 +88,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_utils.c,v $ $Revision: 1.18 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_utils.c,v $ $Revision: 1.19 $" ;
 
 static char const * const cmdStrings[] = {
     "unknown command",
@@ -318,9 +318,11 @@ Ral_InterpSetError(
     Ral_ErrorInfo *info)
 {
     if (interp && info) {
-        assert(info->errorCode < RAL_ERR_LAST_ERRORCODE) ;
-	const char *param = Tcl_DStringValue(&info->param) ;
+	const char *param ;
 
+        assert(info->errorCode < RAL_ERR_LAST_ERRORCODE) ;
+
+	param = Tcl_DStringValue(&info->param) ;
 	Tcl_ResetResult(interp) ;
 	Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
 	    resultStrings[info->errorCode], ", \"", param, "\"", NULL) ;

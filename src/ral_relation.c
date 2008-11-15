@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.35 $
-$Date: 2008/11/10 01:25:12 $
+$Revision: 1.36 $
+$Date: 2008/11/15 02:38:56 $
  *--
  */
 
@@ -118,7 +118,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.35 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relation.c,v $ $Revision: 1.36 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -2552,7 +2552,7 @@ Ral_RelationGetIdKey(
 	int attrIndex = orderMap ? Ral_IntVectorFetch(orderMap, *iter) : *iter ;
 	assert(attrIndex < Ral_TupleDegree(tuple)) ;
         if (i > 0) {
-            Tcl_DStringAppend(idKey, "\0177", 1) ; // "DEL" as separator
+            Tcl_DStringAppend(idKey, "\0177", 1) ; /* "DEL" as separator */
         }
         Ral_AppendKeyValue(idKey,
                 Ral_TupleHeadingFetch(tuple->heading, attrIndex),
@@ -2765,7 +2765,7 @@ Ral_AppendTupleToKey(
     end = Ral_TupleEnd(tuple) ;
     for (iter = Ral_TupleBegin(tuple) ; iter != end ; ++iter) {
         if (i > 0) {
-            Tcl_DStringAppend(idKey, "\0177", 1) ; // "DEL" as separator
+            Tcl_DStringAppend(idKey, "\0177", 1) ; /* "DEL" as separator */
         }
         Ral_AppendKeyValue(idKey, Ral_TupleHeadingFetch(tuple->heading, i),
                 *iter) ;
@@ -2820,7 +2820,7 @@ Ral_AppendKeyValue(
         end = Ral_RelationEnd(relation) ;
         for (iter = Ral_RelationBegin(relation) ; iter != end ; ++iter) {
             if (i > 0) {
-                Tcl_DStringAppend(idKey, "\0177", 1) ; // "DEL" as separator
+                Tcl_DStringAppend(idKey, "\0177", 1) ; /* "DEL" as separator */
             }
             Ral_AppendTupleToKey(idKey, *iter) ;
             ++i ;
