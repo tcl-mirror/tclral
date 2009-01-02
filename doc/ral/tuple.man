@@ -1,4 +1,4 @@
-[manpage_begin tuple n 0.9]
+[manpage_begin tuple n 0.8.9]
 [comment {
 # This software is copyrighted 2004, 2005, 2006, 2007, 2008, 2009
 # by G. Andrew Mangogna.
@@ -46,8 +46,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: tuple.man,v $
-# $Revision: 1.17 $
-# $Date: 2009/04/11 18:18:54 $
+# $Revision: 1.16.2.1 $
+# $Date: 2009/01/02 00:52:15 $
 #  *--
 }]
 [moddesc "Tuple Operators"]
@@ -94,17 +94,7 @@ list
 dict
 [item]
 bytearray
-[item]
-Tuple
-[item]
-Relation
 [list_end]
-
-If the attribute data type is [emph Tuple] or [emph Relation],
-then the data type specifier must be a list of two elements,
-the first being the type name Tuple or Relation and the second being
-another list contain the tuple or relation heading.
-Tuples and relations thus may contain tuple-value or relation-valued attributes.
 
 [para]
 These types have the same name as the corresponding Tcl type
@@ -180,12 +170,7 @@ pairs.
 The following is a literal string representation of a tuple with
 three attributes.
 [example {
-{Name string Breed string Age int} {Name Fido Breed Terrier Age 2}
-}]
-The following is a string representation that is equivalent to the
-same tuple.
-[example {
-{Name string Breed string Age int} {Breed Terrier Name Fido Age 2}
+{{Name string Breed string Age int} {Name Fido Breed Terrier Age 2}}
 }]
 
 [section COMMANDS]
@@ -341,7 +326,7 @@ to determine tuple equality is not reliable and should not be used
 The [cmd extend] subcommand returns a new tuple with the same heading and
 values as the [arg tupleValue] argument except that the new attributes given by
 the [arg "name type value"] arguments are included.
-The extension arguments of [arg name-type-value] must come in groups of three.
+The extension arguments of [arg name-type-value] must come in sets of three.
 The three arguments
 are a new attribute name, attribute data type and attribute
 value in that order.
@@ -391,7 +376,6 @@ The form of the list is the same as that returned by the [cmd "array get"]
 command and accepted by the [cmd "array set"] command.
 The [cmd get] subcommand provides a convenient means to move tuple
 values into an array.
-The form of the list returned may also be used directly the [cmd dict] command.
 
 [example {
 % set t1 {{Name string Age int} {Name {Fred Jones} Age 27}}
@@ -441,11 +425,14 @@ the result being the tuple with no attributes.
 {} {}
 }]
 
-[call [cmd "::ral::tuple relation"] [arg tupleValue]]
+[call [cmd "::ral::tuple relation"] [arg tupleValue] [opt [arg "id-list"]]]
 The [cmd relation] subcommand returns a new relation value that contains
 [arg tupleValue] as its only tuple.
 The heading of the returned relation value is the same as that of
 [arg tupleValue].
+The identifiers of the returned relation value are given by [arg id-list].
+If [arg id-list] is not given or is the empty list
+then all attributes become part of a single identifier.
 This subcommand corresponds to the [cmd "::ral::relation tuple"] command.
 
 [call [cmd "::ral::tuple rename"] [arg tupleValue] [opt [arg "oldname newname ..."]]]
@@ -502,29 +489,31 @@ duplicate attribute name, "while unwrapping tuple"
 }]
 
 
-[call [cmd "::ral::tuple update"] [arg tupleValue]\
-    [arg [opt "attr1 value1 attr2 value2 ..."]]]
+[call [cmd "::ral::tuple update"] [arg tupleVarName]\
+    [opt "attr1 value1 attr2 value2 ..."]]
 
-The [cmd update] subcommand returns a new tuple that has the same
-heading as [arg tupleValue] and that is modified by
-replacing the attribute values given by the [arg attrN] arguments
-with their corresponding values as given by the [arg valueN] arguments.
-modifies the attribute values of a tuple in place.
+The [cmd update] subcommand modifies the attribute values of a tuple in place.
+The [arg tupleVarName] argument is the name of a variable that contains a
+tuple value.
+The remaining arguments are treated as 
+pairs giving the attribute name and the
+new value to which that attribute is to be set.
+The command modifies the attributes in place
+and returns the updated tuple.
 It is an error to attempt to update an attribute that does exist,
 [emph i.e.] the structure of the tuple may not be changed by this command.
 
 [example {
 % set t {{Name string Age int} {Name {Fred Jones} Age 27}}
 {Name string Age int} {Name {Fred Jones} Age 27}
-% tuple update $t Name {Jane Jones}
+% tuple update t Name {Jane Jones}
 {Name string Age int} {Name {Jane Jones} Age 27}
-% tuple update $t Status 20
+% tuple update t Status 20
 unknown attribute name, "Status"
 }]
 
 
-[call [cmd "::ral::tuple wrap"] [arg tupleValue] [arg newAttr]\
-        [arg [opt "attr1 attr2 ..."]]]
+[call [cmd "::ral::tuple wrap"] [arg tupleValue] [arg newAttr] [arg oldAttrList]]
 
 The [cmd wrap] subcommand creates a new tuple where some of the attributes
 are contained in a Tuple valued attribute.
@@ -532,14 +521,14 @@ This command provides a means to create nested tuples, [emph i.e.]
 tuples that contain tuple valued attributes.
 The [arg tupleValue] argument must be a tuple and [arg newAttr] is the name the
 the new tuple valued attribute will be given.
-The [arg attrN] arguments are the names of attributes that will be placed
+The [arg oldAttrList] argument is a list of attribute names that will be placed
 in the new tuple valued attribute.
 Referring to the example from the [cmd "tuple unwrap"] command above:
 
 [example {
 % set t {{Name string Number int Street string} {Name Fred Number 100 Street Elm}}
 {Name string Number int Street string} {Name Fred Number 100 Street Elm}
-% tuple wrap $t Address Number Street
+% tuple wrap $t Address {Number Street}
 {Name string Address {Tuple {Number int Street string}}} {Name Fred Address {Number 100 Street Elm}}
 }]
 
