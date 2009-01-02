@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuple.h,v $
-$Revision: 1.11 $
-$Date: 2009/04/11 18:18:54 $
+$Revision: 1.10.2.1 $
+$Date: 2009/01/02 00:32:19 $
  *--
  */
 #ifndef _ral_tuple_h_
@@ -63,7 +63,6 @@ INCLUDE FILES
 #include "ral_utils.h"
 #include "ral_attribute.h"
 #include "ral_tupleheading.h"
-#include "ral_vector.h"
 #include <stdio.h>
 
 /*
@@ -94,15 +93,13 @@ TYPE DECLARATIONS
  *	{{Name string Street int Wage double}\
  *	{Name Andrew Street Blackwood Wage 5.74}}
  *
+ * Internally tuples are reference counted. The same tuple is sometimes
+ * referenced by many different relations.
  */
 
 typedef Tcl_Obj **Ral_TupleIter ;
 typedef struct Ral_Tuple {
-    int refCount ;		/* Reference Count
-                                 * Internally tuples are reference counted. The
-                                 * same tuple is sometimes referenced by many
-                                 * different relations.
-                                 */
+    int refCount ;		/* Reference Count */
     Ral_TupleHeading heading ;	/* Pointer to Tuple heading */
     Ral_TupleIter values ;	/* Pointer to an array of values.
 				 * The size of the array is the same as the
@@ -136,12 +133,6 @@ extern void Ral_TupleUnreference(Ral_Tuple) ;
 
 extern int Ral_TupleEqual(Ral_Tuple, Ral_Tuple) ;
 extern int Ral_TupleEqualValues(Ral_Tuple, Ral_Tuple) ;
-
-extern unsigned int Ral_TupleHash(Ral_Tuple) ;
-extern unsigned int Ral_TupleHashAttr(Ral_Tuple, Ral_IntVector) ;
-extern int Ral_TupleAttrEqual(Ral_Tuple, Ral_IntVector, Ral_Tuple,
-        Ral_IntVector) ;
-
 extern int Ral_TupleUpdateAttrValue(Ral_Tuple,
     const char *, Tcl_Obj *, Ral_ErrorInfo *) ;
 extern Tcl_Obj *Ral_TupleGetAttrValue(Ral_Tuple, const char *) ;
@@ -149,7 +140,6 @@ extern int Ral_TupleCopy(Ral_Tuple, Ral_TupleHeadingIter,
     Ral_TupleHeadingIter, Ral_Tuple) ;
 extern int Ral_TupleCopyValues(Ral_TupleIter, Ral_TupleIter, Ral_TupleIter) ;
 extern Ral_Tuple Ral_TupleDup(Ral_Tuple) ;
-extern Ral_Tuple Ral_TupleDupShallow(Ral_Tuple) ;
 extern Ral_Tuple Ral_TupleDupOrdered(Ral_Tuple, Ral_TupleHeading,
     Ral_IntVector) ;
 extern int Ral_TupleScan(Ral_Tuple, Ral_AttributeTypeScanFlags *,

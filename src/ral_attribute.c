@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.c,v $
-$Revision: 1.26 $
-$Date: 2009/04/11 18:18:54 $
+$Revision: 1.25.2.1 $
+$Date: 2009/01/02 00:32:19 $
  *--
  */
 
@@ -63,6 +63,7 @@ INCLUDE FILES
 #include "ral_attribute.h"
 #include "ral_utils.h"
 #include "ral_tupleheading.h"
+#include "ral_relationheading.h"
 #include "ral_tupleobj.h"
 #include "ral_relationobj.h"
 #ifdef Tcl_GetBignumFromObj_TCL_DECLARED
@@ -101,13 +102,11 @@ TYPE DEFINITIONS
 typedef int (*IsATypeFunc)(Tcl_Interp *, Tcl_Obj *) ;
 typedef int (*IsEqualFunc)(Tcl_Obj *, Tcl_Obj *) ;
 typedef int (*CompareFunc)(Tcl_Obj *, Tcl_Obj *) ;
-typedef unsigned (*HashFunc)(Tcl_Obj *) ;
 struct ral_type {
     char const *typeName ;
     IsATypeFunc isa ;
     IsEqualFunc isequal ;
     CompareFunc compare ;
-    HashFunc hash ;
 } ;
 
 /*
@@ -122,58 +121,44 @@ static struct ral_type *findRalType(char const *) ;
 static int isABoolean(Tcl_Interp *, Tcl_Obj *) ;
 static int booleanEqual(Tcl_Obj *, Tcl_Obj *) ;
 static int booleanCompare(Tcl_Obj *, Tcl_Obj *) ;
-static unsigned booleanHash(Tcl_Obj *) ;
-
-static int isAByteArray(Tcl_Interp *, Tcl_Obj *) ;
-static int byteArrayEqual(Tcl_Obj *, Tcl_Obj *) ;
-static int byteArrayCompare(Tcl_Obj *, Tcl_Obj *) ;
-static unsigned byteArrayHash(Tcl_Obj *) ;
 
 static int isAnInt(Tcl_Interp *, Tcl_Obj *) ;
 static int intEqual(Tcl_Obj *, Tcl_Obj *) ;
 static int intCompare(Tcl_Obj *, Tcl_Obj *) ;
-static unsigned intHash(Tcl_Obj *) ;
 
 static int isALong(Tcl_Interp *, Tcl_Obj *) ;
 static int longEqual(Tcl_Obj *, Tcl_Obj *) ;
 static int longCompare(Tcl_Obj *, Tcl_Obj *) ;
-static unsigned longHash(Tcl_Obj *) ;
 
 static int isADouble(Tcl_Interp *, Tcl_Obj *) ;
 static int doubleEqual(Tcl_Obj *, Tcl_Obj *) ;
 static int doubleCompare(Tcl_Obj *, Tcl_Obj *) ;
-static unsigned doubleHash(Tcl_Obj *) ;
 
 #ifdef Tcl_GetBignumFromObj_TCL_DECLARED
 static int isABignum(Tcl_Interp *, Tcl_Obj *) ;
 static int bignumEqual(Tcl_Obj *, Tcl_Obj *) ;
 static int bignumCompare(Tcl_Obj *, Tcl_Obj *) ;
-static unsigned bignumHash(Tcl_Obj *) ;
 #endif
 
 #   ifndef NO_WIDE_TYPE
 static int isAWideInt(Tcl_Interp *, Tcl_Obj *) ;
 static int wideIntEqual(Tcl_Obj *, Tcl_Obj *) ;
 static int wideIntCompare(Tcl_Obj *, Tcl_Obj *) ;
-static unsigned wideIntHash(Tcl_Obj *) ;
 #   endif
 
 static int isAList(Tcl_Interp *, Tcl_Obj *) ;
 static int listEqual(Tcl_Obj *, Tcl_Obj *) ;
 static int listCompare(Tcl_Obj *, Tcl_Obj *) ;
-static unsigned listHash(Tcl_Obj *) ;
 
 #   ifdef Tcl_DictObjSize_TCL_DECLARED
 static int isADict(Tcl_Interp *, Tcl_Obj *) ;
 static int dictEqual(Tcl_Obj *, Tcl_Obj *) ;
 static int dictCompare(Tcl_Obj *, Tcl_Obj *) ;
-static unsigned dictHash(Tcl_Obj *) ;
 #   endif
 
 static int isAString(Tcl_Interp *, Tcl_Obj *) ;
 static int stringEqual(Tcl_Obj *, Tcl_Obj *) ;
 static int stringCompare(Tcl_Obj *, Tcl_Obj *) ;
-static unsigned stringHash(Tcl_Obj *) ;
 
 /*
 EXTERNAL DATA REFERENCES
@@ -182,8 +167,8 @@ EXTERNAL DATA REFERENCES
 /*
 EXTERNAL DATA DEFINITIONS
 */
-char ral_relationTypeName[] = "Relation" ;
-char ral_tupleTypeName[] = "Tuple" ;
+char const ral_relationKeyword[] = "Relation" ;
+char const ral_tupleTypeName[] = "Tuple" ;
 
 /*
 STATIC DATA ALLOCATION
@@ -194,26 +179,25 @@ STATIC DATA ALLOCATION
  */
 static struct ral_type const Ral_Types[] = {
 #	ifdef Tcl_GetBignumFromObj_TCL_DECLARED
-    {"bignum", isABignum, bignumEqual, bignumCompare, bignumHash},
+    {"bignum", isABignum, bignumEqual, bignumCompare},
 #	endif
-    {"boolean", isABoolean, booleanEqual, booleanCompare, booleanHash},
-    {"bytearray", isAByteArray, byteArrayEqual, byteArrayCompare,
-            byteArrayHash},
+    {"boolean", isABoolean, booleanEqual, booleanCompare},
 #	ifdef Tcl_DictObjSize_TCL_DECLARED
-    {"dict", isADict, dictEqual, dictCompare, dictHash},
+    {"dict", isADict, dictEqual, dictCompare},
 #	endif
-    {"double", isADouble, doubleEqual, doubleCompare, doubleHash},
-    {"int", isAnInt, intEqual, intCompare, intHash},
-    {"list", isAList, listEqual, listCompare, listHash},
-    {"long", isALong, longEqual, longCompare, longHash},
-    {"string", isAString, stringEqual, stringCompare, stringHash},
+    {"double", isADouble, doubleEqual, doubleCompare},
+    {"int", isAnInt, intEqual, intCompare},
+    {"list", isAList, listEqual, listCompare},
+    {"long", isALong, longEqual, longCompare},
+    {"string", isAString, stringEqual, stringCompare},
 #	ifndef NO_WIDE_TYPE
-    {"wideInt", isAWideInt, wideIntEqual, wideIntCompare, wideIntHash},
+    {"wideInt", isAWideInt, wideIntEqual, wideIntCompare},
 #	endif
 } ;
 
 static char const openList = '{' ;
 static char const closeList = '}' ;
+static char const rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.25.2.1 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -235,7 +219,6 @@ Ral_AttributeNewTclType(
     a->name = strcpy((char *)(a + 1), name) ;
     a->typeName = ralType->typeName ;
     a->attrType = Tcl_Type ;
-    a->heading = NULL ;
 
     return a ;
 }
@@ -251,7 +234,7 @@ Ral_AttributeNewTupleType(
     a->name = strcpy((char *)(a + 1), name) ;
     a->typeName = ral_tupleTypeName ;
     a->attrType = Tuple_Type ;
-    Ral_TupleHeadingReference(a->heading = heading) ;
+    Ral_TupleHeadingReference(a->heading.tupleHeading = heading) ;
 
     return a ;
 }
@@ -259,15 +242,15 @@ Ral_AttributeNewTupleType(
 Ral_Attribute
 Ral_AttributeNewRelationType(
     const char *name,
-    Ral_TupleHeading heading)
+    Ral_RelationHeading heading)
 {
     Ral_Attribute a ;
 
     a = (Ral_Attribute)ckalloc(sizeof(*a) + strlen(name) + 1) ;
     a->name = strcpy((char *)(a + 1), name) ;
-    a->typeName = ral_relationTypeName ;
+    a->typeName = ral_relationKeyword ;
     a->attrType = Relation_Type ;
-    Ral_TupleHeadingReference(a->heading = heading) ;
+    Ral_RelationHeadingReference(a->heading.relationHeading = heading) ;
 
     return a ;
 }
@@ -278,13 +261,14 @@ Ral_AttributeDelete(
 {
     switch (a->attrType) {
     case Tcl_Type:
-        assert(a->heading == NULL) ;
 	break ;
 
     case Tuple_Type:
+	Ral_TupleHeadingUnreference(a->heading.tupleHeading) ;
+	break ;
+
     case Relation_Type:
-        assert(a->heading != NULL) ;
-	Ral_TupleHeadingUnreference(a->heading) ;
+	Ral_RelationHeadingUnreference(a->heading.relationHeading) ;
 	break ;
 
     default:
@@ -304,22 +288,22 @@ Ral_AttributeDup(
     switch (a->attrType) {
     case Tcl_Type:
 	newAttr = Ral_AttributeNewTclType(a->name, a->typeName) ;
+	assert(newAttr != NULL) ;
 	break ;
 
     case Tuple_Type:
-	newAttr = Ral_AttributeNewTupleType(a->name, a->heading) ;
+	newAttr = Ral_AttributeNewTupleType(a->name, a->heading.tupleHeading) ;
 	break ;
 
     case Relation_Type:
-	newAttr = Ral_AttributeNewRelationType(a->name, a->heading) ;
+	newAttr = Ral_AttributeNewRelationType(a->name,
+		a->heading.relationHeading) ;
 	break ;
 
     default:
 	Tcl_Panic("Ral_AttributeDup: unknown attribute type: %d",
 	    a->attrType) ;
     }
-
-    assert(newAttr != NULL) ;
     return newAttr ;
 }
 
@@ -328,29 +312,23 @@ Ral_AttributeRename(
     Ral_Attribute a,
     const char *newName)
 {
-    Ral_Attribute newAttr = NULL ; /* to silence the compiler over
-				      the default case */
-
     switch (a->attrType) {
     case Tcl_Type:
-	newAttr = Ral_AttributeNewTclType(newName, a->typeName) ;
-	break ;
+	return Ral_AttributeNewTclType(newName, a->typeName) ;
 
     case Tuple_Type:
-	newAttr = Ral_AttributeNewTupleType(newName, a->heading) ;
-	break ;
+	return Ral_AttributeNewTupleType(newName, a->heading.tupleHeading) ;
 
     case Relation_Type:
-	newAttr = Ral_AttributeNewRelationType(newName, a->heading) ;
-	break ;
+	return Ral_AttributeNewRelationType(newName,
+		a->heading.relationHeading) ;
 
     default:
 	Tcl_Panic("Ral_AttributeRename: unknown attribute type: %d",
 	    a->attrType) ;
     }
-
-    assert(newAttr != NULL) ;
-    return newAttr ;
+    /* Not reached */
+    return NULL ;
 }
 
 int
@@ -386,12 +364,17 @@ Ral_AttributeTypeEqual(
 	break ;
 
     case Tuple_Type:
+	result = Ral_TupleHeadingEqual(a1->heading.tupleHeading,
+		a2->heading.tupleHeading) ;
+	break ;
+
     case Relation_Type:
-	result = Ral_TupleHeadingEqual(a1->heading, a2->heading) ;
+	result = Ral_RelationHeadingEqual(a1->heading.relationHeading,
+	    a2->heading.relationHeading) ;
 	break ;
 
     default:
-	Tcl_Panic("Ral_AttributeTypeEqual: unknown attribute type: %d",
+	Tcl_Panic("Ral_AttributeEqual: unknown attribute type: %d",
 	    a1->attrType) ;
     }
     return result ;
@@ -404,20 +387,14 @@ Ral_AttributeValueEqual(
     Tcl_Obj *v2)
 {
     int isEqual = 0 ;
-    int v1len ;
-    int v2len ;
 
     switch (a->attrType) {
     case Tcl_Type:
-        (void)Tcl_GetStringFromObj(v1, &v1len) ;
-        (void)Tcl_GetStringFromObj(v2, &v2len) ;
-        if (v1len == 0 && v2len == 0) {
+	if (strlen(Tcl_GetString(v1)) == 0 && strlen(Tcl_GetString(v2)) == 0) {
 	    isEqual = 1 ;
-        } else if ((v1len != 0 && v2len == 0) || (v1len == 0 && v2len != 0)) {
-            isEqual = 0 ;
 	} else {
 	    struct ral_type *type = findRalType(a->typeName) ;
-	    isEqual = type ? type->isequal(v1, v2) : stringEqual(v1, v2) ;
+	    isEqual = type ?  type->isequal(v1, v2) : stringEqual(v1, v2) ;
 	}
 	break ;
 
@@ -426,7 +403,7 @@ Ral_AttributeValueEqual(
 	    Tcl_ConvertToType(NULL, v2, &Ral_TupleObjType) != TCL_OK) {
 	    Tcl_Panic("Ral_AttributeValueEqual: cannot convert to tuple") ;
 	}
-	isEqual = Ral_TupleEqualValues(v1->internalRep.otherValuePtr,
+	isEqual = Ral_TupleEqual(v1->internalRep.otherValuePtr,
 	    v2->internalRep.otherValuePtr) ;
 	break ;
 
@@ -443,7 +420,6 @@ Ral_AttributeValueEqual(
 	Tcl_Panic("Ral_AttributeValueEqual: unknown attribute type: %d",
 	    a->attrType) ;
     }
-
     return isEqual ;
 }
 
@@ -454,29 +430,37 @@ Ral_AttributeValueCompare(
     Tcl_Obj *v2)
 {
     int result = 0 ;
-    struct ral_type *type ;
 
     switch (a->attrType) {
-    case Tcl_Type:
-	type = findRalType(a->typeName) ;
+    case Tcl_Type: {
+	struct ral_type *type = findRalType(a->typeName) ;
 	result = type ?  type->compare(v1, v2) : stringCompare(v1, v2) ;
+    }
 	break ;
 
-	/*
-	 * Relative comparisons of tuple and relations is not possible
-         * since there is not a complete ordering for these types.
-         * Panic here, higher order code should never make the request.
-	 */
     case Tuple_Type:
-	Tcl_Panic("Ral_AttributeValueCompare: attempt to compare Tuple types") ;
+	/*
+	 * This is probably wrong, but hard to say what is right.
+	 */
+	result = strcmp(Tcl_GetString(v1), Tcl_GetString(v2)) ;
 	break ;
 
     case Relation_Type:
-	Tcl_Panic("Ral_AttributeValueCompare: attempt to compare Relation types") ;
+	/*
+	 * This is probably wrong.
+	 * But comparison based on cardinality is all I've come up
+	 * with so far.
+	 */
+	if (Tcl_ConvertToType(NULL, v1, &Ral_RelationObjType) != TCL_OK ||
+	    Tcl_ConvertToType(NULL, v2, &Ral_RelationObjType) != TCL_OK) {
+	    Tcl_Panic("Ral_TupleCompare: cannot convert to Relation") ;
+	}
+	result = Ral_RelationCardinality(v1->internalRep.otherValuePtr) -
+	    Ral_RelationCardinality(v2->internalRep.otherValuePtr) ;
 	break ;
 
     default:
-	Tcl_Panic("Ral_AttributeValueCompare: unknown attribute type: %d",
+	Tcl_Panic("Ral_TupleCompare: unknown attribute type: %d",
 	    a->attrType) ;
     }
 
@@ -566,10 +550,10 @@ Ral_AttributeNewFromObjs(
 	    Ral_ErrorInfoSetError(errInfo, RAL_ERR_HEADING_ERR, typeName) ;
 	    Ral_InterpSetError(interp, errInfo) ;
 	}
-    } else if (strcmp(ral_relationTypeName, typeName) == 0) {
-	if (typec == 2) {
-	    Ral_TupleHeading heading = Ral_TupleHeadingNewFromObj(interp,
-		*(typev + 1), errInfo) ;
+    } else if (strcmp("Relation", typeName) == 0) {
+	if (typec == 3) {
+	    Ral_RelationHeading heading = Ral_RelationHeadingNewFromObjs(interp,
+		typev[1], typev[2], errInfo) ;
 	    if (heading) {
 		attribute = Ral_AttributeNewRelationType(attrName, heading) ;
 	    }
@@ -585,7 +569,7 @@ Ral_AttributeNewFromObjs(
 	    Ral_InterpSetError(interp, errInfo) ;
 	}
     } else {
-        Ral_ErrorInfoSetError(errInfo, RAL_ERR_BAD_TYPE, typeName) ;
+	Ral_ErrorInfoSetError(errInfo, RAL_ERR_BAD_KEYWORD, typeName) ;
 	Ral_InterpSetError(interp, errInfo) ;
     }
 
@@ -599,16 +583,14 @@ Ral_AttributeNewFromObjs(
  * for all types. This is necessary for conditional referential attributes
  * that must never match a value.
  */
-Tcl_Obj *
+int
 Ral_AttributeConvertValueToType(
     Tcl_Interp *interp,
     Ral_Attribute attr,
     Tcl_Obj *objPtr,
     Ral_ErrorInfo *errInfo)
 {
-    Tcl_Obj *result = objPtr ;
-    int status ;
-    int len ;
+    int result = TCL_OK ;
 
     switch (attr->attrType) {
     case Tcl_Type:
@@ -626,113 +608,33 @@ Ral_AttributeConvertValueToType(
 	 * Also, we deem the empty string to be a valid value for any
 	 * simple Tcl type.
 	 */
-        (void)Tcl_GetStringFromObj(objPtr, &len) ;
-	if (len != 0) {
+	if (strlen(Tcl_GetString(objPtr)) != 0) {
 	    struct ral_type *type = findRalType(attr->typeName) ;
-	    status = type ? type->isa(interp, objPtr) :
+	    result = type ? type->isa(interp, objPtr) :
 		    isAString(interp, objPtr) ;
-	    if (status != TCL_OK) {
+	    if (result != TCL_OK) {
 		Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_BAD_VALUE, objPtr) ;
 		Ral_InterpSetError(interp, errInfo) ;
-                result = NULL ;
 	    }
 	}
 	break ;
 
     case Tuple_Type:
 	if (objPtr->typePtr != &Ral_TupleObjType) {
-            if (Tcl_IsShared(objPtr)) {
-                result = Tcl_DuplicateObj(objPtr) ;
-                if (Ral_TupleObjConvert(attr->heading, interp, objPtr, result,
-                        errInfo) == TCL_OK) {
-                    Tcl_InvalidateStringRep(result) ;
-                } else {
-                    Tcl_DecrRefCount(result) ;
-                    result = NULL ;
-                }
-            } else {
-                if (Ral_TupleObjConvert(attr->heading, interp, objPtr,
-                        objPtr, errInfo) == TCL_OK) {
-                    Tcl_InvalidateStringRep(result) ;
-                } else {
-                    result = NULL ;
-                }
-            }
+	    result = Ral_TupleObjConvert(attr->heading.tupleHeading, interp,
+		    objPtr, objPtr, errInfo) ;
 	}
 	break ;
 
     case Relation_Type:
 	if (objPtr->typePtr != &Ral_RelationObjType) {
-            if (Tcl_IsShared(objPtr)) {
-                result = Tcl_DuplicateObj(objPtr) ;
-                if (Ral_RelationObjConvert(attr->heading, interp, objPtr,
-                        result, errInfo) == TCL_OK) {
-                    Tcl_InvalidateStringRep(result) ;
-                } else {
-                    Tcl_DecrRefCount(result) ;
-                    result = NULL ;
-                }
-            } else {
-                if (Ral_RelationObjConvert(attr->heading, interp, objPtr,
-                        objPtr, errInfo) == TCL_OK) {
-                    Tcl_InvalidateStringRep(result) ;
-                } else {
-                    result = NULL ;
-                }
-            }
+	    result = Ral_RelationObjConvert(attr->heading.relationHeading,
+		    interp, objPtr, objPtr, errInfo) ;
 	}
 	break ;
 
     default:
 	Tcl_Panic("Ral_AttributeConvertValueToType: unknown attribute type: %d",
-	    attr->attrType) ;
-	break ;
-    }
-
-    return result ;
-}
-
-unsigned
-Ral_AttributeHashValue(
-    Ral_Attribute attr,
-    Tcl_Obj *objPtr)
-{
-    struct ral_type *type ;
-    unsigned result = 0 ;
-    int olen ;
-
-    switch (attr->attrType) {
-    case Tcl_Type:
-        (void)Tcl_GetStringFromObj(objPtr, &olen) ;
-        if (olen == 0) {
-	    result = 0 ;
-	} else {
-            /*
-             * For simple Tcl types, use the shadow type system to hash the
-             * value.
-             */
-            type = findRalType(attr->typeName) ;
-            result = type ? type->hash(objPtr) : stringHash(objPtr) ;
-        }
-	break ;
-        /*
-         * N.B. That we don't allow tuple or relation valued attributes to
-         * contribute to the hash value. To do so would imply that we must put
-         * the attribute value into some canonical order because hashing
-         * insists that value that are equal must produce the same hash value.
-         * This approach probably makes the hashing function less effective but
-         * avoids problems with defining a canonical order. In the end all
-         * hashing must compare the key to the value found in a hash bucket and
-         * the comparison is well defined even if computing a hash value is
-         * not.
-         */
-    case Tuple_Type:
-    case Relation_Type:
-        result = 0 ;
-	break ;
-
-    default:
-	Tcl_Panic("Ral_AttributeHashValue: unknown attribute type: %d",
 	    attr->attrType) ;
 	break ;
     }
@@ -757,23 +659,6 @@ findRalType(char const *typeName)
     key.typeName = typeName ;
     return bsearch(&key, Ral_Types, COUNTOF(Ral_Types), sizeof(struct ral_type),
 	    cmpTypeNames) ;
-}
-
-/*
- * This is just a simple sum. The hash table code randomized the bits.
- */
-static unsigned
-hashBytes(
-    void const *bPtr,
-    unsigned len)
-{
-    unsigned char const *bytes = (unsigned char const *)bPtr ;
-    unsigned hash = 0 ;
-    while (len-- != 0) {
-        hash += *bytes++ ;
-    }
-
-    return hash ;
 }
 
 static int
@@ -814,69 +699,6 @@ booleanCompare(
     return -1 ;
 }
 
-static unsigned
-booleanHash(
-    Tcl_Obj *boolObj)
-{
-    int b = 0 ;
-    if (Tcl_GetBooleanFromObj(NULL, boolObj, &b) != TCL_OK) {
-        Tcl_Panic("booleanHash: cannot convert, \"%s\"",
-                Tcl_GetString(boolObj)) ;
-    }
-    return hashBytes(&b, sizeof(b)) ;
-}
-
-static int
-isAByteArray(
-    Tcl_Interp *interp,
-    Tcl_Obj *byteArrayObj)
-{
-    return 1 ;
-}
-
-static int
-byteArrayEqual(
-    Tcl_Obj *v1,
-    Tcl_Obj *v2)
-{
-    unsigned char const *ba1 ;
-    int balen1 ;
-    unsigned char const *ba2 ;
-    int balen2 ;
-
-    ba1 = Tcl_GetByteArrayFromObj(v1, &balen1) ;
-    ba2 = Tcl_GetByteArrayFromObj(v2, &balen2) ;
-    return balen1 == balen2 && memcmp(ba1, ba2, balen1) == 0 ;
-}
-
-static int
-byteArrayCompare(
-    Tcl_Obj *v1,
-    Tcl_Obj *v2)
-{
-    unsigned char const *ba1 ;
-    int balen1 ;
-    unsigned char const *ba2 ;
-    int balen2 ;
-    int minlen ;
-
-    ba1 = Tcl_GetByteArrayFromObj(v1, &balen1) ;
-    ba2 = Tcl_GetByteArrayFromObj(v2, &balen2) ;
-    minlen = balen1 < balen2 ? balen1 : balen2 ;
-    return memcmp(ba1, ba2, minlen) ;
-}
-
-static unsigned
-byteArrayHash(
-    Tcl_Obj *byteArrayObj)
-{
-    unsigned char const *ba ;
-    int balen ;
-
-    ba = Tcl_GetByteArrayFromObj(byteArrayObj, &balen) ;
-    return hashBytes(ba, balen) ;
-}
-
 static int
 isAnInt(
     Tcl_Interp *interp,
@@ -915,17 +737,6 @@ intCompare(
     return -1 ;
 }
 
-static unsigned
-intHash(
-    Tcl_Obj *intObj)
-{
-    int i = 0 ;
-    if (Tcl_GetIntFromObj(NULL, intObj, &i) != TCL_OK) {
-        Tcl_Panic("intHash: cannot convert, \"%s\"", Tcl_GetString(intObj)) ;
-    }
-    return hashBytes(&i, sizeof(i)) ;
-}
-
 static int
 isALong(
     Tcl_Interp *interp,
@@ -962,17 +773,6 @@ longCompare(
     }
     Tcl_Panic("longCompare: cannot convert values to \"long\"") ;
     return -1 ;
-}
-
-static unsigned
-longHash(
-    Tcl_Obj *longObj)
-{
-    long l = 0 ;
-    if (Tcl_GetLongFromObj(NULL, longObj, &l) != TCL_OK) {
-        Tcl_Panic("longHash: cannot convert, \"%s\"", Tcl_GetString(longObj)) ;
-    }
-    return hashBytes(&l, sizeof(l)) ;
 }
 
 static int
@@ -1019,18 +819,6 @@ doubleCompare(
     return -1 ;
 }
 
-static unsigned
-doubleHash(
-    Tcl_Obj *doubleObj)
-{
-    double d = 0 ;
-    if (Tcl_GetDoubleFromObj(NULL, doubleObj, &d) != TCL_OK) {
-        Tcl_Panic("doubleHash: cannot convert, \"%s\"",
-                Tcl_GetString(doubleObj)) ;
-    }
-    return hashBytes(&d, sizeof(d)) ;
-}
-
 #   ifndef NO_WIDE_TYPE
 static int
 isAWideInt(
@@ -1074,18 +862,6 @@ wideIntCompare(
     }
     Tcl_Panic("wideIntCompare: cannot convert values to \"wideInt\"") ;
     return -1 ;
-}
-
-static unsigned
-wideIntHash(
-    Tcl_Obj *wideIntObj)
-{
-    Tcl_WideInt wi = 0 ;
-    if (Tcl_GetWideIntFromObj(NULL, wideIntObj, &wi) != TCL_OK) {
-        Tcl_Panic("wideIntHash: cannot convert, \"%s\"",
-                Tcl_GetString(wideIntObj)) ;
-    }
-    return hashBytes(&wi, sizeof(wi)) ;
 }
 #   endif
 
@@ -1141,21 +917,6 @@ bignumCompare(
 
     return result ;
 }
-
-static unsigned
-bignumHash(
-    Tcl_Obj *bignumObj)
-{
-    mp_int bn ;
-    int result ;
-    unsigned hash = 0 ;
-
-    result = Tcl_GetBignumFromObj(NULL, bignumObj, &bn) ;
-    hash = hashBytes(bn.dp, bn.used) ;
-    mp_clear(&bn) ;
-
-    return hash ;
-}
 #   endif
 
 static int
@@ -1184,13 +945,6 @@ listCompare(
     return stringCompare(v1, v2) ;
 }
 
-static unsigned
-listHash(
-    Tcl_Obj *listObj)
-{
-    return stringHash(listObj) ;
-}
-
 #   ifdef Tcl_DictObjSize_TCL_DECLARED
 static int
 isADict(
@@ -1216,13 +970,6 @@ dictCompare(
 {
     return stringCompare(v1, v2) ;
 }
-
-static unsigned
-dictHash(
-    Tcl_Obj *dictObj)
-{
-    return stringHash(dictObj) ;
-}
 #	endif
 
 static int
@@ -1247,17 +994,6 @@ stringCompare(
     Tcl_Obj *v2)
 {
     return strcmp(Tcl_GetString(v1), Tcl_GetString(v2)) ;
-}
-
-static unsigned
-stringHash(
-    Tcl_Obj *stringObj)
-{
-    int slen ;
-    char const *s ;
-    
-    s = Tcl_GetStringFromObj(stringObj, &slen) ;
-    return hashBytes(s, slen) ;
 }
 
 /*
@@ -1307,19 +1043,13 @@ Ral_AttributeScanType(
                  *  and +1 to account for the space separator ==> net 0.
                  */
                 sizeof(ral_tupleTypeName) +
-                sizeof(openList) +
-                Ral_TupleHeadingScan(a->heading, flags) +
-                sizeof(closeList) +
+                Ral_TupleHeadingScan(a->heading.tupleHeading, flags) +
                 sizeof(closeList) ;
 	break ;
 
     case Relation_Type:
-	length = sizeof(openList) +
-                sizeof(ral_relationTypeName) +
-                sizeof(openList) +
-                Ral_TupleHeadingScan(a->heading, flags) +
-                sizeof(closeList) +
-                sizeof(closeList) ;
+	length = Ral_RelationHeadingScan(a->heading.relationHeading, flags) ;
+	length += sizeof(openList) + sizeof(closeList) ;
 	break ;
 
     default:
@@ -1351,9 +1081,7 @@ Ral_AttributeConvertType(
         strcpy(p, ral_tupleTypeName) ;
         p += sizeof(ral_tupleTypeName) - 1 ;
         *p++ = ' ' ;
-	*p++ = openList ;
-	p += Ral_TupleHeadingConvert(a->heading, p, flags) ;
-	*p++ = closeList ;
+	p += Ral_TupleHeadingConvert(a->heading.tupleHeading, p, flags) ;
 	*p++ = closeList ;
 	length = p - dst ;
     }
@@ -1363,12 +1091,7 @@ Ral_AttributeConvertType(
 	char *p = dst ;
 
 	*p++ = openList ;
-        strcpy(p, ral_relationTypeName) ;
-        p += sizeof(ral_relationTypeName) - 1 ;
-        *p++ = ' ' ;
-	*p++ = openList ;
-	p += Ral_TupleHeadingConvert(a->heading, p, flags) ;
-	*p++ = closeList ;
+	p += Ral_RelationHeadingConvert(a->heading.relationHeading, p, flags) ;
 	*p++ = closeList ;
 	length = p - dst ;
     }
@@ -1532,4 +1255,11 @@ Ral_AttributeToString(
     Ral_AttributeTypeScanFlagsFree(&flags) ;
 
     return str ;
+}
+
+
+const char *
+Ral_AttributeVersion(void)
+{
+    return rcsid ;
 }

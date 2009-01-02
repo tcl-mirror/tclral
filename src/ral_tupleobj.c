@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleobj.c,v $
-$Revision: 1.15 $
-$Date: 2009/04/11 18:18:54 $
+$Revision: 1.14.2.1 $
+$Date: 2009/01/02 00:32:19 $
  *--
  */
 
@@ -110,6 +110,7 @@ Tcl_ObjType Ral_TupleObjType = {
 /*
 STATIC DATA ALLOCATION
 */
+static const char rcsid[] = "@(#) $RCSfile: ral_tupleobj.c,v $ $Revision: 1.14.2.1 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -246,7 +247,7 @@ Ral_TupleHeadingAttrsFromVect(
      * tuple heading.
      */
     while (objc-- > 0) {
-	char const *attrName = Tcl_GetString(*objv++) ;
+	const char *attrName = Tcl_GetString(*objv++) ;
 	int attrIndex = Ral_TupleHeadingIndexOf(heading, attrName) ;
 	if (attrIndex >= 0) {
 	    /*
@@ -257,8 +258,7 @@ Ral_TupleHeadingAttrsFromVect(
 	    Ral_InterpErrorInfo(interp, Ral_CmdUnknown, Ral_OptNone,
 		RAL_ERR_UNKNOWN_ATTR, attrName) ;
 	    Ral_IntVectorDelete(attrVector) ;
-            attrVector = NULL ;
-            break ;
+	    return NULL ;
 	}
     }
 
@@ -336,142 +336,6 @@ errorOut:
     Ral_IntVectorDelete(attrStatus) ;
     Ral_InterpSetError(interp, errInfo) ;
     return TCL_ERROR ;
-}
-
-/*
- * The Tcl object must be a list of attribute values in the same
- * order as the tuple heading. A value must be given for every attribute.
- */
-int
-Ral_TupleSetFromValueList(
-    Ral_Tuple tuple,
-    Tcl_Interp *interp,
-    Tcl_Obj *objPtr,
-    Ral_ErrorInfo *errInfo)
-{
-    int elemc ;
-    Tcl_Obj **elemv ;
-    Ral_TupleIter tIter ;
-    Ral_TupleHeadingIter hIter ;
-
-    if (Tcl_ListObjGetElements(interp, objPtr, &elemc, &elemv) != TCL_OK) {
-	return TCL_ERROR ;
-    }
-    /*
-     * Make sure we get the correct number of attributes.
-     */
-    if (elemc != Ral_TupleDegree(tuple)) {
-	Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_WRONG_NUM_ATTRS, objPtr) ;
-	Ral_InterpSetError(interp, errInfo) ;
-	return TCL_ERROR ;
-    }
-    /*
-     * Go through the attributes in the tuple and update the value to that
-     * given in the value list.
-     */
-    hIter = Ral_TupleHeadingBegin(tuple->heading) ;
-    for (tIter = Ral_TupleBegin(tuple) ; tIter != Ral_TupleEnd(tuple) ;
-            ++tIter) {
-        Tcl_Obj *cvtValue ;
-        Tcl_Obj *oldValue ;
-
-        cvtValue = Ral_AttributeConvertValueToType(interp, *hIter++, *elemv++,
-            errInfo) ;
-        if (cvtValue == NULL) {
-            Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_BAD_VALUE, *(elemv - 1)) ;
-            return TCL_ERROR ;
-        }
-        oldValue = *tIter ;
-        if (oldValue) {
-            Tcl_DecrRefCount(oldValue) ;
-        }
-        Tcl_IncrRefCount(cvtValue) ;
-        *tIter = cvtValue ;
-    }
-
-    return TCL_OK ;
-}
-
-/*
- * Construct a tuple from a name / value list. Obtain the data type information
- * from the "tuple" argument and insist that there are no unknown attribute
- * names. But allow the tuple to be "short", i.e. some of the attributes may
- * not be present. Return the newly created tuple object.
- */
-Tcl_Obj *
-Ral_TuplePartialSetFromObj(
-    Ral_TupleHeading heading,
-    Tcl_Interp *interp,
-    Tcl_Obj *objPtr,
-    Ral_ErrorInfo *errInfo)
-{
-    int elemc ;
-    Tcl_Obj **elemv ;
-    Ral_TupleHeading newHeading ;
-    Ral_Tuple newTuple ;
-
-    if (Tcl_ListObjGetElements(interp, objPtr, &elemc, &elemv) != TCL_OK) {
-	return NULL ;
-    }
-    /*
-     * We must have attribute name / value pairs.
-     */
-    if (elemc % 2 != 0) {
-	Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_BAD_PAIRS_LIST, objPtr) ;
-	Ral_InterpSetError(interp, errInfo) ;
-	return NULL ;
-    }
-    newHeading = Ral_TupleHeadingNew(elemc / 2) ;
-    newTuple = Ral_TupleNew(newHeading) ;
-    /*
-     * Go through the attribute / value pairs making sure that that each
-     * attribute is known in the tuple. If so then add the attribute
-     * to the heading and also add its value to the tuple.
-     */
-    for ( ; elemc > 0 ; elemc -= 2, elemv += 2) {
-	const char *attrName ;
-        Tcl_Obj *value ;
-        Tcl_Obj *cvtValue ;
-	Ral_TupleHeadingIter found ;
-        int status ;
-	Ral_TupleHeadingIter aIter ;
-
-	attrName = Tcl_GetString(*elemv) ;
-        value = *(elemv + 1) ;
-
-	found = Ral_TupleHeadingFind(heading, attrName) ;
-	if (found == Ral_TupleHeadingEnd(heading)) {
-	    Ral_ErrorInfoSetError(errInfo, RAL_ERR_UNKNOWN_ATTR, attrName) ;
-            Ral_InterpSetError(interp, errInfo) ;
-            goto errorOut ;
-	}
-        status = Ral_TupleHeadingAppend(heading, found, found + 1, newHeading) ;
-        if (status == 0) {
-	    Ral_ErrorInfoSetError(errInfo, RAL_ERR_DUPLICATE_ATTR, attrName) ;
-            Ral_InterpSetError(interp, errInfo) ;
-            goto errorOut ;
-        }
-        /*
-         * Convert the value to the type of the attribute.
-         */
-        aIter = Ral_TupleHeadingEnd(newHeading) - 1 ;
-        cvtValue = Ral_AttributeConvertValueToType(interp, *aIter, value,
-                errInfo) ;
-        if (cvtValue == NULL) {
-            goto errorOut ;
-        }
-        /*
-         * Update the tuple to the new value.
-         */
-        newTuple->values[aIter - Ral_TupleHeadingBegin(newHeading)] = cvtValue ;
-        Tcl_IncrRefCount(cvtValue) ;
-    }
-
-    return Ral_TupleObjNew(newTuple) ;
-
-errorOut:
-    Ral_TupleDelete(newTuple) ;
-    return NULL ;
 }
 
 /*
