@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleheading.c,v $
-$Revision: 1.15.2.1 $
-$Date: 2009/01/02 00:32:19 $
+$Revision: 1.15.2.2 $
+$Date: 2009/01/12 00:45:36 $
  *--
  */
 
@@ -91,10 +91,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tupleheading.c,v $ $Revision: 1.15.2.1 $" ;
-
-static const char openList = '{' ;
-static const char closeList = '}' ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tupleheading.c,v $ $Revision: 1.15.2.2 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -335,7 +332,6 @@ Ral_TupleHeadingPushBack(
     if (Ral_TupleHeadingSize(h) >= Ral_TupleHeadingCapacity(h)) {
 	Tcl_Panic("Ral_TupleHeadingPushBack: overflow") ;
     }
-
     /*
      * Check if the new attribute is already in place. Attribute names
      * must be unique.
@@ -465,6 +461,190 @@ Ral_TupleHeadingIntersect(
 }
 
 /*
+ * Create a new tuple heading that is the join of two other headings.  "map"
+ * contains the attribute mapping of what is to be joined.  Returns the new
+ * tuple heading and "attrMap" which is a vector that is the same size as
+ * the degree of h2.  Each element contains either -1 if that attribute of h2
+ * is not included in the join, or the index into the join heading where that
+ * attribute of h2 is to be placed in the joined relation.
+ * Caller must delete the returned "attrMap" vector.
+ */
+Ral_TupleHeading
+Ral_TupleHeadingJoin(
+    Ral_TupleHeading h1,
+    Ral_TupleHeading h2,
+    Ral_JoinMap map,
+    Ral_IntVector *attrMap,
+    Ral_ErrorInfo *errInfo)
+{
+    int status ;
+    Ral_TupleHeading joinHeading ;
+    Ral_IntVector h2JoinAttrs ;
+    Ral_IntVectorIter h2AttrMapIter ;
+    Ral_TupleHeadingIter h2TupleHeadingIter ;
+    Ral_TupleHeadingIter h2TupleHeadingEnd = Ral_TupleHeadingEnd(h2) ;
+    int joinIndex = Ral_TupleHeadingSize(h1) ;
+    /*
+     * Construct the tuple heading. The size of the heading is the
+     * sum of the degrees of the two relations being joined minus
+     * the number of attributes participating in the join.
+     */
+    joinHeading = Ral_TupleHeadingNew(Ral_TupleHeadingSize(h1) +
+	Ral_TupleHeadingSize(h2) - Ral_JoinMapAttrSize(map)) ;
+    /*
+     * The tuple heading contains all the attributes of the first
+     * relation.
+     */
+    status = Ral_TupleHeadingAppend(h1, Ral_TupleHeadingBegin(h1),
+	Ral_TupleHeadingEnd(h1), joinHeading) ;
+    assert(status != 0) ;
+    /*
+     * The tuple heading contains all the attributes of the second relation
+     * except those that are used in the join. So create a vector that
+     * contains a boolean that indicates whether or not a given attribute
+     * index is contained in the join map and use that determine which
+     * attributes in r2 are placed in the join. As we iterate through the
+     * vector, we modify it in place to be the offset in the join tuple
+     * heading where this attribute will be placed.
+     */
+    *attrMap = h2JoinAttrs = Ral_JoinMapAttrMap(map, 1,
+	Ral_TupleHeadingSize(h2)) ;
+    h2AttrMapIter = Ral_IntVectorBegin(h2JoinAttrs) ;
+    for (h2TupleHeadingIter = Ral_TupleHeadingBegin(h2) ;
+	h2TupleHeadingIter != h2TupleHeadingEnd ; ++h2TupleHeadingIter) {
+	if (*h2AttrMapIter) {
+	    status = Ral_TupleHeadingAppend(h2,
+		h2TupleHeadingIter, h2TupleHeadingIter + 1, joinHeading) ;
+	    if (status == 0) {
+		Ral_ErrorInfoSetError(errInfo, RAL_ERR_DUPLICATE_ATTR,
+		    (*h2TupleHeadingIter)->name) ;
+		Ral_TupleHeadingDelete(joinHeading) ;
+		Ral_IntVectorDelete(h2JoinAttrs) ;
+		*attrMap = NULL ;
+		return NULL ;
+	    }
+	    *h2AttrMapIter++ = joinIndex++ ;
+	} else {
+	    /*
+	     * Attributes that don't appear in the result are given a final
+	     * index of -1
+	     */
+	    *h2AttrMapIter++ = -1 ;
+	}
+    }
+
+    return joinHeading ;
+}
+
+/*
+ * Create a new tuple heading that is the compose of two other headings.
+ * "map" contains the attribute mapping of what is to be joined.  Returns the
+ * new tuple heading and two attribute maps.  An attribute map is a vector
+ * that is the same size as the degree of the corresponding heading.  Each
+ * element contains either -1 if that attribute of the heading is not included
+ * in the compose, or the index into the compose heading where that attribute
+ * of the heading is to be placed in the composed relation.  Caller must delete
+ * the returned attribute map vectors.
+ */
+Ral_TupleHeading
+Ral_TupleHeadingCompose(
+    Ral_TupleHeading h1,
+    Ral_TupleHeading h2,
+    Ral_JoinMap map,
+    Ral_IntVector *attrMap1,
+    Ral_IntVector *attrMap2,
+    Ral_ErrorInfo *errInfo)
+{
+    int status ;
+    Ral_TupleHeading composeHeading ;
+    Ral_IntVector h1JoinAttrs ;
+    Ral_IntVector h2JoinAttrs ;
+    Ral_IntVectorIter attrMapIter ;
+    Ral_TupleHeadingIter tupleHeadingIter ;
+    Ral_TupleHeadingIter tupleHeadingEnd ;
+    int composeIndex = 0 ;
+
+    /*
+     * Construct the tuple heading. The size of the heading is the
+     * sum of the degrees of the two relations being composeed minus
+     * twice the number of attributes participating in the compose.
+     * Twice because we are eliminating all the compose attributes.
+     */
+    composeHeading = Ral_TupleHeadingNew(Ral_TupleHeadingSize(h1) +
+	Ral_TupleHeadingSize(h2) - 2 * Ral_JoinMapAttrSize(map)) ;
+    /*
+     * The tuple heading contains all the attributes of the first
+     * relation except those used in the join and all the attribute of the
+     * second heading except again all those used in the join.
+     * So create a vector that
+     * contains a boolean that indicates whether or not a given attribute
+     * index is contained in the compose map and use that determine which
+     * attributes are placed in the compose. As we iterate through the
+     * vector, we modify it in place to be the offset in the compose tuple
+     * heading where this attribute will be placed.
+     */
+    *attrMap1 = h1JoinAttrs = Ral_JoinMapAttrMap(map, 0,
+	Ral_TupleHeadingSize(h1)) ;
+    attrMapIter = Ral_IntVectorBegin(h1JoinAttrs) ;
+    tupleHeadingEnd = Ral_TupleHeadingEnd(h1) ;
+
+    for (tupleHeadingIter = Ral_TupleHeadingBegin(h1) ;
+	tupleHeadingIter != tupleHeadingEnd ; ++tupleHeadingIter) {
+	if (*attrMapIter) {
+	    status = Ral_TupleHeadingAppend(h1,
+		tupleHeadingIter, tupleHeadingIter + 1, composeHeading) ;
+	    if (status == 0) {
+		Ral_ErrorInfoSetError(errInfo, RAL_ERR_DUPLICATE_ATTR,
+		    (*tupleHeadingIter)->name) ;
+		Ral_TupleHeadingDelete(composeHeading) ;
+		Ral_IntVectorDelete(h1JoinAttrs) ;
+		*attrMap1 = NULL ;
+		return NULL ;
+	    }
+	    *attrMapIter++ = composeIndex++ ;
+	} else {
+	    /*
+	     * Attributes that don't appear in the result are given a final
+	     * index of -1
+	     */
+	    *attrMapIter++ = -1 ;
+	}
+    }
+    /*
+     * Now for the second relation.
+     */
+    *attrMap2 = h2JoinAttrs = Ral_JoinMapAttrMap(map, 1,
+            Ral_TupleHeadingSize(h2)) ;
+    attrMapIter = Ral_IntVectorBegin(h2JoinAttrs) ;
+    tupleHeadingEnd = Ral_TupleHeadingEnd(h2) ;
+
+    for (tupleHeadingIter = Ral_TupleHeadingBegin(h2) ;
+	tupleHeadingIter != tupleHeadingEnd ; ++tupleHeadingIter) {
+	if (*attrMapIter) {
+	    status = Ral_TupleHeadingAppend(h2,
+		tupleHeadingIter, tupleHeadingIter + 1, composeHeading) ;
+	    if (status == 0) {
+		Ral_ErrorInfoSetError(errInfo, RAL_ERR_DUPLICATE_ATTR,
+		    (*tupleHeadingIter)->name) ;
+		Ral_TupleHeadingDelete(composeHeading) ;
+		Ral_IntVectorDelete(h2JoinAttrs) ;
+		*attrMap2 = NULL ;
+		return NULL ;
+	    }
+	    *attrMapIter++ = composeIndex++ ;
+	} else {
+	    /*
+	     * Attributes that don't appear in the result are given a final
+	     * index of -1
+	     */
+	    *attrMapIter++ = -1 ;
+	}
+    }
+
+    return composeHeading ;
+}
+
+/*
  * Compute ordering to map attributes in "h1" to the corresponding attributes
  * in "h2".
  * If the ordering is the same, i.e. the mapping is the identity mapping, then
@@ -572,6 +752,11 @@ Ral_TupleHeadingMapIndices(
     }
 }
 
+/*
+ * Scan the heading to determine how much space is needed for a string
+ * to hold it.
+ * N.B. this does NOT include any braces to surround the heading list.
+ */
 int
 Ral_TupleHeadingScan(
     Ral_TupleHeading h,
@@ -594,8 +779,8 @@ Ral_TupleHeadingScan(
     memset(flags->flags.compoundFlags.flags, 0, nBytes) ;
 
     typeFlag = flags->flags.compoundFlags.flags ;
-    length = sizeof(openList) ;
 
+    length = 0 ;
     for (i = h->start ; i < h->finish ; ++i) {
 	Ral_Attribute a = *i ;
 	/*
@@ -606,7 +791,6 @@ Ral_TupleHeadingScan(
 	length += Ral_AttributeScanType(a, typeFlag) + 1 ;
 	++typeFlag ;
     }
-    length += sizeof(closeList) ;
 
     return length ;
 }
@@ -623,8 +807,6 @@ Ral_TupleHeadingConvert(
 
     assert(flags->flags.compoundFlags.count == Ral_TupleHeadingSize(h)) ;
 
-    *p++ = openList ;
-
     for (i = h->start ; i < h->finish ; ++i) {
 	Ral_Attribute a = *i ;
 
@@ -635,13 +817,11 @@ Ral_TupleHeadingConvert(
 	++typeFlag ;
     }
     /*
-     * Overwrite any trailing blank. There will be no trailing blank if the
-     * heading didn't have any attributes.
+     * Remove any trailing blank.
      */
     if (*(p - 1) == ' ') {
 	--p ;
     }
-    *p++ = closeList ;
 
     return p - dst ;
 }

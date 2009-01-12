@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationobj.c,v $
-$Revision: 1.25 $
-$Date: 2009/04/11 18:18:54 $
+$Revision: 1.24.2.1 $
+$Date: 2009/01/12 00:45:36 $
  *--
  */
 
@@ -108,6 +108,7 @@ Tcl_ObjType Ral_RelationObjType = {
 /*
 STATIC DATA ALLOCATION
 */
+static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.24.2.1 $" ;
 
 /*
 FUNCTION DEFINITIONS

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.32.2.1 $
-$Date: 2009/01/02 00:32:19 $
+$Revision: 1.32.2.2 $
+$Date: 2009/01/12 00:45:36 $
  *--
  */
 
@@ -122,7 +122,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.32.2.1 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.32.2.2 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -327,37 +327,21 @@ RelvarCreateCmd(
     Tcl_Obj *const*objv,
     Ral_RelvarInfo rInfo)
 {
-    int elemc ;
-    Tcl_Obj **elemv ;
-    Ral_RelationHeading heading ;
+    Ral_TupleHeading heading ;
     Ral_ErrorInfo errInfo ;
 
-    /* relvar create relvarName heading */
-    if (objc != 4) {
-	Tcl_WrongNumArgs(interp, 2, objv, "relvarName heading") ;
+    /* relvar create relvarName heading ids */
+    if (objc != 5) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relvarName heading ids") ;
 	return TCL_ERROR ;
     }
 
     Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelvar, Ral_OptCreate) ;
 
-    if (Tcl_ListObjGetElements(interp, objv[3], &elemc, &elemv) != TCL_OK) {
-	return TCL_ERROR ;
-    }
-    if (elemc != 3) {
-	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_FORMAT_ERR, objv[3]) ;
-	Ral_InterpSetError(interp, &errInfo) ;
-	return TCL_ERROR ;
-    }
-    if (strcmp(Ral_RelationObjType.name, Tcl_GetString(*elemv)) != 0) {
-	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_BAD_KEYWORD, *elemv) ;
-	Ral_InterpSetError(interp, &errInfo) ;
-	return TCL_ERROR ;
-    }
     /*
      * Create the heading from the external representation.
      */
-    heading = Ral_RelationHeadingNewFromObjs(interp, elemv[1], elemv[2],
-	&errInfo) ;
+    heading = Ral_TupleHeadingNewFromObj(interp, objv[3], &errInfo) ;
     if (!heading) {
 	return TCL_ERROR ;
     }
@@ -457,7 +441,6 @@ RelvarDeleteOneCmd(
     Ral_Relvar relvar ;
     Ral_Relation relation ;
     Ral_Tuple key ;
-    int idNum ;
     int deleted = 0 ;
     int result ;
     Ral_ErrorInfo errInfo ;
@@ -486,8 +469,12 @@ RelvarDeleteOneCmd(
 
     Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelvar, Ral_OptDeleteone) ;
 
-    key = Ral_RelationObjKeyTuple(interp, relation, objc, objv, &idNum,
+    /*
+     * HERE
+     * key = Ral_RelationObjKeyTuple(interp, relation, objc, objv, &idNum,
 	&errInfo) ;
+     */
+    key = NULL ;
     if (key == NULL) {
 	return TCL_ERROR ;
     }
@@ -498,7 +485,11 @@ RelvarDeleteOneCmd(
 	return TCL_ERROR ;
     }
 
-    found = Ral_RelationFindKey(relation, idNum, key, NULL) ;
+    /*
+     * HERE
+     * found = Ral_RelationFindKey(relation, idNum, key, NULL) ;
+     */
+    found = Ral_RelationBegin(relation) ;
     if (found != Ral_RelationEnd(relation)) {
 	Tcl_Obj *tupleObj ;
 
@@ -943,8 +934,8 @@ RelvarSetCmd(
 	}
 	relation = valueObj->internalRep.otherValuePtr ;
 
-	if (!Ral_RelationHeadingEqual(relvalue->heading, relation->heading)) {
-	    char *headingStr = Ral_RelationHeadingStringOf(relation->heading) ;
+	if (!Ral_TupleHeadingEqual(relvalue->heading, relation->heading)) {
+	    char *headingStr = Ral_TupleHeadingStringOf(relation->heading) ;
 	    Ral_ErrorInfoSetError(&errInfo, RAL_ERR_HEADING_NOT_EQUAL,
 		headingStr) ;
 	    Ral_InterpSetError(interp, &errInfo) ;
@@ -1439,7 +1430,6 @@ RelvarUpdateOneCmd(
     int elemc ;
     Tcl_Obj **elemv ;
     Ral_Tuple key ;
-    int idNum ;
     Ral_RelationIter found ;
     int result = TCL_OK ;
     Ral_Relation updatedTuples ;
@@ -1472,12 +1462,20 @@ RelvarUpdateOneCmd(
     /*
      * Find the tuple whose identifying attribute values are given.
      */
-    key = Ral_RelationObjKeyTuple(interp, relation, elemc, elemv, &idNum,
+    /*
+     * HERE
+     * key = Ral_RelationObjKeyTuple(interp, relation, elemc, elemv, &idNum,
 	&errInfo) ;
+     */
+    key = NULL ;
     if (key == NULL) {
 	return TCL_ERROR ;
     }
-    found = Ral_RelationFindKey(relation, idNum, key, NULL) ;
+    /*
+     * HERE
+     * found = Ral_RelationFindKey(relation, idNum, key, NULL) ;
+     */
+    found = Ral_RelationBegin(relation) ;
     Ral_TupleDelete(key) ;
     updatedTuples = Ral_RelationNew(relation->heading) ;
 

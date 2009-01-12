@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.40.2.1 $
-# $Date: 2009/01/02 00:32:19 $
+# $Revision: 1.40.2.2 $
+# $Date: 2009/01/12 00:45:36 $
 #  *--
 
 namespace eval ::ral {
@@ -92,13 +92,9 @@ namespace eval ::ral {
 	namespace export tupleAsTable
 
 	# Default report style for Relation types
-	::report::defstyle ::ral::relationAsTable {{idCols {}} {capRows 2}} {
+	::report::defstyle ::ral::relationAsTable {{capRows 2}} {
 	    ::ral::tupleAsTable $capRows
-	    set sepTemplate [top get]
-	    foreach col $idCols {
-		lset sepTemplate [expr {2 * $col + 1}] =
-	    }
-	    top set $sepTemplate
+	    top set [top get]
 	    bottom set [top get]
 	    topcapsep set [top get]
 	}
@@ -174,19 +170,10 @@ proc ::ral::relation2matrix {relValue {sortAttr {}} {noheading 0}} {
 proc ::ral::relformat {relValue {title {}} {sortAttrs {}} {noheading 0}} {
     package require report
 
-    # Determine which columns hold attributes that are part of some identifier
-    set relAttrs [relation attributes $relValue]
-    set idCols [list]
-    foreach id [relation identifiers $relValue] {
-	foreach idAttr $id {
-	    lappend idCols [lsearch -exact $relAttrs $idAttr]
-	}
-    }
-
     variable reportCounter
     set reportName rep[incr reportCounter]
     ::report::report $reportName [relation degree $relValue]\
-	style ::ral::relationAsTable $idCols [expr {$noheading ? 0 : 2}]
+	style ::ral::relationAsTable [expr {$noheading ? 0 : 2}]
     set m [relation2matrix $relValue $sortAttrs $noheading]
     set result [string trimright [$reportName printmatrix $m]]
     if {$title ne ""} {
@@ -696,7 +683,7 @@ proc ${sfuncNS}::rmax {relation attr} {
 proc ::ral::addHeading {matrix heading} {
     set attrNames [list]
     set attrTypes [list]
-    foreach {name type} [lindex $heading 1] {
+    foreach {name type} $heading {
 	lappend attrNames $name
 	# For Relation and Tuple types, just use the keyword.
 	# The components of the types will be apparent from the headings
@@ -715,8 +702,8 @@ proc ::ral::addHeading {matrix heading} {
 # and tuple valued attributes will be in the relation keyed by the attribute
 # name with values corresponding to the "relformat" or "tupleformat" command.
 proc ::ral::getFormatMap {heading} {
-    set attrReportMap {Relation {AttrName string AttrFunc string} AttrName {}}
-    foreach {name type} [lindex $heading 1] {
+    set attrReportMap {{AttrName string AttrFunc string} {}}
+    foreach {name type} $heading {
 	set typeKey [lindex $type 0]
 	if {$typeKey eq "Tuple"} {
 	    set attrReportMap [relation include $attrReportMap\
@@ -733,9 +720,9 @@ proc ::ral::getFormatMap {heading} {
 proc ::ral::addTuple {matrix tupleValue attrMap} {
     set values [list]
     foreach {attr value} [tuple get $tupleValue] {
-	set mapping [relation choose $attrMap AttrName $attr]
+	set mapping [relation restrictwith $attrMap {$AttrName eq $attr}]
 	if {[relation isnotempty $mapping]} {
-	    set attrfunc [tuple extract [relation tuple $mapping] AttrFunc]
+	    set attrfunc [relation extract $mapping AttrFunc]
 	    set value [$attrfunc $value]
 	} else {
 	    # Limit the width of scalar values. We use the "textutil"
@@ -786,7 +773,7 @@ proc ::ral::getConstraint {cname} {
 
 proc ::ral::tupleValue {tuple} {
     set result [list]
-    foreach {attr type} [lindex [tuple heading $tuple] 1]\
+    foreach {attr type} [tuple heading $tuple]\
 	{attr value} [tuple get $tuple] {
 	switch [lindex $type 0] {
 	    Tuple {
@@ -829,7 +816,7 @@ proc ::ral::mkHeading {attr type} {
 }
 
 proc ::ral::mkStoreTuple {cursor tuple} {
-    foreach {attr type} [lindex [tuple heading $tuple] 1]\
+    foreach {attr type} [tuple heading $tuple]\
 	{attr value} [tuple get $tuple] {
 	switch -exact [lindex $type 0] {
 	    Tuple {

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuple.c,v $
-$Revision: 1.13.2.1 $
-$Date: 2009/01/02 00:32:19 $
+$Revision: 1.13.2.2 $
+$Date: 2009/01/12 00:45:36 $
  *--
  */
 
@@ -91,7 +91,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_tuple.c,v $ $Revision: 1.13.2.1 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tuple.c,v $ $Revision: 1.13.2.2 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -238,6 +238,25 @@ Ral_TupleEqualValues(
 	}
     }
     return 1 ;
+}
+
+/*
+ * Compute a hash value for a tuple.
+ */
+unsigned int
+Ral_TupleHash(
+    Ral_Tuple tuple)
+{
+    Ral_TupleHeading heading = tuple->heading ;
+    Ral_TupleIter viter = Ral_TupleBegin(tuple) ;
+    Ral_TupleHeadingIter hiter = Ral_TupleHeadingBegin(heading) ;
+    unsigned int hash = 0 ;
+
+    while (hiter != Ral_TupleHeadingEnd(heading)) {
+        hash += Ral_AttributeHashValue(*hiter++, *viter++) ;
+    }
+
+    return hash ;
 }
 
 int
@@ -428,9 +447,9 @@ Ral_TupleScan(
     int length ;
     /*
      * Scan the header.
-     * +1 for space
+     * +1 for "{", +1 for "}" and +1 for the separating space
      */
-    length = Ral_TupleHeadingScan(heading, typeFlags) + 1 ;
+    length = Ral_TupleHeadingScan(heading, typeFlags) + 3 ;
     /*
      * Scan the values.
      */
@@ -448,9 +467,11 @@ Ral_TupleConvert(
     char *p = dst ;
 
     /*
-     * Convert the heading.
+     * Convert the heading adding "{}" to make it a list.
      */
+    *p++ = openList ;
     p += Ral_TupleHeadingConvert(tuple->heading, p, typeFlags) ;
+    *p++ = closeList ;
     /*
      * Separate the heading from the body by space.
      */

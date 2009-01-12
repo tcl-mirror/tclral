@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.h,v $
-$Revision: 1.15.2.1 $
-$Date: 2009/01/02 00:32:19 $
+$Revision: 1.15.2.2 $
+$Date: 2009/01/12 00:45:36 $
  *--
  */
 #ifndef _ral_attribute_h_
@@ -95,13 +95,14 @@ typedef enum Ral_AttrDataType {
  */
 
 typedef struct Ral_Attribute {
-    char const *name ;		    /* name of the attribute */
-    char const *typeName ;	    /* data type name */
-    Ral_AttrDataType attrType ;	    /* encoding to distinguish the union */
-    union {
-	struct Ral_TupleHeading *tupleHeading ;
-	struct Ral_RelationHeading *relationHeading ;
-    } heading ;
+    char const *name ;                  /* name of the attribute */
+    char const *typeName ;              /* data type name */
+    Ral_AttrDataType attrType ;         /* distinguish between scalar and
+                                         * relational types */
+    struct Ral_TupleHeading *heading ;  /* for Tuple and Relation typed
+                                         * attributes, this is the pointer to
+                                         * the heading that describes the
+                                         * details of the type. */
 } *Ral_Attribute ;
 
 /*
@@ -116,25 +117,25 @@ typedef struct Ral_Attribute {
 typedef struct Ral_AttributeTypeScanFlags {
     Ral_AttrDataType attrType ;
     int nameFlags ;
-    int nameLength ;	/* Since attribute names appear several places,
-			 * we save the scan length result and reuse it*/
+    int nameLength ;    /* Since attribute names appear several places,
+                         * we save the scan length result and reuse it*/
     union {
-	int simpleFlags ;
-	struct {
-	    int count ;
-	    struct Ral_AttributeTypeScanFlags *flags ;
-	} compoundFlags ;
+        int simpleFlags ;
+        struct {
+            int count ;
+            struct Ral_AttributeTypeScanFlags *flags ;
+        } compoundFlags ;
     } flags ;
 } Ral_AttributeTypeScanFlags ;
 
 typedef struct Ral_AttributeValueScanFlags {
     Ral_AttrDataType attrType ;
     union {
-	int simpleFlags ;
-	struct {
-	    int count ;
-	    struct Ral_AttributeValueScanFlags *flags ;
-	} compoundFlags ;
+        int simpleFlags ;
+        struct {
+            int count ;
+            struct Ral_AttributeValueScanFlags *flags ;
+        } compoundFlags ;
     } flags ;
 } Ral_AttributeValueScanFlags ;
 
@@ -142,7 +143,7 @@ typedef struct Ral_AttributeValueScanFlags {
 DATA DECLARATIONS
 */
 extern char const ral_tupleTypeName[] ;
-extern char const ral_relationKeyword[] ;
+extern char const ral_relationTypeName[] ;
 
 /*
 FUNCTION DECLARATIONS
@@ -152,11 +153,12 @@ extern Ral_Attribute Ral_AttributeNewTclType(char const *, char const *) ;
 extern Ral_Attribute Ral_AttributeNewTupleType(char const *,
     struct Ral_TupleHeading *) ;
 extern Ral_Attribute Ral_AttributeNewRelationType(char const *,
-    struct Ral_RelationHeading *) ;
+    struct Ral_TupleHeading *) ;
 extern Ral_Attribute Ral_AttributeNewFromObjs(Tcl_Interp *, Tcl_Obj *,
     Tcl_Obj*, Ral_ErrorInfo *) ;
 extern int Ral_AttributeConvertValueToType(Tcl_Interp *, Ral_Attribute,
     Tcl_Obj *, Ral_ErrorInfo *) ;
+extern unsigned Ral_AttributeHashValue(Ral_Attribute, Tcl_Obj *) ;
 extern void Ral_AttributeDelete(Ral_Attribute) ;
 extern Ral_Attribute Ral_AttributeDup(Ral_Attribute) ;
 extern Ral_Attribute Ral_AttributeRename(Ral_Attribute, char const *) ;
@@ -178,6 +180,5 @@ extern int Ral_AttributeConvertValue(Ral_Attribute, Tcl_Obj *, char *,
 extern void Ral_AttributeTypeScanFlagsFree(Ral_AttributeTypeScanFlags *) ;
 extern void Ral_AttributeValueScanFlagsFree(Ral_AttributeValueScanFlags *) ;
 extern char *Ral_AttributeToString(Ral_Attribute) ;
-extern char const *Ral_AttributeVersion(void) ;
 
 #endif /* _ral_attribute_h_ */

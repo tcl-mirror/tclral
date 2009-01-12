@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleheading.h,v $
-$Revision: 1.11.2.1 $
-$Date: 2009/01/02 00:32:19 $
+$Revision: 1.11.2.2 $
+$Date: 2009/01/12 00:45:36 $
  *--
  */
 #ifndef _ral_tupleheading_h_
@@ -142,12 +142,17 @@ extern Ral_TupleHeadingIter Ral_TupleHeadingPushBack(Ral_TupleHeading,
 extern Ral_TupleHeadingIter Ral_TupleHeadingFind(Ral_TupleHeading,
     const char *) ;
 extern int Ral_TupleHeadingIndexOf(Ral_TupleHeading, const char *) ;
-extern Ral_TupleHeading Ral_TupleHeadingCompare(Ral_TupleHeading,
-    Ral_TupleHeading) ;
+
 extern Ral_TupleHeading Ral_TupleHeadingUnion(Ral_TupleHeading,
     Ral_TupleHeading) ;
 extern Ral_TupleHeading Ral_TupleHeadingIntersect(Ral_TupleHeading,
     Ral_TupleHeading) ;
+extern Ral_TupleHeading Ral_TupleHeadingJoin( Ral_TupleHeading,
+    Ral_TupleHeading, Ral_JoinMap, Ral_IntVector *, Ral_ErrorInfo *) ;
+extern Ral_TupleHeading Ral_TupleHeadingCompose(Ral_TupleHeading,
+    Ral_TupleHeading, Ral_JoinMap, Ral_IntVector *, Ral_IntVector *,
+    Ral_ErrorInfo *) ;
+
 extern Ral_IntVector Ral_TupleHeadingNewOrderMap(Ral_TupleHeading,
     Ral_TupleHeading) ;
 extern int Ral_TupleHeadingCommonAttributes(Ral_TupleHeading, Ral_TupleHeading,

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuplecmd.c,v $
-$Revision: 1.20.2.1 $
-$Date: 2009/01/02 00:32:19 $
+$Revision: 1.20.2.2 $
+$Date: 2009/01/12 00:45:36 $
  *--
  */
 
@@ -62,7 +62,7 @@ INCLUDE FILES
 #include "ral_vector.h"
 #include "ral_tuplecmd.h"
 #include "ral_tupleobj.h"
-#include "ral_relationheading.h"
+#include "ral_tupleheading.h"
 #include "ral_relation.h"
 #include "ral_relationobj.h"
 
@@ -109,7 +109,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tuplecmd.c,v $ $Revision: 1.20.2.1 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tuplecmd.c,v $ $Revision: 1.20.2.2 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -687,7 +687,7 @@ TupleProjectCmd(
     return TCL_OK ;
 }
 
-/* tuple relation tupleValue ?id-list? */
+/* tuple relation tupleValue */
 static int
 TupleRelationCmd(
     Tcl_Interp *interp,
@@ -697,13 +697,10 @@ TupleRelationCmd(
     Tcl_Obj *tupleObj ;
     Ral_Tuple tuple ;
     Ral_TupleHeading tupHeading ;
-    Ral_RelationHeading relHeading ;
     Ral_Relation rel ;
-    int elemc ;
-    Tcl_Obj **elemv ;
 
-    if (objc < 3 || objc > 4) {
-	Tcl_WrongNumArgs(interp, 2, objv, "tupleValue ?id-list?") ;
+    if (objc != 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "tupleValue") ;
 	return TCL_ERROR ;
     }
 
@@ -714,51 +711,7 @@ TupleRelationCmd(
     tuple = tupleObj->internalRep.otherValuePtr ;
     tupHeading = tuple->heading ;
 
-    if (objc == 4) {
-	/*
-	 * Identifiers given in a list.
-	 */
-	Tcl_Obj *idListObj = objv[3] ;
-	if (Tcl_ListObjGetElements(interp, idListObj, &elemc, &elemv)
-		!= TCL_OK) {
-	    return TCL_ERROR ;
-	}
-    } else {
-	elemc = 0 ;
-    }
-    if (elemc == 0) {
-	/*
-	 * No identifiers given (or an empty list was given), so all attributes
-	 * are used for the identifier.
-	 */
-	int status;
-	Ral_IntVector idVect =
-	    Ral_IntVectorNew(Ral_TupleHeadingSize(tupHeading), 0) ;
-
-	Ral_IntVectorFillConsecutive(idVect, 0) ;
-	relHeading = Ral_RelationHeadingNew(tupHeading, 1) ;
-	status = Ral_RelationHeadingAddIdentifier(relHeading, 0, idVect) ;
-	assert(status != 0) ;
-    } else {
-	/*
-	 * Iterate through the list of identifiers and add them to the
-	 * relation heading. Each identifier is in turn a list.
-	 */
-	int idNum = 0 ;
-	Ral_ErrorInfo errInfo ;
-
-	Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdTuple, Ral_OptRelation) ;
-	relHeading = Ral_RelationHeadingNew(tupHeading, elemc) ;
-	while (elemc-- > 0) {
-	    if (Ral_RelationHeadingNewIdFromObj(interp, relHeading, idNum++,
-		    *elemv++, &errInfo) != TCL_OK) {
-		Ral_RelationHeadingDelete(relHeading) ;
-		return TCL_ERROR ;
-	    }
-	}
-    }
-
-    rel = Ral_RelationNew(relHeading) ;
+    rel = Ral_RelationNew(tupHeading) ;
     Ral_RelationReserve(rel, 1) ;
     Ral_RelationPushBack(rel, tuple, NULL) ;
 

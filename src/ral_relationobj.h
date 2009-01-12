@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationobj.h,v $
-$Revision: 1.16 $
-$Date: 2009/04/11 18:18:54 $
+$Revision: 1.15.2.1 $
+$Date: 2009/01/12 00:45:36 $
  *--
  */
 #ifndef _ral_relationobj_h_

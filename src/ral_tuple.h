@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuple.h,v $
-$Revision: 1.10.2.1 $
-$Date: 2009/01/02 00:32:19 $
+$Revision: 1.10.2.2 $
+$Date: 2009/01/12 00:45:36 $
  *--
  */
 #ifndef _ral_tuple_h_
@@ -93,13 +93,15 @@ TYPE DECLARATIONS
  *	{{Name string Street int Wage double}\
  *	{Name Andrew Street Blackwood Wage 5.74}}
  *
- * Internally tuples are reference counted. The same tuple is sometimes
- * referenced by many different relations.
  */
 
 typedef Tcl_Obj **Ral_TupleIter ;
 typedef struct Ral_Tuple {
-    int refCount ;		/* Reference Count */
+    int refCount ;		/* Reference Count
+                                 * Internally tuples are reference counted. The
+                                 * same tuple is sometimes referenced by many
+                                 * different relations.
+                                 */
     Ral_TupleHeading heading ;	/* Pointer to Tuple heading */
     Ral_TupleIter values ;	/* Pointer to an array of values.
 				 * The size of the array is the same as the
@@ -133,6 +135,9 @@ extern void Ral_TupleUnreference(Ral_Tuple) ;
 
 extern int Ral_TupleEqual(Ral_Tuple, Ral_Tuple) ;
 extern int Ral_TupleEqualValues(Ral_Tuple, Ral_Tuple) ;
+
+extern unsigned int Ral_TupleHash(Ral_Tuple) ;
+
 extern int Ral_TupleUpdateAttrValue(Ral_Tuple,
     const char *, Tcl_Obj *, Ral_ErrorInfo *) ;
 extern Tcl_Obj *Ral_TupleGetAttrValue(Ral_Tuple, const char *) ;

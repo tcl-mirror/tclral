@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.41.2.1 $
-$Date: 2009/01/02 00:32:19 $
+$Revision: 1.41.2.2 $
+$Date: 2009/01/12 00:45:36 $
  *--
  */
 
@@ -143,7 +143,7 @@ static const struct traceOpsMap {
 } ;
 static const char specErrMsg[] = "multiplicity specification" ;
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.41.2.1 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.41.2.2 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -154,7 +154,7 @@ Ral_RelvarObjNew(
     Tcl_Interp *interp,
     Ral_RelvarInfo info,
     char const *name,
-    Ral_RelationHeading heading)
+    Ral_TupleHeading heading)
 {
     Tcl_DString resolve ;
     char const *resolvedName ;
@@ -393,7 +393,7 @@ Ral_RelvarObjInsertTuple(
     /*
      * Make the new tuple refer to the heading contained in the relation.
      */
-    tuple = Ral_TupleNew(relation->heading->tupleHeading) ;
+    tuple = Ral_TupleNew(relation->heading) ;
     /*
      * Set the values of the attributes from the list of attribute / value
      * pairs.
@@ -628,8 +628,8 @@ Ral_RelvarObjCreateAssoc(
      * to those in the referred to relation.
      */
     refMap = Ral_JoinMapNew(0, 0) ;
-    th1 = r1->heading->tupleHeading ;
-    th2 = r2->heading->tupleHeading ;
+    th1 = r1->heading ;
+    th2 = r2->heading ;
     while (elemc1-- > 0) {
 	int attrIndex1 = Ral_TupleHeadingIndexOf(th1, Tcl_GetString(*elemv1)) ;
 	int attrIndex2 = Ral_TupleHeadingIndexOf(th2, Tcl_GetString(*elemv2)) ;
@@ -655,7 +655,11 @@ Ral_RelvarObjCreateAssoc(
      * identifier of the relation.
      */
     refAttrs = Ral_JoinMapGetAttr(refMap, 1) ;
-    isNotId = Ral_RelationHeadingFindIdentifier(r2->heading, refAttrs) < 0 ;
+    /*
+     * HERE
+     * isNotId = Ral_RelationHeadingFindIdentifier(r2->heading, refAttrs) < 0 ;
+     */
+    isNotId = 1 ;
     Ral_IntVectorDelete(refAttrs) ;
     if (isNotId) {
 	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptAssociation,
@@ -774,7 +778,7 @@ Ral_RelvarObjCreatePartition(
      * identifier.
      */
     superAttrs = Ral_IntVectorNewEmpty(supElemc) ;
-    supth = superRel->heading->tupleHeading ;
+    supth = superRel->heading ;
     while (supElemc-- > 0) {
 	char const *attrName = Tcl_GetString(*supElemv++) ;
 	int attrIndex = Ral_TupleHeadingIndexOf(supth, attrName) ;
@@ -794,12 +798,17 @@ Ral_RelvarObjCreatePartition(
 	    return TCL_ERROR ;
 	}
     }
+    /*
+     * HERE -- identifiers again.
+     */
+    #if 0
     if (Ral_RelationHeadingFindIdentifier(superRel->heading, superAttrs) < 0) {
 	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptPartition,
 	    RAL_ERR_NOT_AN_IDENTIFIER, objv[2]) ;
 	Ral_IntVectorDelete(superAttrs) ;
 	return TCL_ERROR ;
     }
+    #endif
     nSupAttrs = Ral_IntVectorSize(superAttrs) ;
     /*
      * Create the partition constraint.
@@ -879,7 +888,7 @@ Ral_RelvarObjCreatePartition(
 	subRef->relvar = sub ;
 	subRef->subsetMap = refMap = Ral_JoinMapNew(0, 0) ;
 	Ral_PtrVectorPushBack(partition->subsetReferences, subRef) ;
-	subth = subRel->heading->tupleHeading ;
+	subth = subRel->heading ;
 	supAttrIter = Ral_IntVectorBegin(superAttrs) ;
 	while (subElemc-- > 0) {
 	    char const *attrName = Tcl_GetString(*subElemv++) ;
@@ -1105,8 +1114,8 @@ Ral_RelvarObjCreateCorrelation(
      * The attributes in relvar 1 and relvar 2 must be identifiers.
      * The attributes in the correlation relvar are the referring attributes.
      */
-    thC = rC->heading->tupleHeading ;
-    th1 = r1->heading->tupleHeading ;
+    thC = rC->heading ;
+    th1 = r1->heading ;
     refMap = correl->aReferenceMap ;
     while (elemc1-- > 0) {
 	int attrIndexC = Ral_TupleHeadingIndexOf(thC, Tcl_GetString(*elemvC1)) ;
@@ -1131,7 +1140,11 @@ Ral_RelvarObjCreateCorrelation(
      * identifier of the relation.
      */
     refAttrs = Ral_JoinMapGetAttr(refMap, 1) ;
-    isNotId = Ral_RelationHeadingFindIdentifier(r1->heading, refAttrs) < 0 ;
+    /*
+     * HERE
+     * isNotId = Ral_RelationHeadingFindIdentifier(r1->heading, refAttrs) < 0 ;
+     */
+    isNotId = 1 ;
     Ral_IntVectorDelete(refAttrs) ;
     if (isNotId) {
 	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptCorrelation,
@@ -1144,7 +1157,7 @@ Ral_RelvarObjCreateCorrelation(
     Ral_JoinMapSortAttr(refMap, 1) ;
 
     refMap = correl->bReferenceMap ;
-    th2 = r2->heading->tupleHeading ;
+    th2 = r2->heading ;
     while (elemc2-- > 0) {
 	int attrIndexC = Ral_TupleHeadingIndexOf(thC, Tcl_GetString(*elemvC2)) ;
 	int attrIndex2 = Ral_TupleHeadingIndexOf(th2, Tcl_GetString(*elemv2)) ;
@@ -1168,7 +1181,11 @@ Ral_RelvarObjCreateCorrelation(
      * identifier of the relation.
      */
     refAttrs = Ral_JoinMapGetAttr(refMap, 1) ;
-    isNotId = Ral_RelationHeadingFindIdentifier(r2->heading, refAttrs) < 0 ;
+    /*
+     * HERE
+     * isNotId = Ral_RelationHeadingFindIdentifier(r2->heading, refAttrs) < 0 ;
+     */
+    isNotId = 1 ;
     Ral_IntVectorDelete(refAttrs) ;
     if (isNotId) {
 	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptCorrelation,
@@ -1857,10 +1874,9 @@ Ral_RelvarObjExecSetTraces(
 		return NULL ;
 	    }
 	    origRel = relvar->relObj->internalRep.otherValuePtr ;
-	    if (!Ral_RelationHeadingEqual(resultRel->heading,
-		    origRel->heading)) {
+	    if (!Ral_TupleHeadingEqual(resultRel->heading, origRel->heading)) {
 		char *headingStr =
-		    Ral_RelationHeadingStringOf(resultRel->heading) ;
+		    Ral_TupleHeadingStringOf(resultRel->heading) ;
 		Ral_ErrorInfoSetError(errInfo, RAL_ERR_HEADING_NOT_EQUAL,
 		    headingStr) ;
 		Ral_InterpSetError(interp, errInfo) ;
@@ -2066,7 +2082,7 @@ relvarConstraintAttrNames(
 
     assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
     relation = relvar->relObj->internalRep.otherValuePtr ;
-    th = relation->heading->tupleHeading ;
+    th = relation->heading ;
 
     for (aIter = Ral_IntVectorBegin(attrIndices) ; aIter != aEnd ; ++aIter) {
 	Ral_Attribute attr = Ral_TupleHeadingFetch(th, *aIter) ;
