@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.40.2.2 $
-# $Date: 2009/01/12 00:45:36 $
+# $Revision: 1.40.2.3 $
+# $Date: 2009/01/19 01:51:11 $
 #  *--
 
 namespace eval ::ral {
@@ -706,10 +706,10 @@ proc ::ral::getFormatMap {heading} {
     foreach {name type} $heading {
 	set typeKey [lindex $type 0]
 	if {$typeKey eq "Tuple"} {
-	    set attrReportMap [relation include $attrReportMap\
+	    set attrReportMap [relation insert $attrReportMap\
 		    [list AttrName $name AttrFunc ::ral::tupleformat]]
 	} elseif {$typeKey eq "Relation"} {
-	    set attrReportMap [relation include $attrReportMap\
+	    set attrReportMap [relation insert $attrReportMap\
 		    [list AttrName $name AttrFunc ::ral::relformat]]
 	}
     }
