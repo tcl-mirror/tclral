@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_joinmap.h,v $
-$Revision: 1.7 $
-$Date: 2009/04/11 18:18:54 $
+$Revision: 1.6.2.1 $
+$Date: 2009/01/19 01:45:46 $
  *--
  */
 #ifndef _ral_joinmap_h_

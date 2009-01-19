@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuple.c,v $
-$Revision: 1.13.2.2 $
-$Date: 2009/01/12 00:45:36 $
+$Revision: 1.13.2.3 $
+$Date: 2009/01/19 01:45:46 $
  *--
  */
 
@@ -59,6 +59,7 @@ INCLUDE FILES
 */
 #include "ral_utils.h"
 #include "ral_tuple.h"
+#include "ral_vector.h"
 #include <string.h>
 #include <assert.h>
 
@@ -91,7 +92,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_tuple.c,v $ $Revision: 1.13.2.2 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tuple.c,v $ $Revision: 1.13.2.3 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -257,6 +258,72 @@ Ral_TupleHash(
     }
 
     return hash ;
+}
+
+/*
+ * Compute the hash value for a tuple using only the specified
+ * attributes.
+ */
+unsigned int
+Ral_TupleHashAttr(
+    Ral_Tuple keyTuple,
+    Ral_IntVector keyAttrs)
+{
+    Ral_IntVectorIter indexIter ;
+    unsigned int hash = 0 ;
+
+    for (indexIter = Ral_IntVectorBegin(keyAttrs) ;
+            indexIter != Ral_IntVectorEnd(keyAttrs) ; ++indexIter) {
+        Ral_TupleHeadingIter hiter =
+                Ral_TupleHeadingBegin(keyTuple->heading) + *indexIter ;
+        Ral_TupleIter viter =
+                Ral_TupleBegin(keyTuple) + *indexIter ;
+
+        assert(*indexIter < Ral_TupleDegree(keyTuple)) ;
+        hash += Ral_AttributeHashValue(*hiter, *viter) ;
+    }
+
+    return hash ;
+}
+
+/*
+ * Compare the attributes of two tuples to determine if they are equal.
+ * The attributes must have the same type, but not necessarily the same name.
+ */
+int
+Ral_TupleAttrEqual(
+    Ral_Tuple keyTuple1,
+    Ral_IntVector keyAttrs1,
+    Ral_Tuple keyTuple2,
+    Ral_IntVector keyAttrs2)
+{
+    Ral_IntVectorIter indexIter1 ;
+    Ral_IntVectorIter indexIter2 ;
+
+    assert(Ral_IntVectorSize(keyAttrs1) == Ral_IntVectorSize(keyAttrs2)) ;
+
+    for (   indexIter1 = Ral_IntVectorBegin(keyAttrs1),
+            indexIter2 = Ral_IntVectorBegin(keyAttrs2) ;
+            indexIter1 != Ral_IntVectorEnd(keyAttrs1) ;
+            ++indexIter1, ++indexIter2) {
+        Ral_TupleHeadingIter hiter1 =
+                Ral_TupleHeadingBegin(keyTuple1->heading) + *indexIter1 ;
+        Ral_TupleIter viter1 =
+                Ral_TupleBegin(keyTuple1) + *indexIter1 ;
+        Ral_TupleHeadingIter hiter2 =
+                Ral_TupleHeadingBegin(keyTuple2->heading) + *indexIter2 ;
+        Ral_TupleIter viter2 =
+                Ral_TupleBegin(keyTuple2) + *indexIter2 ;
+        assert(*indexIter1 < Ral_TupleDegree(keyTuple1)) ;
+        assert(*indexIter2 < Ral_TupleDegree(keyTuple2)) ;
+        assert(Ral_AttributeTypeEqual(*hiter1, *hiter2)) ;
+
+        if (!Ral_AttributeValueEqual(*hiter1, *viter1, *viter2)) {
+            return 0 ;
+        }
+    }
+
+    return 1 ;
 }
 
 int

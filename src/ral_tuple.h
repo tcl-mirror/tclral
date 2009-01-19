@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuple.h,v $
-$Revision: 1.10.2.2 $
-$Date: 2009/01/12 00:45:36 $
+$Revision: 1.10.2.3 $
+$Date: 2009/01/19 01:45:46 $
  *--
  */
 #ifndef _ral_tuple_h_
@@ -63,6 +63,7 @@ INCLUDE FILES
 #include "ral_utils.h"
 #include "ral_attribute.h"
 #include "ral_tupleheading.h"
+#include "ral_vector.h"
 #include <stdio.h>
 
 /*
@@ -137,6 +138,9 @@ extern int Ral_TupleEqual(Ral_Tuple, Ral_Tuple) ;
 extern int Ral_TupleEqualValues(Ral_Tuple, Ral_Tuple) ;
 
 extern unsigned int Ral_TupleHash(Ral_Tuple) ;
+extern unsigned int Ral_TupleHashAttr(Ral_Tuple, Ral_IntVector) ;
+extern int Ral_TupleAttrEqual(Ral_Tuple, Ral_IntVector, Ral_Tuple,
+        Ral_IntVector) ;
 
 extern int Ral_TupleUpdateAttrValue(Ral_Tuple,
     const char *, Tcl_Obj *, Ral_ErrorInfo *) ;

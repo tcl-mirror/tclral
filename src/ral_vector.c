@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_vector.c,v $
-$Revision: 1.14 $
-$Date: 2009/04/11 18:18:54 $
+$Revision: 1.13.2.1 $
+$Date: 2009/01/19 01:45:46 $
  *--
  */
 

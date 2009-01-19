@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.c,v $
-$Revision: 1.19.2.1 $
-$Date: 2009/01/12 00:45:36 $
+$Revision: 1.19.2.2 $
+$Date: 2009/01/19 01:45:46 $
  *--
  */
 
@@ -121,7 +121,7 @@ static char const * const condMultStrings[2][2] = {
     {"1", "+"},
     {"?", "*"}
 } ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.19.2.1 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.19.2.2 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -1485,7 +1485,8 @@ relvarConstraintErrorMsg(
     Tcl_DStringAppend(msg, "\n", -1) ;
 
     for (vIter = Ral_IntVectorBegin(violations) ; vIter != vEnd ; ++vIter) {
-	Ral_Tuple errTuple = Ral_RelationTupleAt(rel, *vIter) ;
+        assert(*vIter < Ral_RelationCardinality(rel)) ;
+	Ral_Tuple errTuple = *(Ral_RelationBegin(rel) + *vIter) ;
 	char *tupleString = Ral_TupleValueStringOf(errTuple) ;
 
 	Tcl_DStringAppend(msg, "tuple ", -1) ;

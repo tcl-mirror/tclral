@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.c,v $
-$Revision: 1.25.2.2 $
-$Date: 2009/01/12 00:45:36 $
+$Revision: 1.25.2.3 $
+$Date: 2009/01/19 01:45:46 $
  *--
  */
 
@@ -214,7 +214,7 @@ static struct ral_type const Ral_Types[] = {
 
 static char const openList = '{' ;
 static char const closeList = '}' ;
-static char const rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.25.2.2 $" ;
+static char const rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.25.2.3 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -421,7 +421,7 @@ Ral_AttributeValueEqual(
 	    Tcl_ConvertToType(NULL, v2, &Ral_TupleObjType) != TCL_OK) {
 	    Tcl_Panic("Ral_AttributeValueEqual: cannot convert to tuple") ;
 	}
-	isEqual = Ral_TupleEqual(v1->internalRep.otherValuePtr,
+	isEqual = Ral_TupleEqualValues(v1->internalRep.otherValuePtr,
 	    v2->internalRep.otherValuePtr) ;
 	break ;
 
@@ -449,40 +449,29 @@ Ral_AttributeValueCompare(
     Tcl_Obj *v2)
 {
     int result = 0 ;
-    Ral_Relation rel1 ;
-    Ral_Relation rel2 ;
+    struct ral_type *type ;
 
     switch (a->attrType) {
-    case Tcl_Type: {
-	struct ral_type *type = findRalType(a->typeName) ;
+    case Tcl_Type:
+	type = findRalType(a->typeName) ;
 	result = type ?  type->compare(v1, v2) : stringCompare(v1, v2) ;
-    }
 	break ;
 
-    case Tuple_Type:
 	/*
-	 * This is probably wrong, but hard to say what is right.
+	 * Relative comparisons of tuple and relations is not possible
+         * since there is not a complete ordering for these types.
+         * Panic here, higher order code should never make the request.
 	 */
-	result = strcmp(Tcl_GetString(v1), Tcl_GetString(v2)) ;
+    case Tuple_Type:
+	Tcl_Panic("Ral_AttributeValueCompare: attempt to compare Tuple types") ;
 	break ;
 
     case Relation_Type:
-	/*
-	 * This is probably wrong.
-	 * But comparison based on cardinality is all I've come up
-	 * with so far.
-	 */
-	if (Tcl_ConvertToType(NULL, v1, &Ral_RelationObjType) != TCL_OK ||
-	    Tcl_ConvertToType(NULL, v2, &Ral_RelationObjType) != TCL_OK) {
-	    Tcl_Panic("Ral_TupleCompare: cannot convert to Relation") ;
-	}
-        rel1 = v1->internalRep.otherValuePtr ;
-        rel2 = v2->internalRep.otherValuePtr ;
-	result = Ral_RelationCardinality(rel1) - Ral_RelationCardinality(rel2) ;
+	Tcl_Panic("Ral_AttributeValueCompare: attempt to compare Relation types") ;
 	break ;
 
     default:
-	Tcl_Panic("Ral_TupleCompare: unknown attribute type: %d",
+	Tcl_Panic("Ral_AttributeValueCompare: unknown attribute type: %d",
 	    a->attrType) ;
     }
 
@@ -715,7 +704,7 @@ findRalType(char const *typeName)
 }
 
 /*
- * This is basically the same hash used by Tcl, multiply by 9 and add.
+ * This is just a simple sum. The hash table code randomized the bits.
  */
 static unsigned
 hashBytes(
@@ -725,7 +714,7 @@ hashBytes(
     unsigned char const *bytes = (unsigned char const *)bPtr ;
     unsigned hash = 0 ;
     while (len-- != 0) {
-        hash += (hash << 3) + *bytes++ ;
+        hash += *bytes++ ;
     }
 
     return hash ;

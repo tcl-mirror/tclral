@@ -46,8 +46,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.39.2.2 $
-$Date: 2009/01/12 00:45:36 $
+$Revision: 1.39.2.3 $
+$Date: 2009/01/19 01:45:46 $
  *--
  */
 
@@ -112,7 +112,7 @@ static int RelationExtractCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationForeachCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationGroupCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationHeadingCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
-static int RelationIncludeCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
+static int RelationInsertCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationIntersectCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationIsCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationIsemptyCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
@@ -146,7 +146,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.39.2.2 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.39.2.3 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -188,7 +188,7 @@ relationCmd(
 	{"foreach", RelationForeachCmd},
 	{"group", RelationGroupCmd},
 	{"heading", RelationHeadingCmd},
-	{"include", RelationIncludeCmd},
+	{"insert", RelationInsertCmd},
 	{"intersect", RelationIntersectCmd},
 	{"is", RelationIsCmd},
 	{"isempty", RelationIsemptyCmd},
@@ -1263,7 +1263,7 @@ RelationHeadingCmd(
 }
 
 static int
-RelationIncludeCmd(
+RelationInsertCmd(
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const*objv)
@@ -1273,7 +1273,7 @@ RelationIncludeCmd(
     Ral_Relation newRel ;
     Ral_ErrorInfo errInfo ;
 
-    /* relation include relationValue ?name-value-list ...? */
+    /* relation insert relationValue ?name-value-list ...? */
     if (objc < 3) {
 	Tcl_WrongNumArgs(interp, 2, objv,
 	    "relationValue ?name-value-list ...?") ;
@@ -1291,7 +1291,7 @@ RelationIncludeCmd(
 
     newRel = Ral_RelationShallowCopy(relation) ;
     Ral_RelationReserve(newRel, objc) ;
-    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptInclude) ;
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptInsert) ;
     while (objc-- > 0) {
 	/*
 	 * Enforce insert style semantics, i.e. we error out on duplicates
@@ -2397,7 +2397,7 @@ RelationTagCmd(
     if (objc < 4 || objc > 8) {
 	Tcl_WrongNumArgs(interp, 2, objv, "relation "
 	    "?-ascending | -descending sort-attr-list? "
-	    "?-within idsubset-list? attrName") ;
+	    "?-within attr-list? attrName") ;
 	return TCL_ERROR ;
     }
 

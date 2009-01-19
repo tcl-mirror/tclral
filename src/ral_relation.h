@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.h,v $
-$Revision: 1.20.2.1 $
-$Date: 2009/01/12 00:45:36 $
+$Revision: 1.20.2.2 $
+$Date: 2009/01/19 01:45:46 $
  *--
  */
 #ifndef _ral_relation_h_
@@ -131,6 +131,18 @@ typedef struct Ral_Relation {
 #define Ral_RelationCapacity(r)  ((r)->endStorage - (r)->start)
 
 /*
+ * Data structure used in a custom hash table for finding tuples
+ * in a relation based on the values of the tuple attributes.
+ */
+typedef struct Ral_TupleAttrHashKey {
+    Ral_Tuple tuple ;       /* reference to tuple that is the hash key */
+    Ral_IntVector attrs ;   /* vector holds the attribute indices that are
+                             * to be used to form the key and for comparison
+                             * purposes.
+                             */
+} *Ral_TupleAttrHashKey ;
+
+/*
 DATA DECLARATIONS
 */
 
@@ -146,7 +158,6 @@ extern void Ral_RelationDelete(Ral_Relation) ;
 extern void Ral_RelationReserve(Ral_Relation, int) ;
 
 extern int Ral_RelationPushBack(Ral_Relation, Ral_Tuple, Ral_IntVector) ;
-extern Ral_Tuple Ral_RelationTupleAt(Ral_Relation, int) ;
 extern int Ral_RelationUpdate(Ral_Relation, Ral_RelationIter, Ral_Tuple,
     Ral_IntVector) ;
 

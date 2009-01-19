@@ -50,8 +50,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.47.2.2 $
-# $Date: 2009/01/12 00:45:36 $
+# $Revision: 1.47.2.3 $
+# $Date: 2009/01/19 01:45:46 $
 #  *--
 
 package require tcltest 2.2
@@ -1636,9 +1636,9 @@ namespace eval ::ral::test {
         relation heading $S
     } -result {S# string SNAME string STATUS int CITY string}
 
-    # relation include subcommand
-    test relation-include-1.0 {single tuple} -body {
-        relation include [relation emptyof $S]\
+    # relation insert subcommand
+    test relation-insert-1.0 {single tuple} -body {
+        relation insert [relation emptyof $S]\
             {S# S1 SNAME Jones STATUS 20 CITY Madrid}
     } -result {
         {S# string SNAME string STATUS int CITY string}
@@ -1647,8 +1647,8 @@ namespace eval ::ral::test {
         }
     } -match relation
 
-    test relation-include-2.0 {multiple tuple} -body {
-        relation include [relation emptyof $S]\
+    test relation-insert-2.0 {multiple tuple} -body {
+        relation insert [relation emptyof $S]\
             {S# S1 SNAME Jones STATUS 20 CITY Madrid}\
             {S# S2 SNAME Smith STATUS 10 CITY London}\
             {S# S3 SNAME Elm STATUS 30 CITY Athens}
@@ -1661,16 +1661,16 @@ namespace eval ::ral::test {
         }
     } -match relation
 
-    test relation-include-3.0 {duplicate tuple} -body {
-        relation include [relation emptyof $S]\
+    test relation-insert-3.0 {duplicate tuple} -body {
+        relation insert [relation emptyof $S]\
             {S# S1 SNAME Jones STATUS 20 CITY Madrid}\
             {S# S3 SNAME Elm STATUS 30 CITY Athens}\
             {S# S1 SNAME Jones STATUS 20 CITY Madrid}
     } -result {duplicate tuple, "S# S1 SNAME Jones STATUS 20 CITY Madrid"}\
     -returnCodes error
 
-    test relation-include-4.0 {bad tuple} -body {
-        relation include [relation emptyof $S]\
+    test relation-insert-4.0 {bad tuple} -body {
+        relation insert [relation emptyof $S]\
             {S# S1 SNAME Jones STATUS 20}
     } -result {wrong number of attributes specified, "S# S1 SNAME Jones STATUS 20"}\
     -returnCodes error
@@ -3655,8 +3655,7 @@ in expression "_@_< 20"} -returnCodes error
     } -result 1
 
     test relation-tuple-3.0 {body too long} -body {
-        set r {{Name string Age int}
-            {{Name Andrew Age 20} {Name George Age 20}}}
+        set r {{Name string Age int} {{Name Andrew Age 20} {Name George Age 20}}}
         relation tuple $r
     } -result {relation must have cardinality of one, "{Name string Age int} {{Name Andrew Age 20} {Name George Age 20}}"} -returnCodes error
 
@@ -5445,7 +5444,7 @@ Suppliers
 ---------}
 
     test relformat-4.0 {relation valued attribute} -body {
-        relformat [relation group $SP PQ P# QTY]
+        relformat [relation group $SP PQ P# QTY] {} S#
     } -result {+------+------------+
 |S#    |PQ          |
 |string|Relation    |

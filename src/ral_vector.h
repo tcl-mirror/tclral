@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_vector.h,v $
-$Revision: 1.12 $
-$Date: 2009/04/11 18:18:54 $
+$Revision: 1.11.2.1 $
+$Date: 2009/01/19 01:45:46 $
  *--
  */
 #ifndef _ral_vector_h_
