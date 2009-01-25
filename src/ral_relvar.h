@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.h,v $
-$Revision: 1.12.2.1 $
-$Date: 2009/01/12 00:45:36 $
+$Revision: 1.12.2.2 $
+$Date: 2009/01/25 02:41:12 $
  *--
  */
 #ifndef _ral_relvar_h_
@@ -142,6 +142,20 @@ typedef struct Ral_Relvar {
     Ral_PtrVector constraints ;	/* a list of Ral_Constraint  */
     Ral_TraceInfo traces ;	/* linked list of Ral_TraceInfo */
     int traceFlags ;		/* state of tracing */
+    unsigned idCount ;          /* Number of identifiers for the relvar.
+                                 * This is the actual size of the array of
+                                 * hash tables in the next member. */
+    struct relvarId {
+        Ral_IntVector idAttrs ; /* A set of attribute indices that form an
+                                 * and identifier. */
+        Tcl_HashTable idIndex ; /* Hash tables used to enforce identifier
+                                 * constraints. The tuples are hashed based
+                                 * in the identifying attributes. */
+    } identifiers[1] ;          /* Every relvar must have at least one
+                                 * identifier. This is allocated at the end of
+                                 * the relvar structure so that it can be
+                                 * of variable length and the memory for a
+                                 * relvar can be allocated in one block. */
 } *Ral_Relvar ;
 
 typedef struct Ral_RelvarTransaction {
@@ -165,8 +179,8 @@ FUNCTION DECLARATIONS
 */
 
 extern Ral_Relvar Ral_RelvarNew(Ral_RelvarInfo, char const *,
-    Ral_TupleHeading) ;
-extern void Ral_RelvarDelete(Ral_RelvarInfo, char const *) ;
+    Ral_TupleHeading, int) ;
+extern void Ral_RelvarDelete(Ral_RelvarInfo, Ral_Relvar) ;
 extern Ral_Relvar Ral_RelvarFind(Ral_RelvarInfo, char const *) ;
 
 extern ClientData Ral_RelvarNewInfo(char const *, Tcl_Interp *) ;

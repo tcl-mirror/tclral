@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.36.2.2 $
-$Date: 2009/01/19 01:45:46 $
+$Revision: 1.36.2.3 $
+$Date: 2009/01/25 02:41:12 $
  *--
  */
 
@@ -150,7 +150,7 @@ static Tcl_HashKeyType const tupleHashType = {
  * offset into the relation where the tuple that contains the attributes is
  * located. This is used to enforce identifier constraints in relvars.
  */
-static Tcl_HashKeyType const tupleAttrHashType = {
+Tcl_HashKeyType const tupleAttrHashType = {
     TCL_HASH_KEY_TYPE_VERSION,  /* version */
     TCL_HASH_KEY_RANDOMIZE_HASH,/* flags */
     tupleAttrHashGenKey,        /* hashKeyProc */
@@ -536,10 +536,7 @@ Ral_RelationTimes(
     Ral_TupleHeading prodHeading ;
     Ral_Relation product ;
     Ral_RelationIter mcandIter ;
-    Ral_RelationIter mcandEnd = Ral_RelationEnd(multiplicand) ;
     Ral_RelationIter mlierIter ;
-    Ral_RelationIter mlierEnd = Ral_RelationEnd(multiplier) ;
-    int mlierOffset = Ral_RelationDegree(multiplicand) ;
 
     prodHeading = Ral_TupleHeadingUnion(multiplicand->heading,
 	multiplier->heading) ;
@@ -551,24 +548,23 @@ Ral_RelationTimes(
     Ral_RelationReserve(product, Ral_RelationCardinality(multiplicand) *
 	Ral_RelationCardinality(multiplier)) ;
 
-    for (mcandIter = Ral_RelationBegin(multiplicand) ; mcandIter != mcandEnd ;
-	++mcandIter) {
-	for (mlierIter = Ral_RelationBegin(multiplier) ; mlierIter != mlierEnd ;
-	    ++mlierIter) {
+    for (mcandIter = Ral_RelationBegin(multiplicand) ;
+            mcandIter != Ral_RelationEnd(multiplicand) ; ++mcandIter) {
+	for (mlierIter = Ral_RelationBegin(multiplier) ;
+                mlierIter != Ral_RelationEnd(multiplier) ; ++mlierIter) {
 	    Ral_Tuple mcandTuple = *mcandIter ;
 	    Ral_Tuple mlierTuple = *mlierIter ;
 	    Ral_Tuple prodTuple = Ral_TupleNew(prodHeading) ;
-	    Ral_TupleIter prodTupleBegin = Ral_TupleBegin(prodTuple) ;
+            int status ;
 
 	    Ral_TupleCopyValues(Ral_TupleBegin(mcandTuple),
-		Ral_TupleEnd(mcandTuple), prodTupleBegin) ;
+                    Ral_TupleEnd(mcandTuple), Ral_TupleBegin(prodTuple)) ;
 	    Ral_TupleCopyValues(Ral_TupleBegin(mlierTuple),
-		Ral_TupleEnd(mlierTuple), prodTupleBegin + mlierOffset) ;
+                    Ral_TupleEnd(mlierTuple), Ral_TupleBegin(prodTuple) +
+                    Ral_RelationDegree(multiplicand)) ;
 
-	    if (!Ral_RelationPushBack(product, prodTuple, NULL)) {
-		Ral_RelationDelete(product) ;
-		return NULL ;
-	    }
+            status = Ral_RelationPushBack(product, prodTuple, NULL) ;
+            assert(status != 0) ;
 	}
     }
 
@@ -583,13 +579,12 @@ Ral_RelationProject(
     Ral_TupleHeading projHeading =
 	Ral_TupleHeadingSubset(relation->heading, attrSet) ;
     Ral_Relation projRel = Ral_RelationNew(projHeading) ;
-    Ral_RelationIter end = Ral_RelationEnd(relation) ;
     Ral_RelationIter iter ;
 
     Ral_RelationReserve(projRel, Ral_RelationCardinality(relation)) ;
-    for (iter = Ral_RelationBegin(relation) ; iter != end ; ++iter) {
-	Ral_Tuple projTuple = Ral_TupleSubset(*iter, projHeading,
-	    attrSet) ;
+    for (iter = Ral_RelationBegin(relation) ;
+            iter != Ral_RelationEnd(relation) ; ++iter) {
+	Ral_Tuple projTuple = Ral_TupleSubset(*iter, projHeading, attrSet) ;
 	/*
 	 * Ignore the return. Projecting, in general, results in
 	 * duplicated tuples.
@@ -1196,10 +1191,7 @@ Ral_RelationDivide(
     Ral_TupleHeading trialTupleHeading ;
     Ral_Tuple trialTuple ;
     Ral_IntVector trialOrder ;
-    Ral_RelationIter dendEnd ;
     Ral_RelationIter dendIter ;
-    Ral_RelationIter dsorEnd ;
-    Ral_RelationIter medEnd ;
 
     /*
      * The heading of the dividend must be disjoint from the heading of the
@@ -1251,11 +1243,8 @@ Ral_RelationDivide(
      * Iterate over the dividend modifying a tuple with the divsor values
      * and then find it in the mediator.
      */
-    dendEnd = Ral_RelationEnd(dend) ;
-    dsorEnd = Ral_RelationEnd(dsor) ;
-    medEnd = Ral_RelationEnd(med) ;
-    for (dendIter = Ral_RelationBegin(dend) ; dendIter != dendEnd ;
-	++dendIter) {
+    for (dendIter = Ral_RelationBegin(dend) ;
+            dendIter != Ral_RelationEnd(dend) ; ++dendIter) {
 	Ral_Tuple dendTuple = *dendIter ;
 	Ral_TupleIter trialIter = Ral_TupleBegin(trialTuple) ;
 	Ral_RelationIter dsorIter ;
@@ -1270,8 +1259,8 @@ Ral_RelationDivide(
 	/*
 	 * Iterate through each tuple in the divisor.
 	 */
-	for (dsorIter = Ral_RelationBegin(dsor) ; dsorIter != dsorEnd ;
-	    ++dsorIter) {
+	for (dsorIter = Ral_RelationBegin(dsor) ;
+                dsorIter != Ral_RelationEnd(dsor) ; ++dsorIter) {
 	    Ral_Tuple dsorTuple = *dsorIter ;
 	    /*
 	     * Copy in the tuple values from the divisor.
@@ -1281,8 +1270,8 @@ Ral_RelationDivide(
 	    /*
 	     * Tally if we can find this tuple in the mediator.
 	     */
-	    matches += Ral_RelationFind(med, trialTuple, trialOrder)
-		!= medEnd ;
+	    matches += Ral_RelationFind(med, trialTuple, trialOrder) !=
+                    Ral_RelationEnd(med) ;
 	}
 	/*
 	 * If the number of matches equals the cardinality of the divisor then
@@ -1299,6 +1288,139 @@ Ral_RelationDivide(
     Ral_IntVectorDelete(trialOrder) ;
 
     return quot ;
+}
+
+Ral_Relation
+Ral_RelationTag(
+    Ral_Relation relation,
+    char const *attrName,
+    Ral_IntVector sortMap,
+    Ral_ErrorInfo *errInfo)
+{
+    Ral_Attribute tagAttr ;
+    Ral_TupleHeading tagHeading ;
+    Ral_Relation tagRelation ;
+    Ral_IntVectorIter mIter ;
+    int tagValue = 0 ;
+    /*
+     * Make a new relation, adding the tag attribute.
+     */
+    tagAttr = Ral_AttributeNewTclType(attrName, "int") ;
+    assert(tagAttr != NULL) ;
+    tagHeading = Ral_TupleHeadingExtend(relation->heading, 1) ;
+    if (Ral_TupleHeadingPushBack(tagHeading, tagAttr) ==
+            Ral_TupleHeadingEnd(tagHeading)) {
+	Ral_ErrorInfoSetError(errInfo, RAL_ERR_DUPLICATE_ATTR, attrName) ;
+	Ral_TupleHeadingDelete(tagHeading) ;
+	return NULL ;
+    }
+    tagRelation = Ral_RelationNew(tagHeading) ;
+    /*
+     * Iterate through the relation in the order of the sort map adding
+     * the tag attribute value.
+     */
+    for (mIter = Ral_IntVectorBegin(sortMap) ;
+            mIter != Ral_IntVectorEnd(sortMap) ; ++mIter) {
+        Ral_Tuple tuple = *(Ral_RelationBegin(relation) + *mIter) ;
+        Ral_Tuple tagTuple = Ral_TupleNew(tagHeading) ;
+        Ral_TupleIter tagIter = Ral_TupleBegin(tagTuple) ;
+        int status ;
+
+        tagIter += Ral_TupleCopyValues(Ral_TupleBegin(tuple),
+                Ral_TupleEnd(tuple), tagIter) ;
+        *tagIter = Tcl_NewIntObj(tagValue++) ;
+        Tcl_IncrRefCount(*tagIter) ;
+        /*
+         * Should always be able to insert the tagged tuple since
+         * the tuples values of the original relation were already unique.
+         */
+        status = Ral_RelationPushBack(tagRelation, tagTuple, NULL) ;
+        assert(status != 0) ;
+    }
+
+    return tagRelation ;
+}
+
+/*
+ * Like Ral_RelationTag(), but tag values are minimally unique within
+ * a set of attributes.
+ */
+Ral_Relation
+Ral_RelationTagWithin(
+    Ral_Relation relation,
+    char const *attrName,
+    Ral_IntVector sortMap,
+    Ral_IntVector withinAttrs,
+    Ral_ErrorInfo *errInfo)
+{
+    Ral_Attribute tagAttr ;
+    Ral_TupleHeading tagHeading ;
+    Ral_Relation tagRelation ;
+    Ral_IntVectorIter mIter ;
+    Tcl_HashTable index ;
+    /*
+     * Make a new relation, adding the tag attribute.
+     */
+    tagAttr = Ral_AttributeNewTclType(attrName, "int") ;
+    assert(tagAttr != NULL) ;
+    tagHeading = Ral_TupleHeadingExtend(relation->heading, 1) ;
+    if (Ral_TupleHeadingPushBack(tagHeading, tagAttr) ==
+            Ral_TupleHeadingEnd(tagHeading)) {
+	Ral_ErrorInfoSetError(errInfo, RAL_ERR_DUPLICATE_ATTR, attrName) ;
+	Ral_TupleHeadingDelete(tagHeading) ;
+	return NULL ;
+    }
+    tagRelation = Ral_RelationNew(tagHeading) ;
+    /*
+     * Iterate through the relation in the order of the sort map adding the tag
+     * attribute value. In order to find the groups of tuples that have the
+     * same values for the given attribute set, we use a hash table.  The hash
+     * entry value will be the current value of the tag attribute.
+     */
+    Tcl_InitCustomHashTable(&index, TCL_CUSTOM_PTR_KEYS, &tupleAttrHashType) ;
+    for (mIter = Ral_IntVectorBegin(sortMap) ;
+            mIter != Ral_IntVectorEnd(sortMap) ; ++mIter) {
+        struct Ral_TupleAttrHashKey key ;
+        Ral_Tuple tuple = *(Ral_RelationBegin(relation) + *mIter) ;
+	Tcl_HashEntry *entry ;
+	int newPtr ;
+        int tagValue ;
+        Ral_Tuple tagTuple = Ral_TupleNew(tagHeading) ;
+        Ral_TupleIter tagIter = Ral_TupleBegin(tagTuple) ;
+        int status ;
+
+        /*
+         * Put the tuple into the hash table based on the attribute set
+         * we are interested in. We don't really care if a new entry is
+         * created or not. If a new is created, the hash value will be
+         * zero as that is what it is set to by the custom entry allocation
+         * function.
+         */
+        key.tuple = tuple ;
+        key.attrs = withinAttrs ;
+        entry = Tcl_CreateHashEntry(&index, (char const *)&key, &newPtr) ;
+        tagValue = (int)Tcl_GetHashValue(entry) ;
+        /*
+         * Copy the old tuple values over, adding the tag attrbute value.
+         */
+        tagIter += Ral_TupleCopyValues(Ral_TupleBegin(tuple),
+                Ral_TupleEnd(tuple), tagIter) ;
+        *tagIter = Tcl_NewIntObj(tagValue++) ;
+        Tcl_IncrRefCount(*tagIter) ;
+        /*
+         * Update the tag value back into the hash entry.
+         */
+        Tcl_SetHashValue(entry, (ClientData)tagValue) ;
+        /*
+         * Should always be able to insert the tagged tuple since
+         * the tuples values of the original relation were already unique.
+         */
+        status = Ral_RelationPushBack(tagRelation, tagTuple, NULL) ;
+        assert(status != 0) ;
+    }
+
+    Tcl_DeleteHashTable(&index) ;
+    return tagRelation ;
 }
 
 int
@@ -1379,9 +1501,9 @@ Ral_RelationFindJoinTuples(
     /*
      * Done. Clean up.
      */
+    Tcl_DeleteHashTable(&r2Index) ;
     Ral_IntVectorDelete(r1Attrs) ;
     Ral_IntVectorDelete(r2Attrs) ;
-    Tcl_DeleteHashTable(&r2Index) ;
 }
 
 /*
@@ -1648,16 +1770,16 @@ Ral_RelationExtract(
     Ral_IntVector tupleSet)
 {
     Ral_Relation subRel = Ral_RelationNew(relation->heading) ;
-    Ral_IntVectorIter end = Ral_IntVectorEnd(tupleSet) ;
     Ral_IntVectorIter iter ;
-    Ral_RelationIter relBegin = Ral_RelationBegin(relation) ;
 
     Ral_RelationReserve(subRel, Ral_IntVectorSize(tupleSet)) ;
 
-    for (iter = Ral_IntVectorBegin(tupleSet) ; iter != end ; ++iter) {
+    for (iter = Ral_IntVectorBegin(tupleSet) ;
+            iter != Ral_IntVectorEnd(tupleSet) ; ++iter) {
 	int status ;
 
-	status = Ral_RelationPushBack(subRel, *(relBegin + *iter), NULL) ;
+	status = Ral_RelationPushBack(subRel,
+                *(Ral_RelationBegin(relation) + *iter), NULL) ;
 	assert(status != 0) ;
     }
 
@@ -1887,7 +2009,6 @@ Ral_RelationRenameAttribute(
     Ral_ErrorInfo *errInfo)
 {
     Ral_TupleHeading tupleHeading = relation->heading ;
-    Ral_TupleHeadingIter end = Ral_TupleHeadingEnd(tupleHeading) ;
     Ral_TupleHeadingIter found ;
     Ral_Attribute newAttr ;
 
@@ -1895,7 +2016,7 @@ Ral_RelationRenameAttribute(
      * Find the old name.
      */
     found = Ral_TupleHeadingFind(tupleHeading, oldName) ;
-    if (found == end) {
+    if (found == Ral_TupleHeadingEnd(tupleHeading)) {
 	Ral_ErrorInfoSetError(errInfo, RAL_ERR_UNKNOWN_ATTR, oldName) ;
 	return 0 ;
     }
@@ -1907,7 +2028,7 @@ Ral_RelationRenameAttribute(
      * Store the new attribute into the heading.
      */
     found = Ral_TupleHeadingStore(tupleHeading, found, newAttr) ;
-    if (found == end) {
+    if (found == Ral_TupleHeadingEnd(tupleHeading)) {
 	Ral_ErrorInfoSetError(errInfo, RAL_ERR_DUPLICATE_ATTR, newName) ;
 	return 0 ;
     }
@@ -1978,12 +2099,9 @@ Ral_RelationScanValue(
     int length ;
     Ral_AttributeTypeScanFlags *typeFlag ;
     Ral_AttributeValueScanFlags *valueFlag ;
-    Ral_RelationIter rend = Ral_RelationEnd(relation) ;
     Ral_RelationIter riter ;
     Ral_TupleHeading tupleHeading = relation->heading ;
-    int nonEmptyHeading = !Ral_TupleHeadingEmpty(tupleHeading) ;
-    Ral_TupleHeadingIter hEnd = Ral_TupleHeadingEnd(tupleHeading) ;
-    Ral_TupleHeadingIter hIter ;
+    Ral_TupleHeadingIter hiter ;
 
     assert(typeFlags->attrType == Relation_Type) ;
     assert(typeFlags->flags.compoundFlags.count
@@ -2005,15 +2123,16 @@ Ral_RelationScanValue(
     length = sizeof(openList) ;
 
     valueFlag = valueFlags->flags.compoundFlags.flags ;
-    for (riter = Ral_RelationBegin(relation) ; riter != rend ; ++riter) {
+    for (riter = Ral_RelationBegin(relation) ;
+            riter != Ral_RelationEnd(relation) ; ++riter) {
 	Ral_Tuple tuple = *riter ;
 	Tcl_Obj **values = tuple->values ;
 	typeFlag = typeFlags->flags.compoundFlags.flags ;
 
 	length += sizeof(openList) ;
-	for (hIter = Ral_TupleHeadingBegin(tupleHeading) ;
-	    hIter != hEnd ; ++hIter) {
-	    Ral_Attribute a = *hIter ;
+	for (hiter = Ral_TupleHeadingBegin(tupleHeading) ;
+                hiter != Ral_TupleHeadingEnd(tupleHeading) ; ++hiter) {
+	    Ral_Attribute a = *hiter ;
 	    Tcl_Obj *v = *values++ ;
 
 	    /*
@@ -2028,7 +2147,7 @@ Ral_RelationScanValue(
 	 * Remove trailing space from tuple values if the tuple has a
 	 * non-zero header.
 	 */
-	if (nonEmptyHeading) {
+	if (!Ral_TupleHeadingEmpty(tupleHeading)) {
 	    --length ;
 	}
 	length += sizeof(closeList) ;
@@ -2055,11 +2174,9 @@ Ral_RelationConvertValue(
     char *p = dst ;
     Ral_AttributeTypeScanFlags *typeFlag ;
     Ral_AttributeValueScanFlags *valueFlag ;
-    Ral_RelationIter rend = Ral_RelationEnd(relation) ;
     Ral_RelationIter riter ;
     Ral_TupleHeading tupleHeading = relation->heading ;
-    Ral_TupleHeadingIter hEnd = Ral_TupleHeadingEnd(tupleHeading) ;
-    Ral_TupleHeadingIter hIter ;
+    Ral_TupleHeadingIter hiter ;
 
     assert(typeFlags->attrType == Relation_Type) ;
     assert(typeFlags->flags.compoundFlags.count
@@ -2070,15 +2187,16 @@ Ral_RelationConvertValue(
 
     valueFlag = valueFlags->flags.compoundFlags.flags ;
     *p++ = openList ;
-    for (riter = Ral_RelationBegin(relation) ; riter != rend ; ++riter) {
+    for (riter = Ral_RelationBegin(relation) ;
+            riter != Ral_RelationEnd(relation) ; ++riter) {
 	Ral_Tuple tuple = *riter ;
 	Tcl_Obj **values = tuple->values ;
 	typeFlag = typeFlags->flags.compoundFlags.flags ;
 
 	*p++ = openList ;
-	for (hIter = Ral_TupleHeadingBegin(tupleHeading) ;
-	    hIter != hEnd ; ++hIter) {
-	    Ral_Attribute a = *hIter ;
+	for (hiter = Ral_TupleHeadingBegin(tupleHeading) ;
+                hiter != Ral_TupleHeadingEnd(tupleHeading) ; ++hiter) {
+	    Ral_Attribute a = *hiter ;
 	    Tcl_Obj *v = *values++ ;
 
 	    p += Ral_AttributeConvertName(a, p, typeFlag) ;
@@ -2088,7 +2206,7 @@ Ral_RelationConvertValue(
 	    *p++ = ' ' ;
 	}
         /*
-         * Remove the trailing space.
+         * Remove any trailing space.
          */
         if (*(p - 1) == ' ') {
 	    --p ;
@@ -2097,7 +2215,7 @@ Ral_RelationConvertValue(
 	*p++ = ' ' ;
     }
     /*
-     * Remove the trailing space.
+     * Remove any trailing space.
      */
     if (*(p - 1) == ' ') {
 	--p ;
@@ -2356,13 +2474,16 @@ tupleAttrHashEntryAlloc(
     hPtr->clientData = NULL ;
     /*
      * Initialize the new key from the old key.  Tuples are reference counted
-     * so we just copy the pointer and increment the reference count. The
-     * vector of attribute indices is duplicated.
+     * so we just copy the pointer and increment the reference count.
+     *
+     * N.B. we just copy the pointer to the attributes vector. This implies
+     * that the lifetime of the vector must be longer that that of the hash
+     * table.
      */
     oldKey = (Ral_TupleAttrHashKey)keyPtr ;
     newKey->tuple = oldKey->tuple ;
     Ral_TupleReference(newKey->tuple) ;
-    newKey->attrs = Ral_IntVectorDup(oldKey->attrs) ;
+    newKey->attrs = oldKey->attrs ;
 
     return hPtr ;
 }
@@ -2379,7 +2500,6 @@ tupleAttrHashEntryFree(
      */
     key = (Ral_TupleAttrHashKey)hPtr->key.oneWordValue ;
     Ral_TupleUnreference(key->tuple) ;
-    Ral_IntVectorDelete(key->attrs) ;
     ckfree((char *)hPtr) ;
 }
 
@@ -2409,13 +2529,16 @@ tupleAttrHashMultiEntryAlloc(
     hPtr->clientData = Ral_IntVectorNewEmpty(3) ;
     /*
      * Initialize the new key from the old key.  Tuples are reference counted
-     * so we just copy the pointer and increment the reference count. The
-     * vector of attribute indices is duplicated.
+     * so we just copy the pointer and increment the reference count.
+     *
+     * N.B. we just copy the pointer to the attributes vector. This implies
+     * that the lifetime of the vector must be longer that that of the hash
+     * table.
      */
     oldKey = (Ral_TupleAttrHashKey)keyPtr ;
     newKey->tuple = oldKey->tuple ;
     Ral_TupleReference(newKey->tuple) ;
-    newKey->attrs = Ral_IntVectorDup(oldKey->attrs) ;
+    newKey->attrs = oldKey->attrs ;
 
     return hPtr ;
 }
@@ -2433,7 +2556,6 @@ tupleAttrHashMultiEntryFree(
      */
     key = (Ral_TupleAttrHashKey)hPtr->key.oneWordValue ;
     Ral_TupleUnreference(key->tuple) ;
-    Ral_IntVectorDelete(key->attrs) ;
     Ral_IntVectorDelete(hPtr->clientData) ;
     ckfree((char *)hPtr) ;
 }

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.h,v $
-$Revision: 1.20.2.2 $
-$Date: 2009/01/19 01:45:46 $
+$Revision: 1.20.2.3 $
+$Date: 2009/01/25 02:41:12 $
  *--
  */
 #ifndef _ral_relation_h_
@@ -145,6 +145,7 @@ typedef struct Ral_TupleAttrHashKey {
 /*
 DATA DECLARATIONS
 */
+extern Tcl_HashKeyType const tupleAttrHashType ;
 
 /*
 FUNCTION DECLARATIONS
@@ -200,6 +201,10 @@ extern Ral_Relation Ral_RelationSemiMinus(Ral_Relation, Ral_Relation,
     Ral_JoinMap) ;
 extern Ral_Relation Ral_RelationDivide(Ral_Relation, Ral_Relation, Ral_Relation,
     Ral_ErrorInfo *) ;
+extern Ral_Relation Ral_RelationTag(Ral_Relation, char const *, Ral_IntVector,
+    Ral_ErrorInfo *) ;
+extern Ral_Relation Ral_RelationTagWithin(Ral_Relation, char const *,
+    Ral_IntVector, Ral_IntVector, Ral_ErrorInfo *) ;
 extern Ral_Relation Ral_RelationTclose(Ral_Relation) ;
 
 extern Ral_IntVector Ral_RelationSort(Ral_Relation, Ral_IntVector, int) ;

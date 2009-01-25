@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.c,v $
-$Revision: 1.19.2.2 $
-$Date: 2009/01/19 01:45:46 $
+$Revision: 1.19.2.3 $
+$Date: 2009/01/25 02:41:12 $
  *--
  */
 
@@ -121,7 +121,7 @@ static char const * const condMultStrings[2][2] = {
     {"1", "+"},
     {"?", "*"}
 } ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.19.2.2 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.19.2.3 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -131,7 +131,8 @@ Ral_Relvar
 Ral_RelvarNew(
     Ral_RelvarInfo info,
     char const *name,
-    Ral_TupleHeading heading)
+    Ral_TupleHeading heading,
+    int idCnt)
 {
     int newPtr ;
     Tcl_HashEntry *entry ;
@@ -140,15 +141,25 @@ Ral_RelvarNew(
     entry = Tcl_CreateHashEntry(&info->relvars, name, &newPtr) ;
     if (newPtr) {
 	    /* +1 for NUL terminator */
-	relvar = (Ral_Relvar)ckalloc(sizeof(*relvar) + strlen(name) + 1) ;
-	relvar->name = (char *)(relvar + 1) ;
-	strcpy(relvar->name, name) ;
+        assert(idCnt >= 1) ;
+	relvar = (Ral_Relvar)ckalloc(sizeof(*relvar) +
+                (idCnt - 1) * sizeof(struct relvarId)) ;
+	relvar->name = ckalloc(strlen(name) + 1) ;
+        strcpy(relvar->name, name) ;
 	Tcl_IncrRefCount(
 	    relvar->relObj = Ral_RelationObjNew(Ral_RelationNew(heading))) ;
 	relvar->transStack = Ral_PtrVectorNew(1) ;
 	relvar->constraints = Ral_PtrVectorNew(0) ;
 	relvar->traces = NULL ;
 	relvar->traceFlags = 0 ;
+        relvar->idCount = idCnt ;
+        /*
+         * Zero this out so we can use the the "idAttrs" as an indication
+         * of whether or not the corresponding hash table is initialized.
+         * We need do this so that we can clean up partially initialized
+         * relvars.
+         */
+        memset(relvar->identifiers, 0, idCnt * sizeof(struct relvarId)) ;
 	Tcl_SetHashValue(entry, relvar) ;
     }
 
@@ -158,18 +169,15 @@ Ral_RelvarNew(
 void
 Ral_RelvarDelete(
     Ral_RelvarInfo info,
-    char const *name)
+    Ral_Relvar relvar)
 {
     Tcl_HashEntry *entry ;
-    Ral_Relvar relvar ;
-
     /*
      * Clean out the variable name from the hash table so that subsequent
      * commands will not see it.
      */
-    entry = Tcl_FindHashEntry(&info->relvars, name) ;
+    entry = Tcl_FindHashEntry(&info->relvars, relvar->name) ;
     assert(entry != NULL) ;
-    relvar = (Ral_Relvar)Tcl_GetHashValue(entry) ;
     Tcl_DeleteHashEntry(entry) ;
     /*
      * Remove the object.
@@ -890,6 +898,8 @@ relvarCleanup(
     Ral_Relvar relvar)
 {
     Ral_TraceInfo t ;
+    struct relvarId *iditer ;
+    int idCnt ;
 
     if (relvar->relObj) {
 	assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
@@ -912,6 +922,24 @@ relvarCleanup(
 	relvarTraceCleanup(del) ;
     }
 
+    /*
+     * Free up the hash tables for the identifiers.
+     */
+    iditer = relvar->identifiers ;
+    for (idCnt = relvar->idCount ; idCnt != 0 ; --idCnt) {
+        /*
+         * It is possible for us to delete a partially created relvar,
+         * i.e. if we encounter a bad identifying attribute list during
+         * construction.
+         */
+        if (iditer->idAttrs) {
+            Tcl_DeleteHashTable(&iditer->idIndex) ;
+            Ral_IntVectorDelete(iditer->idAttrs) ;
+        }
+        ++iditer ;
+    }
+
+    ckfree(relvar->name) ;
     ckfree((char *)relvar) ;
 }
 

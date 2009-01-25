@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.32.2.2 $
-$Date: 2009/01/12 00:45:36 $
+$Revision: 1.32.2.3 $
+$Date: 2009/01/25 02:41:12 $
  *--
  */
 
@@ -122,7 +122,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.32.2.2 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.32.2.3 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -329,13 +329,16 @@ RelvarCreateCmd(
 {
     Ral_TupleHeading heading ;
     Ral_ErrorInfo errInfo ;
+    char const *name ;
 
-    /* relvar create relvarName heading ids */
-    if (objc != 5) {
-	Tcl_WrongNumArgs(interp, 2, objv, "relvarName heading ids") ;
+    /* relvar create relvarName heading id1 ?id2 id3 ...? */
+    if (objc < 5) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+                "relvarName heading id1 ?id2 id3 ...?") ;
 	return TCL_ERROR ;
     }
 
+    name = Tcl_GetString(objv[2]) ;
     Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelvar, Ral_OptCreate) ;
 
     /*
@@ -346,7 +349,11 @@ RelvarCreateCmd(
 	return TCL_ERROR ;
     }
 
-    return Ral_RelvarObjNew(interp, rInfo, Tcl_GetString(objv[2]), heading) ;
+    objc -= 4 ;
+    objv += 4 ;
+
+    return Ral_RelvarObjNew(interp, rInfo, name, heading, objc, objv,
+            &errInfo) ;
 }
 
 static int

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.41.2.2 $
-$Date: 2009/01/12 00:45:36 $
+$Revision: 1.41.2.3 $
+$Date: 2009/01/25 02:41:12 $
  *--
  */
 
@@ -143,7 +143,6 @@ static const struct traceOpsMap {
 } ;
 static const char specErrMsg[] = "multiplicity specification" ;
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.41.2.2 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -154,54 +153,133 @@ Ral_RelvarObjNew(
     Tcl_Interp *interp,
     Ral_RelvarInfo info,
     char const *name,
-    Ral_TupleHeading heading)
+    Ral_TupleHeading heading,
+    int idCnt,
+    Tcl_Obj *const*idAttrs,
+    Ral_ErrorInfo *errInfo)
 {
     Tcl_DString resolve ;
     char const *resolvedName ;
     Ral_Relvar relvar ;
     int status ;
+    struct relvarId *idIter ;
+    Ral_IntVector id ;
 
     /*
      * Creating a relvar is not allowed during an "eval" script.
      */
     if (Ral_RelvarIsTransOnGoing(info)) {
-	Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptCreate,
-	    RAL_ERR_BAD_TRANS_OP, "create") ;
+        Ral_ErrorInfoSetError(errInfo, RAL_ERR_BAD_TRANS_OP,
+            "relvar creation not allowed during a transaction") ;
+        Ral_InterpSetError(interp, errInfo) ;
 	return TCL_ERROR ;
     }
     /*
      * Create the relvar.
      */
     resolvedName = relvarResolveName(interp, name, &resolve) ;
-    relvar = Ral_RelvarNew(info, resolvedName, heading) ;
+    relvar = Ral_RelvarNew(info, resolvedName, heading, idCnt) ;
+    Tcl_DStringFree(&resolve) ;
     if (relvar == NULL) {
 	/*
 	 * Duplicate name.
 	 */
-	Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptCreate,
-	    RAL_ERR_DUP_NAME, resolvedName) ;
-	Tcl_DStringFree(&resolve) ;
+        Ral_ErrorInfoSetError(errInfo, RAL_ERR_DUP_NAME, resolvedName) ;
+        Ral_InterpSetError(interp, errInfo) ;
 	return TCL_ERROR ;
+    }
+    /*
+     * Deal with the identifiers. At this point the relvar structure
+     * has the space allocated for identifier information, but we need
+     * to look at the attribute lists to make sure they are well formed.
+     */
+    idIter = relvar->identifiers ;
+    while (idCnt-- != 0) {
+        int elemc ;
+        Tcl_Obj **elemv ;
+        struct relvarId *ckIter ;
+
+        if (Tcl_ListObjGetElements(interp, *idAttrs, &elemc, &elemv)
+                != TCL_OK) {
+            Ral_RelvarDelete(info, relvar) ;
+            return TCL_ERROR ;
+        }
+        /*
+         * Vector to hold the attribute indices that constitute the
+         * identifier.
+         */
+        id = Ral_IntVectorNewEmpty(elemc) ;
+        /*
+         * Find the attribute in the tuple heading and build up a vector of
+         * attributes indices that will form the identifier.
+         */
+        while (elemc-- > 0) {
+            const char *attrName = Tcl_GetString(*elemv++) ;
+            int index = Ral_TupleHeadingIndexOf(heading, attrName) ;
+            if (index < 0) {
+                Ral_ErrorInfoSetError(errInfo, RAL_ERR_UNKNOWN_ATTR, attrName) ;
+                goto errorOut ;
+            }
+            /*
+             * The indices in an identifier must form a set, i.e. you cannot
+             * have a duplicate attribute in a list of attributes that is
+             * intended to be an identifier of a relation.
+             */
+            if (!Ral_IntVectorSetAdd(id, index)) {
+                Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_DUP_ATTR_IN_ID,
+                        *idAttrs) ;
+                goto errorOut ;
+            }
+        }
+        /*
+         * Add the set of attribute indices as an identifier.
+         * Check if the identifier is not a subset of an existing one.
+         * Make sure the identifier is in canonical order.
+         */
+        Ral_IntVectorSort(id) ;
+        for (ckIter = relvar->identifiers ; ckIter != idIter ; ++ckIter) {
+            if (Ral_IntVectorSubsetOf(id, ckIter->idAttrs) ||
+                    Ral_IntVectorSubsetOf(ckIter->idAttrs, id)) {
+                Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_IDENTIFIER_SUBSET,
+                        *idAttrs) ;
+                goto errorOut ;
+            }
+        }
+        /*
+         * Finally add the attribute vector to the relvar structure and
+         * initialize the hash table that will be used to enforce
+         * the identity constraints.
+         */
+        idIter->idAttrs = id ;
+        Tcl_InitCustomHashTable(&idIter->idIndex, TCL_CUSTOM_PTR_KEYS,
+                &tupleAttrHashType) ;
+        ++idAttrs ;
+        ++idIter ;
     }
     /*
      * Create a variable by the same name.
      */
-    if (Tcl_SetVar2Ex(interp, resolvedName, NULL, relvar->relObj,
-	TCL_LEAVE_ERR_MSG) == NULL) {
-	Ral_RelvarDelete(info, resolvedName) ;
-	Tcl_DStringFree(&resolve) ;
+    if (Tcl_SetVar2Ex(interp, relvar->name, NULL, relvar->relObj,
+            TCL_LEAVE_ERR_MSG) == NULL) {
+        Ral_RelvarDelete(info, relvar) ;
 	return TCL_ERROR ;
     }
     /*
      * Set up a trace to make the Tcl variable read only.
      */
-    status = Tcl_TraceVar(interp, resolvedName, relvarTraceFlags,
+    status = Tcl_TraceVar(interp, relvar->name, relvarTraceFlags,
 	relvarTraceProc, info) ;
     assert(status == TCL_OK) ;
 
-    Tcl_DStringFree(&resolve) ;
     Tcl_SetObjResult(interp, relvar->relObj) ;
     return TCL_OK ;
+
+errorOut:
+    Ral_IntVectorDelete(id) ;
+    Ral_RelvarDelete(info, relvar) ;
+    Ral_InterpSetError(interp, errInfo) ;
+    return TCL_ERROR ;
+    
 }
 
 int
@@ -254,7 +332,7 @@ Ral_RelvarObjDelete(
 	return TCL_ERROR ;
     }
 
-    Ral_RelvarDelete(info, relvar->name) ;
+    Ral_RelvarDelete(info, relvar) ;
 
     Tcl_ResetResult(interp) ;
     return TCL_OK ;

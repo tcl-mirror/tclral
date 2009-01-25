@@ -1,7 +1,8 @@
 #!/bin/sh
 # \
 exec tclsh "$0" "$@"
-# This software is copyrighted 2004, 2005, 2006 by G. Andrew Mangogna.
+# This software is copyrighted 2004, 2005, 2006, 2007, 2008, 2009
+# by G. Andrew Mangogna.
 # The following terms apply to all files associated with the software unless
 # explicitly disclaimed in individual files.
 # 
@@ -50,8 +51,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.47.2.3 $
-# $Date: 2009/01/19 01:45:46 $
+# $Revision: 1.47.2.4 $
+# $Date: 2009/01/25 02:41:12 $
 #  *--
 
 package require tcltest 2.2
@@ -3148,19 +3149,15 @@ in expression "_@_< 20"} -returnCodes error
     } -match relation
 
     test relation-semijoin-6.1 {unknown using attribute} -setup {
-        relvar create A {A_ID string} A_ID
-        relvar create B {B_ID string} B_ID
-    } -cleanup {
-        relvar unset A B
+        set A [relation create {A_ID string}]
+        set B [relation create {B_ID string}]
     } -body {
         relation semijoin $A $B -using {A_ID A_ID}
     } -result {unknown attribute name, "A_ID"} -returnCodes error
 
     test relation-semijoin-6.2 {bad -using list} -setup {
-        relvar create A {A_ID string} A_ID
-        relvar create B {B_ID string} B_ID
-    } -cleanup {
-        relvar unset A B
+        set A [relation create {A_ID string}]
+        set B [relation create {B_ID string}]
     } -body {
         relation semijoin $A $B -using {A_ID}
     } -result {bad list of pairs, "A_ID"} -returnCodes error
@@ -3343,7 +3340,7 @@ in expression "_@_< 20"} -returnCodes error
 
     # relation tag subcommand
     test relation-tag-1.0 {relation scope -- ascending} -body {
-        relation tag $S -ascending SNAME NameOrder
+        relation tag $S NameOrder -ascending SNAME
     } -result {
         {S# string SNAME string STATUS int CITY string NameOrder int}
         {
@@ -3356,7 +3353,7 @@ in expression "_@_< 20"} -returnCodes error
     } -match relation
 
     test relation-tag-2.0 {relation scope -- descending} -body {
-        relation tag $S -descending SNAME NameOrder
+        relation tag $S NameOrder -descending SNAME
     } -result {
         {S# string SNAME string STATUS int CITY string NameOrder int}
         {
@@ -3369,7 +3366,7 @@ in expression "_@_< 20"} -returnCodes error
     } -match relation
 
     test relation-tag-3.0 {within scope} -body {
-        relation tag $SP -within S# SOrder
+        relation tag $SP SOrder -within S#
     } -result {
         {S# string P# string QTY int SOrder int}
         {
@@ -3389,7 +3386,7 @@ in expression "_@_< 20"} -returnCodes error
     } -match relation
 
     test relation-tag-3.1 {within scope -- descending P#} -body {
-        relation tag $SP -descending P# -within S# POrder
+        relation tag $SP POrder -descending P# -within S#
     } -result {
         {S# string P# string QTY int POrder int}
         {
@@ -3407,6 +3404,30 @@ in expression "_@_< 20"} -returnCodes error
             {S# S4 P# P5 QTY 400 POrder 0}
         }
     } -match relation
+
+    test relation-tag-4.1 {
+        duplicate tag attribute name
+    } -body {
+        relation tag $S SNAME
+    } -result {duplicate attribute name, "SNAME"} -returnCodes error
+
+    test relation-tag-4.2 {
+        contradicting sort options
+    } -body {
+        relation tag $S SNAME -descending SNAME -ascending SNAME
+    } -result {duplicate command option, "-ascending"} -returnCodes error
+
+    test relation-tag-4.3 {
+        contradicting sort options
+    } -body {
+        relation tag $S SNAME -within SNAME -within SNAME
+    } -result {duplicate command option, "-within"} -returnCodes error
+
+    test relation-tag-4.4 {
+        sorting on unknown attribute
+    } -body {
+        relation tag $S SNAME -ascending foo
+    } -result {unknown attribute name, "foo"} -returnCodes error
 
     # relation tclose subcommand
     test relation-tclose-1.0 {single path} -body {
@@ -3897,6 +3918,40 @@ in expression "_@_< 20"} -returnCodes error
     } -match relation
 
     # relvar Tests
+
+    # relvar create subcommand
+    test relvar-create-1.0 {
+        single attribute
+    } -body {
+        relvar create N {Name string} Name
+    } -cleanup {
+        relvar unset N
+    } -result {{Name string} {}} -match relation
+
+    test relvar-create-2.0 {
+        non-existent namespace
+    } -body {
+        relvar create ::ral::test::foo::N {Name string} Name
+    } -result {can't set "::ral::test::foo::N": parent namespace doesn't exist}\
+    -returnCodes error
+
+    test relvar-create-2.1 {
+        no such id attribute
+    } -body {
+        relvar create N {Name string} foo
+    } -result {unknown attribute name, "foo"} -returnCodes error
+
+    test relvar-create-2.2 {
+        duplicate attribute in an identifier
+    } -body {
+        relvar create N {Name string} {Name Name}
+    } -result {duplicate attribute name in identifier attribute set, "Name Name"} -returnCodes error
+
+    test relvar-create-2.3 {
+        identifiers that are subsets of each other
+    } -body {
+        relvar create N {Name string Address string} Name {Name Address}
+    } -result {identifiers must not be subsets of other identifiers, "Name Address"} -returnCodes error
 
 if 0 {
     # relvar association subcommand
@@ -4407,19 +4462,6 @@ tuple {C1 c C2 42} references no tuple
         }
         return
     } -result {}
-
-    # relvar create subcommand
-    test relvar-create-1.0 {single attribute} -body {
-        relvar create N {Relation {Name string} Name}
-    } -cleanup {
-        relvar unset N
-    } -result {Relation {Name string} Name {}} -match relation
-
-    test relvar-create-2.0 {non-existent namespace} -body {
-        relvar create ::ral::test::foo::N {Relation {Name string} Name}
-    } -cleanup {
-    } -result {can't set "::ral::test::foo::N": parent namespace doesn't exist}\
-    -returnCodes error
 
     # relvar delete subcommand
     test relvar-delete-1.0 {expression is false} -setup {

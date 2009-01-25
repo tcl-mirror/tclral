@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleobj.c,v $
-$Revision: 1.14.2.1 $
-$Date: 2009/01/02 00:32:19 $
+$Revision: 1.14.2.2 $
+$Date: 2009/01/25 02:41:12 $
  *--
  */
 
@@ -110,7 +110,7 @@ Tcl_ObjType Ral_TupleObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tupleobj.c,v $ $Revision: 1.14.2.1 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tupleobj.c,v $ $Revision: 1.14.2.2 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -247,7 +247,7 @@ Ral_TupleHeadingAttrsFromVect(
      * tuple heading.
      */
     while (objc-- > 0) {
-	const char *attrName = Tcl_GetString(*objv++) ;
+	char const *attrName = Tcl_GetString(*objv++) ;
 	int attrIndex = Ral_TupleHeadingIndexOf(heading, attrName) ;
 	if (attrIndex >= 0) {
 	    /*
@@ -258,7 +258,8 @@ Ral_TupleHeadingAttrsFromVect(
 	    Ral_InterpErrorInfo(interp, Ral_CmdUnknown, Ral_OptNone,
 		RAL_ERR_UNKNOWN_ATTR, attrName) ;
 	    Ral_IntVectorDelete(attrVector) ;
-	    return NULL ;
+            attrVector = NULL ;
+            break ;
 	}
     }
 

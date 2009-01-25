@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_utils.c,v $
-$Revision: 1.19.2.1 $
-$Date: 2009/01/19 01:45:46 $
+$Revision: 1.19.2.2 $
+$Date: 2009/01/25 02:41:12 $
  *--
  */
 
@@ -88,7 +88,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_utils.c,v $ $Revision: 1.19.2.1 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_utils.c,v $ $Revision: 1.19.2.2 $" ;
 
 static char const * const cmdStrings[] = {
     "unknown command",
@@ -180,6 +180,7 @@ static char const * const resultStrings[] = {
     "bad type keyword",
     "wrong number of attributes specified",
     "bad list of pairs",
+    "duplicate command option",
 
     "relations of non-zero degree must have at least one identifier",
     "identifiers must have at least one attribute",
