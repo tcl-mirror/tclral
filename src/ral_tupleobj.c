@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleobj.c,v $
-$Revision: 1.14.2.2 $
-$Date: 2009/01/25 02:41:12 $
+$Revision: 1.14.2.3 $
+$Date: 2009/02/02 01:30:33 $
  *--
  */
 
@@ -110,7 +110,7 @@ Tcl_ObjType Ral_TupleObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tupleobj.c,v $ $Revision: 1.14.2.2 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tupleobj.c,v $ $Revision: 1.14.2.3 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -337,6 +337,86 @@ errorOut:
     Ral_IntVectorDelete(attrStatus) ;
     Ral_InterpSetError(interp, errInfo) ;
     return TCL_ERROR ;
+}
+
+/*
+ * Construct a tuple from a name / value list. Obtain the data type information
+ * from the "tuple" argument and insist that there are no unknown attribute
+ * names. But allow the tuple to be "short", i.e. some of the attributes may
+ * not be present. Return the newly created tuple object.
+ */
+Tcl_Obj *
+Ral_TuplePartialSetFromObj(
+    Ral_TupleHeading heading,
+    Tcl_Interp *interp,
+    Tcl_Obj *objPtr,
+    Ral_ErrorInfo *errInfo)
+{
+    int elemc ;
+    Tcl_Obj **elemv ;
+    Ral_TupleHeading newHeading ;
+    Ral_Tuple newTuple ;
+
+    if (Tcl_ListObjGetElements(interp, objPtr, &elemc, &elemv) != TCL_OK) {
+	return NULL ;
+    }
+    /*
+     * We must have attribute name / value pairs.
+     */
+    if (elemc % 2 != 0) {
+	Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_BAD_PAIRS_LIST, objPtr) ;
+	Ral_InterpSetError(interp, errInfo) ;
+	return NULL ;
+    }
+    newHeading = Ral_TupleHeadingNew(elemc / 2) ;
+    newTuple = Ral_TupleNew(newHeading) ;
+    /*
+     * Go through the attribute / value pairs making sure that that each
+     * attribute is known in the tuple. If so then add the attribute
+     * to the heading and also add its value to the tuple.
+     */
+    for ( ; elemc > 0 ; elemc -= 2, elemv += 2) {
+	const char *attrName ;
+        Tcl_Obj *value ;
+	Ral_TupleHeadingIter found ;
+        int status ;
+	Ral_TupleHeadingIter aIter ;
+
+	attrName = Tcl_GetString(*elemv) ;
+        value = *(elemv + 1) ;
+
+	found = Ral_TupleHeadingFind(heading, attrName) ;
+	if (found == Ral_TupleHeadingEnd(heading)) {
+	    Ral_ErrorInfoSetError(errInfo, RAL_ERR_UNKNOWN_ATTR, attrName) ;
+            Ral_InterpSetError(interp, errInfo) ;
+            goto errorOut ;
+	}
+        status = Ral_TupleHeadingAppend(heading, found, found + 1, newHeading) ;
+        if (status == 0) {
+	    Ral_ErrorInfoSetError(errInfo, RAL_ERR_DUPLICATE_ATTR, attrName) ;
+            Ral_InterpSetError(interp, errInfo) ;
+            goto errorOut ;
+        }
+        /*
+         * Convert the value to the type of the attribute.
+         */
+        aIter = Ral_TupleHeadingEnd(newHeading) - 1 ;
+        if (Ral_AttributeConvertValueToType(interp, *aIter, value, errInfo)
+                != TCL_OK) {
+            goto errorOut ;
+        }
+        /*
+         * Update the tuple to the new value.
+         */
+        newTuple->values[aIter - Ral_TupleHeadingBegin(newHeading)] = value ;
+        Tcl_IncrRefCount(value) ;
+    }
+
+    return Ral_TupleObjNew(newTuple) ;
+
+errorOut:
+    Ral_TupleDelete(newTuple) ;
+    return NULL ;
 }
 
 /*

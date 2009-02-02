@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.41.2.3 $
-$Date: 2009/01/25 02:41:12 $
+$Revision: 1.41.2.4 $
+$Date: 2009/02/02 01:30:33 $
  *--
  */
 
@@ -201,6 +201,13 @@ Ral_RelvarObjNew(
 
         if (Tcl_ListObjGetElements(interp, *idAttrs, &elemc, &elemv)
                 != TCL_OK) {
+            Ral_RelvarDelete(info, relvar) ;
+            return TCL_ERROR ;
+        }
+        if (elemc < 1) {
+            Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_IDENTIFIER_FORMAT,
+                    *idAttrs) ;
+            Ral_InterpSetError(interp, errInfo) ;
             Ral_RelvarDelete(info, relvar) ;
             return TCL_ERROR ;
         }
@@ -454,7 +461,7 @@ Ral_RelvarObjFindRelvar(
  * Returns a tuple object. This tuple object will be the final result
  * of any trace operations.
  */
-Tcl_Obj *
+int
 Ral_RelvarObjInsertTuple(
     Tcl_Interp *interp,
     Ral_Relvar relvar,
@@ -462,62 +469,63 @@ Ral_RelvarObjInsertTuple(
     Ral_ErrorInfo *errInfo)
 {
     Ral_Relation relation ;
-    Ral_Tuple tuple ;
+    Tcl_Obj *tupleObj ;
     Tcl_Obj *resultObj ;
+    int result = 0 ;
 
     assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
     relation = relvar->relObj->internalRep.otherValuePtr ;
 
     /*
-     * Make the new tuple refer to the heading contained in the relation.
+     * Create a new tuple object from the list of attribute / value pairs. It
+     * is allowed that there be fewer attributes than the tuple heading so that
+     * variable traces may extend the tuple.
      */
-    tuple = Ral_TupleNew(relation->heading) ;
-    /*
-     * Set the values of the attributes from the list of attribute / value
-     * pairs.
-     */
-    /*
-     * HERE -- Ral_TupleSetFromObj() insists that all attributes be set.
-     * Need something that is not so strict so that the insert traces
-     * can fill out the rest of the heading.
-     */
-    if (Ral_TupleSetFromObj(tuple, interp, nameValueObj, errInfo) != TCL_OK) {
-	Ral_TupleDelete(tuple) ;
-	return NULL ;
+    tupleObj = Ral_TuplePartialSetFromObj(relation->heading, interp,
+            nameValueObj, errInfo) ;
+    if (tupleObj == NULL) {
+	return 0 ;
     }
     /*
-     * Run the traces and get the result back.
+     * Run the traces and get the result back. "resultObj" will have
+     * a reference count of at least one and will need to be decremented.
      */
-    resultObj = Ral_RelvarObjExecInsertTraces(interp, relvar,
-	Ral_TupleObjNew(tuple)) ;
+    resultObj = Ral_RelvarObjExecInsertTraces(interp, relvar, tupleObj) ;
     if (resultObj) {
+        Ral_Tuple tuple ;
 	/*
 	 * Objects returned have already been converted to tuples.
 	 * Insert the tuple into the relation.
 	 */
 	assert(resultObj->typePtr == &Ral_TupleObjType) ;
 	tuple = resultObj->internalRep.otherValuePtr ;
-	/*
-	 * HERE -- check that the tuple heading did not change after
-	 * the traces. Ral_RelationPushBack() only asserts that.
-	 */
-	if (!Ral_RelationPushBack(relation, tuple, NULL)) {
-	    Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_DUPLICATE_TUPLE,
-		resultObj) ;
-	    Ral_InterpSetError(interp, errInfo) ;
-	    /*
-	     * HERE
-	     * Somethings not quite right here.
-	     * We get a memory crash if we don't increment the ref count
-	     * first.
-	     */
-	    Tcl_IncrRefCount(resultObj) ;
-	    Tcl_DecrRefCount(resultObj) ;
-	    resultObj = NULL ;
-	}
+        /*
+         * Check that the relvar traces did not return a heading
+         * that no longer matches that of the relation value.
+         */
+        if (Ral_TupleHeadingEqual(relation->heading, tuple->heading)) {
+            Ral_IntVector orderMap ;
+            /*
+             * Since the traces may return a tuple heading of any order
+             * we must make sure to reorder things if necessary.
+             */
+            orderMap = Ral_TupleHeadingNewOrderMap(relation->heading,
+                    tuple->heading) ;
+            if (Ral_RelvarInsertTuple(relvar, tuple, orderMap, errInfo)) {
+                result = 1 ;
+            } else {
+                Ral_InterpSetError(interp, errInfo) ;
+            }
+            Ral_IntVectorDelete(orderMap) ;
+        } else {
+            Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_HEADING_NOT_EQUAL,
+                    resultObj) ;
+            Ral_InterpSetError(interp, errInfo) ;
+        }
+        Tcl_DecrRefCount(resultObj) ;
     }
 
-    return resultObj ;
+    return result ;
 }
 
 int
@@ -1891,6 +1899,12 @@ Ral_RelvarObjExecInsertTraces(
     Ral_Relvar relvar,
     Tcl_Obj *insertTuple)
 {
+    /*
+     * Hold on to the insert tuple. This function returns an object that
+     * has a reference count of at least one. The caller must decrement
+     * the reference count.
+     */
+    Tcl_IncrRefCount(insertTuple) ;
     if (relvar->traces && relvar->traceFlags == 0) {
 	relvar->traceFlags = TRACEOP_INSERT_FLAG ;
 	insertTuple = Ral_RelvarObjExecTraces(interp, relvar, &Ral_TupleObjType,
@@ -2021,7 +2035,7 @@ Ral_RelvarObjExecEvalTraces(
 		 * Break out the list as a array of argments and evaluate it.
 		 */
 		if (Tcl_ListObjGetElements(interp, cmd, &cmdc, &cmdv)
-		    == TCL_OK) {
+                        == TCL_OK) {
 		    Tcl_EvalObjv(interp, cmdc, cmdv, TCL_EVAL_DIRECT) ;
 		}
 		Tcl_DecrRefCount(cmd) ;
@@ -2378,9 +2392,12 @@ Ral_RelvarObjExecTraces(
 		 * Break out the list as a array of argments and evaluate it.
 		 */
 		if (Tcl_ListObjGetElements(interp, cmd, &cmdc, &cmdv)
-			!= TCL_OK ||
-		    Tcl_EvalObjv(interp, cmdc, cmdv, TCL_EVAL_DIRECT)
-			!= TCL_OK) {
+                            != TCL_OK ||
+                        Tcl_EvalObjv(interp, cmdc, cmdv, TCL_EVAL_DIRECT)
+                            != TCL_OK) {
+                    if (traceObj) {
+                        Tcl_DecrRefCount(traceObj) ;
+                    }
 		    goto cmdError ;
 		}
 		if (type != NULL) {
@@ -2390,7 +2407,12 @@ Ral_RelvarObjExecTraces(
 		     * proc we fish it out of the interpreter and make
 		     * sure that it is of the proper type.
 		     */
+                    if (traceObj) {
+                        Tcl_DecrRefCount(traceObj) ;
+                    }
 		    traceObj = Tcl_GetObjResult(interp) ;
+                    Tcl_IncrRefCount(traceObj) ;
+                    Tcl_ResetResult(interp) ;
 		    result = Tcl_ConvertToType(interp, traceObj, type) ;
 		    /*
 		     * If we got the correct object type, then we pass it

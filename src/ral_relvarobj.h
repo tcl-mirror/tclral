@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.h,v $
-$Revision: 1.17.2.2 $
-$Date: 2009/01/25 02:41:12 $
+$Revision: 1.17.2.3 $
+$Date: 2009/02/02 01:30:33 $
  *--
  */
 #ifndef _ral_relvarobj_h_
@@ -88,7 +88,7 @@ extern int Ral_RelvarObjDelete(Tcl_Interp *, Ral_RelvarInfo, Tcl_Obj *) ;
 extern int Ral_RelvarObjCopyOnShared(Tcl_Interp *, Ral_RelvarInfo, Ral_Relvar) ;
 extern Ral_Relvar Ral_RelvarObjFindRelvar(Tcl_Interp *, Ral_RelvarInfo,
     char const *) ;
-extern Tcl_Obj *Ral_RelvarObjInsertTuple(Tcl_Interp *, Ral_Relvar, Tcl_Obj *,
+extern int Ral_RelvarObjInsertTuple(Tcl_Interp *, Ral_Relvar, Tcl_Obj *,
     Ral_ErrorInfo *) ;
 extern int Ral_RelvarObjUpdateTuple(Tcl_Interp *, Ral_Relvar, Ral_Relation,
     Ral_RelationIter, Tcl_Obj *, Tcl_Obj *, Ral_Relation, Ral_ErrorInfo *) ;

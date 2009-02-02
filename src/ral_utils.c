@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_utils.c,v $
-$Revision: 1.19.2.2 $
-$Date: 2009/01/25 02:41:12 $
+$Revision: 1.19.2.3 $
+$Date: 2009/02/02 01:30:33 $
  *--
  */
 
@@ -88,7 +88,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_utils.c,v $ $Revision: 1.19.2.2 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_utils.c,v $ $Revision: 1.19.2.3 $" ;
 
 static char const * const cmdStrings[] = {
     "unknown command",
@@ -185,6 +185,7 @@ static char const * const resultStrings[] = {
     "relations of non-zero degree must have at least one identifier",
     "identifiers must have at least one attribute",
     "identifiers must not be subsets of other identifiers",
+    "tuple has duplicate values for an identifier",
     "duplicate attribute name in identifier attribute set",
     "duplicate tuple",
     "headings not equal",

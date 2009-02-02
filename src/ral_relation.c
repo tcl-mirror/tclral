@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.36.2.3 $
-$Date: 2009/01/25 02:41:12 $
+$Revision: 1.36.2.4 $
+$Date: 2009/02/02 01:30:33 $
  *--
  */
 
@@ -332,9 +332,9 @@ Ral_RelationPushBack(
 	Ral_TupleDupOrdered(tuple, relation->heading, orderMap) : tuple ;
     Ral_TupleReference(insertTuple) ;
 
-    if (Ral_RelationIndexTuple(relation, insertTuple, relation->finish)) {
+    status = Ral_RelationIndexTuple(relation, insertTuple, relation->finish) ;
+    if (status) {
 	Ral_TupleReference(*relation->finish++ = insertTuple) ;
-	status = 1 ;
     }
 
     Ral_TupleUnreference(insertTuple) ;
@@ -982,7 +982,7 @@ Ral_RelationJoin(
 }
 
 /*
- * Compose of two relations. Like compose, except all the compose attributes
+ * Compose of two relations. Like join, except all the join attributes
  * are elminated.
  */
 Ral_Relation
@@ -1764,6 +1764,9 @@ Ral_RelationFind(
             Ral_RelationEnd(relation) ;
 }
 
+/*
+ * Create a new relation that contains a given set of tuples.
+ */
 Ral_Relation
 Ral_RelationExtract(
     Ral_Relation relation,

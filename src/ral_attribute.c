@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.c,v $
-$Revision: 1.25.2.3 $
-$Date: 2009/01/19 01:45:46 $
+$Revision: 1.25.2.4 $
+$Date: 2009/02/02 01:30:33 $
  *--
  */
 
@@ -214,7 +214,7 @@ static struct ral_type const Ral_Types[] = {
 
 static char const openList = '{' ;
 static char const closeList = '}' ;
-static char const rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.25.2.3 $" ;
+static char const rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.25.2.4 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -405,11 +405,17 @@ Ral_AttributeValueEqual(
     Tcl_Obj *v2)
 {
     int isEqual = 0 ;
+    int v1len ;
+    int v2len ;
 
     switch (a->attrType) {
     case Tcl_Type:
-	if (strlen(Tcl_GetString(v1)) == 0 && strlen(Tcl_GetString(v2)) == 0) {
+        (void)Tcl_GetStringFromObj(v1, &v1len) ;
+        (void)Tcl_GetStringFromObj(v2, &v2len) ;
+        if (v1len == 0 && v2len == 0) {
 	    isEqual = 1 ;
+        } else if ((v1len != 0 && v2len == 0) || (v1len == 0 && v2len != 0)) {
+            isEqual = 0 ;
 	} else {
 	    struct ral_type *type = findRalType(a->typeName) ;
 	    isEqual = type ? type->isequal(v1, v2) : stringEqual(v1, v2) ;
@@ -602,6 +608,7 @@ Ral_AttributeConvertValueToType(
     Ral_ErrorInfo *errInfo)
 {
     int result = TCL_OK ;
+    int len ;
 
     switch (attr->attrType) {
     case Tcl_Type:
@@ -619,7 +626,8 @@ Ral_AttributeConvertValueToType(
 	 * Also, we deem the empty string to be a valid value for any
 	 * simple Tcl type.
 	 */
-	if (strlen(Tcl_GetString(objPtr)) != 0) {
+        (void)Tcl_GetStringFromObj(objPtr, &len) ;
+	if (len != 0) {
 	    struct ral_type *type = findRalType(attr->typeName) ;
 	    result = type ? type->isa(interp, objPtr) :
 		    isAString(interp, objPtr) ;
@@ -660,16 +668,33 @@ Ral_AttributeHashValue(
 {
     struct ral_type *type ;
     unsigned result = 0 ;
+    int olen ;
 
     switch (attr->attrType) {
     case Tcl_Type:
-	/*
-	 * For simple Tcl types, use the shadow type system to hash the value.
-	 */
-        type = findRalType(attr->typeName) ;
-        result = type ? type->hash(objPtr) : stringHash(objPtr) ;
+        (void)Tcl_GetStringFromObj(objPtr, &olen) ;
+        if (olen == 0) {
+	    result = 0 ;
+	} else {
+            /*
+             * For simple Tcl types, use the shadow type system to hash the
+             * value.
+             */
+            type = findRalType(attr->typeName) ;
+            result = type ? type->hash(objPtr) : stringHash(objPtr) ;
+        }
 	break ;
-
+        /*
+         * N.B. That we don't allow tuple or relation valued attributes to
+         * contribute to the hash value. To do so would imply that we must put
+         * the attribute value into some canonical order because hashing
+         * insists that value that are equal must produce the same hash value.
+         * This approach probably makes the hashing function less effective but
+         * avoids problems with defining a canonical order. In the end all
+         * hashing must compare the key to the value found in a hash bucket and
+         * the comparison is well defined even if computing a hash value is
+         * not.
+         */
     case Tuple_Type:
     case Relation_Type:
         result = 0 ;
@@ -1197,8 +1222,11 @@ static unsigned
 stringHash(
     Tcl_Obj *stringObj)
 {
-    char const *s = Tcl_GetString(stringObj) ;
-    return hashBytes(s, stringObj->length) ;
+    int slen ;
+    char const *s ;
+    
+    s = Tcl_GetStringFromObj(stringObj, &slen) ;
+    return hashBytes(s, slen) ;
 }
 
 /*

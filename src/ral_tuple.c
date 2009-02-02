@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuple.c,v $
-$Revision: 1.13.2.3 $
-$Date: 2009/01/19 01:45:46 $
+$Revision: 1.13.2.4 $
+$Date: 2009/02/02 01:30:33 $
  *--
  */
 
@@ -92,7 +92,7 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_tuple.c,v $ $Revision: 1.13.2.3 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_tuple.c,v $ $Revision: 1.13.2.4 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -359,7 +359,7 @@ Ral_TupleUpdateAttrValue(
      * Convert the value to the type of the attribute.
      */
     if (Ral_AttributeConvertValueToType(NULL, attribute, value, errInfo)
-	!= TCL_OK) {
+            != TCL_OK) {
 	Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_BAD_VALUE, value) ;
 	return 0 ;
     }

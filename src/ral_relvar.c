@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.c,v $
-$Revision: 1.19.2.3 $
-$Date: 2009/01/25 02:41:12 $
+$Revision: 1.19.2.4 $
+$Date: 2009/02/02 01:30:33 $
  *--
  */
 
@@ -63,6 +63,7 @@ INCLUDE FILES
 #include "ral_tupleheading.h"
 #include "ral_relationobj.h"
 #include "ral_relation.h"
+#include "ral_utils.h"
 
 /*
 MACRO DEFINITIONS
@@ -82,7 +83,9 @@ FORWARD FUNCTION REFERENCES
 static void relvarCleanup(Ral_Relvar) ;
 static void relvarConstraintCleanup(Ral_Constraint) ;
 static void relvarTraceCleanup(Ral_TraceInfo) ;
-static void relvarSetIntRep(Ral_Relvar, Ral_Relation) ;
+static int relvarSetIntRep(Ral_Relvar, Ral_Relation, Ral_ErrorInfo *) ;
+static int relvarIndexIds(Ral_Relvar, Ral_Relation, Ral_ErrorInfo *) ;
+static int relvarIdIndexTuple(Ral_Relvar, Ral_Tuple, int, Ral_ErrorInfo *) ;
 static int relvarAssocConstraintEval(char const *, Ral_AssociationConstraint,
     Tcl_DString *) ;
 static int relvarPartitionConstraintEval(char const *,
@@ -121,7 +124,7 @@ static char const * const condMultStrings[2][2] = {
     {"1", "+"},
     {"?", "*"}
 } ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.19.2.3 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.19.2.4 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -752,16 +755,16 @@ Ral_RelvarConstraintEval(
     /* NOT REACHED */
 }
 
-void
+int
 Ral_RelvarSetRelation(
     Ral_Relvar relvar,
-    Tcl_Obj *newRelObj)
+    Tcl_Obj *newRelObj,
+    Ral_ErrorInfo *errInfo)
 {
     Ral_Relation oldRel ;
     Ral_Relation newRel ;
     Ral_Relation copyRel ;
     Ral_IntVector orderMap ;
-    int copied ;
 
     assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
     oldRel = relvar->relObj->internalRep.otherValuePtr ;
@@ -777,6 +780,8 @@ Ral_RelvarSetRelation(
      */
     orderMap = Ral_TupleHeadingNewOrderMap(oldRel->heading, newRel->heading) ;
     if (orderMap) {
+        int copied ;
+
 	copyRel = Ral_RelationNew(oldRel->heading) ;
 	Ral_RelationReserve(copyRel, Ral_RelationCardinality(newRel)) ;
 	copied = Ral_RelationCopy(newRel, Ral_RelationBegin(newRel),
@@ -789,7 +794,43 @@ Ral_RelvarSetRelation(
     /*
      * Free up the old relation and install the copy.
      */
-    relvarSetIntRep(relvar, copyRel) ;
+    return relvarSetIntRep(relvar, copyRel, errInfo) ;
+}
+
+/*
+ * Insert a tuple into the relation value held in a relvar.
+ * Update the index of the relation value and update the hash tables
+ * of the identifiers.
+ */
+int
+Ral_RelvarInsertTuple(
+    Ral_Relvar relvar,
+    Ral_Tuple tuple,
+    Ral_IntVector orderMap,
+    Ral_ErrorInfo *errInfo)
+{
+    Ral_Relation relation ;
+    int where ;
+
+    assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
+    relation = relvar->relObj->internalRep.otherValuePtr ;
+    if (!Ral_RelationPushBack(relation, tuple, orderMap)) {
+        char *tupString = Ral_TupleStringOf(tuple) ;
+        Ral_ErrorInfoSetError(errInfo, RAL_ERR_DUPLICATE_TUPLE, tupString) ;
+        ckfree(tupString) ;
+        return 0 ;
+    }
+    /*
+     * Fetch the tuple from the relation in case Ral_RelationPushBack()
+     * had to reorder the tuple upon insertion.
+     */
+    where = Ral_RelationCardinality(relation) - 1 ;
+    if (!relvarIdIndexTuple(relvar, *(Ral_RelationBegin(relation) + where),
+            where, errInfo)) {
+        return 0 ;
+    }
+
+    return 1 ;
 }
 
 /*
@@ -801,8 +842,11 @@ Ral_RelvarRestorePrev(
     Ral_Relvar relvar)
 {
     Ral_Relation oldRel = Ral_PtrVectorBack(relvar->transStack) ;
+    int status ;
+
     Ral_PtrVectorPopBack(relvar->transStack) ;
-    relvarSetIntRep(relvar, oldRel) ;
+    status = relvarSetIntRep(relvar, oldRel, NULL) ;
+    assert(status != 0) ;
 }
 
 void
@@ -998,16 +1042,137 @@ relvarTraceCleanup(
     ckfree((char *)trace) ;
 }
 
-static void
+static int
 relvarSetIntRep(
     Ral_Relvar relvar,
-    Ral_Relation relation)
+    Ral_Relation relation,
+    Ral_ErrorInfo *errInfo)
 {
+    int result ;
+
     assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
-    relvar->relObj->typePtr->freeIntRepProc(relvar->relObj) ;
-    relvar->relObj->internalRep.otherValuePtr = relation ;
-    relvar->relObj->typePtr = &Ral_RelationObjType ;
-    Tcl_InvalidateStringRep(relvar->relObj) ;
+    if (relvarIndexIds(relvar, relation, errInfo)) {
+        /*
+         * This is rather underhanded, but remember we have a variable
+         * that holds a reference to this value and we are trying to
+         * swap out the value without the variable reference knowing
+         * any different.
+         */
+        relvar->relObj->typePtr->freeIntRepProc(relvar->relObj) ;
+        relvar->relObj->internalRep.otherValuePtr = relation ;
+        /*
+         * The "freeIntRepProc" will NULL out the type pointer.
+         */
+        relvar->relObj->typePtr = &Ral_RelationObjType ;
+        Tcl_InvalidateStringRep(relvar->relObj) ;
+        result = 1 ;
+    } else {
+        /*
+         * We failed the identify constraints! We must now restore the
+         * old values of the hash tables. We do this by reindexing the
+         * old relation value. Failure is costly, but does not happen
+         * that often.
+         */
+        int status ;
+
+        status = relvarIndexIds(relvar,
+                relvar->relObj->internalRep.otherValuePtr, NULL) ;
+        assert(status != 0) ;
+        result = 0 ;
+    }
+
+    return result ;
+}
+
+/*
+ * Compute the hash table indices for the identifiers of "relvar" as if the
+ * relation given by "relation" is to become the new relvar value.  This
+ * enforces the identity constraints. If any tuple contains values for
+ * identifying attributes that duplicate those in another tuple, then the
+ * indexing stops and the function returns 0. Otherwise all the hash tables
+ * that index for the identifiers are computed and the function returns 1.
+ * This function wipes out the old hash tables and installs new ones.
+ * On failure, the new hash tables may be only partially completed.
+ */
+static int
+relvarIndexIds(
+    Ral_Relvar relvar,
+    Ral_Relation relation,
+    Ral_ErrorInfo *errInfo)
+{
+    int cnt ;
+    struct relvarId *idIter ;
+    Ral_RelationIter rIter ;
+
+    /*
+     * Iterate through the identifier indices, delete the old hash
+     * tables and create new ones.
+     */
+    for (idIter = relvar->identifiers, cnt = relvar->idCount ; cnt != 0 ;
+            ++idIter, --cnt) {
+        Tcl_DeleteHashTable(&idIter->idIndex) ;
+        Tcl_InitCustomHashTable(&idIter->idIndex, TCL_CUSTOM_PTR_KEYS,
+                &tupleAttrHashType) ;
+    }
+    /*
+     * Iterate through each tuple of the relation and create a hash
+     * entry that maps the values of the identifying attributes to the
+     * offset of the tuple in the relation array storage.
+     */
+    for (rIter = Ral_RelationBegin(relation) ;
+            rIter != Ral_RelationEnd(relation) ; ++rIter) {
+        if (!relvarIdIndexTuple(relvar, *rIter,
+                rIter - Ral_RelationBegin(relation), errInfo)) {
+            return 0 ;
+        }
+    }
+
+    return 1 ;
+}
+
+static int
+relvarIdIndexTuple(
+    Ral_Relvar relvar,
+    Ral_Tuple tuple,
+    int where,
+    Ral_ErrorInfo *errInfo)
+{
+    struct relvarId *idIter ;
+    int cnt ;
+    struct Ral_TupleAttrHashKey key ;
+    key.tuple = tuple ;
+
+    /*
+     * Iterate through the identifier indices and compute new hash entries
+     * for the identifying attributes.
+     */
+    for (idIter = relvar->identifiers, cnt = relvar->idCount ; cnt != 0 ;
+            ++idIter, --cnt) {
+        Tcl_HashEntry *entry ;
+        int newPtr ;
+
+        key.attrs = idIter->idAttrs ;
+
+        entry = Tcl_CreateHashEntry(&idIter->idIndex, (char const *)&key,
+                &newPtr) ;
+        if (newPtr) {
+            Tcl_SetHashValue(entry, where) ;
+        } else {
+            /*
+             * We must create a new entry on each tuple or we have
+             * violated the identifying constraints.
+             */
+            if (errInfo) {
+                char *tupString = Ral_TupleStringOf(tuple) ;
+                Ral_ErrorInfoSetError(errInfo, RAL_ERR_IDENTITY_CONSTRAINT,
+                        tupString) ;
+                ckfree(tupString) ;
+            }
+            return 0 ;
+        }
+    }
+
+    return 1 ;
 }
 
 /*

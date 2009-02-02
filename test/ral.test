@@ -51,8 +51,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.47.2.4 $
-# $Date: 2009/01/25 02:41:12 $
+# $Revision: 1.47.2.5 $
+# $Date: 2009/02/02 01:30:33 $
 #  *--
 
 package require tcltest 2.2
@@ -3953,6 +3953,494 @@ in expression "_@_< 20"} -returnCodes error
         relvar create N {Name string Address string} Name {Name Address}
     } -result {identifiers must not be subsets of other identifiers, "Name Address"} -returnCodes error
 
+    test relvar-create-2.4 {
+        empty list as an identifier
+    } -body {
+        relvar create N {A1 string B1 int} {}
+    } -result {identifiers must have at least one attribute, ""}\
+    -returnCodes error
+
+    test relvar-create-2.5 {
+        bad list as identifier
+    } -body {
+        relvar create N {A1 string B1 int} \{
+    } -result {unmatched open brace in list}\
+    -returnCodes error
+
+    # relvar names subcommand
+    test relvar-names-1.0 {simple list of names} -setup {
+        relvar create SV {S# string SNAME string STATUS int CITY string} S#
+        relvar create PV\
+            {P# string PNAME string COLOR string WEIGHT double CITY string}\
+            P#
+        relvar create SPV {S# string P# string QTY int} {S# P#}
+    } -body {
+        lsort [relvar names]
+    } -cleanup {
+        relvar unset SV PV SPV
+    } -result {::ral::test::PV ::ral::test::SPV ::ral::test::SV}
+
+    # relvar path subcommand
+    test relvar-path-1.0 {path name} -setup {
+        relvar create R {S# string SNAME string STATUS int CITY string} S#
+    } -body {
+        relvar path R
+    } -cleanup {
+        relvar unset R
+    } -result {::ral::test::R}
+
+    # relvar set subcommand
+    test relvar-set-1.0 {simple assignment} -body {
+        relvar create SV\
+            {S# string SNAME string STATUS int CITY string} S#
+        relvar set SV $S
+    } -cleanup {
+        relvar unset SV
+    } -result {
+        {S# string SNAME string STATUS int CITY string}
+        {
+            {S# S1 SNAME Smith STATUS 20 CITY London}
+            {S# S2 SNAME Jones STATUS 10 CITY Paris}
+            {S# S3 SNAME Blake STATUS 30 CITY Paris}
+            {S# S4 SNAME Clark STATUS 20 CITY London}
+            {S# S5 SNAME Adams STATUS 30 CITY Athens}
+        }
+    } -match relation
+
+    test relvar-set-2.0 {name resolution} -setup {
+        relvar create ::R {R# string RNAME string} R#
+    } -cleanup {
+        relvar unset ::R
+    } -body {
+        relvar set R [relation create {R# string RNAME string}\
+            {R# 1 RNAME First}]
+        relvar set ::R
+    } -result {
+        {R# string RNAME string}
+        {
+            {R# 1 RNAME First}
+        }
+    } -match relation
+
+    test relvar-set-3.0 {Tcl variable is also modified} -body {
+        relvar create SV\
+            {S# string SNAME string STATUS int CITY string} S#
+        relvar set SV $S
+        set SV
+    } -cleanup {
+        relvar unset SV
+    } -result {
+        {S# string SNAME string STATUS int CITY string}
+        {
+            {S# S1 SNAME Smith STATUS 20 CITY London}
+            {S# S2 SNAME Jones STATUS 10 CITY Paris}
+            {S# S3 SNAME Blake STATUS 30 CITY Paris}
+            {S# S4 SNAME Clark STATUS 20 CITY London}
+            {S# S5 SNAME Adams STATUS 30 CITY Athens}
+        }
+    } -match relation
+
+    test relvar-set-4.0 {
+        fails identity constraints
+    } -setup {
+        relvar create ID {Name string Age int} Name
+    } -cleanup {
+        relvar unset ID
+    } -body {
+        relvar set ID [relation create\
+            {Name string Age int}\
+            {Name Andrew Age 30}\
+            {Name Andrew Age 32}\
+        ]
+    } -result {tuple has duplicate values for an identifier, "{Name string Age int} {Name Andrew Age 32}"}\
+    -returnCodes error
+
+    test relvar-set-4.1 {
+        fails identity constraints -- old value remains
+    } -setup {
+        relvar create ID {Name string Age int} Name
+        relvar set ID [relation create\
+            {Name string Age int}\
+            {Name Andrew Age 30}\
+            {Name George Age 32}\
+        ]
+    } -cleanup {
+        relvar unset ID
+    } -body {
+        catch {
+            relvar set ID [relation create\
+                {Name string Age int}\
+                {Name Andrew Age 30}\
+                {Name Andrew Age 32}]
+        }
+        relvar set ID
+    } -result {
+            {Name string Age int} {
+                {Name Andrew Age 30}
+                {Name George Age 32}
+            }
+    } -match relation
+
+    # relvar union subcommand
+    test relvar-union-1.0 {union single relation} -setup {
+        relvar create X {Name string Status int} Name
+        relvar set X [relation create {Name string Status int}\
+            {Name George Status 20}\
+            {Name Fred Status 30}\
+            {Status 40 Name Alice}]
+    } -cleanup {
+        relvar unset X
+    } -body {
+        set x [relation create\
+            {Name string Status int}\
+            {Name George Status 20}\
+            {Status 40 Name Alice}\
+            {Name Allen Status 95}\
+        ]
+        relvar union X $x
+    } -result {
+        {Name string Status int}
+        {
+            {Name George Status 20}
+            {Name Fred Status 30}
+            {Status 40 Name Alice}
+            {Name Allen Status 95}
+        }
+    } -match relation
+
+    test relvar-union-1.1 {check Tcl variable} -setup {
+        relvar create X {Name string Status int} Name
+        relvar set X [relation create\
+            {Name string Status int}\
+            {Name George Status 20}\
+            {Name Fred Status 30}\
+            {Status 40 Name Alice}]
+    } -cleanup {
+        relvar unset X
+    } -body {
+        set x [relation create\
+            {Name string Status int}\
+            {Name George Status 20}\
+            {Status 40 Name Alice}\
+            {Name Allen Status 95}\
+        ]
+        relvar union X $x
+        set X
+    } -result {
+        {Name string Status int}
+        {
+            {Name George Status 20}
+            {Name Fred Status 30}
+            {Status 40 Name Alice}
+            {Name Allen Status 95}
+        }
+    } -match relation
+
+    test relvar-union-1.2 {union multiple relations} -setup {
+        relvar create X {Name string Status int} Name
+        relvar set X [relation create\
+            {Name string Status int}\
+            {Name George Status 20}\
+            {Name Fred Status 30}\
+            {Status 40 Name Alice}]
+    } -cleanup {
+        relvar unset X
+    } -body {
+        set x [relation create\
+            {Name string Status int}\
+            {Name George Status 20}\
+            {Status 40 Name Alice}\
+            {Name Allen Status 95}\
+        ]
+        set y [relation create\
+            {Name string Status int}\
+            {Name Jean Status 22}\
+            {Name John Status 28}\
+        ]
+        relvar union X $x $y
+    } -result {
+        {Name string Status int}
+        {
+            {Name George Status 20}
+            {Name Fred Status 30}
+            {Status 40 Name Alice}
+            {Name Allen Status 95}
+            {Name Jean Status 22}
+            {Name John Status 28}
+        }
+    } -match relation
+
+    test relvar-union-1.3 {
+        different header order
+    } -setup {
+        relvar create X {Name string Status int} Name
+        relvar set X [relation create\
+            {Name string Status int}\
+            {Name George Status 20}\
+            {Name Fred Status 30}\
+            {Status 40 Name Alice}]
+    } -cleanup {
+        relvar unset X
+    } -body {
+        set x [relation create\
+            {Status int Name string}\
+            {Name George Status 20}\
+            {Status 40 Name Alice}\
+            {Name Allen Status 95}\
+        ]
+        relvar union X $x
+    } -result {
+        {Name string Status int}
+        {
+            {Name George Status 20}
+            {Name Fred Status 30}
+            {Status 40 Name Alice}
+            {Name Allen Status 95}
+        }
+    } -match relation
+
+    test relvar-union-2.0 {incompatible union} -setup {
+        relvar create X {Name string Status int} Name
+        relvar set X [relation create\
+            {Name string Status int}\
+            {Name George Status 20}\
+            {Name Fred Status 30}\
+            {Status 40 Name Alice}]
+    } -cleanup {
+        relvar unset X
+    } -body {
+        set x [relation create {Name string} {Name George}]
+        relvar union X $x
+    } -result {headings not equal, "Name string"}\
+    -returnCodes error
+
+    test relvar-union-2.1 {
+        error: wrong args
+    } -body {
+        relvar union
+    } -result {wrong # args: should be "relvar union relvarName ?relationValue ...?"}\
+    -returnCodes error
+
+    test relvar-union-2.2 {
+        union with non relation type
+    } -setup {
+        relvar create X {Name string Status int} Name
+        relvar set X [relation create\
+            {Name string Status int}\
+            {Name George Status 20}\
+            {Name Fred Status 30}\
+            {Status 40 Name Alice}]
+    } -cleanup {
+        relvar unset X
+    } -body {
+        relvar union X 27
+    } -result {bad value format, "27"} -returnCodes error
+
+    test relvar-union-2.3 {
+        union results in identity constraint failure
+    } -setup {
+        relvar create X {Name string Status int} Name
+        relvar set X [relation create\
+            {Name string Status int}\
+            {Name George Status 20}\
+            {Name Fred Status 30}\
+            {Status 40 Name Alice}]
+    } -cleanup {
+        relvar unset X
+    } -body {
+        set x [relation create\
+            {Status int Name string}\
+            {Name George Status 30}\
+            {Status 40 Name Alice}\
+            {Name Allen Status 95}\
+        ]
+        relvar union X $x
+    } -result {tuple has duplicate values for an identifier, "{Name string Status int} {Name George Status 30}"}\
+    -returnCodes error
+
+    # relvar intersect subcommand
+    test relvar-intersect-1.0 {intersect single relation} -setup {
+        relvar create X {Name string Status int} Name
+        relvar set X [relation create\
+            {Name string Status int}\
+            {Name George Status 20}\
+            {Name Fred Status 30}\
+            {Status 40 Name Alice}]
+    } -cleanup {
+        relvar unset X
+    } -body {
+        set x [relation create\
+            {Name string Status int}\
+            {Name George Status 20}\
+            {Status 40 Name Alice}\
+            {Name Allen Status 95}\
+        ]
+        relvar intersect X $x
+    } -result {
+        {Name string Status int}
+        {
+            {Name George Status 20}
+            {Name Alice Status 40}
+        }
+    } -match relation
+
+    # relvar minus subcommand
+    test relvar-minus-1.0 {subtract single relation} -setup {
+        relvar create X {Name string Status int} Name
+        relvar set X [relation create\
+            {Name string Status int}\
+            {Name George Status 20}\
+            {Name Fred Status 30}\
+            {Status 40 Name Alice}]
+    } -cleanup {
+        relvar unset X
+    } -body {
+        set x [relation create\
+            {Name string Status int}\
+            {Name George Status 20}\
+            {Status 40 Name Alice}\
+            {Name Allen Status 95}\
+        ]
+        relvar minus X $x
+    } -result {
+        {Name string Status int}
+        {
+            {Name Fred Status 30}
+        }
+    } -match relation
+
+    # relvar insert subcommand
+    test relvar-insert-1.0 {insert single tuple} -setup {
+        relvar create N {Name string Age int City string} Name
+    } -cleanup {
+        relvar unset N
+    } -body {
+        relvar insert N {Name Andrew Age 20 City Sunnyvale}
+    } -result {
+        {Name string Age int City string} {
+            {Name Andrew Age 20 City Sunnyvale}
+        }
+    } -match relation
+
+    test relvar-insert-2.0 {insert multiple tuples} -setup {
+        relvar create N {Name string Age int City string} Name
+    } -cleanup {
+        relvar unset N
+    } -body {
+        relvar insert N\
+            {Name Andrew Age 20 City Sunnyvale}\
+            {Age 20 Name George City {San Jose}}\
+            {Name Fred City Saratoga Age 20}
+    } -result {
+        {Name string Age int City string}
+        {
+            {Name Andrew Age 20 City Sunnyvale}
+            {Name George Age 20 City {San Jose}}
+            {Name Fred Age 20 City Saratoga}
+        }
+    } -match relation
+
+    test relvar-insert-3.0 {duplicate tuple} -setup {
+        relvar create N {Name string Age int City string} Name
+    } -cleanup {
+        relvar unset N
+    } -body {
+        relvar insert N\
+            {Name Andrew Age 20 City Sunnyvale}\
+            {Age 20 Name George City {San Jose}}\
+            {Name Andrew City Sunnyvale Age 20}
+    } -result {duplicate tuple, "{Name string City string Age int} {Name Andrew City Sunnyvale Age 20}"}\
+    -returnCodes error
+
+    test relvar-insert-4.0 {value preserved on error} -setup {
+        relvar create N {Name string Age int City string} Name
+        relvar insert N\
+            {Name Andrew Age 20 City Sunnyvale}\
+            {Age 20 Name George City {San Jose}}\
+            {Name Fred City Saratoga Age 20}
+    } -cleanup {
+        relvar unset N
+    } -body {
+        catch {relvar insert N {Name Andrew Age 20 City Sunnyvale}}
+        relvar set N
+    } -result {
+        {Name string Age int City string}
+        {
+            {Name Andrew Age 20 City Sunnyvale}
+            {Name George Age 20 City {San Jose}}
+            {Name Fred Age 20 City Saratoga}
+        }
+    } -match relation
+
+    test relvar-insert-5.0 {
+        empty value for type
+    } -setup {
+        relvar create N {Name string Age int City string} Name
+    } -cleanup {
+        relvar unset N
+    } -body {
+        relvar insert N {Name Andrew Age {} City Sunnyvale}
+    } -result {
+        {Name string Age int City string}
+        {
+            {Name Andrew Age {} City Sunnyvale}
+        }
+    } -match relation
+
+    test relvar-insert-5.1 {
+        trace returns incorrect heading
+    } -setup {
+        proc insertTrace {op relvar tuple} {
+            return [tuple create {Name string Status int} {Name foo Status 20}]
+        }
+        relvar create N {Name string Age int City string} Name
+        relvar trace add variable N insert insertTrace
+    } -cleanup {
+        relvar unset N
+        rename insertTrace {}
+    } -body {
+        relvar insert N {Name Andrew Age 33 City Sunnyvale}
+    } -result {headings not equal, "{Name string Status int} {Name foo Status 20}"} -returnCodes error
+
+    test relvar-insert-5.2 {
+        trace changes heading order
+    } -setup {
+        proc insertTrace {op relvar tuple} {
+            return [tuple create {City string Age int Name string}\
+                    {Age 20 City Sunnyvale Name Fred}]
+        }
+        relvar create N {Name string Age int City string} Name
+        relvar trace add variable N insert insertTrace
+    } -cleanup {
+        relvar unset N
+        rename insertTrace {}
+    } -body {
+        relvar insert N {Name Andrew Age 33 City Sunnyvale}
+    } -result {
+        {Name string Age int City string} {
+            {Name Fred Age 20 City Sunnyvale}
+        }
+    } -match relation
+
+    test relvar-insert-5.3 {
+        trace adds an attribute
+    } -setup {
+        proc insertTrace {op relvar tuple} {
+            return [tuple extend $tuple Age int 33]
+        }
+        relvar create N {Name string Age int City string} Name
+        relvar trace add variable N insert insertTrace
+    } -cleanup {
+        relvar unset N
+        rename insertTrace {}
+    } -body {
+        relvar insert N {Name Andrew City Sunnyvale}
+    } -result {
+        {Name string Age int City string} {
+            {Name Andrew Age 33 City Sunnyvale}
+        }
+    } -match relation
+
 if 0 {
     # relvar association subcommand
     test relvar-association-1.1 {one to one} -setup {
@@ -4753,78 +5241,6 @@ tuple {A1 c} is not referred to by any tuple
         return
     } -result {}
 
-    # relvar set subcommand
-    test relvar-set-1.0 {simple assignment} -body {
-        relvar create SV {
-            Relation
-            {S# string SNAME string STATUS int CITY string}
-            S#
-        }
-        relvar set SV $S
-    } -cleanup {
-        relvar unset SV
-    } -result {
-        Relation
-        {S# string SNAME string STATUS int CITY string}
-        S#
-        {
-            {S# S1 SNAME Smith STATUS 20 CITY London}
-            {S# S2 SNAME Jones STATUS 10 CITY Paris}
-            {S# S3 SNAME Blake STATUS 30 CITY Paris}
-            {S# S4 SNAME Clark STATUS 20 CITY London}
-            {S# S5 SNAME Adams STATUS 30 CITY Athens}
-        }
-    } -match relation
-
-    test relvar-set-2.0 {name resolution} -setup {
-        relvar create ::R {
-            Relation
-            {R# string RNAME string}
-            R#
-        }
-        relvar insert ::R {R# 1 RNAME First}
-        relvar create R {
-            Relation
-            {R# string RNAME string}
-            R#
-        }
-        relvar insert R {R# 2 RNAME Second}
-    } -cleanup {
-        relvar unset ::R R
-    } -body {
-        relvar set R
-    } -result {
-        Relation
-        {R# string RNAME string}
-        R#
-        {
-            {R# 2 RNAME Second}
-        }
-    } -match relation
-
-    test relvar-set-3.0 {Tcl variable is also modified} -body {
-        relvar create SV {
-            Relation
-            {S# string SNAME string STATUS int CITY string}
-            S#
-        }
-        relvar set SV $S
-        set SV
-    } -cleanup {
-        relvar unset SV
-    } -result {
-        Relation
-        {S# string SNAME string STATUS int CITY string}
-        S#
-        {
-            {S# S1 SNAME Smith STATUS 20 CITY London}
-            {S# S2 SNAME Jones STATUS 10 CITY Paris}
-            {S# S3 SNAME Blake STATUS 30 CITY Paris}
-            {S# S4 SNAME Clark STATUS 20 CITY London}
-            {S# S5 SNAME Adams STATUS 30 CITY Athens}
-        }
-    } -match relation
-
     # relvar eval subcommand
     test relvar-eval-1.0 {simple body} -setup {
         relvar create SV {
@@ -4934,366 +5350,6 @@ tuple {A1 c} is not referred to by any tuple
         S#
         {
             {S# S1 SNAME Smith STATUS 20 CITY London}
-        }
-    } -match relation
-
-    # relvar insert subcommand
-    test relvar-insert-1.0 {insert single tuple} -setup {
-        relvar create N {Relation {Name string Age int City string} Name}
-    } -cleanup {
-        relvar unset N
-    } -body {
-        relvar insert N {Name Andrew Age 20 City Sunnyvale}
-    } -result {
-        Relation
-        {Name string Age int City string}
-        Name
-        {
-            {Name Andrew Age 20 City Sunnyvale}
-        }
-    } -match relation
-
-    test relvar-insert-2.0 {insert multiple tuples} -setup {
-        relvar create N {Relation {Name string Age int City string} Name}
-    } -cleanup {
-        relvar unset N
-    } -body {
-        relvar insert N\
-            {Name Andrew Age 20 City Sunnyvale}\
-            {Age 20 Name George City {San Jose}}\
-            {Name Fred City Saratoga Age 20}
-    } -result {
-        Relation
-        {Name string Age int City string}
-        Name
-        {
-            {Name Andrew Age 20 City Sunnyvale}
-            {Name George Age 20 City {San Jose}}
-            {Name Fred Age 20 City Saratoga}
-        }
-    } -match relation
-
-    test relvar-insert-3.0 {duplicate tuple} -setup {
-        relvar create N {Relation {Name string Age int City string} Name}
-    } -cleanup {
-        relvar unset N
-    } -body {
-        relvar insert N\
-            {Name Andrew Age 20 City Sunnyvale}\
-            {Age 20 Name George City {San Jose}}\
-            {Name Andrew City Sunnyvale Age 20}
-    } -result {duplicate tuple, "{Name string Age int City string} {Name Andrew Age 20 City Sunnyvale}"}\
-    -returnCodes error
-
-    test relvar-insert-4.0 {value preserved on error} -setup {
-        relvar create N {Relation {Name string Age int City string} Name}
-        relvar insert N\
-            {Name Andrew Age 20 City Sunnyvale}\
-            {Age 20 Name George City {San Jose}}\
-            {Name Fred City Saratoga Age 20}
-    } -cleanup {
-        relvar unset N
-    } -body {
-        catch {relvar insert N {Name Andrew Age 20 City Sunnyvale}}
-        relvar set N
-    } -result {
-        Relation
-        {Name string Age int City string}
-        Name
-        {
-            {Name Andrew Age 20 City Sunnyvale}
-            {Name George Age 20 City {San Jose}}
-            {Name Fred Age 20 City Saratoga}
-        }
-    } -match relation
-
-    test relvar-insert-5.0 {
-            bad value for type
-    } -setup {
-        relvar create N {Relation {Name string Age int City string} Name}
-    } -cleanup {
-        relvar unset N
-    } -body {
-        relvar insert N {Name Andrew Age {} City Sunnyvale}
-    } -result {
-        Relation
-        {Name string Age int City string}
-        Name
-        {
-            {Name Andrew Age {} City Sunnyvale}
-        }
-    } -match relation
-
-    # relvar names subcommand
-    test relvar-names-1.0 {simple list of names} -setup {
-        relvar create SV {
-            Relation
-            {S# string SNAME string STATUS int CITY string}
-            S#
-        }
-        relvar create PV {
-            Relation
-            {P# string PNAME string COLOR string WEIGHT double CITY string}
-            P#
-        }
-        relvar create SPV {
-            Relation
-            {S# string P# string QTY int}
-            {{S# P#}}
-        }
-    } -body {
-        lsort [relvar names]
-    } -cleanup {
-        relvar unset SV PV SPV
-    } -result {::ral::test::PV ::ral::test::SPV ::ral::test::SV}
-
-    # relvar path subcommand
-    test relvar-path-1.0 {path name} -setup {
-        relvar create R {
-            Relation
-            {S# string SNAME string STATUS int CITY string}
-            S#
-        }
-    } -body {
-        relvar path R
-    } -cleanup {
-        relvar unset R
-    } -result {::ral::test::R}
-
-    test relvar-union-1.0 {union single relation} -setup {
-        relvar create X {
-            Relation
-            {Name string Status int}
-            Name
-        }
-        relvar insert X\
-            {Name George Status 20}\
-            {Name Fred Status 30}\
-            {Status 40 Name Alice}
-    } -cleanup {
-        relvar unset X
-    } -body {
-        set x [relation create {Name string Status int} Name\
-            {Name George Status 20}\
-            {Status 40 Name Alice}\
-            {Name Allen Status 95}\
-        ]
-        relvar union X $x
-    } -result {
-        Relation
-        {Name string Status int}
-        Name
-        {
-            {Name George Status 20}
-            {Name Fred Status 30}
-            {Status 40 Name Alice}
-            {Name Allen Status 95}
-        }
-    } -match relation
-
-    test relvar-union-1.1 {check Tcl variable} -setup {
-        relvar create X {
-            Relation
-            {Name string Status int}
-            Name
-        }
-        relvar insert X\
-            {Name George Status 20}\
-            {Name Fred Status 30}\
-            {Status 40 Name Alice}
-    } -cleanup {
-        relvar unset X
-    } -body {
-        set x [relation create {Name string Status int} Name\
-            {Name George Status 20}\
-            {Status 40 Name Alice}\
-            {Name Allen Status 95}\
-        ]
-        relvar union X $x
-        set X
-    } -result {
-        Relation
-        {Name string Status int}
-        Name
-        {
-            {Name George Status 20}
-            {Name Fred Status 30}
-            {Status 40 Name Alice}
-            {Name Allen Status 95}
-        }
-    } -match relation
-
-    test relvar-union-1.1 {union multiple relations} -setup {
-        relvar create X {
-            Relation
-            {Name string Status int}
-            Name
-        }
-        relvar insert X\
-            {Name George Status 20}\
-            {Name Fred Status 30}\
-            {Status 40 Name Alice}
-    } -cleanup {
-        relvar unset X
-    } -body {
-        set x [relation create {Name string Status int} Name\
-            {Name George Status 20}\
-            {Status 40 Name Alice}\
-            {Name Allen Status 95}\
-        ]
-        set y [relation create {Name string Status int} Name\
-            {Name Jean Status 22}\
-            {Name John Status 28}\
-        ]
-        relvar union X $x $y
-    } -result {
-        Relation
-        {Name string Status int}
-        Name
-        {
-            {Name George Status 20}
-            {Name Fred Status 30}
-            {Status 40 Name Alice}
-            {Name Allen Status 95}
-            {Name Jean Status 22}
-            {Name John Status 28}
-        }
-    } -match relation
-
-    test relvar-union-1.2 {
-        different header order
-    } -setup {
-        relvar create X {
-            Relation
-            {Name string Status int}
-            Name
-        }
-        relvar insert X\
-            {Name George Status 20}\
-            {Name Fred Status 30}\
-            {Status 40 Name Alice}
-    } -cleanup {
-        relvar unset X
-    } -body {
-        set x [relation create {Status int Name string} Name\
-            {Name George Status 20}\
-            {Status 40 Name Alice}\
-            {Name Allen Status 95}\
-        ]
-        relvar union X $x
-    } -result {
-        Relation
-        {Name string Status int}
-        Name
-        {
-            {Name George Status 20}
-            {Name Fred Status 30}
-            {Status 40 Name Alice}
-            {Name Allen Status 95}
-        }
-    } -match relation
-
-    test relvar-union-2.0 {incompatible union} -setup {
-        relvar create X {
-            Relation
-            {Name string Status int}
-            Name
-        }
-        relvar insert X\
-            {Name George Status 20}\
-            {Name Fred Status 30}\
-            {Status 40 Name Alice}
-    } -cleanup {
-        relvar unset X
-    } -body {
-        set x [relation create {Name string} Name\
-            {Name George}\
-        ]
-        relvar union X $x
-    } -result {headings not equal, "Relation {Name string} Name"}\
-    -returnCodes error
-
-    test relvar-union-2.1 {
-        error: wrong args
-    } -setup {
-    } -cleanup {
-    } -body {
-        relvar union
-    } -result {wrong # args: should be "relvar union relvarName ?relationValue ...?"}\
-    -returnCodes error
-
-    test relvar-union-2.2 {
-        union with non relation type
-    } -setup {
-        relvar create X {
-            Relation
-            {Name string Status int}
-            Name
-        }
-        relvar insert X\
-            {Name George Status 20}\
-            {Name Fred Status 30}\
-            {Status 40 Name Alice}
-    } -cleanup {
-        relvar unset X
-    } -body {
-        relvar union X 27
-    } -result {bad value format, "27"} -returnCodes error
-
-    test relvar-intersect-1.0 {intersect single relation} -setup {
-        relvar create X {
-            Relation
-            {Name string Status int}
-            Name
-        }
-        relvar insert X\
-            {Name George Status 20}\
-            {Name Fred Status 30}\
-            {Status 40 Name Alice}
-    } -cleanup {
-        relvar unset X
-    } -body {
-        set x [relation create {Name string Status int} Name\
-            {Name George Status 20}\
-            {Status 40 Name Alice}\
-            {Name Allen Status 95}\
-        ]
-        relvar intersect X $x
-    } -result {
-        Relation
-        {Name string Status int}
-        Name
-        {
-            {Name George Status 20}
-            {Name Alice Status 40}
-        }
-    } -match relation
-
-    test relvar-minus-1.0 {subtract single relation} -setup {
-        relvar create X {
-            Relation
-            {Name string Status int}
-            Name
-        }
-        relvar insert X\
-            {Name George Status 20}\
-            {Name Fred Status 30}\
-            {Status 40 Name Alice}
-    } -cleanup {
-        relvar unset X
-    } -body {
-        set x [relation create {Name string Status int} Name\
-            {Name George Status 20}\
-            {Status 40 Name Alice}\
-            {Name Allen Status 95}\
-        ]
-        relvar minus X $x
-    } -result {
-        Relation
-        {Name string Status int}
-        Name
-        {
-            {Name Fred Status 30}
         }
     } -match relation
 

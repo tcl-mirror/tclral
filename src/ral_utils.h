@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_utils.h,v $
-$Revision: 1.16.2.2 $
-$Date: 2009/01/25 02:41:12 $
+$Revision: 1.16.2.3 $
+$Date: 2009/02/02 01:30:33 $
  *--
  */
 #ifndef _ral_utils_h_
@@ -161,6 +161,7 @@ typedef enum {
     RAL_ERR_NO_IDENTIFIER,
     RAL_ERR_IDENTIFIER_FORMAT,
     RAL_ERR_IDENTIFIER_SUBSET,
+    RAL_ERR_IDENTITY_CONSTRAINT,
     RAL_ERR_DUP_ATTR_IN_ID,
     RAL_ERR_DUPLICATE_TUPLE,
     RAL_ERR_HEADING_NOT_EQUAL,

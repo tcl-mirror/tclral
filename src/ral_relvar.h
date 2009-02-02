@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.h,v $
-$Revision: 1.12.2.2 $
-$Date: 2009/01/25 02:41:12 $
+$Revision: 1.12.2.3 $
+$Date: 2009/02/02 01:30:33 $
  *--
  */
 #ifndef _ral_relvar_h_
@@ -63,6 +63,7 @@ INCLUDE FILES
 #include "ral_vector.h"
 #include "ral_relation.h"
 #include "ral_joinmap.h"
+#include "ral_utils.h"
 #include "ral_vector.h"
 
 /*
@@ -213,7 +214,9 @@ extern Ral_Constraint Ral_ConstraintNewCorrelation(char const *) ;
 extern void Ral_ConstraintDelete(Ral_Constraint) ;
 extern int Ral_RelvarConstraintEval(Ral_Constraint, Tcl_DString *) ;
 
-extern void Ral_RelvarSetRelation(Ral_Relvar, Tcl_Obj *) ;
+extern int Ral_RelvarSetRelation(Ral_Relvar, Tcl_Obj *, Ral_ErrorInfo *) ;
+extern int Ral_RelvarInsertTuple(Ral_Relvar, Ral_Tuple, Ral_IntVector,
+        Ral_ErrorInfo *) ;
 extern void Ral_RelvarRestorePrev(Ral_Relvar) ;
 extern void Ral_RelvarDiscardPrev(Ral_Relvar) ;
 
