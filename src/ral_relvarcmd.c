@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.32.2.4 $
-$Date: 2009/02/02 01:30:33 $
+$Revision: 1.32.2.5 $
+$Date: 2009/02/08 19:04:45 $
  *--
  */
 
@@ -122,7 +122,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.32.2.4 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvarcmd.c,v $ $Revision: 1.32.2.5 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -417,7 +417,7 @@ RelvarDeleteCmd(
 	    if (result != TCL_OK) {
 		break ;
 	    }
-	    rIter = Ral_RelationErase(relation, rIter, rIter + 1) ;
+	    rIter = Ral_RelvarDeleteTuple(relvar, rIter) ;
 	    ++deleted ;
 	} else {
 	    ++rIter ;
@@ -448,6 +448,7 @@ RelvarDeleteOneCmd(
     Ral_Relvar relvar ;
     Ral_Relation relation ;
     Ral_Tuple key ;
+    int idNum ;
     int deleted = 0 ;
     int result ;
     Ral_ErrorInfo errInfo ;
@@ -477,11 +478,10 @@ RelvarDeleteOneCmd(
     Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelvar, Ral_OptDeleteone) ;
 
     /*
-     * HERE
-     * key = Ral_RelationObjKeyTuple(interp, relation, objc, objv, &idNum,
-	&errInfo) ;
+     * Make a tuple to use as a key from the arguments.
      */
-    key = NULL ;
+    key = Ral_RelvarObjKeyTuple(interp, relvar, objc, objv, &idNum,
+            &errInfo) ;
     if (key == NULL) {
 	return TCL_ERROR ;
     }
@@ -492,17 +492,13 @@ RelvarDeleteOneCmd(
 	return TCL_ERROR ;
     }
 
-    /*
-     * HERE
-     * found = Ral_RelationFindKey(relation, idNum, key, NULL) ;
-     */
-    found = Ral_RelationBegin(relation) ;
+    found = Ral_RelvarFindById(relvar, idNum, key) ;
     if (found != Ral_RelationEnd(relation)) {
 	Tcl_Obj *tupleObj ;
 
 	Tcl_IncrRefCount(tupleObj = Ral_TupleObjNew(*found)) ;
 	if (Ral_RelvarObjExecDeleteTraces(interp, relvar, tupleObj) == TCL_OK) {
-	    Ral_RelationErase(relation, found, found + 1) ;
+	    Ral_RelvarDeleteTuple(relvar, found) ;
 	    deleted = 1 ;
 	    Tcl_InvalidateStringRep(relvar->relObj) ;
 	}
@@ -549,7 +545,11 @@ RelvarEvalCmd(
 	static const char msgfmt[] =
 	    "\n    (\"in ::ral::relvar eval\" body line %d)" ;
 	char msg[sizeof(msgfmt) + TCL_INTEGER_SPACE] ;
-	sprintf(msg, msgfmt, Tcl_GetErrorLine(interp)) ;
+#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION <= 5
+        sprintf(msg, msgfmt, interp->errorLine) ;
+#else
+        sprintf(msg, msgfmt, Tcl_GetErrorLine(interp)) ;
+#endif
 	Tcl_AddObjErrorInfo(interp, msg, -1) ;
     }
 
@@ -571,6 +571,9 @@ RelvarInsertCmd(
     int inserted = 0 ;
     int result = TCL_OK ;
     Ral_ErrorInfo errInfo ;
+    Ral_Relation relation ;
+    Ral_Relation resultRel ;
+    Ral_IntVector orderMap = NULL ;
 
     /* relvar insert relvarName ?name-value-list ...? */
     if (objc < 3) {
@@ -598,8 +601,39 @@ RelvarInsertCmd(
     objc -= 3 ;
     objv += 3 ;
 
+    /*
+     * The result of relvar insert is a relation value that contains the
+     * tuples that were inserted into the relvar. This allows access to
+     * modifications that the relvar traces might have performed.
+     */
+    relation = relvar->relObj->internalRep.otherValuePtr ;
+    resultRel = Ral_RelationNew(relation->heading) ;
+
     while (objc-- > 0) {
-        if (Ral_RelvarObjInsertTuple(interp, relvar, *objv++, &errInfo)) {
+        Ral_IntVectorDelete(orderMap) ;
+
+        Tcl_Obj *insertedTuple = Ral_RelvarObjInsertTuple(interp, relvar,
+                *objv++, &orderMap, &errInfo) ;
+        if (insertedTuple) {
+            Ral_Tuple tuple ;
+
+            assert(insertedTuple->typePtr == &Ral_TupleObjType) ;
+            tuple = insertedTuple->internalRep.otherValuePtr ;
+            if (!Ral_RelationPushBack(resultRel, tuple, orderMap)) {
+                Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_DUPLICATE_TUPLE,
+                        insertedTuple) ;
+                Ral_InterpSetError(interp, &errInfo) ;
+                result = TCL_ERROR ;
+                break ;
+            }
+            /*
+             * The inserted tuple object had a reference count of at least
+             * one from the insertion processing. We now need to discard
+             * the Tcl_Obj, even though the underlying tuple has have
+             * its reference count incremented by being inserted into
+             * both the relvar and the result relation value.
+             */
+            Tcl_DecrRefCount(insertedTuple) ;
             ++inserted ;
 	} else {
 	    result = TCL_ERROR ;
@@ -607,12 +641,15 @@ RelvarInsertCmd(
 	}
     }
 
+    Ral_IntVectorDelete(orderMap) ;
     result = Ral_RelvarObjEndCmd(interp, rInfo, result != TCL_OK) ;
     if (result == TCL_OK) {
 	if (inserted) {
 	    Tcl_InvalidateStringRep(relvar->relObj) ;
 	}
-	Tcl_SetObjResult(interp, relvar->relObj) ;
+	Tcl_SetObjResult(interp, Ral_RelationObjNew(resultRel)) ;
+    } else {
+        Ral_RelationDelete(resultRel) ;
     }
     return result ;
 }

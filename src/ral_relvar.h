@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.h,v $
-$Revision: 1.12.2.3 $
-$Date: 2009/02/02 01:30:33 $
+$Revision: 1.12.2.4 $
+$Date: 2009/02/08 19:04:45 $
  *--
  */
 #ifndef _ral_relvar_h_
@@ -217,6 +217,9 @@ extern int Ral_RelvarConstraintEval(Ral_Constraint, Tcl_DString *) ;
 extern int Ral_RelvarSetRelation(Ral_Relvar, Tcl_Obj *, Ral_ErrorInfo *) ;
 extern int Ral_RelvarInsertTuple(Ral_Relvar, Ral_Tuple, Ral_IntVector,
         Ral_ErrorInfo *) ;
+extern Ral_RelationIter Ral_RelvarDeleteTuple(Ral_Relvar, Ral_RelationIter) ;
+extern int Ral_RelvarFindIdentifier(Ral_Relvar, Ral_IntVector) ;
+extern Ral_RelationIter Ral_RelvarFindById(Ral_Relvar, int, Ral_Tuple) ;
 extern void Ral_RelvarRestorePrev(Ral_Relvar) ;
 extern void Ral_RelvarDiscardPrev(Ral_Relvar) ;
 

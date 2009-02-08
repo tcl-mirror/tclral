@@ -51,8 +51,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.47.2.5 $
-# $Date: 2009/02/02 01:30:33 $
+# $Revision: 1.47.2.6 $
+# $Date: 2009/02/08 19:04:45 $
 #  *--
 
 package require tcltest 2.2
@@ -4340,6 +4340,25 @@ in expression "_@_< 20"} -returnCodes error
         }
     } -match relation
 
+    test relvar-insert-2.1 {
+        return value is what is inserted.
+    } -setup {
+        relvar create N {Name string Age int City string} Name
+        relvar insert N\
+            {Name Andrew Age 20 City Sunnyvale}\
+            {Age 20 Name George City {San Jose}}
+    } -cleanup {
+        relvar unset N
+    } -body {
+        relvar insert N\
+            {Name Fred City Saratoga Age 20}
+    } -result {
+        {Name string Age int City string}
+        {
+            {Name Fred Age 20 City Saratoga}
+        }
+    } -match relation
+
     test relvar-insert-3.0 {duplicate tuple} -setup {
         relvar create N {Name string Age int City string} Name
     } -cleanup {
@@ -4440,6 +4459,269 @@ in expression "_@_< 20"} -returnCodes error
             {Name Andrew Age 33 City Sunnyvale}
         }
     } -match relation
+
+    # relvar delete subcommand
+    test relvar-delete-1.0 {expression is false} -setup {
+        relvar create X {Name string Status int} Name
+        relvar insert X\
+            {Name George Status 20}\
+            {Name Fred Status 30}\
+            {Status 40 Name Alice}
+    } -cleanup {
+        relvar unset X
+    } -body {
+        relvar delete X t {0}
+    } -result {0}
+
+    test relvar-delete-2.0 {expression is true} -setup {
+        relvar create X {Name string Status int} Name
+        relvar insert X\
+            {Name George Status 20}\
+            {Name Fred Status 30}\
+            {Status 40 Name Alice}
+    } -cleanup {
+        relvar unset X
+    } -body {
+        relvar delete X t {1}
+    } -result {3}
+
+    test relvar-delete-3.0 {subset is deleted} -setup {
+        relvar create X {Name string Status int} Name
+        relvar insert X\
+            {Name Fred Status 30}\
+            {Name George Status 20}\
+            {Status 40 Name Alice}
+    } -cleanup {
+        relvar unset X
+    } -body {
+        relvar delete X t {[tuple extract $t Name] eq "George"}
+    } -result {1}
+
+    test relvar-delete-3.1 {
+        subset is deleted -- correct relation remains
+    } -setup {
+        relvar create X {Name string Status int} Name
+        relvar insert X\
+            {Name Fred Status 30}\
+            {Name George Status 20}\
+            {Status 40 Name Alice}
+    } -cleanup {
+        relvar unset X
+    } -body {
+        relvar delete X t {[tuple extract $t Name] eq "George"}
+        relvar set X
+    } -result {
+        {Name string Status int} {
+            {Status 40 Name Alice}
+            {Name Fred Status 30}
+        }
+    } -match relation
+
+    # relvar deleteone subcommand
+    test relvar-deleteone-1.0 {
+        no match
+    } -setup {
+        relvar create X {Name string Status int} Name
+        relvar insert X\
+            {Name George Status 20}\
+            {Name Fred Status 30}\
+            {Status 40 Name Alice}
+    } -cleanup {
+        relvar unset X
+    } -body {
+        relvar deleteone X Name Jane
+    } -result {0}
+
+    test relvar-deleteone-2.0 {
+        match
+    } -setup {
+        relvar create X {Name string Status int} Name
+        relvar insert X\
+            {Name George Status 20}\
+            {Name Fred Status 30}\
+            {Status 40 Name Alice}
+    } -cleanup {
+        relvar unset X
+    } -body {
+        relvar deleteone X Name Fred
+    } -result {1}
+
+    test relvar-deleteone-3.0 {
+        bad identifier
+    } -setup {
+        relvar create X {Name string Status int} Name
+        relvar insert X\
+            {Name George Status 20}\
+            {Name Fred Status 30}\
+            {Status 40 Name Alice}
+    } -cleanup {
+        relvar unset X
+    } -body {
+        relvar deleteone X Status 30
+    } -result {attributes do not constitute an identifier, "during identifier construction operation"}\
+    -returnCodes error
+
+    test relvar-deleteone-3.1 {
+        unknown attribute
+    } -setup {
+        relvar create X {Name string Status int} Name
+        relvar insert X\
+            {Name George Status 20}\
+            {Name Fred Status 30}\
+            {Status 40 Name Alice}
+    } -cleanup {
+        relvar unset X
+    } -body {
+        relvar deleteone X Address 30
+    } -result {unknown attribute name, "Address"} -returnCodes error
+
+    test relvar-deleteone-3.2 {
+        bad attribute value
+    } -setup {
+        relvar create X {Name string Status int} Status
+        relvar insert X\
+            {Name George Status 20}\
+            {Name Fred Status 30}\
+            {Status 40 Name Alice}
+    } -cleanup {
+        relvar unset X
+    } -body {
+        relvar deleteone X Status foo
+    } -result {bad value type for value, "foo"} -returnCodes error
+
+    test relvar-deleteone-4.0 {
+        deleting and iterating on same relvar
+    } -setup {
+        relvar create Foo {A string B int} A
+        relvar insert Foo {
+            A a1 B 1
+        } {
+            A a2 B 2
+        } {
+            A a3 B 3
+        }
+    } -cleanup {
+        relvar unset Foo
+    } -body {
+        set aValues [list]
+        relation foreach f [relvar set Foo] {
+            lappend aValues [relation extract $f A]
+            relvar deleteone Foo A [relation extract $f A]
+        }
+        set aValues
+    } -result {a1 a2 a3}
+
+    test relvar-deleteone-4.1 {
+        deleting and iterating on same relvar
+    } -setup {
+        relvar create Foo {A string B int} A
+        relvar insert Foo {
+            A a1 B 1
+        } {
+            A a2 B 2
+        } {
+            A a3 B 3
+        }
+    } -cleanup {
+        relvar unset Foo
+    } -body {
+        relation foreach f [relvar set Foo] {
+            lappend aValues [relation extract $f A]
+            relvar deleteone Foo A [relation extract $f A]
+        }
+        relation list [relvar set Foo] A
+    } -result {}
+
+    # relvar eval subcommand
+    test relvar-eval-1.0 {simple body} -setup {
+        relvar create SV {S# string SNAME string STATUS int CITY string} S#
+    } -body {
+        relvar eval {
+            relvar set SV $S
+        }
+    } -cleanup {
+        relvar unset SV
+    } -result {
+        {S# string SNAME string STATUS int CITY string} {
+            {S# S1 SNAME Smith STATUS 20 CITY London}
+            {S# S2 SNAME Jones STATUS 10 CITY Paris}
+            {S# S3 SNAME Blake STATUS 30 CITY Paris}
+            {S# S4 SNAME Clark STATUS 20 CITY London}
+            {S# S5 SNAME Adams STATUS 30 CITY Athens}
+        }
+    } -match relation
+
+    test relvar-eval-1.1 {break out of eval} -setup {
+        relvar create SV {S# string SNAME string STATUS int CITY string} S#
+    } -body {
+        while 1 {
+            relvar eval {
+                relvar insert SV {S# S1 SNAME Smith STATUS 20 CITY London}
+                if {[catch {relvar insert SV\
+                    {S# S1 SNAME Smith STATUS 20 CITY London}}]} {
+                    break ;
+                }
+            }
+        }
+        set SV
+    } -cleanup {
+        relvar unset SV
+    } -result {
+        {S# string SNAME string STATUS int CITY string} {
+            {S# S1 SNAME Smith STATUS 20 CITY London}
+        }
+    } -match relation
+
+    test relvar-eval-1.2 {continue out of eval} -setup {
+        relvar create SV {S# string SNAME string STATUS int CITY string} S#
+    } -body {
+        set id 0
+        foreach status {10 20 30} {
+            relvar eval {
+                if {$status == 20} {
+                    continue ;
+                }
+                relvar insert SV [list\
+                    S# S[incr id] SNAME Smith STATUS $status CITY London\
+                ]
+            }
+        }
+        set SV
+    } -cleanup {
+        relvar unset SV
+    } -result {
+        {S# string SNAME string STATUS int CITY string} {
+            {S# S1 SNAME Smith STATUS 10 CITY London}
+            {S# S2 SNAME Smith STATUS 30 CITY London}
+        }
+    } -match relation
+
+    test relvar-eval-1.3 {return out of eval} -setup {
+        relvar create SV {S# string SNAME string STATUS int CITY string} S#
+    } -body {
+        while 1 {
+            relvar eval {
+                relvar insert SV {S# S1 SNAME Smith STATUS 20 CITY London}
+                if {[catch {relvar insert SV\
+                    {S# S1 SNAME Smith STATUS 20 CITY London}}]} {
+                    return $SV
+                }
+            }
+        }
+    } -cleanup {
+        relvar unset SV
+    } -result {
+        {S# string SNAME string STATUS int CITY string} {
+            {S# S1 SNAME Smith STATUS 20 CITY London}
+        }
+    } -match relation
+
+    # relvar transaction tests
+    test relvar-transaction-1.0 {
+        ending a transaction that was not begun
+    } -body {
+        relvar transaction end
+    } -result {end transaction with no beginning} -returnCodes error
 
 if 0 {
     # relvar association subcommand
@@ -4951,158 +5233,6 @@ tuple {C1 c C2 42} references no tuple
         return
     } -result {}
 
-    # relvar delete subcommand
-    test relvar-delete-1.0 {expression is false} -setup {
-        relvar create X {
-            Relation
-            {Name string Status int}
-            Name
-        }
-        relvar insert X\
-            {Name George Status 20}\
-            {Name Fred Status 30}\
-            {Status 40 Name Alice}
-    } -cleanup {
-        relvar unset X
-    } -body {
-        relvar delete X t {0}
-    } -result {0}
-
-    test relvar-delete-2.0 {expression is true} -setup {
-        relvar create X {
-            Relation
-            {Name string Status int}
-            Name
-        }
-        relvar insert X\
-            {Name George Status 20}\
-            {Name Fred Status 30}\
-            {Status 40 Name Alice}
-    } -cleanup {
-        relvar unset X
-    } -body {
-        relvar delete X t {1}
-    } -result {3}
-
-    test relvar-delete-3.0 {subset is deleted} -setup {
-        relvar create X {
-            Relation
-            {Name string Status int}
-            Name
-        }
-        relvar insert X\
-            {Name George Status 20}\
-            {Name Fred Status 30}\
-            {Status 40 Name Alice}
-    } -cleanup {
-        relvar unset X
-    } -body {
-        relvar delete X t {[tuple extract $t Name] eq "George"}
-    } -result {1}
-
-    # relvar deleteone subcommand
-    test relvar-deleteone-1.0 {no match} -setup {
-        relvar create X {
-            Relation
-            {Name string Status int}
-            Name
-        }
-        relvar insert X\
-            {Name George Status 20}\
-            {Name Fred Status 30}\
-            {Status 40 Name Alice}
-    } -cleanup {
-        relvar unset X
-    } -body {
-        relvar deleteone X Name Jane
-    } -result {0}
-
-    test relvar-deleteone-2.0 {match} -setup {
-        relvar create X {
-            Relation
-            {Name string Status int}
-            Name
-        }
-        relvar insert X\
-            {Name George Status 20}\
-            {Name Fred Status 30}\
-            {Status 40 Name Alice}
-    } -cleanup {
-        relvar unset X
-    } -body {
-        relvar deleteone X Name Fred
-    } -result {1}
-
-    test relvar-deleteone-3.0 {bad identifier} -setup {
-        relvar create X {
-            Relation
-            {Name string Status int}
-            Name
-        }
-        relvar insert X\
-            {Name George Status 20}\
-            {Name Fred Status 30}\
-            {Status 40 Name Alice}
-    } -cleanup {
-        relvar unset X
-    } -body {
-        relvar deleteone X Status 30
-    } -result {attributes do not constitute an identifier, "during identifier construction operation"}\
-    -returnCodes error
-
-    test relvar-deleteone-4.0 {deleting and iterating on same relvar} -setup {
-        relvar create Foo {
-            Relation {
-                A string
-                B int
-            } {
-                A
-            }
-        }
-        relvar insert Foo {
-            A a1 B 1
-        } {
-            A a2 B 2
-        } {
-            A a3 B 3
-        }
-    } -cleanup {
-        relvar unset Foo
-    } -body {
-        set aValues [list]
-        relation foreach f [relvar set Foo] {
-            lappend aValues [relation extract $f A]
-            relvar deleteone Foo A [relation extract $f A]
-        }
-        set aValues
-    } -result {a1 a2 a3}
-
-    test relvar-deleteone-4.1 {deleting and iterating on same relvar} -setup {
-        relvar create Foo {
-            Relation {
-                A string
-                B int
-            } {
-                A
-            }
-        }
-        relvar insert Foo {
-            A a1 B 1
-        } {
-            A a2 B 2
-        } {
-            A a3 B 3
-        }
-    } -cleanup {
-        relvar unset Foo
-    } -body {
-        relation foreach f [relvar set Foo] {
-            lappend aValues [relation extract $f A]
-            relvar deleteone Foo A [relation extract $f A]
-        }
-        relation list [relvar set Foo] A
-    } -result {}
-
     # relvar partition subcommand
     test relvar-partition-1.1 {simple partition} -setup {
         relvar create A {Relation {A1 string} A1}
@@ -5240,125 +5370,6 @@ tuple {A1 c} is not referred to by any tuple
         }
         return
     } -result {}
-
-    # relvar eval subcommand
-    test relvar-eval-1.0 {simple body} -setup {
-        relvar create SV {
-            Relation
-            {S# string SNAME string STATUS int CITY string}
-            S#
-        }
-    } -body {
-        relvar eval {
-            relvar set SV $S
-        }
-    } -cleanup {
-        relvar unset SV
-    } -result {
-        Relation
-        {S# string SNAME string STATUS int CITY string}
-        S#
-        {
-            {S# S1 SNAME Smith STATUS 20 CITY London}
-            {S# S2 SNAME Jones STATUS 10 CITY Paris}
-            {S# S3 SNAME Blake STATUS 30 CITY Paris}
-            {S# S4 SNAME Clark STATUS 20 CITY London}
-            {S# S5 SNAME Adams STATUS 30 CITY Athens}
-        }
-    } -match relation
-
-    test relvar-eval-1.1 {break out of eval} -setup {
-        relvar create SV {
-            Relation
-            {S# string SNAME string STATUS int CITY string}
-            S#
-        }
-    } -body {
-        while 1 {
-            relvar eval {
-                relvar insert SV {S# S1 SNAME Smith STATUS 20 CITY London}
-                if {[catch {relvar insert SV\
-                    {S# S1 SNAME Smith STATUS 20 CITY London}}]} {
-                    break ;
-                }
-            }
-        }
-        set SV
-    } -cleanup {
-        relvar unset SV
-    } -result {
-        Relation
-        {S# string SNAME string STATUS int CITY string}
-        S#
-        {
-            {S# S1 SNAME Smith STATUS 20 CITY London}
-        }
-    } -match relation
-
-    test relvar-eval-1.2 {continue out of eval} -setup {
-        relvar create SV {
-            Relation
-            {S# string SNAME string STATUS int CITY string}
-            S#
-        }
-    } -body {
-        set id 0
-        foreach status {10 20 30} {
-            relvar eval {
-                if {$status == 20} {
-                    continue ;
-                }
-                relvar insert SV [list\
-                    S# S[incr id] SNAME Smith STATUS $status CITY London\
-                ]
-            }
-        }
-        set SV
-    } -cleanup {
-        relvar unset SV
-    } -result {
-        Relation
-        {S# string SNAME string STATUS int CITY string}
-        S#
-        {
-            {S# S1 SNAME Smith STATUS 10 CITY London}
-            {S# S2 SNAME Smith STATUS 30 CITY London}
-        }
-    } -match relation
-
-    test relvar-eval-1.3 {return out of eval} -setup {
-        relvar create SV {
-            Relation
-            {S# string SNAME string STATUS int CITY string}
-            S#
-        }
-    } -body {
-        while 1 {
-            relvar eval {
-                relvar insert SV {S# S1 SNAME Smith STATUS 20 CITY London}
-                if {[catch {relvar insert SV\
-                    {S# S1 SNAME Smith STATUS 20 CITY London}}]} {
-                    return $SV
-                }
-            }
-        }
-    } -cleanup {
-        relvar unset SV
-    } -result {
-        Relation
-        {S# string SNAME string STATUS int CITY string}
-        S#
-        {
-            {S# S1 SNAME Smith STATUS 20 CITY London}
-        }
-    } -match relation
-
-    # relvar transaction tests
-    test relvar-transaction-1.0 {
-        ending a transaction that was not begun
-    } -body {
-        relvar transaction end
-    } -result {end transaction with no beginning} -returnCodes error
 }
 
     # examples from the Date book

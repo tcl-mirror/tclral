@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.h,v $
-$Revision: 1.20.2.3 $
-$Date: 2009/01/25 02:41:12 $
+$Revision: 1.20.2.4 $
+$Date: 2009/02/08 19:04:44 $
  *--
  */
 #ifndef _ral_relation_h_
@@ -145,7 +145,7 @@ typedef struct Ral_TupleAttrHashKey {
 /*
 DATA DECLARATIONS
 */
-extern Tcl_HashKeyType const tupleAttrHashType ;
+extern Tcl_HashKeyType tupleAttrHashType ;
 
 /*
 FUNCTION DECLARATIONS

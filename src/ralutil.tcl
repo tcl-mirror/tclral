@@ -49,8 +49,8 @@
 # without cluttering the TclRAL package proper.
 # 
 # $RCSfile: ralutil.tcl,v $
-# $Revision: 1.15.2.1 $
-# $Date: 2009/01/02 00:32:19 $
+# $Revision: 1.15.2.2 $
+# $Date: 2009/02/08 19:04:45 $
 #  *--
 
 package provide ralutil 0.9.0
@@ -392,13 +392,8 @@ proc ::ralutil::alter {relvarName varName script} {
 # relvar holding the identifiers, although that is not done here.
 proc ::ralutil::sysIdsInit {} {
     if {[llength [relvar names ::__ral_systemids__]] == 0} {
-	relvar create ::__ral_systemids__ {
-	    Relation
-	    {RelvarName string IdAttr string IdNum int}
-	    {
-		{RelvarName IdAttr}
-	    }
-	}
+	relvar create ::__ral_systemids__\
+            {RelvarName string IdAttr string IdNum int} {RelvarName IdAttr}
     }
 }
 

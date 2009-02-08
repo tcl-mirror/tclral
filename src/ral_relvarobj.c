@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.41.2.4 $
-$Date: 2009/02/02 01:30:33 $
+$Revision: 1.41.2.5 $
+$Date: 2009/02/08 19:04:45 $
  *--
  */
 
@@ -461,17 +461,17 @@ Ral_RelvarObjFindRelvar(
  * Returns a tuple object. This tuple object will be the final result
  * of any trace operations.
  */
-int
+Tcl_Obj *
 Ral_RelvarObjInsertTuple(
     Tcl_Interp *interp,
     Ral_Relvar relvar,
     Tcl_Obj *nameValueObj,
+    Ral_IntVector *orderMap,
     Ral_ErrorInfo *errInfo)
 {
     Ral_Relation relation ;
     Tcl_Obj *tupleObj ;
     Tcl_Obj *resultObj ;
-    int result = 0 ;
 
     assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
     relation = relvar->relObj->internalRep.otherValuePtr ;
@@ -484,7 +484,7 @@ Ral_RelvarObjInsertTuple(
     tupleObj = Ral_TuplePartialSetFromObj(relation->heading, interp,
             nameValueObj, errInfo) ;
     if (tupleObj == NULL) {
-	return 0 ;
+	return NULL ;
     }
     /*
      * Run the traces and get the result back. "resultObj" will have
@@ -504,28 +504,100 @@ Ral_RelvarObjInsertTuple(
          * that no longer matches that of the relation value.
          */
         if (Ral_TupleHeadingEqual(relation->heading, tuple->heading)) {
-            Ral_IntVector orderMap ;
             /*
              * Since the traces may return a tuple heading of any order
-             * we must make sure to reorder things if necessary.
+             * we must make sure to reorder things if necessary. This vector
+             * is also returned by reference, so the caller must delete it.
              */
-            orderMap = Ral_TupleHeadingNewOrderMap(relation->heading,
+            *orderMap = Ral_TupleHeadingNewOrderMap(relation->heading,
                     tuple->heading) ;
-            if (Ral_RelvarInsertTuple(relvar, tuple, orderMap, errInfo)) {
-                result = 1 ;
-            } else {
-                Ral_InterpSetError(interp, errInfo) ;
+            if (!Ral_RelvarInsertTuple(relvar, tuple, *orderMap, errInfo)) {
+                goto errorOut ;
             }
-            Ral_IntVectorDelete(orderMap) ;
         } else {
             Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_HEADING_NOT_EQUAL,
                     resultObj) ;
-            Ral_InterpSetError(interp, errInfo) ;
+            goto errorOut ;
         }
-        Tcl_DecrRefCount(resultObj) ;
     }
 
-    return result ;
+    return resultObj ;
+
+errorOut:
+    Ral_InterpSetError(interp, errInfo) ;
+    Tcl_DecrRefCount(resultObj) ;
+    return NULL ;
+}
+
+/*
+ * Returns a tuple that has values set for the given attributes.
+ * The attributes are examined to make sure that they form an identifier of the
+ * relvar so that the resulting tuple can be used as a key to look up a
+ * particular tuple in the relation of the relvar.
+ * Caller must delete the returned tuple.
+ */
+Ral_Tuple
+Ral_RelvarObjKeyTuple(
+    Tcl_Interp *interp,
+    Ral_Relvar relvar,
+    int objc,
+    Tcl_Obj *const*objv,
+    int *idRef,
+    Ral_ErrorInfo *errInfo)
+{
+    Ral_Relation relation ;
+    Ral_IntVector id ;
+    Ral_Tuple key ;
+    int idNum ;
+
+    if (objc % 2 != 0) {
+	Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_BAD_PAIRS_LIST, *objv) ;
+	Ral_InterpSetError(interp, errInfo) ;
+	return NULL ;
+    }
+    assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
+    relation = relvar->relObj->internalRep.otherValuePtr ;
+    /*
+     * Iterate through the name/value list and construct an identifier
+     * vector from the attribute names and a key tuple from the corresponding
+     * values.
+     */
+    id = Ral_IntVectorNewEmpty(objc / 2) ;
+    key = Ral_TupleNew(relation->heading) ;
+    for ( ; objc > 0 ; objc -= 2, objv += 2) {
+	const char *attrName = Tcl_GetString(*objv) ;
+	int attrIndex = Ral_TupleHeadingIndexOf(relation->heading, attrName) ;
+
+	if (attrIndex < 0) {
+	    Ral_ErrorInfoSetError(errInfo, RAL_ERR_UNKNOWN_ATTR, attrName) ;
+	    goto error_out ;
+	}
+	Ral_IntVectorPushBack(id, attrIndex) ;
+
+	if (!Ral_TupleUpdateAttrValue(key, attrName, *(objv + 1), errInfo)) {
+	    goto error_out ;
+	}
+    }
+    /*
+     * Check if the attributes given do constitute an identifier.
+     */
+    idNum = Ral_RelvarFindIdentifier(relvar, id) ;
+    if (idNum < 0) {
+	Ral_ErrorInfoSetError(errInfo, RAL_ERR_NOT_AN_IDENTIFIER,
+	    "during identifier construction operation") ;
+	goto error_out ;
+    } else if (idRef) {
+	*idRef = idNum ;
+    }
+    Ral_IntVectorDelete(id) ;
+
+    return key ;
+
+error_out:
+    Ral_InterpSetError(interp, errInfo) ;
+    Ral_IntVectorDelete(id) ;
+    Ral_TupleDelete(key) ;
+    return NULL ;
 }
 
 int
@@ -552,8 +624,13 @@ Ral_RelvarObjUpdateTuple(
 	    "\n    (\"in ::ral::%s %s\" body line %d)" ;
 	char msg[sizeof(msgfmt) + TCL_INTEGER_SPACE + 50] ;
 
+#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION <= 5
+	sprintf(msg, msgfmt, Ral_ErrorInfoGetCommand(errInfo),
+	    Ral_ErrorInfoGetOption(errInfo), interp->errorLine) ;
+#else
 	sprintf(msg, msgfmt, Ral_ErrorInfoGetCommand(errInfo),
 	    Ral_ErrorInfoGetOption(errInfo), Tcl_GetErrorLine(interp)) ;
+#endif
 	Tcl_AddObjErrorInfo(interp, msg, -1) ;
 	return TCL_ERROR ;
     } else if (result != TCL_OK) {

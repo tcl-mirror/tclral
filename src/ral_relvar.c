@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.c,v $
-$Revision: 1.19.2.4 $
-$Date: 2009/02/02 01:30:33 $
+$Revision: 1.19.2.5 $
+$Date: 2009/02/08 19:04:45 $
  *--
  */
 
@@ -86,6 +86,7 @@ static void relvarTraceCleanup(Ral_TraceInfo) ;
 static int relvarSetIntRep(Ral_Relvar, Ral_Relation, Ral_ErrorInfo *) ;
 static int relvarIndexIds(Ral_Relvar, Ral_Relation, Ral_ErrorInfo *) ;
 static int relvarIdIndexTuple(Ral_Relvar, Ral_Tuple, int, Ral_ErrorInfo *) ;
+static void relvarIdUnindexTuple(Ral_Relvar relvar, Ral_Tuple tuple) ;
 static int relvarAssocConstraintEval(char const *, Ral_AssociationConstraint,
     Tcl_DString *) ;
 static int relvarPartitionConstraintEval(char const *,
@@ -124,7 +125,7 @@ static char const * const condMultStrings[2][2] = {
     {"1", "+"},
     {"?", "*"}
 } ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.19.2.4 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.19.2.5 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -834,6 +835,108 @@ Ral_RelvarInsertTuple(
 }
 
 /*
+ * Delete a tuple from the relation value held in a relvar.  Update the index
+ * of the relation value and update the hash tables of the identifiers for the
+ * relvar. The "riter" must point into the relation value stored in "relvar".
+ */
+Ral_RelationIter
+Ral_RelvarDeleteTuple(
+    Ral_Relvar relvar,
+    Ral_RelationIter riter)
+{
+    Ral_Relation relation ;
+    Ral_RelationIter siter ;
+    Ral_RelationIter newiter ;
+
+    assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
+    /*
+     * Remove the hash entry for the tuple from the hash table for
+     * each identifier.
+     */
+    relvarIdUnindexTuple(relvar, *riter) ;
+    relation = relvar->relObj->internalRep.otherValuePtr ;
+    /*
+     * Remove the tuple from the relation. This reindexes the relation
+     * value itself. "newIter" will point to the place where the old
+     * tuple was removed and everything has now been shuffled up.
+     */
+    newiter = Ral_RelationErase(relation, riter, riter + 1) ;
+    /*
+     * Now we reindex the identifiers for the new position that the
+     * tuples after the deleted one have assumed. First we must delete
+     * the old index value and then instate a new one.
+     */
+    for (siter = newiter ; siter != Ral_RelationEnd(relation) ; ++siter) {
+        int status ;
+
+        relvarIdUnindexTuple(relvar, *siter) ;
+        status = relvarIdIndexTuple(relvar, *siter,
+                siter - Ral_RelationBegin(relation), NULL) ;
+        /*
+         * We should never have duplicated identifying attributes after a
+         * deletion.
+         */
+        assert(status != 0) ;
+    }
+
+    return newiter ;
+}
+
+/*
+ * Return the index into the identifier array where the identifier
+ * matches. Returns -1 if there is no match.
+ */
+int
+Ral_RelvarFindIdentifier(
+    Ral_Relvar relvar,
+    Ral_IntVector id)
+{
+    struct relvarId *idIter ;
+    int cnt ;
+    /*
+     * Iterate through the identifier indices and compare the id vectors
+     * to the argument. Sort the argument vector into canonical form.
+     */
+    Ral_IntVectorSort(id) ;
+    for (idIter = relvar->identifiers, cnt = relvar->idCount ; cnt != 0 ;
+            ++idIter, --cnt) {
+        if (Ral_IntVectorEqual(id, idIter->idAttrs)) {
+            return idIter - relvar->identifiers ;
+        }
+    }
+
+    return -1 ;
+}
+
+/*
+ * Find a tuple in a relvar that matches the given tuple. Only those attributes
+ * values that correspond to the attributes of the identifier must be present.
+ */
+Ral_RelationIter
+Ral_RelvarFindById(
+    Ral_Relvar relvar,
+    int idNum,
+    Ral_Tuple tuple)
+{
+    Ral_Relation relation ;
+    struct Ral_TupleAttrHashKey key ;
+    Tcl_HashEntry *entry ;
+
+    assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
+    assert(idNum < relvar->idCount) ;
+
+    relation = relvar->relObj->internalRep.otherValuePtr ;
+    assert(Ral_TupleHeadingEqual(relation->heading, tuple->heading)) ;
+
+    key.tuple = tuple ;
+    key.attrs = relvar->identifiers[idNum].idAttrs ;
+    entry = Tcl_FindHashEntry(&relvar->identifiers[idNum].idIndex,
+            (char const *)&key) ;
+    return entry ?
+            Ral_RelationBegin(relation) + (int)Tcl_GetHashValue(entry) :
+            Ral_RelationEnd(relation) ;
+}
+/*
  * When restoring the value saved during the transaction, we
  * have to set the underlying relation back to the old value.
  */
@@ -1173,6 +1276,32 @@ relvarIdIndexTuple(
     }
 
     return 1 ;
+}
+
+static void
+relvarIdUnindexTuple(
+    Ral_Relvar relvar,
+    Ral_Tuple tuple)
+{
+    struct relvarId *idIter ;
+    int cnt ;
+    struct Ral_TupleAttrHashKey key ;
+
+    assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
+    /*
+     * Remove the hash entry for the tuple from the hash table for
+     * each identifier.
+     */
+    key.tuple = tuple ;
+    for (idIter = relvar->identifiers, cnt = relvar->idCount ; cnt != 0 ;
+            ++idIter, --cnt) {
+        Tcl_HashEntry *entry ;
+
+        key.attrs = idIter->idAttrs ;
+        entry = Tcl_FindHashEntry(&idIter->idIndex, (char const *)&key) ;
+        assert(entry != NULL) ;
+        Tcl_DeleteHashEntry(entry) ;
+    }
 }
 
 /*

@@ -46,8 +46,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.39.2.4 $
-$Date: 2009/01/25 02:41:12 $
+$Revision: 1.39.2.5 $
+$Date: 2009/02/08 19:04:44 $
  *--
  */
 
@@ -146,7 +146,7 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.39.2.4 $" ;
+static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.39.2.5 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -1123,7 +1123,11 @@ RelationForeachCmd(
 		static const char msgfmt[] =
 		    "\n    (\"relation foreach\" body line %d)" ;
 		char msg[sizeof(msgfmt) + TCL_INTEGER_SPACE] ;
+#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION <= 5
+		sprintf(msg, msgfmt, interp->errorLine) ;
+#else
 		sprintf(msg, msgfmt, Tcl_GetErrorLine(interp)) ;
+#endif
 		Tcl_AddObjErrorInfo(interp, msg, -1) ;
 		break ;
 	    } else {
@@ -1720,8 +1724,8 @@ RelationProjectCmd(
  * "int" and its value is the number of tuples in "relationValue" where the
  * value of "rankAttr" is <= (-descending) or >= (-ascending) than its value
  * for a given tuple. Default ranking is "-ascending".  "rankAttr" must be of
- * type "int", "double", or "string" so that the comparison operation is well
- * defined.
+ * type "int", "double", "string", or "bytearray" so that the comparison
+ * operation is well defined.
  */
 static int
 RelationRankCmd(

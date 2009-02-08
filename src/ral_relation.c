@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.36.2.4 $
-$Date: 2009/02/02 01:30:33 $
+$Revision: 1.36.2.5 $
+$Date: 2009/02/08 19:04:44 $
  *--
  */
 
@@ -133,7 +133,7 @@ static const char closeList = '}' ;
  * index into the relation where the tuple is stored. This is used to enforce
  * the constraint that relations are sets of tuples with no duplicates.
  */
-static Tcl_HashKeyType const tupleHashType = {
+static Tcl_HashKeyType tupleHashType = {
     TCL_HASH_KEY_TYPE_VERSION,  /* version */
     TCL_HASH_KEY_RANDOMIZE_HASH,/* flags */
     tupleHashGenKey,            /* hashKeyProc */
@@ -150,7 +150,7 @@ static Tcl_HashKeyType const tupleHashType = {
  * offset into the relation where the tuple that contains the attributes is
  * located. This is used to enforce identifier constraints in relvars.
  */
-Tcl_HashKeyType const tupleAttrHashType = {
+Tcl_HashKeyType tupleAttrHashType = {
     TCL_HASH_KEY_TYPE_VERSION,  /* version */
     TCL_HASH_KEY_RANDOMIZE_HASH,/* flags */
     tupleAttrHashGenKey,        /* hashKeyProc */
@@ -168,7 +168,7 @@ Tcl_HashKeyType const tupleAttrHashType = {
  * relation. This type of hash table is used in join and all its derivatives to
  * find all the tuples that match values from a given tuple.
  */
-static Tcl_HashKeyType const tupleAttrHashMultiType = {
+static Tcl_HashKeyType tupleAttrHashMultiType = {
     TCL_HASH_KEY_TYPE_VERSION,      /* version */
     TCL_HASH_KEY_RANDOMIZE_HASH,    /* flags */
     tupleAttrHashGenKey,            /* hashKeyProc */
