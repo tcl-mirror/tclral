@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.h,v $
-$Revision: 1.12.2.4 $
-$Date: 2009/02/08 19:04:45 $
+$Revision: 1.12.2.5 $
+$Date: 2009/02/15 23:34:59 $
  *--
  */
 #ifndef _ral_relvar_h_
@@ -90,6 +90,7 @@ typedef struct Ral_AssociationConstraint {
     struct Ral_Relvar *referredToRelvar ;
     int referredToCond ;
     int referredToMult ;
+    int referredToIdentifier ;
     Ral_JoinMap referenceMap ;
 } *Ral_AssociationConstraint ;
 
@@ -100,6 +101,7 @@ typedef struct Ral_SubsetReference {
 
 typedef struct Ral_PartitionConstraint {
     struct Ral_Relvar *referredToRelvar ;
+    int referredToIdentifier ;
     Ral_PtrVector subsetReferences ;	/* list of Ral_SubsetReference */
 } *Ral_PartitionConstraint ;
 
@@ -108,10 +110,12 @@ typedef struct Ral_CorrelationConstraint {
     struct Ral_Relvar *aRefToRelvar ;
     int aCond ;
     int aMult ;
+    int aIdentifier ;
     Ral_JoinMap aReferenceMap ;
     struct Ral_Relvar *bRefToRelvar ;
     int bCond ;
     int bMult ;
+    int bIdentifier ;
     Ral_JoinMap bReferenceMap ;
     int complete ;
 } *Ral_CorrelationConstraint ;
@@ -220,6 +224,8 @@ extern int Ral_RelvarInsertTuple(Ral_Relvar, Ral_Tuple, Ral_IntVector,
 extern Ral_RelationIter Ral_RelvarDeleteTuple(Ral_Relvar, Ral_RelationIter) ;
 extern int Ral_RelvarFindIdentifier(Ral_Relvar, Ral_IntVector) ;
 extern Ral_RelationIter Ral_RelvarFindById(Ral_Relvar, int, Ral_Tuple) ;
+extern int Ral_RelvarIdIndexTuple(Ral_Relvar, Ral_Tuple, int, Ral_ErrorInfo *) ;
+extern void Ral_RelvarIdUnindexTuple(Ral_Relvar relvar, Ral_Tuple tuple) ;
 extern void Ral_RelvarRestorePrev(Ral_Relvar) ;
 extern void Ral_RelvarDiscardPrev(Ral_Relvar) ;
 

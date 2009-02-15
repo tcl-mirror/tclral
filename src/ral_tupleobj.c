@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleobj.c,v $
-$Revision: 1.14.2.3 $
-$Date: 2009/02/02 01:30:33 $
+$Revision: 1.14.2.4 $
+$Date: 2009/02/15 23:34:59 $
  *--
  */
 
@@ -110,7 +110,6 @@ Tcl_ObjType Ral_TupleObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tupleobj.c,v $ $Revision: 1.14.2.3 $" ;
 
 /*
 FUNCTION DEFINITIONS

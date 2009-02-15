@@ -51,8 +51,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.47.2.6 $
-# $Date: 2009/02/08 19:04:45 $
+# $Revision: 1.47.2.7 $
+# $Date: 2009/02/15 23:34:59 $
 #  *--
 
 package require tcltest 2.2
@@ -4723,11 +4723,10 @@ in expression "_@_< 20"} -returnCodes error
         relvar transaction end
     } -result {end transaction with no beginning} -returnCodes error
 
-if 0 {
     # relvar association subcommand
     test relvar-association-1.1 {one to one} -setup {
-        relvar create A {{A1 string A2 int} A1}
-        relvar create B {{B1 string B2 string} B1}
+        relvar create A {A1 string A2 int} A1
+        relvar create B {B1 string B2 string} B1
         relvar association R1 A A1 1 B B1 1
     } -cleanup {
         relvar constraint delete R1
@@ -4743,8 +4742,8 @@ if 0 {
     } -result {}
 
     test relvar-association-1.2 {one to one -- fail referring} -setup {
-        relvar create A {{A1 string A2 int} A1}
-        relvar create B {{B1 string B2 string} B1}
+        relvar create A {A1 string A2 int} A1
+        relvar create B {B1 string B2 string} B1
         relvar association R1 A A1 1 B B1 1
     } -cleanup {
         relvar constraint delete R1
@@ -4761,8 +4760,8 @@ tuple {A1 b A2 42} references no tuple
 } -returnCodes error
 
     test relvar-association-1.3 {one to one -- fail referred to} -setup {
-        relvar create A {{A1 string A2 int} A1}
-        relvar create B {{B1 string B2 string} B1}
+        relvar create A {A1 string A2 int} A1
+        relvar create B {B1 string B2 string} B1
         relvar association R1 A A1 1 B B1 1
     } -cleanup {
         relvar constraint delete R1
@@ -4779,8 +4778,8 @@ tuple {B1 b B2 bar} is not referenced by any tuple
 } -returnCodes error
 
     test relvar-association-2.1 {one conditional to one} -setup {
-        relvar create C {{C1 string C2 int} C1}
-        relvar create D {{D1 string D2 string} D1}
+        relvar create C {C1 string C2 int} C1
+        relvar create D {D1 string D2 string} D1
         relvar association R2 C C1 ? D D1 1
     } -cleanup {
         relvar constraint delete R2
@@ -4797,8 +4796,8 @@ tuple {B1 b B2 bar} is not referenced by any tuple
     } -result {}
 
     test relvar-association-2.2 {one conditional to one -- fail} -setup {
-        relvar create C {Relation {C1 string C2 int} C1}
-        relvar create D {Relation {D1 string D2 string} D1}
+        relvar create C {C1 string C2 int} C1
+        relvar create D {D1 string D2 string} D1
         relvar association R2 C C1 ? D D1 1
     } -cleanup {
         relvar constraint delete R2
@@ -4815,8 +4814,8 @@ tuple {C1 c C2 42} references no tuple
 } -returnCodes error
 
     test relvar-association-3.1 {one conditional to one conditional} -setup {
-        relvar create C {Relation {C1 string C2 int} C1}
-        relvar create D {Relation {D1 string D2 string} D1}
+        relvar create C {C1 string C2 int} C1
+        relvar create D {D1 string D2 string} D1
         relvar association R2 C C1 ? D D1 ?
     } -cleanup {
         relvar constraint delete R2
@@ -4832,8 +4831,8 @@ tuple {C1 c C2 42} references no tuple
     } -result {}
 
     test relvar-association-4.1 {many to one} -setup {
-        relvar create A {Relation {A1 string BID string} A1}
-        relvar create B {Relation {B1 string B2 string} B1}
+        relvar create A {A1 string BID string} A1
+        relvar create B {B1 string B2 string} B1
         relvar association R1 A BID + B B1 1
     } -cleanup {
         relvar constraint delete R1
@@ -4847,11 +4846,11 @@ tuple {C1 c C2 42} references no tuple
             relvar insert B {B1 a B2 foo}
             relvar insert B {B1 b B2 foo}
         }
-    } -result {Relation {B1 string B2 string} B1 {{B1 b B2 foo}}}
+    } -result {{B1 string B2 string} {{B1 b B2 foo}}} -match relation
 
     test relvar-association-4.2 {many to one -- fail referring} -setup {
-        relvar create A {Relation {A1 string BID string} A1}
-        relvar create B {Relation {B1 string B2 string} B1}
+        relvar create A {A1 string BID string} A1
+        relvar create B {B1 string B2 string} B1
         relvar association R1 A BID + B B1 1
     } -cleanup {
         relvar constraint delete R1
@@ -4870,8 +4869,8 @@ tuple {A1 d BID c} references no tuple
 } -returnCodes error
 
     test relvar-association-4.3 {many to one -- fail referred to} -setup {
-        relvar create A {Relation {A1 string BID string} A1}
-        relvar create B {Relation {B1 string B2 string} B1}
+        relvar create A {A1 string BID string} A1
+        relvar create B {B1 string B2 string} B1
         relvar association R1 A BID + B B1 1
     } -cleanup {
         relvar constraint delete R1
@@ -4891,8 +4890,8 @@ tuple {B1 c B2 foo} is not referenced by any tuple
 } -returnCodes error
 
     test relvar-association-5.1 {many conditional to one} -setup {
-        relvar create A {Relation {A1 string BID string} A1}
-        relvar create B {Relation {B1 string B2 string} B1}
+        relvar create A {A1 string BID string} A1
+        relvar create B {B1 string B2 string} B1
         relvar association R1 A BID * B B1 1
     } -cleanup {
         relvar constraint delete R1
@@ -4911,8 +4910,8 @@ tuple {B1 c B2 foo} is not referenced by any tuple
     } -result {}
 
     test relvar-association-5.2 {many to one conditional} -setup {
-        relvar create A {Relation {A1 string BID string} A1}
-        relvar create B {Relation {B1 string B2 string} B1}
+        relvar create A {A1 string BID string} A1
+        relvar create B {B1 string B2 string} B1
         relvar association R1 A BID + B B1 ?
     } -cleanup {
         relvar constraint delete R1
@@ -4931,8 +4930,8 @@ tuple {B1 c B2 foo} is not referenced by any tuple
     } -result {}
 
     test relvar-association-5.3 {many conditional to one conditional} -setup {
-        relvar create A {Relation {A1 string BID string} A1}
-        relvar create B {Relation {B1 string B2 string} B1}
+        relvar create A {A1 string BID string} A1
+        relvar create B {B1 string B2 string} B1
         relvar association R1 A BID * B B1 ?
     } -cleanup {
         relvar constraint delete R1
@@ -4948,11 +4947,11 @@ tuple {B1 c B2 foo} is not referenced by any tuple
             relvar insert B {B1 b B2 foo}
             relvar insert B {B1 c B2 foo}
         }
-    } -result {Relation {B1 string B2 string} B1 {{B1 c B2 foo}}}
+    } -result {{B1 string B2 string} {{B1 c B2 foo}}} -match relation
 
     test relvar-association-5.4 {many to one conditional, empty one} -setup {
-        relvar create A {Relation {A1 string BID string} A1}
-        relvar create B {Relation {B1 string B2 string} B1}
+        relvar create A {A1 string BID string} A1
+        relvar create B {B1 string B2 string} B1
         relvar association R1 A BID + B B1 ?
     } -cleanup {
         relvar constraint delete R1
@@ -4966,8 +4965,8 @@ tuple {B1 c B2 foo} is not referenced by any tuple
     } -result {}
 
     test relvar-association-5.5 {many conditional to one , empty many} -setup {
-        relvar create A {Relation {A1 string BID string} A1}
-        relvar create B {Relation {B1 string B2 string} B1}
+        relvar create A {A1 string BID string} A1
+        relvar create B {B1 string B2 string} B1
         relvar association R1 A BID * B B1 1
     } -cleanup {
         relvar constraint delete R1
@@ -4982,8 +4981,8 @@ tuple {B1 c B2 foo} is not referenced by any tuple
     } -result {}
 
     test relvar-association-6.1 {duplicate names} -setup {
-        relvar create A {Relation {A1 string BID string} A1}
-        relvar create B {Relation {B1 string B2 string} B1}
+        relvar create A {A1 string BID string} A1
+        relvar create B {B1 string B2 string} B1
     } -body {
         relvar association R1 A BID * B B1 ?
         relvar association R1 A BID * B B1 ?
@@ -4993,8 +4992,8 @@ tuple {B1 c B2 foo} is not referenced by any tuple
     } -result {duplicate constraint name, "::ral::test::R1"} -returnCodes error
 
     test relvar-association-6.2 {bad cond / mult spec} -setup {
-        relvar create A {Relation {A1 string BID string} A1}
-        relvar create B {Relation {B1 string B2 string} B1}
+        relvar create A {A1 string BID string} A1
+        relvar create B {B1 string B2 string} B1
     } -body {
         relvar association R1 A BID X B B1 ?
     } -cleanup {
@@ -5002,8 +5001,8 @@ tuple {B1 c B2 foo} is not referenced by any tuple
     } -result {bad multiplicity specification "X": must be 1, +, ?, or *} -returnCodes error
 
     test relvar-association-6.3 {bad multiplicity} -setup {
-        relvar create A {Relation {A1 string BID string} A1}
-        relvar create B {Relation {B1 string B2 string} B1}
+        relvar create A {A1 string BID string} A1
+        relvar create B {B1 string B2 string} B1
     } -body {
         relvar association R1 A BID * B B1 *
     } -cleanup {
@@ -5011,8 +5010,8 @@ tuple {B1 c B2 foo} is not referenced by any tuple
     } -result {referred to identifiers can not have non-singular multiplicities, "*"} -returnCodes error
 
     test relvar-association-7.1 {ordering in compound identifiers} -setup {
-        relvar create A {Relation {A1 string B1ID string B2ID string} A1}
-        relvar create B {Relation {B1 string B2 string} {{B1 B2}}}
+        relvar create A {A1 string B1ID string B2ID string} A1
+        relvar create B {B1 string B2 string} {B1 B2}
         relvar association R1 A {B2ID B1ID} + B {B2 B1} 1
     } -body {
         relvar eval {
@@ -5022,11 +5021,11 @@ tuple {B1 c B2 foo} is not referenced by any tuple
     } -cleanup {
         relvar constraint delete R1
         relvar unset A B
-    } -result {Relation {B1 string B2 string} {{B1 B2}} {{B1 b1 B2 b2}}}
+    } -result {{B1 string B2 string} {{B1 b1 B2 b2}}} -match relation
 
     test relvar-association-8.1 {failure at creation time} -setup {
-        relvar create C {Relation {C1 string C2 int} C1}
-        relvar create D {Relation {D1 string D2 string} D1}
+        relvar create C {C1 string C2 int} C1
+        relvar create D {D1 string D2 string} D1
         relvar insert C {C1 a C2 42}
         relvar insert C {C1 c C2 42}
         relvar insert D {D1 a D2 foo}
@@ -5041,8 +5040,8 @@ tuple {C1 c C2 42} references no tuple
 
     # relvar constraint subcommand
     test relvar-constraint-1.1 {constraint names} -setup {
-        relvar create A {Relation {A1 string BID1 string BID2 int} A1}
-        relvar create B {Relation {B1 string B2 int} {B1 B2}}
+        relvar create A {A1 string BID1 string BID2 int} A1
+        relvar create B {B1 string B2 int} B1 B2
         relvar association R3 A BID1 * B B1 ?
         relvar association R4 A BID2 * B B2 ?
     } -cleanup {
@@ -5053,8 +5052,8 @@ tuple {C1 c C2 42} references no tuple
     } -result {::ral::test::R3 ::ral::test::R4}
 
     test relvar-constraint-2.1 {constraint info -- association} -setup {
-        relvar create A {Relation {A1 string BID1 string BID2 int} A1}
-        relvar create B {Relation {B1 string B2 int} {B1 B2}}
+        relvar create A {A1 string BID1 string BID2 int} A1
+        relvar create B {B1 string B2 int} B1 B2
         relvar association R3 A BID1 * B B1 ?
     } -cleanup {
         relvar constraint delete R3
@@ -5064,9 +5063,9 @@ tuple {C1 c C2 42} references no tuple
     } -result {association ::ral::test::R3 ::ral::test::A BID1 * ::ral::test::B B1 ?}
 
     test relvar-constraint-2.2 {constraint info -- partition} -setup {
-        relvar create A {Relation {A1 string} A1}
-        relvar create B {Relation {B1 string} B1}
-        relvar create C {Relation {C1 string} C1}
+        relvar create A {A1 string} A1
+        relvar create B {B1 string} B1
+        relvar create C {C1 string} C1
         relvar partition R1 A A1 B B1 C C1
     } -cleanup {
         relvar constraint delete R1
@@ -5076,9 +5075,9 @@ tuple {C1 c C2 42} references no tuple
     } -result {partition ::ral::test::R1 ::ral::test::A A1 ::ral::test::B B1 ::ral::test::C C1}
 
     test relvar-constraint-2.3 {constraint info -- correlation} -setup {
-        relvar create A {Relation {X1 string Y1 string} {{X1 Y1}}}
-        relvar create X {Relation {X1 string} X1}
-        relvar create Y {Relation {Y1 string} Y1}
+        relvar create A {X1 string Y1 string} X1 Y1
+        relvar create X {X1 string} X1
+        relvar create Y {Y1 string} Y1
         relvar correlation R1 A X1 + X X1 Y1 * Y Y1
     } -cleanup {
         relvar constraint delete R1
@@ -5088,9 +5087,9 @@ tuple {C1 c C2 42} references no tuple
     } -result {correlation ::ral::test::R1 ::ral::test::A X1 + ::ral::test::X X1 Y1 * ::ral::test::Y Y1}
 
     test relvar-constraint-3.1 {constraint member} -setup {
-        relvar create A {Relation {X1 string Y1 string} {{X1 Y1}}}
-        relvar create X {Relation {X1 string} X1}
-        relvar create Y {Relation {Y1 string} Y1}
+        relvar create A {X1 string Y1 string} X1 Y1
+        relvar create X {X1 string} X1
+        relvar create Y {Y1 string} Y1
         relvar correlation R1 A X1 + X X1 Y1 * Y Y1
     } -cleanup {
         relvar constraint delete R1
@@ -5101,21 +5100,9 @@ tuple {C1 c C2 42} references no tuple
 
     # relvar correlation subcommand
     test relvar-correlation-1.1 {many to many} -setup {
-        relvar create A {
-            Relation
-            {A1 int X_ID string Y_ID string}
-            {{X_ID Y_ID}}
-        }
-        relvar create X {
-            Relation
-            {X_ID string X2 string}
-            X_ID
-        }
-        relvar create Y {
-            Relation
-            {Y_ID string Y2 string}
-            Y_ID
-        }
+        relvar create A {A1 int X_ID string Y_ID string} {X_ID Y_ID}
+        relvar create X {X_ID string X2 string} X_ID
+        relvar create Y {Y_ID string Y2 string} Y_ID
         relvar correlation R1 A X_ID + X X_ID Y_ID + Y Y_ID
     } -cleanup {
         relvar constraint delete R1
@@ -5134,21 +5121,9 @@ tuple {C1 c C2 42} references no tuple
     } -result {}
 
     test relvar-correlation-1.2 {many to many complete} -setup {
-        relvar create A {
-            Relation
-            {A1 int X_ID string Y_ID string}
-            {{X_ID Y_ID}}
-        }
-        relvar create X {
-            Relation
-            {X_ID string X2 string}
-            X_ID
-        }
-        relvar create Y {
-            Relation
-            {Y_ID string Y2 string}
-            Y_ID
-        }
+        relvar create A {A1 int X_ID string Y_ID string} {X_ID Y_ID}
+        relvar create X {X_ID string X2 string} X_ID
+        relvar create Y {Y_ID string Y2 string} Y_ID
         relvar correlation -complete R1 A X_ID + X X_ID Y_ID + Y Y_ID
     } -cleanup {
         relvar constraint delete R1
@@ -5168,21 +5143,9 @@ tuple {C1 c C2 42} references no tuple
     } -result {}
 
     test relvar-correlation-1.3 {many to many complete -- failure} -setup {
-        relvar create A {
-            Relation
-            {A1 int X_ID string Y_ID string}
-            {{X_ID Y_ID}}
-        }
-        relvar create X {
-            Relation
-            {X_ID string X2 string}
-            X_ID
-        }
-        relvar create Y {
-            Relation
-            {Y_ID string Y2 string}
-            Y_ID
-        }
+        relvar create A {A1 int X_ID string Y_ID string} {X_ID Y_ID}
+        relvar create X {X_ID string X2 string} X_ID
+        relvar create Y {Y_ID string Y2 string} Y_ID
         relvar correlation -complete R1 A X_ID + X X_ID Y_ID + Y Y_ID
     } -cleanup {
         relvar constraint delete R1
@@ -5202,21 +5165,9 @@ tuple {C1 c C2 42} references no tuple
     -returnCodes error
 
     test relvar-correlation-2.1 {1 to 1} -setup {
-        relvar create A {
-            Relation
-            {A1 int X_ID string Y_ID string}
-            {{X_ID Y_ID}}
-        }
-        relvar create X {
-            Relation
-            {X_ID string X2 string}
-            X_ID
-        }
-        relvar create Y {
-            Relation
-            {Y_ID string Y2 string}
-            Y_ID
-        }
+        relvar create A {A1 int X_ID string Y_ID string} {X_ID Y_ID}
+        relvar create X {X_ID string X2 string} X_ID
+        relvar create Y {Y_ID string Y2 string} Y_ID
         relvar correlation R1 A X_ID 1 X X_ID Y_ID 1 Y Y_ID
     } -cleanup {
         relvar constraint delete R1
@@ -5235,9 +5186,9 @@ tuple {C1 c C2 42} references no tuple
 
     # relvar partition subcommand
     test relvar-partition-1.1 {simple partition} -setup {
-        relvar create A {Relation {A1 string} A1}
-        relvar create B {Relation {B1 string} B1}
-        relvar create C {Relation {C1 string} C1}
+        relvar create A {A1 string} A1
+        relvar create B {B1 string} B1
+        relvar create C {C1 string} C1
     } -cleanup {
         relvar constraint delete R1
         relvar unset A B C
@@ -5246,8 +5197,8 @@ tuple {C1 c C2 42} references no tuple
     } -result {}
 
     test relvar-partition-1.2 {unknown relvar} -setup {
-        relvar create A {Relation {A1 string} A1}
-        relvar create B {Relation {B1 string} B1}
+        relvar create A {A1 string} A1
+        relvar create B {B1 string} B1
     } -cleanup {
         relvar unset A B
     } -body {
@@ -5255,9 +5206,9 @@ tuple {C1 c C2 42} references no tuple
     } -result {unknown relvar name, "C"} -returnCodes error
 
     test relvar-partition-1.3 {unknown attribute} -setup {
-        relvar create A {Relation {A1 string} A1}
-        relvar create B {Relation {B1 string} B1}
-        relvar create C {Relation {C1 string} C1}
+        relvar create A {A1 string} A1
+        relvar create B {B1 string} B1
+        relvar create C {C1 string} C1
     } -cleanup {
         relvar unset A B C
     } -body {
@@ -5265,9 +5216,9 @@ tuple {C1 c C2 42} references no tuple
     } -result {unknown attribute name, "C2"} -returnCodes error
 
     test relvar-partition-1.4 {not an identifier } -setup {
-        relvar create A {Relation {A1 string A2 int} A1}
-        relvar create B {Relation {B1 string} B1}
-        relvar create C {Relation {C1 string} C1}
+        relvar create A {A1 string A2 int} A1
+        relvar create B {B1 string} B1
+        relvar create C {C1 string} C1
     } -cleanup {
         relvar unset A B C
     } -body {
@@ -5276,9 +5227,9 @@ tuple {C1 c C2 42} references no tuple
     -returnCodes error
 
     test relvar-partition-1.5 {compound reference} -setup {
-        relvar create A {Relation {A1 string A2 string A3 int} {{A1 A2}}}
-        relvar create B {Relation {A1 string A2 string B1 string} {{A1 A2}}}
-        relvar create C {Relation {A1 string A2 string C1 string} {{A1 A2}}}
+        relvar create A {A1 string A2 string A3 int} {A1 A2}
+        relvar create B {A1 string A2 string B1 string} {A1 A2}
+        relvar create C {A1 string A2 string C1 string} {A1 A2}
     } -cleanup {
         relvar constraint delete R1
         relvar unset A B C
@@ -5287,9 +5238,9 @@ tuple {C1 c C2 42} references no tuple
     } -result {}
 
     test relvar-partition-2.1 {passes constraints} -setup {
-        relvar create A {Relation {A1 string} A1}
-        relvar create B {Relation {B1 string} B1}
-        relvar create C {Relation {C1 string} C1}
+        relvar create A {A1 string} A1
+        relvar create B {B1 string} B1
+        relvar create C {C1 string} C1
         relvar partition R1 A A1 B B1 C C1
     } -cleanup {
         relvar constraint delete R1
@@ -5300,12 +5251,12 @@ tuple {C1 c C2 42} references no tuple
             relvar insert B {B1 b}
             relvar insert C {C1 c}
         }
-    } -result {Relation {C1 string} C1 {{C1 c}}}
+    } -result {{C1 string} {{C1 c}}} -match relation
 
     test relvar-partition-2.2 {missing subtype} -setup {
-        relvar create A {Relation {A1 string} A1}
-        relvar create B {Relation {B1 string} B1}
-        relvar create C {Relation {C1 string} C1}
+        relvar create A {A1 string} A1
+        relvar create B {B1 string} B1
+        relvar create C {C1 string} C1
         relvar partition R1 A A1 B B1 C C1
     } -cleanup {
         relvar constraint delete R1
@@ -5320,9 +5271,9 @@ tuple {A1 c} is not referred to by any tuple
 } -returnCodes error
 
     test relvar-partition-2.3 {extra super type reference} -setup {
-        relvar create A {Relation {A1 string} A1}
-        relvar create B {Relation {B1 string} B1}
-        relvar create C {Relation {C1 string} C1}
+        relvar create A {A1 string} A1
+        relvar create B {B1 string} B1
+        relvar create C {C1 string} C1
         relvar partition R1 A A1 B B1 C C1
     } -cleanup {
         relvar constraint delete R1
@@ -5338,9 +5289,9 @@ tuple {A1 b} is referred to by multiple tuples
 } -returnCodes error
 
     test relvar-partition-3.1 {fail at create time} -setup {
-        relvar create A {Relation {A1 string} A1}
-        relvar create B {Relation {B1 string} B1}
-        relvar create C {Relation {C1 string} C1}
+        relvar create A {A1 string} A1
+        relvar create B {B1 string} B1
+        relvar create C {C1 string} C1
         relvar insert A {A1 b} {A1 c}
         relvar insert B {B1 b}
     } -cleanup {
@@ -5356,9 +5307,9 @@ tuple {A1 c} is not referred to by any tuple
     # identifier ordering of the relvar definitions, the constraint evaluation
     # would fail.
     test relvar-partition-3.2 {strange ordering} -setup {
-        relvar create A {Relation {A1 string A2 string A3 int} {{A1 A2}}}
-        relvar create B {Relation {A1 string A2 string B1 string} {{A1 A2}}}
-        relvar create C {Relation {A1 string A2 string C1 string} {{A1 A2}}}
+        relvar create A {A1 string A2 string A3 int} {A1 A2}
+        relvar create B {A1 string A2 string B1 string} {A1 A2}
+        relvar create C {A1 string A2 string C1 string} {A1 A2}
     } -cleanup {
         relvar constraint delete R1
         relvar unset A B C
@@ -5370,7 +5321,6 @@ tuple {A1 c} is not referred to by any tuple
         }
         return
     } -result {}
-}
 
     # examples from the Date book
     test date-example-1.0 {Get suppliers who supply all parts} -body {

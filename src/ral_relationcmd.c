@@ -46,8 +46,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.39.2.5 $
-$Date: 2009/02/08 19:04:44 $
+$Revision: 1.39.2.6 $
+$Date: 2009/02/15 23:34:59 $
  *--
  */
 
@@ -146,7 +146,6 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.39.2.5 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -228,11 +227,6 @@ relationCmd(
     return cmdTable[index].cmdFunc(interp, objc, objv) ;
 }
 
-const char *
-Ral_RelationCmdVersion(void)
-{
-    return rcsid ;
-}
 /*
  * ======================================================================
  * Relations Sub-Command Functions
@@ -1123,10 +1117,10 @@ RelationForeachCmd(
 		static const char msgfmt[] =
 		    "\n    (\"relation foreach\" body line %d)" ;
 		char msg[sizeof(msgfmt) + TCL_INTEGER_SPACE] ;
-#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION <= 5
-		sprintf(msg, msgfmt, interp->errorLine) ;
-#else
+#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 6
 		sprintf(msg, msgfmt, Tcl_GetErrorLine(interp)) ;
+#else
+		sprintf(msg, msgfmt, interp->errorLine) ;
 #endif
 		Tcl_AddObjErrorInfo(interp, msg, -1) ;
 		break ;

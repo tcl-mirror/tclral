@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuple.c,v $
-$Revision: 1.13.2.4 $
-$Date: 2009/02/02 01:30:33 $
+$Revision: 1.13.2.5 $
+$Date: 2009/02/15 23:34:59 $
  *--
  */
 
@@ -92,7 +92,6 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_tuple.c,v $ $Revision: 1.13.2.4 $" ;
 
 /*
 FUNCTION DEFINITIONS

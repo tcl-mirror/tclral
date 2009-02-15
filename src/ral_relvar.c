@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.c,v $
-$Revision: 1.19.2.5 $
-$Date: 2009/02/08 19:04:45 $
+$Revision: 1.19.2.6 $
+$Date: 2009/02/15 23:34:59 $
  *--
  */
 
@@ -63,6 +63,7 @@ INCLUDE FILES
 #include "ral_tupleheading.h"
 #include "ral_relationobj.h"
 #include "ral_relation.h"
+#include "ral_joinmap.h"
 #include "ral_utils.h"
 
 /*
@@ -85,14 +86,13 @@ static void relvarConstraintCleanup(Ral_Constraint) ;
 static void relvarTraceCleanup(Ral_TraceInfo) ;
 static int relvarSetIntRep(Ral_Relvar, Ral_Relation, Ral_ErrorInfo *) ;
 static int relvarIndexIds(Ral_Relvar, Ral_Relation, Ral_ErrorInfo *) ;
-static int relvarIdIndexTuple(Ral_Relvar, Ral_Tuple, int, Ral_ErrorInfo *) ;
-static void relvarIdUnindexTuple(Ral_Relvar relvar, Ral_Tuple tuple) ;
 static int relvarAssocConstraintEval(char const *, Ral_AssociationConstraint,
     Tcl_DString *) ;
 static int relvarPartitionConstraintEval(char const *,
     Ral_PartitionConstraint, Tcl_DString *) ;
 static int relvarCorrelationConstraintEval(char const *,
     Ral_CorrelationConstraint, Tcl_DString *) ;
+static void relvarFindJoinTuples(Ral_Relvar, Ral_Relvar, int, Ral_JoinMap) ;
 static int relvarEvalAssocTupleCounts(Ral_IntVector, int, int, Ral_IntVector,
     Ral_IntVector) ;
 static void relvarAssocConstraintErrorMsg(Tcl_DString *, char const *,
@@ -125,7 +125,6 @@ static char const * const condMultStrings[2][2] = {
     {"1", "+"},
     {"?", "*"}
 } ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvar.c,v $ $Revision: 1.19.2.5 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -826,7 +825,7 @@ Ral_RelvarInsertTuple(
      * had to reorder the tuple upon insertion.
      */
     where = Ral_RelationCardinality(relation) - 1 ;
-    if (!relvarIdIndexTuple(relvar, *(Ral_RelationBegin(relation) + where),
+    if (!Ral_RelvarIdIndexTuple(relvar, *(Ral_RelationBegin(relation) + where),
             where, errInfo)) {
         return 0 ;
     }
@@ -853,7 +852,7 @@ Ral_RelvarDeleteTuple(
      * Remove the hash entry for the tuple from the hash table for
      * each identifier.
      */
-    relvarIdUnindexTuple(relvar, *riter) ;
+    Ral_RelvarIdUnindexTuple(relvar, *riter) ;
     relation = relvar->relObj->internalRep.otherValuePtr ;
     /*
      * Remove the tuple from the relation. This reindexes the relation
@@ -869,8 +868,8 @@ Ral_RelvarDeleteTuple(
     for (siter = newiter ; siter != Ral_RelationEnd(relation) ; ++siter) {
         int status ;
 
-        relvarIdUnindexTuple(relvar, *siter) ;
-        status = relvarIdIndexTuple(relvar, *siter,
+        Ral_RelvarIdUnindexTuple(relvar, *siter) ;
+        status = Ral_RelvarIdIndexTuple(relvar, *siter,
                 siter - Ral_RelationBegin(relation), NULL) ;
         /*
          * We should never have duplicated identifying attributes after a
@@ -891,21 +890,32 @@ Ral_RelvarFindIdentifier(
     Ral_Relvar relvar,
     Ral_IntVector id)
 {
+    Ral_IntVector dupId ;
     struct relvarId *idIter ;
     int cnt ;
+    int result = -1 ;
+    /*
+     * We dont want to sort "id" in place as the order might be significant
+     * to the caller. So duplicate it before we sort it.
+     * We need to sort it because that is the canonical form for vectors
+     * of attribute indices that serve as identifiers.
+     */
+    dupId = Ral_IntVectorDup(id) ;
+    Ral_IntVectorSort(dupId) ;
     /*
      * Iterate through the identifier indices and compare the id vectors
-     * to the argument. Sort the argument vector into canonical form.
+     * to the argument.
      */
-    Ral_IntVectorSort(id) ;
     for (idIter = relvar->identifiers, cnt = relvar->idCount ; cnt != 0 ;
             ++idIter, --cnt) {
-        if (Ral_IntVectorEqual(id, idIter->idAttrs)) {
-            return idIter - relvar->identifiers ;
+        if (Ral_IntVectorEqual(dupId, idIter->idAttrs)) {
+            result = idIter - relvar->identifiers ;
+            break; 
         }
     }
+    Ral_IntVectorDelete(dupId) ;
 
-    return -1 ;
+    return result ;
 }
 
 /*
@@ -936,6 +946,78 @@ Ral_RelvarFindById(
             Ral_RelationBegin(relation) + (int)Tcl_GetHashValue(entry) :
             Ral_RelationEnd(relation) ;
 }
+
+int
+Ral_RelvarIdIndexTuple(
+    Ral_Relvar relvar,
+    Ral_Tuple tuple,
+    int where,
+    Ral_ErrorInfo *errInfo)
+{
+    struct relvarId *idIter ;
+    int cnt ;
+    struct Ral_TupleAttrHashKey key ;
+    key.tuple = tuple ;
+
+    /*
+     * Iterate through the identifier indices and compute new hash entries
+     * for the identifying attributes.
+     */
+    for (idIter = relvar->identifiers, cnt = relvar->idCount ; cnt != 0 ;
+            ++idIter, --cnt) {
+        Tcl_HashEntry *entry ;
+        int newPtr ;
+
+        key.attrs = idIter->idAttrs ;
+
+        entry = Tcl_CreateHashEntry(&idIter->idIndex, (char const *)&key,
+                &newPtr) ;
+        if (newPtr) {
+            Tcl_SetHashValue(entry, where) ;
+        } else {
+            /*
+             * We must create a new entry on each tuple or we have
+             * violated the identifying constraints.
+             */
+            if (errInfo) {
+                char *tupString = Ral_TupleStringOf(tuple) ;
+                Ral_ErrorInfoSetError(errInfo, RAL_ERR_IDENTITY_CONSTRAINT,
+                        tupString) ;
+                ckfree(tupString) ;
+            }
+            return 0 ;
+        }
+    }
+
+    return 1 ;
+}
+
+void
+Ral_RelvarIdUnindexTuple(
+    Ral_Relvar relvar,
+    Ral_Tuple tuple)
+{
+    struct relvarId *idIter ;
+    int cnt ;
+    struct Ral_TupleAttrHashKey key ;
+
+    assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
+    /*
+     * Remove the hash entry for the tuple from the hash table for
+     * each identifier.
+     */
+    key.tuple = tuple ;
+    for (idIter = relvar->identifiers, cnt = relvar->idCount ; cnt != 0 ;
+            ++idIter, --cnt) {
+        Tcl_HashEntry *entry ;
+
+        key.attrs = idIter->idAttrs ;
+        entry = Tcl_FindHashEntry(&idIter->idIndex, (char const *)&key) ;
+        assert(entry != NULL) ;
+        Tcl_DeleteHashEntry(entry) ;
+    }
+}
+
 /*
  * When restoring the value saved during the transaction, we
  * have to set the underlying relation back to the old value.
@@ -1224,84 +1306,13 @@ relvarIndexIds(
      */
     for (rIter = Ral_RelationBegin(relation) ;
             rIter != Ral_RelationEnd(relation) ; ++rIter) {
-        if (!relvarIdIndexTuple(relvar, *rIter,
+        if (!Ral_RelvarIdIndexTuple(relvar, *rIter,
                 rIter - Ral_RelationBegin(relation), errInfo)) {
             return 0 ;
         }
     }
 
     return 1 ;
-}
-
-static int
-relvarIdIndexTuple(
-    Ral_Relvar relvar,
-    Ral_Tuple tuple,
-    int where,
-    Ral_ErrorInfo *errInfo)
-{
-    struct relvarId *idIter ;
-    int cnt ;
-    struct Ral_TupleAttrHashKey key ;
-    key.tuple = tuple ;
-
-    /*
-     * Iterate through the identifier indices and compute new hash entries
-     * for the identifying attributes.
-     */
-    for (idIter = relvar->identifiers, cnt = relvar->idCount ; cnt != 0 ;
-            ++idIter, --cnt) {
-        Tcl_HashEntry *entry ;
-        int newPtr ;
-
-        key.attrs = idIter->idAttrs ;
-
-        entry = Tcl_CreateHashEntry(&idIter->idIndex, (char const *)&key,
-                &newPtr) ;
-        if (newPtr) {
-            Tcl_SetHashValue(entry, where) ;
-        } else {
-            /*
-             * We must create a new entry on each tuple or we have
-             * violated the identifying constraints.
-             */
-            if (errInfo) {
-                char *tupString = Ral_TupleStringOf(tuple) ;
-                Ral_ErrorInfoSetError(errInfo, RAL_ERR_IDENTITY_CONSTRAINT,
-                        tupString) ;
-                ckfree(tupString) ;
-            }
-            return 0 ;
-        }
-    }
-
-    return 1 ;
-}
-
-static void
-relvarIdUnindexTuple(
-    Ral_Relvar relvar,
-    Ral_Tuple tuple)
-{
-    struct relvarId *idIter ;
-    int cnt ;
-    struct Ral_TupleAttrHashKey key ;
-
-    assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
-    /*
-     * Remove the hash entry for the tuple from the hash table for
-     * each identifier.
-     */
-    key.tuple = tuple ;
-    for (idIter = relvar->identifiers, cnt = relvar->idCount ; cnt != 0 ;
-            ++idIter, --cnt) {
-        Tcl_HashEntry *entry ;
-
-        key.attrs = idIter->idAttrs ;
-        entry = Tcl_FindHashEntry(&idIter->idIndex, (char const *)&key) ;
-        assert(entry != NULL) ;
-        Tcl_DeleteHashEntry(entry) ;
-    }
 }
 
 /*
@@ -1333,8 +1344,8 @@ relvarAssocConstraintEval(
     /*
      * Map the tuples as if they were to be joined.
      */
-    Ral_RelationFindJoinTuples(referringRel, referredToRel,
-	association->referenceMap) ;
+    relvarFindJoinTuples(referringRelvar, referredToRelvar,
+            association->referredToIdentifier, association->referenceMap) ;
     /*
      * Now we count the tuples in the mapping and verify that the join
      * would match the conditionality and multiplicity of the association.
@@ -1413,7 +1424,6 @@ relvarPartitionConstraintEval(
     Ral_IntVector superMatches ;
     Ral_PtrVectorIter subEnd = Ral_PtrVectorEnd(partition->subsetReferences) ;
     Ral_PtrVectorIter subIter ;
-    Ral_IntVectorIter mEnd ;
     Ral_IntVectorIter mIter ;
     Ral_IntVector multViolations ;
     Ral_IntVector condViolations ;
@@ -1423,7 +1433,7 @@ relvarPartitionConstraintEval(
     superMatches = Ral_IntVectorNew(Ral_RelationCardinality(superRel), 0) ;
 
     for (subIter = Ral_PtrVectorBegin(partition->subsetReferences) ;
-	subIter != subEnd ; ++subIter) {
+            subIter != subEnd ; ++subIter) {
 	Ral_SubsetReference subRef = *subIter ;
 	Ral_Relvar sub = subRef->relvar ;
 	Ral_Relation subRel ;
@@ -1435,7 +1445,8 @@ relvarPartitionConstraintEval(
 	/*
 	 * Find the join from the subtype to the supertype.
 	 */
-	Ral_RelationFindJoinTuples(subRel, superRel, subMap) ;
+        relvarFindJoinTuples(sub, super, partition->referredToIdentifier,
+                subMap) ;
 	/*
 	 * The number of matching tuple entries must be the same as
 	 * the cardinality of the subtype.
@@ -1445,7 +1456,6 @@ relvarPartitionConstraintEval(
 	    Ral_IntVector violations = Ral_IntVectorNewEmpty(1) ;
 	    Ral_IntVector matchMap = Ral_JoinMapTupleMap(subMap, 0,
 		Ral_RelationCardinality(subRel)) ;
-	    Ral_IntVectorIter mEnd = Ral_IntVectorEnd(matchMap) ;
 	    Ral_IntVectorIter mIter ;
 
 	    /*
@@ -1453,8 +1463,8 @@ relvarPartitionConstraintEval(
 	     * the supertype. We can do this by getting the map
 	     * and examining it.
 	     */
-	    for (mIter = Ral_IntVectorBegin(matchMap) ; mIter != mEnd ;
-		++mIter) {
+	    for (mIter = Ral_IntVectorBegin(matchMap) ;
+                    mIter != Ral_IntVectorEnd(matchMap) ; ++mIter) {
 		if (*mIter) {
 		    Ral_IntVectorPushBack(violations,
 			Ral_IntVectorOffsetOf(matchMap, mIter)) ;
@@ -1482,8 +1492,8 @@ relvarPartitionConstraintEval(
      */
     multViolations = Ral_IntVectorNewEmpty(0) ;
     condViolations = Ral_IntVectorNewEmpty(0) ;
-    mEnd = Ral_IntVectorEnd(superMatches) ;
-    for (mIter = Ral_IntVectorBegin(superMatches) ; mIter != mEnd ; ++mIter) {
+    for (mIter = Ral_IntVectorBegin(superMatches) ;
+            mIter != Ral_IntVectorEnd(superMatches) ; ++mIter) {
 	int matchCount = *mIter ;
 
 	if (matchCount != 1) {
@@ -1548,8 +1558,8 @@ relvarCorrelationConstraintEval(
     /*
      * Map the tuples as if they were to be joined.
      */
-    Ral_RelationFindJoinTuples(referringRel, aRefToRel,
-	correlation->aReferenceMap) ;
+    relvarFindJoinTuples(referringRelvar, aRefToRelvar,
+            correlation->aIdentifier, correlation->aReferenceMap) ;
     /*
      * Now we count the tuples in the mapping and verify that the join
      * would match the conditionality and multiplicity of the correlation.
@@ -1610,8 +1620,8 @@ relvarCorrelationConstraintEval(
     /*
      * Map the tuples as if they were to be joined.
      */
-    Ral_RelationFindJoinTuples(referringRel, bRefToRel,
-	correlation->bReferenceMap) ;
+    relvarFindJoinTuples(referringRelvar, bRefToRelvar,
+            correlation->bIdentifier, correlation->bReferenceMap) ;
     /*
      * Now we count the tuples in the mapping and verify that the join
      * would match the conditionality and multiplicity of the correlation.
@@ -1683,6 +1693,60 @@ relvarCorrelationConstraintEval(
     return aRef_result && aRefTo_result
 	    && bRef_result && bRefTo_result
 	    && comp_result ;
+}
+
+/*
+ * Find the tuples that match from a referring relvar to a referred to
+ * relvar and record the result back into the join map.
+ * The attributes of the referring relvar refer to an identifier in
+ * the referred to relvar.
+ * The strategy is to use the hash table of the referred to identifier
+ * and hash tuple of the referring relvar to find the match.
+ */
+static void
+relvarFindJoinTuples(
+    Ral_Relvar refing,
+    Ral_Relvar refto,
+    int refToId,
+    Ral_JoinMap map)
+{
+    Ral_Relation refingRel ;
+    struct Ral_TupleAttrHashKey key ;
+    Tcl_HashTable *idIndex ;
+    Ral_RelationIter refingIter ;
+
+    assert(refing->relObj->typePtr == &Ral_RelationObjType) ;
+    assert(refto->relObj->typePtr == &Ral_RelationObjType) ;
+    refingRel = refing->relObj->internalRep.otherValuePtr ;
+
+    assert(refToId < refto->idCount) ;
+    idIndex = &refto->identifiers[refToId].idIndex ;
+    key.attrs = Ral_JoinMapGetAttr(map, 0) ;
+    /*
+     * Foreach tuple in "r1", find the corresponding tuple in "r2" that
+     * hash the same values for the r1 referring attributes. Record the matches
+     * back into the join map.
+     */
+    for (refingIter = Ral_RelationBegin(refingRel) ;
+            refingIter != Ral_RelationEnd(refingRel) ; ++refingIter) {
+        Tcl_HashEntry *entry ;
+
+        key.tuple =  *refingIter ;
+        entry = Tcl_FindHashEntry(idIndex, (char const *)&key) ;
+        if (entry) {
+            /*
+             * If we find an entry, then the hash value is the index into the
+             * referred to relation value.  Add the index to the join map.
+             */
+            Ral_JoinMapAddTupleMapping(map,
+                    refingIter - Ral_RelationBegin(refingRel),
+                    (int)Tcl_GetHashValue(entry)) ;
+        }
+    }
+    /*
+     * Done. Clean up.
+     */
+    Ral_IntVectorDelete(key.attrs) ;
 }
 
 static int

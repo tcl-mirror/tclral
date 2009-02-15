@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleheading.c,v $
-$Revision: 1.15.2.2 $
-$Date: 2009/01/12 00:45:36 $
+$Revision: 1.15.2.3 $
+$Date: 2009/02/15 23:34:59 $
  *--
  */
 
@@ -91,7 +91,6 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_tupleheading.c,v $ $Revision: 1.15.2.2 $" ;
 
 /*
 FUNCTION DEFINITIONS

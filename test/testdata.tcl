@@ -38,17 +38,19 @@ relvar insert People {
 relvar create A {AID1 string AID2 int A_ATTR1 string} {AID1 AID2}
 relvar create B {AID1 string B_ATTR1 string} AID1
 
+if 0 {
 relvar association R15 A AID1 * B AID1 ?
 
 relvar insert A\
     {AID1 A1 AID2 1 A_ATTR1 foo}\
     {AID1 A2 AID2 2 A_ATTR1 bar}\
-    {AID1 A1 AID2 3 A_ATTR1 baz}
+    {AID1 A1 AID2 3 A_ATTR1 baz}\
 
 relvar insert B\
     {AID1 A1 B_ATTR1 foo}\
     {AID1 A2 B_ATTR1 bar}\
-    {AID1 A4 B_ATTR1 baz}
+    {AID1 A4 B_ATTR1 baz}\
+}
 
 # The famous "Date" example database.
 relvar create S {S# string SNAME string STATUS int CITY string} S#
@@ -56,7 +58,9 @@ relvar create P {P# string PNAME string COLOR string WEIGHT double CITY string}\
         P#
 relvar create SP {S# string P# string QTY int} {S# P#}
 
+if 0 {
 relvar correlation R1 SP S# * S S# P# + P P#
+}
 
 relvar eval {
     relvar insert S\
@@ -94,7 +98,9 @@ relvar create Lamp {ModelNum int Color string} ModelNum
 relvar create FloorLamp {ModelNum int Height int} ModelNum
 relvar create TableLamp {ModelNum int Type string} ModelNum
 
+if 0 {
 relvar partition R3 Lamp ModelNum FloorLamp ModelNum TableLamp ModelNum
+}
 
 relvar eval {
     relvar insert Lamp\

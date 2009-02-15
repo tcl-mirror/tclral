@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.41.2.5 $
-$Date: 2009/02/08 19:04:45 $
+$Revision: 1.41.2.6 $
+$Date: 2009/02/15 23:34:59 $
  *--
  */
 
@@ -486,11 +486,13 @@ Ral_RelvarObjInsertTuple(
     if (tupleObj == NULL) {
 	return NULL ;
     }
+    Tcl_IncrRefCount(tupleObj) ;
     /*
      * Run the traces and get the result back. "resultObj" will have
      * a reference count of at least one and will need to be decremented.
      */
     resultObj = Ral_RelvarObjExecInsertTraces(interp, relvar, tupleObj) ;
+    Tcl_DecrRefCount(tupleObj) ;
     if (resultObj) {
         Ral_Tuple tuple ;
 	/*
@@ -604,17 +606,20 @@ int
 Ral_RelvarObjUpdateTuple(
     Tcl_Interp *interp,
     Ral_Relvar relvar,
-    Ral_Relation relation,
     Ral_RelationIter tupleIter,
     Tcl_Obj *scriptObj,
     Tcl_Obj *tupleVarNameObj,
     Ral_Relation updated,
     Ral_ErrorInfo *errInfo)
 {
+    Ral_Relation relation ;
     int result ;
     Tcl_Obj *newTupleObj ;
     Tcl_Obj *oldTupleObj ;
     Tcl_Obj *resultTupleObj ;
+
+    assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
+    relation = relvar->relObj->internalRep.otherValuePtr ;
     /*
      * Evaluate the script.
      */
@@ -624,12 +629,12 @@ Ral_RelvarObjUpdateTuple(
 	    "\n    (\"in ::ral::%s %s\" body line %d)" ;
 	char msg[sizeof(msgfmt) + TCL_INTEGER_SPACE + 50] ;
 
-#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION <= 5
-	sprintf(msg, msgfmt, Ral_ErrorInfoGetCommand(errInfo),
-	    Ral_ErrorInfoGetOption(errInfo), interp->errorLine) ;
-#else
+#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 6
 	sprintf(msg, msgfmt, Ral_ErrorInfoGetCommand(errInfo),
 	    Ral_ErrorInfoGetOption(errInfo), Tcl_GetErrorLine(interp)) ;
+#else
+	sprintf(msg, msgfmt, Ral_ErrorInfoGetCommand(errInfo),
+	    Ral_ErrorInfoGetOption(errInfo), interp->errorLine) ;
 #endif
 	Tcl_AddObjErrorInfo(interp, msg, -1) ;
 	return TCL_ERROR ;
@@ -663,24 +668,45 @@ Ral_RelvarObjUpdateTuple(
      */
     resultTupleObj = Ral_RelvarObjExecUpdateTraces(interp, relvar, oldTupleObj,
 	newTupleObj) ;
+    Tcl_DecrRefCount(oldTupleObj) ;
+    Tcl_DecrRefCount(newTupleObj) ;
     if (resultTupleObj == NULL) {
-	Tcl_DecrRefCount(oldTupleObj) ;
-	Tcl_DecrRefCount(newTupleObj) ;
 	return TCL_ERROR ;
     }
-    Tcl_IncrRefCount(resultTupleObj) ;
-
+    /*
+     * Remove the old identifier index values.
+     */
+    Ral_RelvarIdUnindexTuple(relvar, *tupleIter) ;
+    /*
+     * Update the tuple values in place.
+     */
     result = Ral_RelationUpdateTupleObj(relation, tupleIter, interp,
 	    resultTupleObj, errInfo) ;
     if (result == TCL_OK) {
+        int status ;
+
 	assert(resultTupleObj->typePtr == &Ral_TupleObjType) ;
 	result = Ral_RelationInsertTupleObj(updated, interp, resultTupleObj,
 	    errInfo) ;
+        assert(result == TCL_OK) ;
+        /*
+         * Re-index the identifiers for the new tuple value. Here is where
+         * we detect if the updated tuple value satisfies the identification
+         * constraints on the relvar.
+         */
+        status = Ral_RelvarIdIndexTuple(relvar, *tupleIter,
+                tupleIter - Ral_RelationBegin(relation), NULL) ;
+        if (status == 0) {
+            Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_DUPLICATE_TUPLE,
+                resultTupleObj) ;
+            Ral_InterpSetError(interp, errInfo) ;
+            result = TCL_ERROR ;
+        }
+    } else {
+        Ral_InterpSetError(interp, errInfo) ;
     }
-
     Tcl_DecrRefCount(resultTupleObj) ;
-    Tcl_DecrRefCount(oldTupleObj) ;
-    Tcl_DecrRefCount(newTupleObj) ;
+
     return result ;
 }
 
@@ -710,7 +736,7 @@ Ral_RelvarObjCreateAssoc(
     Ral_TupleHeading th1 ;
     Ral_TupleHeading th2 ;
     Ral_IntVector refAttrs ;
-    int isNotId ;
+    int refToId ;
     Ral_Constraint constraint ;
     Ral_AssociationConstraint assoc ;
     int result = TCL_OK ;
@@ -814,22 +840,26 @@ Ral_RelvarObjCreateAssoc(
 	++elemv2 ;
     }
     /*
+     * Sort the join map attributes relative to the referred to identifier.
+     * Remember that identifier attribute vectors are kept in sorted order
+     * and we must make sure that the referring attributes are kept in
+     * the same relative order.
+     */
+    Ral_JoinMapSortAttr(refMap, 1) ;
+    /*
      * The referred to attributes in the second relvar must constitute an
      * identifier of the relation.
      */
     refAttrs = Ral_JoinMapGetAttr(refMap, 1) ;
-    /*
-     * HERE
-     * isNotId = Ral_RelationHeadingFindIdentifier(r2->heading, refAttrs) < 0 ;
-     */
-    isNotId = 1 ;
+    refToId = Ral_RelvarFindIdentifier(relvar2, refAttrs) ;
     Ral_IntVectorDelete(refAttrs) ;
-    if (isNotId) {
+    if (refToId < 0) {
 	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptAssociation,
 	    RAL_ERR_NOT_AN_IDENTIFIER, objv[5]) ;
 	Ral_JoinMapDelete(refMap) ;
 	return TCL_ERROR ;
     }
+    assert(refToId < relvar2->idCount) ;
     /*
      * Sort the join map attributes to match the identifier order.
      */
@@ -851,6 +881,7 @@ Ral_RelvarObjCreateAssoc(
     assoc->referredToRelvar = relvar2 ;
     assoc->referredToCond = specTable[specIndex2].conditionality ;
     assoc->referredToMult = specTable[specIndex2].multiplicity ;
+    assoc->referredToIdentifier = refToId ;
     assoc->referenceMap = refMap ;
     /*
      * Record which constraints apply to a given relvar. This is what allows
@@ -897,6 +928,7 @@ Ral_RelvarObjCreatePartition(
     int supElemc ;
     Tcl_Obj **supElemv ;
     Ral_IntVector superAttrs ;
+    int supId ;
     int nSupAttrs ;
     Ral_TupleHeading supth ;
     char const *partName ;
@@ -961,17 +993,13 @@ Ral_RelvarObjCreatePartition(
 	    return TCL_ERROR ;
 	}
     }
-    /*
-     * HERE -- identifiers again.
-     */
-    #if 0
-    if (Ral_RelationHeadingFindIdentifier(superRel->heading, superAttrs) < 0) {
+    supId = Ral_RelvarFindIdentifier(super, superAttrs) ;
+    if (supId < 0) {
 	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptPartition,
 	    RAL_ERR_NOT_AN_IDENTIFIER, objv[2]) ;
 	Ral_IntVectorDelete(superAttrs) ;
 	return TCL_ERROR ;
     }
-    #endif
     nSupAttrs = Ral_IntVectorSize(superAttrs) ;
     /*
      * Create the partition constraint.
@@ -987,6 +1015,7 @@ Ral_RelvarObjCreatePartition(
     }
     partition = constraint->constraint.partition ;
     partition->referredToRelvar = super ;
+    partition->referredToIdentifier = supId ;
 
     Ral_PtrVectorPushBack(super->constraints, constraint) ;
     /*
@@ -1134,7 +1163,6 @@ Ral_RelvarObjCreateCorrelation(
     Ral_TupleHeading th1 ;
     Ral_TupleHeading th2 ;
     Ral_IntVector refAttrs ;
-    int isNotId ;
     Ral_Constraint constraint ;
     Ral_CorrelationConstraint correl ;
     int result = TCL_OK ;
@@ -1302,14 +1330,11 @@ Ral_RelvarObjCreateCorrelation(
      * The referred to attributes in the second relvar must constitute an
      * identifier of the relation.
      */
+    Ral_JoinMapSortAttr(refMap, 1) ;
     refAttrs = Ral_JoinMapGetAttr(refMap, 1) ;
-    /*
-     * HERE
-     * isNotId = Ral_RelationHeadingFindIdentifier(r1->heading, refAttrs) < 0 ;
-     */
-    isNotId = 1 ;
+    correl->aIdentifier = Ral_RelvarFindIdentifier(relvar1, refAttrs) ;
     Ral_IntVectorDelete(refAttrs) ;
-    if (isNotId) {
+    if (correl->aIdentifier < 0) {
 	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptCorrelation,
 	    RAL_ERR_NOT_AN_IDENTIFIER, objv[5]) ;
 	goto errorOut ;
@@ -1343,14 +1368,11 @@ Ral_RelvarObjCreateCorrelation(
      * The referred to attributes in the second relvar must constitute an
      * identifier of the relation.
      */
+    Ral_JoinMapSortAttr(refMap, 1) ;
     refAttrs = Ral_JoinMapGetAttr(refMap, 1) ;
-    /*
-     * HERE
-     * isNotId = Ral_RelationHeadingFindIdentifier(r2->heading, refAttrs) < 0 ;
-     */
-    isNotId = 1 ;
+    correl->bIdentifier = Ral_RelvarFindIdentifier(relvar2, refAttrs) ;
     Ral_IntVectorDelete(refAttrs) ;
-    if (isNotId) {
+    if (correl->bIdentifier < 0) {
 	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptCorrelation,
 	    RAL_ERR_NOT_AN_IDENTIFIER, objv[9]) ;
 	goto errorOut ;
@@ -1998,6 +2020,7 @@ Ral_RelvarObjExecUpdateTraces(
     Tcl_Obj *oldTuple,
     Tcl_Obj *newTuple)
 {
+    Tcl_IncrRefCount(newTuple) ;
     if (relvar->traces && relvar->traceFlags == 0) {
 	relvar->traceFlags = TRACEOP_UPDATE_FLAG ;
 	newTuple = Ral_RelvarObjExecTraces(interp, relvar, &Ral_TupleObjType,
@@ -2014,6 +2037,7 @@ Ral_RelvarObjExecSetTraces(
     Tcl_Obj *relationObj,
     Ral_ErrorInfo *errInfo)
 {
+    Tcl_IncrRefCount(relationObj) ;
     if (relvar->traces && relvar->traceFlags == 0) {
 	relvar->traceFlags = TRACEOP_SET_FLAG ;
 	relationObj = Ral_RelvarObjExecTraces(interp, relvar,
@@ -2469,12 +2493,11 @@ Ral_RelvarObjExecTraces(
 		 * Break out the list as a array of argments and evaluate it.
 		 */
 		if (Tcl_ListObjGetElements(interp, cmd, &cmdc, &cmdv)
-                            != TCL_OK ||
-                        Tcl_EvalObjv(interp, cmdc, cmdv, TCL_EVAL_DIRECT)
-                            != TCL_OK) {
-                    if (traceObj) {
-                        Tcl_DecrRefCount(traceObj) ;
-                    }
+                        != TCL_OK) {
+		    goto cmdError ;
+                }
+                if (Tcl_EvalObjv(interp, cmdc, cmdv, TCL_EVAL_DIRECT)
+                        != TCL_OK) {
 		    goto cmdError ;
 		}
 		if (type != NULL) {
@@ -2526,5 +2549,7 @@ Ral_RelvarObjExecTraces(
 
 cmdError:
     Tcl_DecrRefCount(cmd) ;
+    Tcl_DecrRefCount(flagObj) ;
+    Tcl_DecrRefCount(nameObj) ;
     return NULL ;
 }

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.h,v $
-$Revision: 1.15.2.2 $
-$Date: 2009/01/12 00:45:36 $
+$Revision: 1.15.2.3 $
+$Date: 2009/02/15 23:34:59 $
  *--
  */
 #ifndef _ral_attribute_h_
@@ -142,8 +142,8 @@ typedef struct Ral_AttributeValueScanFlags {
 /*
 DATA DECLARATIONS
 */
-extern char const ral_tupleTypeName[] ;
-extern char const ral_relationTypeName[] ;
+extern char ral_tupleTypeName[] ;
+extern char ral_relationTypeName[] ;
 
 /*
 FUNCTION DECLARATIONS

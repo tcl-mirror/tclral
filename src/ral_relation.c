@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.36.2.5 $
-$Date: 2009/02/08 19:04:44 $
+$Revision: 1.36.2.6 $
+$Date: 2009/02/15 23:34:59 $
  *--
  */
 
@@ -377,7 +377,7 @@ Ral_RelationUpdate(
      * Hash the new tuple to determine if it is unique.
      */
     found = Ral_RelationFind(relation, newTuple, NULL) ;
-    if (found != Ral_RelationEnd(relation)) {
+    if (found == Ral_RelationEnd(relation)) {
         int status ;
 	/*
          * If the new tuple is unique, then discard the old one and install the

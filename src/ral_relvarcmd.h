@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.h,v $
-$Revision: 1.3 $
-$Date: 2009/04/11 18:18:54 $
+$Revision: 1.2.2.1 $
+$Date: 2009/02/15 23:34:59 $
  *--
  */
 #ifndef _ral_relvarcmd_h_

@@ -48,8 +48,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: trace.test,v $
-# $Revision: 1.10.2.1 $
-# $Date: 2009/02/08 19:04:45 $
+# $Revision: 1.10.2.2 $
+# $Date: 2009/02/15 23:34:59 $
 #  *--
 
 package require tcltest 2.2
@@ -268,7 +268,7 @@ namespace eval ::ral::test {
 
     proc setMap {relvarName opsList rel} {
 	#puts "setMap: $relvarName, $opsList\n[relformat $rel setMap]"
-	set newR [relation tag [relation project $rel S#] -ascending S# R#]
+	set newR [relation tag [relation project $rel S#] R# -ascending S#]
 	relvar eval {
 	    relvar set SMap $newR
 	}
@@ -277,15 +277,15 @@ namespace eval ::ral::test {
     }
 
     proc unsetMap {relvarName opsList} {
-	relvar set SMap [relation empty [relvar set SMap]]
+	relvar set SMap [relation emptyof [relvar set SMap]]
     }
 
     unset S
     relvar create S {S# string SNAME string STATUS int CITY string} S#
 
-    relvar create SMap {R# int S# string} {R# S#}
+    relvar create SMap {R# int S# string} R# S#
 
-    test relvar-trace-5.1 {insert tracing} -setup {
+    test relvar-trace-5.0 {insert tracing} -setup {
 	relvar trace add variable S insert [namespace code insertMap]
     } -cleanup {
 	relvar trace remove variable S insert [namespace code insertMap]
@@ -367,7 +367,7 @@ namespace eval ::ral::test {
     } -cleanup {
 	relvar trace remove variable S set [namespace code setMap]
     } -body {
-	relvar set S [relation include $S {S# S7 SNAME Foo STATUS 25 CITY Bar}]
+	relvar set S [relation insert $S {S# S7 SNAME Foo STATUS 25 CITY Bar}]
 	relvar set SMap
     } -result {
 	{R# int S# string}

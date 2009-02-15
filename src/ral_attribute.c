@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.c,v $
-$Revision: 1.25.2.4 $
-$Date: 2009/02/02 01:30:33 $
+$Revision: 1.25.2.5 $
+$Date: 2009/02/15 23:34:59 $
  *--
  */
 
@@ -182,8 +182,8 @@ EXTERNAL DATA REFERENCES
 /*
 EXTERNAL DATA DEFINITIONS
 */
-char const ral_relationTypeName[] = "Relation" ;
-char const ral_tupleTypeName[] = "Tuple" ;
+char ral_relationTypeName[] = "Relation" ;
+char ral_tupleTypeName[] = "Tuple" ;
 
 /*
 STATIC DATA ALLOCATION
@@ -214,7 +214,6 @@ static struct ral_type const Ral_Types[] = {
 
 static char const openList = '{' ;
 static char const closeList = '}' ;
-static char const rcsid[] = "@(#) $RCSfile: ral_attribute.c,v $ $Revision: 1.25.2.4 $" ;
 
 /*
 FUNCTION DEFINITIONS
