@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.h,v $
-$Revision: 1.20.2.4 $
-$Date: 2009/02/08 19:04:44 $
+$Revision: 1.20.2.5 $
+$Date: 2009/02/17 02:28:11 $
  *--
  */
 #ifndef _ral_relation_h_
@@ -176,57 +176,58 @@ extern int Ral_RelationProperSubsetOf(Ral_Relation, Ral_Relation) ;
 extern int Ral_RelationSupersetOf(Ral_Relation, Ral_Relation) ;
 extern int Ral_RelationProperSupersetOf(Ral_Relation, Ral_Relation) ;
 
-extern int Ral_RelationRenameAttribute(Ral_Relation, const char *, const char *,
-    Ral_ErrorInfo *) ;
+extern int Ral_RelationRenameAttribute(Ral_Relation, char const *, char const *,
+        Ral_ErrorInfo *) ;
 
 extern Ral_Relation Ral_RelationUnion(Ral_Relation, Ral_Relation,
-    Ral_ErrorInfo *) ;
+        Ral_ErrorInfo *) ;
 extern Ral_Relation Ral_RelationIntersect(Ral_Relation, Ral_Relation,
-    Ral_ErrorInfo *) ;
+        Ral_ErrorInfo *) ;
 extern Ral_Relation Ral_RelationMinus(Ral_Relation, Ral_Relation,
-    Ral_ErrorInfo *) ;
+        Ral_ErrorInfo *) ;
 extern Ral_Relation Ral_RelationTimes(Ral_Relation, Ral_Relation) ;
 extern Ral_Relation Ral_RelationProject(Ral_Relation, Ral_IntVector) ;
-extern Ral_Relation Ral_RelationGroup(Ral_Relation, const char *,
-    Ral_IntVector) ;
-extern Ral_Relation Ral_RelationUngroup(Ral_Relation, const char *,
-    Ral_ErrorInfo *) ;
+extern Ral_Relation Ral_RelationGroup(Ral_Relation, char const *,
+        Ral_IntVector) ;
+extern Ral_Relation Ral_RelationUngroup(Ral_Relation, char const *,
+        Ral_ErrorInfo *) ;
 extern Ral_Relation Ral_RelationJoin(Ral_Relation, Ral_Relation, Ral_JoinMap,
-    Ral_ErrorInfo *) ;
+        Ral_ErrorInfo *) ;
 extern Ral_Relation Ral_RelationCompose(Ral_Relation, Ral_Relation, Ral_JoinMap,
-    Ral_ErrorInfo *) ;
+        Ral_ErrorInfo *) ;
 extern Ral_Relation Ral_RelationSemiJoin(Ral_Relation, Ral_Relation,
-    Ral_JoinMap) ;
+        Ral_JoinMap) ;
 extern Ral_Relation Ral_RelationSemiMinus(Ral_Relation, Ral_Relation,
-    Ral_JoinMap) ;
+        Ral_JoinMap) ;
 extern Ral_Relation Ral_RelationDivide(Ral_Relation, Ral_Relation, Ral_Relation,
-    Ral_ErrorInfo *) ;
+        Ral_ErrorInfo *) ;
 extern Ral_Relation Ral_RelationTag(Ral_Relation, char const *, Ral_IntVector,
-    Ral_ErrorInfo *) ;
+        Ral_ErrorInfo *) ;
 extern Ral_Relation Ral_RelationTagWithin(Ral_Relation, char const *,
-    Ral_IntVector, Ral_IntVector, Ral_ErrorInfo *) ;
+        Ral_IntVector, Ral_IntVector, Ral_ErrorInfo *) ;
+extern Ral_Relation Ral_RelationUnwrap(Ral_Relation, char const *,
+        Ral_ErrorInfo *) ;
 extern Ral_Relation Ral_RelationTclose(Ral_Relation) ;
 
 extern Ral_IntVector Ral_RelationSort(Ral_Relation, Ral_IntVector, int) ;
-
 extern int Ral_RelationCopy(Ral_Relation, Ral_RelationIter,
-    Ral_RelationIter, Ral_Relation, Ral_IntVector) ;
+        Ral_RelationIter, Ral_Relation, Ral_IntVector) ;
 extern void Ral_RelationFindJoinTuples(Ral_Relation, Ral_Relation,
-    Ral_JoinMap) ;
+        Ral_JoinMap) ;
 
 extern int Ral_RelationScan(Ral_Relation, Ral_AttributeTypeScanFlags *,
-    Ral_AttributeValueScanFlags *) ;
+        Ral_AttributeValueScanFlags *) ;
 extern int Ral_RelationConvert(Ral_Relation, char *,
-    Ral_AttributeTypeScanFlags *, Ral_AttributeValueScanFlags *) ;
+        Ral_AttributeTypeScanFlags *, Ral_AttributeValueScanFlags *) ;
 extern int Ral_RelationScanValue(Ral_Relation,
-    Ral_AttributeTypeScanFlags *, Ral_AttributeValueScanFlags *) ;
+        Ral_AttributeTypeScanFlags *, Ral_AttributeValueScanFlags *) ;
 extern int Ral_RelationConvertValue(Ral_Relation, char *,
-    Ral_AttributeTypeScanFlags *, Ral_AttributeValueScanFlags *) ;
+        Ral_AttributeTypeScanFlags *, Ral_AttributeValueScanFlags *) ;
 extern char *Ral_RelationStringOf(Ral_Relation) ;
 extern char *Ral_RelationValueStringOf(Ral_Relation) ;
 
-const char *Ral_RelationGetIdKey(Ral_Tuple, Ral_IntVector,
-    Ral_IntVector, Tcl_DString *) ;
+char const *Ral_RelationGetIdKey(Ral_Tuple, Ral_IntVector,
+        Ral_IntVector, Tcl_DString *) ;
 
 #endif /* _ral_relation_h_ */
 

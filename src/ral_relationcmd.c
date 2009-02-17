@@ -46,8 +46,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.39.2.6 $
-$Date: 2009/02/15 23:34:59 $
+$Revision: 1.39.2.7 $
+$Date: 2009/02/17 02:28:11 $
  *--
  */
 
@@ -134,6 +134,8 @@ static int RelationTimesCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationTupleCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationUngroupCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationUnionCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
+static int RelationUnwrapCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
+static int RelationWrapCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 
 /*
 EXTERNAL DATA REFERENCES
@@ -209,6 +211,8 @@ relationCmd(
 	{"tuple", RelationTupleCmd},
 	{"ungroup", RelationUngroupCmd},
 	{"union", RelationUnionCmd},
+	{"unwrap", RelationUnwrapCmd},
+	{"wrap", RelationWrapCmd},
 	{NULL, NULL},
     } ;
 
@@ -883,20 +887,23 @@ RelationExtendCmd(
 
 	for (c = objc, v = objv + 2 ; c > 0 ; c -= 3, v += 3) {
 	    Tcl_Obj *exprResult ;
+	    Tcl_Obj *cvtResult ;
 
 	    if (Tcl_ExprObj(interp, *v, &exprResult) != TCL_OK) {
 		Ral_TupleDelete(extTuple) ;
 		goto errorOut ;
 	    }
-	    if (Ral_AttributeConvertValueToType(interp, *attrIter++,
-		exprResult, &errInfo) != TCL_OK) {
-		Ral_TupleDelete(extTuple) ;
+	    cvtResult = Ral_AttributeConvertValueToType(interp, *attrIter++,
+		exprResult, &errInfo) ;
+	    if (cvtResult == NULL) {
 		Tcl_DecrRefCount(exprResult) ;
+		Ral_TupleDelete(extTuple) ;
 		Ral_InterpSetError(interp, &errInfo) ;
 		goto errorOut ;
 	    }
-	    Tcl_IncrRefCount(*extIter++ = exprResult) ;
+	    Tcl_IncrRefCount(cvtResult) ;
 	    Tcl_DecrRefCount(exprResult) ;
+	    *extIter++ = cvtResult ;
 	}
 	/*
 	 * Should always be able to insert the extended tuple since
@@ -2323,17 +2330,24 @@ RelationSummarizeCmd(
 	    Ral_TupleEnd(perTuple), sumIter) ;
 
 	for (c = objc, v = objv + 2 ; c > 0 ; c -= 3, v += 3) {
-	    if (Tcl_ExprObj(interp, *v, sumIter) != TCL_OK) {
+	    Tcl_Obj *exprResult ;
+            Tcl_Obj *cvtResult ;
+
+	    if (Tcl_ExprObj(interp, *v, &exprResult) != TCL_OK) {
 		Ral_TupleDelete(sumTuple) ;
 		goto errorOut ;
 	    }
-	    if (Ral_AttributeConvertValueToType(interp, *attrIter++,
-		*sumIter, &errInfo) != TCL_OK) {
+	    cvtResult = Ral_AttributeConvertValueToType(interp, *attrIter++,
+		exprResult, &errInfo) ;
+	    if (cvtResult == NULL) {
+		Tcl_DecrRefCount(exprResult) ;
 		Ral_TupleDelete(sumTuple) ;
-		Tcl_DecrRefCount(*sumIter) ;
+		Ral_InterpSetError(interp, &errInfo) ;
 		goto errorOut ;
 	    }
-	    ++sumIter ;
+            Tcl_IncrRefCount(cvtResult) ;
+            Tcl_DecrRefCount(exprResult) ;
+            *sumIter++ = cvtResult ;
 	}
 	status = Ral_RelationPushBack(sumRelation, sumTuple, NULL) ;
 	assert(status != 0) ;
@@ -2740,4 +2754,53 @@ RelationUnionCmd(
 
     Tcl_SetObjResult(interp, Ral_RelationObjNew(unionRel)) ;
     return TCL_OK ;
+}
+
+static int
+RelationUnwrapCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_Obj *relObj ;
+    Ral_Relation relation ;
+    Tcl_Obj *attrObj ;
+    const char *attrName ;
+    Ral_Relation unwrapRel ;
+    Ral_ErrorInfo errInfo ;
+
+    /* relation unwrap relation attribute */
+    if (objc != 4) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relation attribute") ;
+	return TCL_ERROR ;
+    }
+    relObj = objv[2] ;
+    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relObj->internalRep.otherValuePtr ;
+    attrObj = objv[3] ;
+    attrName = Tcl_GetString(attrObj) ;
+
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptUnwrap) ;
+    unwrapRel = Ral_RelationUnwrap(relation, attrName, &errInfo) ;
+    if (unwrapRel == NULL) {
+	Ral_InterpSetError(interp, &errInfo) ;
+	return TCL_ERROR ;
+    }
+
+    Tcl_SetObjResult(interp, Ral_RelationObjNew(unwrapRel)) ;
+    return TCL_OK ;
+}
+
+static int
+RelationWrapCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    /*
+     * HERE --
+     */
+    return TCL_ERROR ;
 }

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuple.c,v $
-$Revision: 1.13.2.5 $
-$Date: 2009/02/15 23:34:59 $
+$Revision: 1.13.2.6 $
+$Date: 2009/02/17 02:28:11 $
  *--
  */
 
@@ -337,6 +337,7 @@ Ral_TupleUpdateAttrValue(
     Ral_Attribute attribute ;
     int valueIndex ;
     Tcl_Obj *oldValue ;
+    Tcl_Obj *cvtValue ;
 
     /*
      * Check that we are abiding by copy-on-write semantics.
@@ -357,8 +358,9 @@ Ral_TupleUpdateAttrValue(
     /*
      * Convert the value to the type of the attribute.
      */
-    if (Ral_AttributeConvertValueToType(NULL, attribute, value, errInfo)
-            != TCL_OK) {
+    cvtValue = Ral_AttributeConvertValueToType(NULL, attribute, value,
+            errInfo) ;
+    if (cvtValue == NULL) {
 	Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_BAD_VALUE, value) ;
 	return 0 ;
     }
@@ -376,7 +378,7 @@ Ral_TupleUpdateAttrValue(
     /*
      * Update the tuple to the new value.
      */
-    Tcl_IncrRefCount(tuple->values[valueIndex] = value) ;
+    Tcl_IncrRefCount(tuple->values[valueIndex] = cvtValue) ;
     return 1 ;
 }
 

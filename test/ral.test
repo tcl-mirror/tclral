@@ -51,8 +51,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.47.2.7 $
-# $Date: 2009/02/15 23:34:59 $
+# $Revision: 1.47.2.8 $
+# $Date: 2009/02/17 02:28:11 $
 #  *--
 
 package require tcltest 2.2
@@ -3917,6 +3917,54 @@ in expression "_@_< 20"} -returnCodes error
         }
     } -match relation
 
+    # relation unwrap subcommand
+    test relation-unwrap-1.0 {
+        no duplicated attributes
+    } -body {
+        set r {
+            {Name string Address {Tuple {City string State string}}} {
+                {Name Andrew Address {City Sunnyvale State CA}}
+                {Name George Address {City Cleveland State OH}}
+                {Name Frank Address {City Seattle State WA}}
+            }
+        }
+        relation unwrap $r Address
+    } -result {
+        {Name string City string State string}
+        {
+            {Name Andrew City Sunnyvale State CA}
+            {Name George City Cleveland State OH}
+            {Name Frank City Seattle State WA}
+        }
+    } -match relation
+
+    test relation-unwrap-1.1 {
+        wrong attribute
+    } -body {
+        set r {
+            {Name string Address {Tuple {City string State string}}} {
+                {Name Andrew Address {City Sunnyvale State CA}}
+                {Name George Address {City Cleveland State OH}}
+                {Name Frank Address {City Seattle State WA}}
+            }
+        }
+        relation unwrap $r Foo
+    } -result {unknown attribute name, "Foo"} -returnCodes error
+
+    test relation-unwrap-1.2 {
+        duplicate attribute in the result
+    } -body {
+        set r {
+            {Name string State string
+                    Address {Tuple {City string State string}}} {
+                {Name Andrew State CA Address {City Sunnyvale State CA}}
+                {Name George State CA Address {City Cleveland State OH}}
+                {Name Frank State CA Address {City Seattle State WA}}
+            }
+        }
+        relation unwrap $r Address
+    } -result {duplicate attribute name, "while unwrapping tuple"} -returnCodes error
+
     # relvar Tests
 
     # relvar create subcommand
@@ -4080,6 +4128,91 @@ in expression "_@_< 20"} -returnCodes error
                 {Name George Age 32}
             }
     } -match relation
+
+    # relvar restrictone subcommand
+    test relvar-restrictone-1.0 {
+        find one tuple
+    } -setup {
+        relvar create X {Name string Status int} Name
+        relvar set X [relation create {Name string Status int}\
+            {Name George Status 20}\
+            {Name Fred Status 30}\
+            {Status 40 Name Alice}]
+    } -cleanup {
+        relvar unset X
+    } -body {
+        relation cardinality [relvar restrictone X Name George]
+    } -result 1
+
+    test relvar-restrictone-1.1 {
+        fail to find tuple
+    } -setup {
+        relvar create X {Name string Status int} Name
+        relvar set X [relation create {Name string Status int}\
+            {Name George Status 20}\
+            {Name Fred Status 30}\
+            {Status 40 Name Alice}]
+    } -cleanup {
+        relvar unset X
+    } -body {
+        relation cardinality [relvar restrictone X Name Foo]
+    } -result 0
+
+    test relvar-restrictone-1.2 {
+        Compare integer values
+    } -setup {
+        relvar create X {Name string Status int} Status
+        relvar set X [relation create {Name string Status int}\
+            {Name George Status 20}\
+            {Name Fred Status 30}\
+            {Status 40 Name Alice}]
+    } -cleanup {
+        relvar unset X
+    } -body {
+        relation cardinality [relvar restrictone X Status 0x14]
+    } -result 1
+
+    test relvar-restrictone-2.1 {
+        bad input name / value pairs
+    } -setup {
+        relvar create X {Name string Status int} Name
+        relvar set X [relation create {Name string Status int}\
+            {Name George Status 20}\
+            {Name Fred Status 30}\
+            {Status 40 Name Alice}]
+    } -cleanup {
+        relvar unset X
+    } -body {
+        relation cardinality [relvar restrictone X Name]
+    } -result {wrong # args: should be "relvar restrictone relvarValue attr value ?attr2 value 2 ...?"} -returnCodes error
+
+    test relvar-restrictone-2.2 {
+        unknown attribute
+    } -setup {
+        relvar create X {Name string Status int} Name
+        relvar set X [relation create {Name string Status int}\
+            {Name George Status 20}\
+            {Name Fred Status 30}\
+            {Status 40 Name Alice}]
+    } -cleanup {
+        relvar unset X
+    } -body {
+        relation cardinality [relvar restrictone X Foo 1]
+    } -result {unknown attribute name, "Foo"} -returnCodes error
+
+    test relvar-restrictone-2.3 {
+        not an identifier
+    } -setup {
+        relvar create X {Name string Status int} Name
+        relvar set X [relation create {Name string Status int}\
+            {Name George Status 20}\
+            {Name Fred Status 30}\
+            {Status 40 Name Alice}]
+    } -cleanup {
+        relvar unset X
+    } -body {
+        relation cardinality [relvar restrictone X Status 16]
+    } -result {attributes do not constitute an identifier, "during identifier construction operation"} -returnCodes error
 
     # relvar union subcommand
     test relvar-union-1.0 {union single relation} -setup {

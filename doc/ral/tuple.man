@@ -46,8 +46,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: tuple.man,v $
-# $Revision: 1.16.2.2 $
-# $Date: 2009/01/19 01:45:46 $
+# $Revision: 1.16.2.3 $
+# $Date: 2009/02/17 02:28:11 $
 #  *--
 }]
 [moddesc "Tuple Operators"]
@@ -170,7 +170,7 @@ pairs.
 The following is a literal string representation of a tuple with
 three attributes.
 [example {
-{{Name string Breed string Age int} {Name Fido Breed Terrier Age 2}}
+{Name string Breed string Age int} {Name Fido Breed Terrier Age 2}
 }]
 
 [section COMMANDS]

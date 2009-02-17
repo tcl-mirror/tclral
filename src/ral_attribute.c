@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.c,v $
-$Revision: 1.25.2.5 $
-$Date: 2009/02/15 23:34:59 $
+$Revision: 1.25.2.6 $
+$Date: 2009/02/17 02:28:11 $
  *--
  */
 
@@ -599,14 +599,15 @@ Ral_AttributeNewFromObjs(
  * for all types. This is necessary for conditional referential attributes
  * that must never match a value.
  */
-int
+Tcl_Obj *
 Ral_AttributeConvertValueToType(
     Tcl_Interp *interp,
     Ral_Attribute attr,
     Tcl_Obj *objPtr,
     Ral_ErrorInfo *errInfo)
 {
-    int result = TCL_OK ;
+    Tcl_Obj *result = objPtr ;
+    int status ;
     int len ;
 
     switch (attr->attrType) {
@@ -628,26 +629,57 @@ Ral_AttributeConvertValueToType(
         (void)Tcl_GetStringFromObj(objPtr, &len) ;
 	if (len != 0) {
 	    struct ral_type *type = findRalType(attr->typeName) ;
-	    result = type ? type->isa(interp, objPtr) :
+	    status = type ? type->isa(interp, objPtr) :
 		    isAString(interp, objPtr) ;
-	    if (result != TCL_OK) {
+	    if (status != TCL_OK) {
 		Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_BAD_VALUE, objPtr) ;
 		Ral_InterpSetError(interp, errInfo) ;
+                result = NULL ;
 	    }
 	}
 	break ;
 
     case Tuple_Type:
 	if (objPtr->typePtr != &Ral_TupleObjType) {
-	    result = Ral_TupleObjConvert(attr->heading, interp,
-		    objPtr, objPtr, errInfo) ;
+            if (Tcl_IsShared(objPtr)) {
+                result = Tcl_DuplicateObj(objPtr) ;
+                if (Ral_TupleObjConvert(attr->heading, interp, objPtr, result,
+                        errInfo) == TCL_OK) {
+                    Tcl_InvalidateStringRep(result) ;
+                } else {
+                    Tcl_DecrRefCount(result) ;
+                    result = NULL ;
+                }
+            } else {
+                if (Ral_TupleObjConvert(attr->heading, interp, objPtr,
+                        objPtr, errInfo) == TCL_OK) {
+                    Tcl_InvalidateStringRep(result) ;
+                } else {
+                    result = NULL ;
+                }
+            }
 	}
 	break ;
 
     case Relation_Type:
 	if (objPtr->typePtr != &Ral_RelationObjType) {
-	    result = Ral_RelationObjConvert(attr->heading,
-		    interp, objPtr, objPtr, errInfo) ;
+            if (Tcl_IsShared(objPtr)) {
+                result = Tcl_DuplicateObj(objPtr) ;
+                if (Ral_RelationObjConvert(attr->heading, interp, objPtr,
+                        result, errInfo) == TCL_OK) {
+                    Tcl_InvalidateStringRep(result) ;
+                } else {
+                    Tcl_DecrRefCount(result) ;
+                    result = NULL ;
+                }
+            } else {
+                if (Ral_RelationObjConvert(attr->heading, interp, objPtr,
+                        objPtr, errInfo) == TCL_OK) {
+                    Tcl_InvalidateStringRep(result) ;
+                } else {
+                    result = NULL ;
+                }
+            }
 	}
 	break ;
 

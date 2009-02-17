@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_utils.h,v $
-$Revision: 1.16.2.3 $
-$Date: 2009/02/02 01:30:33 $
+$Revision: 1.16.2.4 $
+$Date: 2009/02/17 02:28:11 $
  *--
  */
 #ifndef _ral_utils_h_
@@ -88,7 +88,6 @@ typedef enum {
     Ral_OptAssociation,
     Ral_OptBody,
     Ral_OptCardinality,
-    Ral_OptChoose,
     Ral_OptCompose,
     Ral_OptConstraint,
     Ral_OptCorrelation,
@@ -122,10 +121,10 @@ typedef enum {
     Ral_OptPartition,
     Ral_OptProject,
     Ral_OptRank,
-    Ral_OptReidentify,
     Ral_OptRelation,
     Ral_OptRename,
     Ral_OptRestrict,
+    Ral_OptRestrictone,
     Ral_OptRestrictwith,
     Ral_OptSemijoin,
     Ral_OptSemiminus,

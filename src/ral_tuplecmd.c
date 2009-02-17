@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuplecmd.c,v $
-$Revision: 1.20.2.3 $
-$Date: 2009/02/15 23:34:59 $
+$Revision: 1.20.2.4 $
+$Date: 2009/02/17 02:28:11 $
  *--
  */
 
@@ -463,6 +463,7 @@ TupleExtendCmd(
     for (newValues = Ral_TupleEnd(newTuple) ; objc > 0 ; objc -= 3, objv += 3) {
 	Ral_Attribute attr ;
 	Ral_TupleHeadingIter hiter ;
+        Tcl_Obj *cvtValue ;
 
 	attr = Ral_AttributeNewFromObjs(interp, objv[0], objv[1], &errInfo) ;
 	if (attr == NULL) {
@@ -476,11 +477,12 @@ TupleExtendCmd(
 	    goto errorOut ;
 	}
 
-	if (Ral_AttributeConvertValueToType(interp, attr, objv[2], &errInfo)
-	    != TCL_OK) {
+	cvtValue = Ral_AttributeConvertValueToType(interp, attr, objv[2],
+                &errInfo) ;
+	if (cvtValue == NULL) {
 	    goto errorOut ;
 	}
-	Tcl_IncrRefCount(*newValues++ = objv[2]) ;
+	Tcl_IncrRefCount(*newValues++ = cvtValue) ;
     }
 
     Tcl_SetObjResult(interp, Ral_TupleObjNew(newTuple)) ;

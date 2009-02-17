@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.36.2.6 $
-$Date: 2009/02/15 23:34:59 $
+$Revision: 1.36.2.7 $
+$Date: 2009/02/17 02:28:11 $
  *--
  */
 
@@ -121,8 +121,8 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char openList = '{' ;
-static const char closeList = '}' ;
+static char const openList = '{' ;
+static char const closeList = '}' ;
 
 /*
  * We use three custom hash tables with relation values.
@@ -774,7 +774,7 @@ Ral_RelationGroup(
 Ral_Relation
 Ral_RelationUngroup(
     Ral_Relation relation,
-    const char *attrName,
+    char const *attrName,
     Ral_ErrorInfo *errInfo)
 {
     Ral_TupleHeading heading = relation->heading ;
@@ -1423,6 +1423,122 @@ Ral_RelationTagWithin(
     return tagRelation ;
 }
 
+Ral_Relation
+Ral_RelationUnwrap(
+    Ral_Relation relation,
+    char const *attrName,
+    Ral_ErrorInfo *errInfo)
+{
+    Ral_TupleHeading heading = relation->heading ;
+    Ral_TupleHeadingIter unwrapAttrIter ;
+    int unwrapAttrIndex ;
+    Ral_Attribute unwrapAttr ;
+    Ral_TupleHeading attrHeading ;
+    Ral_TupleHeading resultHeading ;
+    int status ;
+    Ral_Relation resultRel ;
+    Ral_RelationIter relIter ;
+
+    /*
+     * Check that the attribute exists and is a relation type attribute
+     */
+    unwrapAttrIter = Ral_TupleHeadingFind(heading, attrName) ;
+    if (unwrapAttrIter == Ral_TupleHeadingEnd(heading)) {
+	Ral_ErrorInfoSetError(errInfo, RAL_ERR_UNKNOWN_ATTR, attrName) ;
+	return NULL ;
+    }
+    unwrapAttr = *unwrapAttrIter ;
+    if (unwrapAttr->attrType != Tuple_Type) {
+	Ral_ErrorInfoSetError(errInfo, RAL_ERR_NOT_A_TUPLE, attrName) ;
+	return NULL ;
+    }
+    attrHeading = unwrapAttr->heading ;
+    /*
+     * Create a new tuple heading for the unwrapped result.  The unwrapped
+     * relation has a heading with all the attributes of the original plus that
+     * of the unwrapped attribute minus one (the attribute being unwrapped).
+     */
+    resultHeading = Ral_TupleHeadingNew(Ral_RelationDegree(relation) +
+	Ral_TupleHeadingSize(attrHeading) - 1) ;
+    /*
+     * Copy up to the attribute to be unwrapped. We should always be able
+     * to copy the old heading parts into an empty heading.
+     */
+    status = Ral_TupleHeadingAppend(heading, Ral_TupleHeadingBegin(heading),
+            unwrapAttrIter, resultHeading) ;
+    assert(status != 0) ;
+    /*
+     * Copy the attributes after the one to be unwrapped to the end.
+     */
+    status = Ral_TupleHeadingAppend(heading, unwrapAttrIter + 1,
+	Ral_TupleHeadingEnd(heading), resultHeading) ;
+    assert(status != 0) ;
+    /*
+     * Copy the heading from the unwrapped attribute itself.
+     * Now we have to deal with an attribute in the unwrapped tuple
+     * that is the same as another attribute already in the heading.
+     */
+    status = Ral_TupleHeadingAppend(attrHeading,
+	Ral_TupleHeadingBegin(attrHeading),
+	Ral_TupleHeadingEnd(attrHeading), resultHeading) ;
+    if (status == 0) {
+	Ral_ErrorInfoSetError(errInfo, RAL_ERR_DUPLICATE_ATTR,
+	    "while unwrapping tuple") ;
+	Ral_TupleHeadingDelete(resultHeading) ;
+	return NULL ;
+    }
+    /*
+     * Create the result relation.
+     */
+    resultRel = Ral_RelationNew(resultHeading) ;
+    /*
+     * Now put together the tuples.  Iterate through the relation and add
+     * tuples to the result.  The body of the result consists of all the
+     * tuples of the original relation matched with the value of the
+     * attributes of the unwrapped tuple.
+     */
+    Ral_RelationReserve(resultRel, Ral_RelationCardinality(relation)) ;
+    unwrapAttrIndex = unwrapAttrIter - Ral_TupleHeadingBegin(heading) ;
+    for (relIter = Ral_RelationBegin(relation) ;
+            relIter != Ral_RelationEnd(relation) ; ++relIter) {
+	Ral_Tuple tuple ;
+	Ral_TupleIter unwrapIter ;
+	Tcl_Obj *unwrapObj ;
+	Ral_Tuple unwrapTuple ;
+	Ral_TupleIter dstIter ;
+	Ral_Tuple newTuple ;
+
+	tuple = *relIter ;
+        unwrapIter = Ral_TupleBegin(tuple) + unwrapAttrIndex ;
+        unwrapObj = *unwrapIter ;
+	if (Tcl_ConvertToType(NULL, unwrapObj, &Ral_TupleObjType) != TCL_OK) {
+	    Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_FORMAT_ERR, unwrapObj) ;
+	    Ral_RelationDelete(resultRel) ;
+	    return NULL ;
+	}
+	unwrapTuple = unwrapObj->internalRep.otherValuePtr ;
+        newTuple = Ral_TupleNew(resultHeading) ;
+        dstIter = Ral_TupleBegin(newTuple) ;
+        /*
+         * Build up a new tuple by copying all the values except
+         * the unwrapped attribute and then copy in the values from
+         * the unwrapped tuple itself.
+         */
+        dstIter += Ral_TupleCopyValues(Ral_TupleBegin(tuple), unwrapIter,
+                dstIter) ;
+        dstIter += Ral_TupleCopyValues(unwrapIter + 1, Ral_TupleEnd(tuple),
+                dstIter) ;
+        Ral_TupleCopyValues(Ral_TupleBegin(unwrapTuple),
+                Ral_TupleEnd(unwrapTuple), dstIter) ;
+        /*
+         * Ignore any duplicates. PushBack manages the lifetime of
+         * "unwrapTuple" properly if it is not inserted.
+         */
+        Ral_RelationPushBack(resultRel, newTuple, NULL) ;
+    }
+    return resultRel ;
+}
+
 int
 Ral_RelationCopy(
     Ral_Relation src,
@@ -1548,13 +1664,13 @@ Ral_RelationTclose(
 	int newPtr ;
 
 	value = *tIter++ ;
-	entry = Tcl_CreateHashEntry(&vertices, (const char *)value, &newPtr) ;
+	entry = Tcl_CreateHashEntry(&vertices, (char const *)value, &newPtr) ;
 	if (newPtr) {
 	    Tcl_SetHashValue(entry, index++) ;
 	    Ral_PtrVectorPushBack(valueMap, value) ;
 	}
 	value = *tIter ;
-	entry = Tcl_CreateHashEntry(&vertices, (const char *)value, &newPtr) ;
+	entry = Tcl_CreateHashEntry(&vertices, (char const *)value, &newPtr) ;
 	if (newPtr) {
 	    Tcl_SetHashValue(entry, index++) ;
 	    Ral_PtrVectorPushBack(valueMap, value) ;
@@ -1579,10 +1695,10 @@ Ral_RelationTclose(
 	Ral_TupleIter tIter = Ral_TupleBegin(*rIter) ;
 	Tcl_HashEntry *entry ;
 
-	entry = Tcl_FindHashEntry(&vertices, (const char *)*tIter++) ;
+	entry = Tcl_FindHashEntry(&vertices, (char const *)*tIter++) ;
 	assert(entry != NULL) ;
 	i = (int)Tcl_GetHashValue(entry) ;
-	entry = Tcl_FindHashEntry(&vertices, (const char *)*tIter) ;
+	entry = Tcl_FindHashEntry(&vertices, (char const *)*tIter) ;
 	assert(entry != NULL) ;
 	j = (int)Tcl_GetHashValue(entry) ;
 	Ckij[i * nVertices + j] = 1 ;
@@ -2007,8 +2123,8 @@ Ral_RelationProperSupersetOf(
 int
 Ral_RelationRenameAttribute(
     Ral_Relation relation,
-    const char *oldName,
-    const char *newName,
+    char const *oldName,
+    char const *newName,
     Ral_ErrorInfo *errInfo)
 {
     Ral_TupleHeading tupleHeading = relation->heading ;

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.h,v $
-$Revision: 1.15.2.3 $
-$Date: 2009/02/15 23:34:59 $
+$Revision: 1.15.2.4 $
+$Date: 2009/02/17 02:28:11 $
  *--
  */
 #ifndef _ral_attribute_h_
@@ -156,7 +156,7 @@ extern Ral_Attribute Ral_AttributeNewRelationType(char const *,
     struct Ral_TupleHeading *) ;
 extern Ral_Attribute Ral_AttributeNewFromObjs(Tcl_Interp *, Tcl_Obj *,
     Tcl_Obj*, Ral_ErrorInfo *) ;
-extern int Ral_AttributeConvertValueToType(Tcl_Interp *, Ral_Attribute,
+extern Tcl_Obj *Ral_AttributeConvertValueToType(Tcl_Interp *, Ral_Attribute,
     Tcl_Obj *, Ral_ErrorInfo *) ;
 extern unsigned Ral_AttributeHashValue(Ral_Attribute, Tcl_Obj *) ;
 extern void Ral_AttributeDelete(Ral_Attribute) ;

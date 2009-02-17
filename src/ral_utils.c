@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_utils.c,v $
-$Revision: 1.19.2.4 $
-$Date: 2009/02/15 23:34:59 $
+$Revision: 1.19.2.5 $
+$Date: 2009/02/17 02:28:11 $
  *--
  */
 
@@ -108,7 +108,6 @@ static char const * const optStrings[] = {
     "association",
     "body",
     "cardinality",
-    "choose",
     "compose",
     "constraint",
     "correlation",
@@ -142,10 +141,10 @@ static char const * const optStrings[] = {
     "partition",
     "project",
     "rank",
-    "reidentify",
     "relation",
     "rename",
     "restrict",
+    "restrictone",
     "restrictwith",
     "semijoin",
     "semiminus",

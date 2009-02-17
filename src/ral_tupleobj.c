@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleobj.c,v $
-$Revision: 1.14.2.4 $
-$Date: 2009/02/15 23:34:59 $
+$Revision: 1.14.2.5 $
+$Date: 2009/02/17 02:28:11 $
  *--
  */
 
@@ -377,6 +377,7 @@ Ral_TuplePartialSetFromObj(
     for ( ; elemc > 0 ; elemc -= 2, elemv += 2) {
 	const char *attrName ;
         Tcl_Obj *value ;
+        Tcl_Obj *cvtValue ;
 	Ral_TupleHeadingIter found ;
         int status ;
 	Ral_TupleHeadingIter aIter ;
@@ -400,15 +401,16 @@ Ral_TuplePartialSetFromObj(
          * Convert the value to the type of the attribute.
          */
         aIter = Ral_TupleHeadingEnd(newHeading) - 1 ;
-        if (Ral_AttributeConvertValueToType(interp, *aIter, value, errInfo)
-                != TCL_OK) {
+        cvtValue = Ral_AttributeConvertValueToType(interp, *aIter, value,
+                errInfo) ;
+        if (cvtValue == NULL) {
             goto errorOut ;
         }
         /*
          * Update the tuple to the new value.
          */
-        newTuple->values[aIter - Ral_TupleHeadingBegin(newHeading)] = value ;
-        Tcl_IncrRefCount(value) ;
+        newTuple->values[aIter - Ral_TupleHeadingBegin(newHeading)] = cvtValue ;
+        Tcl_IncrRefCount(cvtValue) ;
     }
 
     return Ral_TupleObjNew(newTuple) ;

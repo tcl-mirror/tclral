@@ -1,6 +1,7 @@
 [manpage_begin relvar n 0.9]
 [comment {
-# This software is copyrighted 2004, 2005, 2006, 2007 by G. Andrew Mangogna.
+# This software is copyrighted 2004, 2005, 2006, 2007, 2008, 2009
+# by G. Andrew Mangogna.
 # The following terms apply to all files associated with the software unless
 # explicitly disclaimed in individual files.
 # 
@@ -47,13 +48,13 @@
 #   This command is part of TclRAL. This file is in Tcl Markup Language
 #   format.
 # $RCSfile: relvar.man,v $
-# $Revision: 1.26.2.1 $
-# $Date: 2009/01/19 01:45:46 $
+# $Revision: 1.26.2.2 $
+# $Date: 2009/02/17 02:28:11 $
 #  *--
 }]
 [moddesc "Relvar Operators"]
 [titledesc "Operators for Relation Variables"]
-[copyright "2004, 2005, 2006, 2007 by G. Andrew Mangogna"]
+[copyright "2004, 2005, 2006, 2007, 2008, 2009 by G. Andrew Mangogna"]
 [require ral [opt 0.9]]
 [description]
 This manpage describes the [cmd relvar] command.
@@ -72,9 +73,8 @@ take the name of a relation variable as an argument.
 In the relational model as it applies to database management systems,
 relation variables play the important role of
 representing the persistent data base values.
-Relation variables are the leaves of the
-expression tree that perform the desired query and represent
-the core data from which results may be computed.
+Relation variables are the leaves of the expression tree for a query and
+represent the core data from which results may be computed.
 That computation is usually expressed as a single, sometimes complex expression.
 This allows for a non-procedural way of specifying the computation and
 allows optimizers to find the most efficient manner of computing the result.
@@ -116,9 +116,31 @@ relvar named [var ::Dog] and a read-only Tcl variable named [var ::Dog].
 TclRAL supports the notion of [emph constraints] as a means of
 insuring integrity among a set of relvars.
 There are many types of constraints that might be used to insure integrity,
-but TclRAL supports three types of declarative constraints.
+but TclRAL supports two distinct types of constraints:
+identification constraints and referential constraints.
 [list_begin definitions]
 
+[def Identification]
+Identification constraints define a set of attributes that must have
+unique values.
+Each relvar must specify at least one identifier.
+An identifier is one or attributes whose values taken together must
+be unique for all tuples stored in the relvar.
+Identifiers must also be minimal in the sense that no two identifiers
+for a given relvar are allowed to be a subset of one another.
+
+[def Referential]
+Referential constraints define how tuples of one relvar refer to tuples
+in another relvar.
+
+[list_end]
+
+Identification constraints are enforced on a relvar by any operation
+that modifies the relation value stored in the relvar.
+
+For referential types of constraints three forms are supported.
+
+[list_begin definitions]
 [def Association]
 Association constraints define a referential association between two relvars.
 In this context,
@@ -152,8 +174,9 @@ It is similar in some ways to two Association Constraints.
 At the end of each [cmd ::ral::eval] command (see below) or,
 if outside of an [cmd eval] command,
 at the end of any command that modifies a relvar
-that participates in a constraint,
-all of the constraints defined for the modified relvars are evaluated.
+that participates in a referential constraint,
+all of the referential constraints defined for the modified relvars
+are evaluated.
 If any of the constraints fail, the relvar modifications are discarded
 and the relvar values are returned to the values they had before
 the modifications.
@@ -355,11 +378,16 @@ themselves.
 % relvar correlation C1 OWNERSHIP OwnerName + OWNER OwnerName DogName * DOG DogName
 }]
 
-[call [cmd "::ral::relvar create"] [arg relvarName] [arg heading]]
+[call [cmd "::ral::relvar create"] [arg relvarName] [arg heading]\
+    [arg id1] [opt [arg "id2 ..."]]]
 
 The [cmd create] subcommand creates a new relation variable whose name is given
-by [arg relvarName] and that has the relation value heading given
-by the [arg heading] argument.
+by [arg relvarName] and that will store a relation value heading whose
+heading matches that of the [arg heading] argument.
+The tuples of the relation value will be identified by [arg id1] and
+any other supplied [arg idN] arguments.
+Each [arg idN] argument is a list of attribute names that appear in the
+[arg heading].
 The subcommand returns the relation value of the newly created relvar,
 which necessarily will have cardinality of 0.
 The [arg heading] argument is a valid relation value heading
@@ -375,30 +403,19 @@ This implies that any namespaces referenced in [arg relvarName]
 must already exist.
 
 [example {
-% relvar create OWNER {
->       Relation
->       {OwnerName string Age int City string}
->       OwnerName
->     }
-Relation {OwnerName string Age int City string} OwnerName {}
+% relvar create OWNER {OwnerName string Age int City string} OwnerName
+{OwnerName string Age int City string} {}
 % puts [relformat $::OWNER]
-+=========+---+------+
++---------+---+------+
 |OwnerName|Age|City  |
 |string   |int|string|
-+=========+---+------+
-+=========+---+------+
-% relvar create DOG {
->       Relation
->       {DogName string Breed string}
->       DogName
->     }
-Relation {DogName string Breed string} DogName {}
-% relvar create OWNERSHIP {
->       Relation
->       {OwnerName string DogName string Acquired string}
->       {{OwnerName DogName}}
->     }
-Relation {OwnerName string DogName string Acquired string} {{OwnerName DogName}} {}
++---------+---+------+
++---------+---+------+
+% relvar create DOG {DogName string Breed string} DogName
+{DogName string Breed string} {}
+% relvar create OWNERSHIP {OwnerName string DogName string Acquired string}\
+{OwnerName DogName}
+{OwnerName string DogName string Acquired string} {}
 }]
 
 [call [cmd "::ral::relvar delete"] [arg relvarName]\
@@ -415,30 +432,30 @@ The return value of the subcommand is the number of tuples deleted.
 
 [example {
 % puts [relformat $::OWNER "Before deleting Sue"]
-+=========+---+-------------+
++---------+---+-------------+
 |OwnerName|Age|City         |
 |string   |int|string       |
-+=========+---+-------------+
++---------+---+-------------+
 |Sue      |24 |Cupertino    |
 |George   |35 |Sunnyvale    |
 |Alice    |30 |San Jose     |
 |Mike     |50 |San Jose     |
 |Jim      |42 |San Francisco|
-+=========+---+-------------+
++---------+---+-------------+
 Before deleting Sue
 -------------------
 % relvar delete OWNER o {[tuple extract $o OwnerName] eq "Sue"}
 1
 % puts [relformat $::OWNER "After deleting Sue"]
-+=========+---+-------------+
++---------+---+-------------+
 |OwnerName|Age|City         |
 |string   |int|string       |
-+=========+---+-------------+
++---------+---+-------------+
 |George   |35 |Sunnyvale    |
 |Alice    |30 |San Jose     |
 |Mike     |50 |San Jose     |
 |Jim      |42 |San Francisco|
-+=========+---+-------------+
++---------+---+-------------+
 After deleting Sue
 ------------------
 }]
@@ -465,44 +482,44 @@ necessarily be either 1 or 0.
 
 [example {
 % puts [relformat $::OWNER "Before deleting Mike"]
-+=========+---+-------------+
++---------+---+-------------+
 |OwnerName|Age|City         |
 |string   |int|string       |
-+=========+---+-------------+
++---------+---+-------------+
 |Sue      |24 |Cupertino    |
 |George   |35 |Sunnyvale    |
 |Alice    |30 |San Jose     |
 |Mike     |50 |San Jose     |
 |Jim      |42 |San Francisco|
-+=========+---+-------------+
++---------+---+-------------+
 Before deleting Mike
 --------------------
 % relvar deleteone OWNER OwnerName Mike
 1
 % puts [relformat $::OWNER "After deleting Mike"]
-+=========+---+-------------+
++---------+---+-------------+
 |OwnerName|Age|City         |
 |string   |int|string       |
-+=========+---+-------------+
++---------+---+-------------+
 |Sue      |24 |Cupertino    |
 |George   |35 |Sunnyvale    |
 |Alice    |30 |San Jose     |
 |Jim      |42 |San Francisco|
-+=========+---+-------------+
++---------+---+-------------+
 After deleting Mike
 -------------------
 % relvar deleteone OWNER OwnerName Alfonse
 0
 % puts [relformat $::OWNER]
-+=========+---+-------------+
++---------+---+-------------+
 |OwnerName|Age|City         |
 |string   |int|string       |
-+=========+---+-------------+
++---------+---+-------------+
 |Sue      |24 |Cupertino    |
 |George   |35 |Sunnyvale    |
 |Alice    |30 |San Jose     |
 |Jim      |42 |San Francisco|
-+=========+---+-------------+
++---------+---+-------------+
 }]
 
 [call [cmd "::ral::relvar eval"] [arg arg] [opt "arg ..."]]
@@ -522,16 +539,16 @@ script executed by [cmd eval].
 
 [example {
 % puts [relformat $::OWNER]
-+=========+---+-------------+
++---------+---+-------------+
 |OwnerName|Age|City         |
 |string   |int|string       |
-+=========+---+-------------+
++---------+---+-------------+
 |Sue      |24 |Cupertino    |
 |George   |35 |Sunnyvale    |
 |Alice    |30 |San Jose     |
 |Mike     |50 |San Jose     |
 |Jim      |42 |San Francisco|
-+=========+---+-------------+
++---------+---+-------------+
 % relvar eval {
 >       relvar insert OWNER {OwnerName Tom Age 22 City Tulsa}
 > }
@@ -539,16 +556,16 @@ for association ::A1(::OWNERSHIP [+] ==> [1] ::OWNER), in relvar ::OWNER
 tuple {OwnerName Tom Age 22 City Tulsa} is not referenced by any tuple
 
 % puts [relformat $::OWNER]
-+=========+---+-------------+
++---------+---+-------------+
 |OwnerName|Age|City         |
 |string   |int|string       |
-+=========+---+-------------+
++---------+---+-------------+
 |Sue      |24 |Cupertino    |
 |George   |35 |Sunnyvale    |
 |Alice    |30 |San Jose     |
 |Mike     |50 |San Jose     |
 |Jim      |42 |San Francisco|
-+=========+---+-------------+
++---------+---+-------------+
 % relvar eval {
 >       relvar insert OWNER {OwnerName Tom Age 22 City Tulsa}
 >       relvar insert OWNERSHIP {OwnerName Tom DogName Skippy Acquired 2006}
@@ -557,34 +574,40 @@ for association ::A2(::OWNERSHIP [*] ==> [1] ::DOG), in relvar ::OWNERSHIP
 tuple {OwnerName Tom DogName Skippy Acquired 2006} references no tuple
 
 % puts [relformat $::OWNER]
-+=========+---+-------------+
++---------+---+-------------+
 |OwnerName|Age|City         |
 |string   |int|string       |
-+=========+---+-------------+
++---------+---+-------------+
 |Sue      |24 |Cupertino    |
 |George   |35 |Sunnyvale    |
 |Alice    |30 |San Jose     |
 |Mike     |50 |San Jose     |
 |Jim      |42 |San Francisco|
-+=========+---+-------------+
++---------+---+-------------+
 % relvar eval {
 >       relvar insert OWNER {OwnerName Tom Age 22 City Tulsa}
 >       relvar insert OWNERSHIP {OwnerName Tom DogName Jumper Acquired 2006}
 >       return
 > }
 % puts [relformat $::OWNER]
-+=========+---+-------------+
++---------+---+-------------+
 |OwnerName|Age|City         |
 |string   |int|string       |
-+=========+---+-------------+
++---------+---+-------------+
 |Sue      |24 |Cupertino    |
 |George   |35 |Sunnyvale    |
 |Alice    |30 |San Jose     |
 |Mike     |50 |San Jose     |
 |Jim      |42 |San Francisco|
 |Tom      |22 |Tulsa        |
-+=========+---+-------------+
++---------+---+-------------+
 }]
+
+[call [cmd "::ral::relvar exists"] [arg relvarName]]
+The [cmd exists] subcommand returns 1 if the relvar given by [arg relvarName]
+exists and 0 otherwise.
+The relvar name is resolved in the current namespace if it is not
+specified as fully qualified.
 
 [call [cmd "::ral::relvar insert"] [arg relvarName]\
     [opt "name-value-list ..."]]
@@ -595,14 +618,16 @@ The value of [arg relvarName] is modified in place.
 The return value is a relation value with the same heading as the
 value held in [arg relvarName] and whose body contains the tuples as they
 were actually inserted.
-This gives the caller access to any attributes that might have been modified
-by a relvar trace.
+This gives the caller access to any attributes that might have been added
+or modified by a relvar trace.
 It is an error to attempt to insert a duplicate tuple or a tuple whose
 heading does not match the heading of the value held in [arg relvarName].
 The values of all attributes of the inserted tuples must be specified
+either in the command invocation or as supplied by any relvar insert traces
 with a valid value representation of the type associated with the attribute.
 However, because of relvar tracing, the tuple values given in
-[arg name-value-list] may not be the ones actually inserted into the relvar.
+[arg name-value-list] may not be the ones actually inserted into the relvar
+and relvar traces may extend the given [arg name-value-list] argument.
 
 [example {
 % relvar insert DOG {DogName Skippy Breed Dalmation}
@@ -727,6 +752,14 @@ tuple {SerialNo NF101 Height 72 Sockets 3} references no tuple
 The [cmd path] subcommand returns the fully qualified relvar
 name of [arg relvarName].
 
+[call [cmd "::ral::relvar restrictone"] [arg relvarName]\
+    [arg attr1] [arg value1] [opt [arg "attr2 value2 ..."]]]
+The [cmd restrictone] subcommand returns a relation value containing
+the tuple whose attributes match those of the [arg attrN] and [arg valueN]
+arguments.
+The [arg attrN] arguments must form an identifier for the relvar.
+The returned relation value will be of cardinality 0 or 1.
+The relation value held in [arg relvarName] is not modified.
 
 [call [cmd "::ral::relvar set"] [arg relvarName] [opt relationValue]]
 
@@ -746,23 +779,16 @@ This command operates in a manner analogous to the [cmd set] command for
 ordinary Tcl variables.
 
 [example {
-% relvar create PUPPY {
->       Relation
->       {PuppyName string Dame string Sire string}
->       PuppyName
->     }
-Relation {PuppyName string Dame string Sire string} PuppyName {}
+% relvar create PUPPY {PuppyName string Dame string Sire string} PuppyName
+{PuppyName string Dame string Sire string} {}
 % relvar set PUPPY {
->       Relation
->       {PuppyName string Dame string Sire string}
->       PuppyName
->       {
->           {PuppyName Bitsy Dame Spot Sire Jumper}
->       }
->     }
-Relation {PuppyName string Dame string Sire string} PuppyName {{PuppyName Bitsy Dame Spot Sire Jumper}}
+>   {PuppyName string Dame string Sire string} {
+>       {PuppyName Bitsy Dame Spot Sire Jumper}
+>   }
+>}
+{PuppyName string Dame string Sire string} {{PuppyName Bitsy Dame Spot Sire Jumper}}
 % relvar set PUPPY $::DOG
-headings not equal, "Relation {DogName string Breed string} DogName"
+headings not equal, "{DogName string Breed string}"
 }]
 
 [call [cmd "::ral::relvar trace"] [arg option] [arg type] [opt [arg args]]]
@@ -893,31 +919,31 @@ is propagated to any surrounding command.
 
 [example {
 % puts [relformat $::OWNER]
-+=========+---+-------------+
++---------+---+-------------+
 |OwnerName|Age|City         |
 |string   |int|string       |
-+=========+---+-------------+
++---------+---+-------------+
 |Sue      |24 |Cupertino    |
 |George   |35 |Sunnyvale    |
 |Alice    |30 |San Jose     |
 |Mike     |50 |San Jose     |
 |Jim      |42 |San Francisco|
-+=========+---+-------------+
++---------+---+-------------+
 % relvar update OWNER o {[tuple extract $o OwnerName] eq "Sue"} {
 >       tuple update o Age [expr {[tuple extract $o Age] + 1}]
 >     }
 1
 % puts [relformat $::OWNER]
-+=========+---+-------------+
++---------+---+-------------+
 |OwnerName|Age|City         |
 |string   |int|string       |
-+=========+---+-------------+
++---------+---+-------------+
 |Sue      |25 |Cupertino    |
 |George   |35 |Sunnyvale    |
 |Alice    |30 |San Jose     |
 |Mike     |50 |San Jose     |
 |Jim      |42 |San Francisco|
-+=========+---+-------------+
++---------+---+-------------+
 % relvar update OWNER o {[tuple extract $o OwnerName] eq "George"} {
 >       tuple update o OwnerName Alfonse
 >     }
@@ -928,16 +954,16 @@ tuple {OwnerName George DogName Fido Acquired 2001} references no tuple
 tuple {OwnerName George DogName Sam Acquired 2000} references no tuple
 
 % puts [relformat $::OWNER]
-+=========+---+-------------+
++---------+---+-------------+
 |OwnerName|Age|City         |
 |string   |int|string       |
-+=========+---+-------------+
++---------+---+-------------+
 |Sue      |25 |Cupertino    |
 |George   |35 |Sunnyvale    |
 |Alice    |30 |San Jose     |
 |Mike     |50 |San Jose     |
 |Jim      |42 |San Francisco|
-+=========+---+-------------+
++---------+---+-------------+
 }]
 
 [call [cmd "::ral::relvar updateone"] [arg relvarName] [arg tupleVarName]\
@@ -968,31 +994,31 @@ by a relvar trace.
 
 [example {
 % puts [relformat $::OWNER]
-+=========+---+-------------+
++---------+---+-------------+
 |OwnerName|Age|City         |
 |string   |int|string       |
-+=========+---+-------------+
++---------+---+-------------+
 |Sue      |24 |Cupertino    |
 |George   |35 |Sunnyvale    |
 |Alice    |30 |San Jose     |
 |Mike     |50 |San Jose     |
 |Jim      |42 |San Francisco|
-+=========+---+-------------+
++---------+---+-------------+
 % relvar updateone OWNER o {OwnerName George} {
 > tuple update o Age 37 City {New York}
 > }
 1
 % puts [relformat $::OWNER]
-+=========+---+-------------+
++---------+---+-------------+
 |OwnerName|Age|City         |
 |string   |int|string       |
-+=========+---+-------------+
++---------+---+-------------+
 |Sue      |24 |Cupertino    |
 |George   |37 |New York     |
 |Alice    |30 |San Jose     |
 |Mike     |50 |San Jose     |
 |Jim      |42 |San Francisco|
-+=========+---+-------------+
++---------+---+-------------+
 }]
 
 [list_end]

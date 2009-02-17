@@ -48,8 +48,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: serialize.test,v $
-# $Revision: 1.4.2.1 $
-# $Date: 2009/02/15 23:34:59 $
+# $Revision: 1.4.2.2 $
+# $Date: 2009/02/17 02:28:11 $
 #  *--
 
 package require tcltest 2.2
@@ -101,7 +101,7 @@ namespace eval ::ral::test {
     } -body {
 	set s [serialize]
 	llength $s
-    } -result {4}
+    } -result {8}
  
     test deserialize-1.0 {
 	deserialize relvar data

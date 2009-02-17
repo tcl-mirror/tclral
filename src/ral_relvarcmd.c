@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.32.2.6 $
-$Date: 2009/02/15 23:34:59 $
+$Revision: 1.32.2.7 $
+$Date: 2009/02/17 02:28:11 $
  *--
  */
 
@@ -102,6 +102,7 @@ static int RelvarNamesCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarPartitionCmd(Tcl_Interp *, int, Tcl_Obj *const*,
     Ral_RelvarInfo) ;
 static int RelvarPathCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
+static int RelvarRestrictOneCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarSetCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarTraceCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarTransactionCmd(Tcl_Interp *, int, Tcl_Obj *const*,
@@ -155,6 +156,7 @@ relvarCmd(
 	{"names", RelvarNamesCmd},
 	{"partition", RelvarPartitionCmd},
 	{"path", RelvarPathCmd},
+	{"restrictone", RelvarRestrictOneCmd},
 	{"set", RelvarSetCmd},
 	{"trace", RelvarTraceCmd},
 	{"transaction", RelvarTransactionCmd},
@@ -852,7 +854,7 @@ RelvarMinusCmd(
     int result = TCL_OK ;
     Ral_ErrorInfo errInfo ;
 
-    /* relvar intersect relvarName relationValue */
+    /* relvar minus relvarName relationValue */
     if (objc != 4) {
 	Tcl_WrongNumArgs(interp, 2, objv, "relvarName relationValue") ;
 	return TCL_ERROR ;
@@ -1004,6 +1006,82 @@ RelvarPathCmd(
      * Creating a partition is an implicit transaction as each
      * relvar participating in the association is treated as modified.
      */
+    return TCL_OK ;
+}
+
+static int
+RelvarRestrictOneCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv,
+    Ral_RelvarInfo rInfo)
+{
+    Ral_Relvar relvar ;
+    Ral_Relation relation ;
+    Ral_ErrorInfo errInfo ;
+    Ral_Tuple key ;
+    int idNum ;
+    Ral_Relation newRelation ;
+    Ral_RelationIter found ;
+
+    /* relvar choose relvarName attr value ?attr2 value2 ...? */
+    if (objc < 5) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+	    "relvarValue attr value ?attr2 value 2 ...?") ;
+	return TCL_ERROR ;
+    }
+
+    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2])) ;
+    if (relvar == NULL) {
+	return TCL_ERROR ;
+    }
+    if (Tcl_ConvertToType(interp, relvar->relObj, &Ral_RelationObjType)
+		!= TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relvar->relObj->internalRep.otherValuePtr ;
+
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelvar, Ral_OptRestrictone) ;
+    objc -= 3 ;
+    objv += 3 ;
+    if (objc % 2 != 0) {
+	Ral_ErrorInfoSetError(&errInfo, RAL_ERR_BAD_PAIRS_LIST,
+	    "attribute / value arguments must be given in pairs") ;
+	Ral_InterpSetError(interp, &errInfo) ;
+	return TCL_ERROR ;
+    }
+    /*
+     * Make a tuple to use as a key from the arguments.
+     */
+    key = Ral_RelvarObjKeyTuple(interp, relvar, objc, objv, &idNum,
+            &errInfo) ;
+    if (key == NULL) {
+	return TCL_ERROR ;
+    }
+    /*
+     * Create the result relation.
+     */
+    newRelation = Ral_RelationNew(relation->heading) ;
+    /*
+     * Check if we find the tuple. If so, put it into the new relation.
+     */
+    found = Ral_RelvarFindById(relvar, idNum, key) ;
+    Ral_TupleDelete(key) ;
+    if (found != Ral_RelationEnd(relation)) {
+        int inserted ;
+
+        inserted = Ral_RelationPushBack(newRelation, *found, NULL) ;
+        /*
+         * Should always be able to insert into an empty relation.
+         */
+        assert(inserted != 0) ;
+    }
+    /*
+     * Either we we return a new relation value. This will necessarily
+     * have a cardinality of 0 or 1.
+     */
+    Tcl_SetObjResult(interp, Ral_RelationObjNew(newRelation)) ;
+
     return TCL_OK ;
 }
 
