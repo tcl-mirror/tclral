@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuplecmd.c,v $
-$Revision: 1.20.2.4 $
-$Date: 2009/02/17 02:28:11 $
+$Revision: 1.20.2.5 $
+$Date: 2009/02/22 01:46:37 $
  *--
  */
 
@@ -953,73 +953,61 @@ TupleWrapCmd(
     Tcl_Obj *const*objv)
 {
     Tcl_Obj *tupleObj ;
-    Tcl_Obj *newAttrNameObj ;
-    Tcl_Obj *oldAttrList ;
     Ral_Tuple tuple ;
     Ral_TupleHeading heading ;
-    int degree ;
-    int elemc ;
-    Tcl_Obj **elemv ;
-    Ral_Tuple wrapTuple ;
+    Tcl_Obj *newAttrNameObj ;
     Ral_TupleHeading wrapHeading ;
-    Ral_TupleHeadingIter hend ;
-    Ral_TupleHeadingIter attrIter ;
-    Ral_TupleHeading newHeading ;
-    Ral_Tuple newTuple ;
-    int i ;
+    Ral_Tuple wrapTuple ;
     Tcl_Obj *wrapTupleObj ;
-    const char *newAttrName ;
+    int i ;
+    Ral_TupleHeadingIter attrIter ;
+    Ral_TupleHeading resultHeading ;
+    Ral_Tuple resultTuple ;
+    Ral_ErrorInfo errInfo ;
+    char const *newAttrName ;
     Ral_Attribute newAttr ;
     Ral_TupleHeadingIter newAttrIter ;
-    Ral_ErrorInfo errInfo ;
 
-    /* tuple wrap tupleValue newAttr oldAttrList */
-    if (objc != 5) {
-	Tcl_WrongNumArgs(interp, 2, objv, "tupleValue newAttr oldAttrList") ;
+    /* tuple wrap tupleValue newAttr ?attr1 attr2 ...? */
+    if (objc < 4) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+                "tupleValue newAttr ?attr attr2 ...?") ;
 	return TCL_ERROR ;
     }
 
-    tupleObj = *(objv + 2) ;
-    newAttrNameObj = *(objv + 3) ;
-    oldAttrList = *(objv + 4) ;
-
+    tupleObj = objv[2] ;
     if (Tcl_ConvertToType(interp, tupleObj, &Ral_TupleObjType) != TCL_OK) {
 	return TCL_ERROR ;
     }
-    if (Tcl_ListObjGetElements(interp, oldAttrList, &elemc, &elemv) != TCL_OK) {
-	return TCL_ERROR ;
-    }
-
     tuple = tupleObj->internalRep.otherValuePtr ;
     heading = tuple->heading ;
-    degree = Ral_TupleDegree(tuple) ;
-    if (elemc > degree) {
-	Ral_InterpErrorInfo(interp, Ral_CmdTuple, Ral_OptWrap,
-	    RAL_ERR_WRONG_NUM_ATTRS,
-	    "attempt to wrap more attributes than exist in the tuple") ;
-	return TCL_ERROR ;
-    }
 
+    newAttrNameObj = objv[3] ;
+
+    objc -= 4 ;
+    objv += 4 ;
     /*
-     * The new tuple valued attribute will have the same number of
-     * attributes as elements in the "oldAttrList" argument.
+     * Compose the heading for the wrapped attribute..
+     * The wrapped tuple valued attribute will have the same number of
+     * attributes as the remaining arguments.
      */
-    wrapHeading = Ral_TupleHeadingNew(elemc) ;
+    wrapHeading = Ral_TupleHeadingNew(objc) ;
     wrapTuple = Ral_TupleNew(wrapHeading) ;
-    hend = Ral_TupleHeadingEnd(heading) ;
-    for (i = 0 ; i < elemc ; ++i) {
-	const char *attrName = Tcl_GetString(*elemv++) ;
+    for (i = 0 ; i < objc ; ++i) {
+	char const *attrName ;
 
+	attrName = Tcl_GetString(objv[i]) ;
 	attrIter = Ral_TupleHeadingFind(heading, attrName) ;
-	if (attrIter == hend) {
+	if (attrIter == Ral_TupleHeadingEnd(heading)) {
 	    Ral_TupleDelete(wrapTuple) ;
 	    Ral_InterpErrorInfo(interp, Ral_CmdTuple, Ral_OptUnwrap,
-		RAL_ERR_UNKNOWN_ATTR, attrName) ;
+                    RAL_ERR_UNKNOWN_ATTR, attrName) ;
 	    return TCL_ERROR ;
 	}
 	if (!Ral_TupleCopy(tuple, attrIter, attrIter + 1, wrapTuple)) {
+	    Ral_TupleDelete(wrapTuple) ;
 	    Ral_InterpErrorInfo(interp, Ral_CmdTuple, Ral_OptUnwrap,
-		RAL_ERR_DUPLICATE_ATTR, attrName) ;
+                    RAL_ERR_DUPLICATE_ATTR, attrName) ;
 	    return TCL_ERROR ;
 	}
     }
@@ -1029,21 +1017,21 @@ TupleWrapCmd(
      */
     wrapTupleObj = Ral_TupleObjNew(wrapTuple) ;
     /*
-     * The newly created tuple has the same number of attributes as the
-     * old tuple minus the number that are to be wrapped plus one for
-     * the new tuple attribute.
+     * The result tuple has the same number of attributes as the input tuple
+     * minus the number that are to be wrapped into the tuple valued attribute
+     * plus one for the new tuple valued attribute.
      */
-    newHeading = Ral_TupleHeadingNew(degree - elemc + 1) ;
-    newTuple = Ral_TupleNew(newHeading) ;
+    resultHeading = Ral_TupleHeadingNew(Ral_TupleDegree(tuple) - objc + 1) ;
+    resultTuple = Ral_TupleNew(resultHeading) ;
 
-    for (attrIter = Ral_TupleHeadingBegin(heading) ; attrIter != hend ;
-	++attrIter) {
+    for (attrIter = Ral_TupleHeadingBegin(heading) ;
+            attrIter != Ral_TupleHeadingEnd(heading) ; ++attrIter) {
 	Ral_Attribute attr = *attrIter ;
 	/*
-	 * Only add the ones that are NOT in the old attribute list.
+	 * Only add the ones that are NOT part of the tuple valued attribute.
 	 */
 	if (Ral_TupleHeadingIndexOf(wrapHeading, attr->name) < 0 &&
-	    !Ral_TupleCopy(tuple, attrIter, attrIter + 1, newTuple)) {
+	    !Ral_TupleCopy(tuple, attrIter, attrIter + 1, resultTuple)) {
 	    /*
 	     * We should never fail here. After all, if all the attribute
 	     * names were unique in the original tuple we should be able
@@ -1053,28 +1041,28 @@ TupleWrapCmd(
 	}
     }
     /*
-     * Now add the wrapped tuple. First add a new attribute and then store the
-     * value.
+     * Now add the new tuple valued attribute.  First create the tuple valued
+     * attribute and then add it to the result tuple.
      */
     Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdTuple, Ral_OptWrap) ;
     newAttrName = Tcl_GetString(newAttrNameObj) ;
     newAttr = Ral_AttributeNewTupleType(newAttrName, wrapHeading) ;
-    newAttrIter = Ral_TupleHeadingPushBack(newHeading, newAttr) ;
-    if (newAttrIter == Ral_TupleHeadingEnd(newHeading)) {
+    newAttrIter = Ral_TupleHeadingPushBack(resultHeading, newAttr) ;
+    if (newAttrIter == Ral_TupleHeadingEnd(resultHeading)) {
 	Ral_ErrorInfoSetError(&errInfo, RAL_ERR_DUPLICATE_ATTR, newAttrName) ;
 	goto errorOut ;
     }
 
-    if (!Ral_TupleUpdateAttrValue(newTuple, newAttrName, wrapTupleObj,
-	&errInfo)) {
+    if (!Ral_TupleUpdateAttrValue(resultTuple, newAttrName, wrapTupleObj,
+            &errInfo)) {
 	goto errorOut ;
     }
 	
-    Tcl_SetObjResult(interp, Ral_TupleObjNew(newTuple)) ;
+    Tcl_SetObjResult(interp, Ral_TupleObjNew(resultTuple)) ;
     return TCL_OK ;
 
 errorOut:
-    Ral_TupleDelete(newTuple) ;
+    Ral_TupleDelete(resultTuple) ;
     Tcl_DecrRefCount(wrapTupleObj) ;
     Ral_InterpSetError(interp, &errInfo) ;
     return TCL_ERROR ;

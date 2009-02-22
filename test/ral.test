@@ -51,8 +51,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.47.2.8 $
-# $Date: 2009/02/17 02:28:11 $
+# $Revision: 1.47.2.9 $
+# $Date: 2009/02/22 01:46:37 $
 #  *--
 
 package require tcltest 2.2
@@ -651,7 +651,7 @@ namespace eval ::ral::test {
         set t [tuple create {Name string Age int Size double}\
             {Age 20 Name Andrew Size 3.0}]
     } -body {
-        tuple wrap $t Props {Age}
+        tuple wrap $t Props Age
     } -result {{Name string Size double Props {Tuple {Age int}}}\
         {Name Andrew Size 3.0 Props {Age 20}}} -match tuple
 
@@ -659,7 +659,7 @@ namespace eval ::ral::test {
         set t [tuple create {Name string Age int Size double}\
             {Age 20 Name Andrew Size 3.0}]
     } -body {
-        tuple wrap $t Props {Age Size}
+        tuple wrap $t Props Age Size
     } -result {{Name string Props {Tuple {Age int Size double}}}\
         {Name Andrew Props {Age 20 Size 3.0}}} -match tuple
 
@@ -667,7 +667,7 @@ namespace eval ::ral::test {
         set t [tuple create {Name string Age int Size double}\
             {Age 20 Name Andrew Size 3.0}]
     } -body {
-        tuple wrap $t Props {Name Age Size}
+        tuple wrap $t Props Name Age Size
     } -result {{Props {Tuple {Name string Age int Size double}}}\
         {Props {Name Andrew Age 20 Size 3.0}}} -match tuple
 
@@ -675,22 +675,42 @@ namespace eval ::ral::test {
         set t [tuple create {Name string Age int Size double}\
             {Age 20 Name Andrew Size 3.0}]
     } -body {
-        tuple wrap $t Props {foo}
+        tuple wrap $t Props foo
     } -result {unknown attribute name, "foo"} -returnCodes error
 
     test tuple-wrap-5.0 {wrap same attribute multiple times} -setup {
         set t [tuple create {Name string Age int Size double}\
             {Age 20 Name Andrew Size 3.0}]
     } -body {
-        tuple wrap $t Props {Name Age Name}
+        tuple wrap $t Props Name Age Name
     } -result {duplicate attribute name, "Name"} -returnCodes error
 
     test tuple-wrap-6.0 {wrap attribute is a duplicate} -setup {
         set t [tuple create {Name string Age int Size double}\
             {Age 20 Name Andrew Size 3.0}]
     } -body {
-        tuple wrap $t Size {Name Age}
+        tuple wrap $t Size Name Age
     } -result {duplicate attribute name, "Size"} -returnCodes error
+
+    test tuple-wrap-7.0 {wrap no attributes at all} -setup {
+        set t [tuple create {Name string Age int Size double}\
+            {Age 20 Name Andrew Size 3.0}]
+    } -body {
+        tuple wrap $t Props
+    } -result {{Name string Age int Size double Props {Tuple {}}}\
+        {Age 20 Name Andrew Size 3.0 Props {}}} -match tuple
+
+    test tuple-wrap-8.0 {
+        tuple valued attribute is same name as wrapped attribute
+    } -setup {
+        set t [tuple create {Name string Age int Size double}\
+            {Age 20 Name Andrew Size 3.0}]
+    } -body {
+        tuple wrap $t Age Age Size
+    } -result {
+        {Name string Age {Tuple {Age int Size double}}}
+            {Age {Size 3.0 Age 20} Name Andrew}
+    } -match tuple
 
     # tuple shimmering tests
     test tuple-shimmer-1.0 {
@@ -3964,6 +3984,109 @@ in expression "_@_< 20"} -returnCodes error
         }
         relation unwrap $r Address
     } -result {duplicate attribute name, "while unwrapping tuple"} -returnCodes error
+
+    # relation wrap subcommand
+    test relation-wrap-1.0 {
+        wrap multiple attributes
+    } -body {
+        set r {
+            {Name string City string State string} {
+                {Name Andrew City Sunnyvale State CA}
+                {Name George City Cleveland State OH}
+                {Name Frank City Seattle State WA}
+            }
+        }
+        relation wrap $r Address City State
+    } -result {
+        {Name string Address {Tuple {City string State string}}} {
+            {Name Andrew Address {City Sunnyvale State CA}}
+            {Name George Address {City Cleveland State OH}}
+            {Name Frank Address {City Seattle State WA}}
+        }
+    } -match relation
+
+    test relation-wrap-2.0 {
+        wrap single attribute
+    } -body {
+        set r {
+            {Name string Status int State string} {
+                {Name Andrew Status 20 State CA}
+                {Name George Status 30 State OH}
+                {Name Frank Status 55 State WA}
+            }
+        }
+        relation wrap $r Number Status
+    } -result {
+        {Name string State string Number {Tuple {Status int}}} {
+            {Name Andrew State CA Number {Status 20}}
+            {Name George State OH Number {Status 30}}
+            {Name Frank State WA Number {Status 55}}
+        }
+    } -match relation
+
+    test relation-wrap-2.1 {
+        wrapped attribute the same as unwrapped attribute
+    } -body {
+        set r {
+            {Name string Status int State string} {
+                {Name Andrew Status 20 State CA}
+                {Name George Status 30 State OH}
+                {Name Frank Status 55 State WA}
+            }
+        }
+        relation wrap $r Status Status
+    } -result {
+        {Name string State string Status {Tuple {Status int}}} {
+            {Name Andrew State CA Status {Status 20}}
+            {Name George State OH Status {Status 30}}
+            {Name Frank State WA Status {Status 55}}
+        }
+    } -match relation
+
+    test relation-wrap-3.0 {
+        wrap no attribute
+    } -body {
+        set r {
+            {Name string Status int State string} {
+                {Name Andrew Status 20 State CA}
+                {Name George Status 30 State OH}
+                {Name Frank Status 55 State WA}
+            }
+        }
+        relation wrap $r Empty
+    } -result {
+        {Name string State string Status int Empty {Tuple {}}} {
+            {Name Andrew State CA Status 20 Empty {}}
+            {Name George State OH Status 30 Empty {}}
+            {Name Frank State WA Status 55 Empty {}}
+        }
+    } -match relation
+
+    test relation-wrap-4.0 {
+        unknown attribute to wrap
+    } -body {
+        set r {
+            {Name string City string State string} {
+                {Name Andrew City Sunnyvale State CA}
+                {Name George City Cleveland State OH}
+                {Name Frank City Seattle State WA}
+            }
+        }
+        relation wrap $r Address City State Zip
+    } -result {unknown attribute name, "Zip"} -returnCodes error
+
+    test relation-wrap-4.1 {
+        duplicate attribute to wrap
+    } -body {
+        set r {
+            {Name string City string State string} {
+                {Name Andrew City Sunnyvale State CA}
+                {Name George City Cleveland State OH}
+                {Name Frank City Seattle State WA}
+            }
+        }
+        relation wrap $r Address City State City
+    } -result {duplicate attribute name, "City"} -returnCodes error
 
     # relvar Tests
 

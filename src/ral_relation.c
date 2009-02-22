@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.36.2.7 $
-$Date: 2009/02/17 02:28:11 $
+$Revision: 1.36.2.8 $
+$Date: 2009/02/22 01:46:37 $
  *--
  */
 
@@ -1440,7 +1440,7 @@ Ral_RelationUnwrap(
     Ral_RelationIter relIter ;
 
     /*
-     * Check that the attribute exists and is a relation type attribute
+     * Check that the attribute exists and is a tuple type attribute
      */
     unwrapAttrIter = Ral_TupleHeadingFind(heading, attrName) ;
     if (unwrapAttrIter == Ral_TupleHeadingEnd(heading)) {

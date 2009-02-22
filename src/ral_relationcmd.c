@@ -46,8 +46,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.39.2.7 $
-$Date: 2009/02/17 02:28:11 $
+$Revision: 1.39.2.8 $
+$Date: 2009/02/22 01:46:37 $
  *--
  */
 
@@ -2769,9 +2769,9 @@ RelationUnwrapCmd(
     Ral_Relation unwrapRel ;
     Ral_ErrorInfo errInfo ;
 
-    /* relation unwrap relation attribute */
+    /* relation unwrap relationValue attribute */
     if (objc != 4) {
-	Tcl_WrongNumArgs(interp, 2, objv, "relation attribute") ;
+	Tcl_WrongNumArgs(interp, 2, objv, "relationValue attribute") ;
 	return TCL_ERROR ;
     }
     relObj = objv[2] ;
@@ -2799,8 +2799,174 @@ RelationWrapCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
+    Tcl_Obj *relationObj ;
+    Tcl_Obj *newAttrNameObj ;
+    Ral_Relation relation ;
+    Ral_TupleHeading heading ;
+    Ral_Relation resultRelation ;
+    Ral_TupleHeading resultHeading ;
+    Ral_TupleHeading wrapHeading ;
+    Ral_IntVector wattrs ;
+    Ral_IntVector rattrs ;
+    Ral_IntVectorIter iviter ;
+    int i ;
+    Ral_Attribute newAttr ;
+    Ral_TupleHeadingIter newAttrIter ;
+    Ral_RelationIter riter ;
+    Ral_ErrorInfo errInfo ;
+
+    /* relation wrap relationValue newAttr ?attr1 attr2 ...? */
+    if (objc < 4) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+                "relationValue newAttr ?attr attr2 ...?") ;
+	return TCL_ERROR ;
+    }
+
+    relationObj = objv[2] ;
+    if (Tcl_ConvertToType(interp, relationObj, &Ral_RelationObjType)
+            != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relationObj->internalRep.otherValuePtr ;
+    heading = relation->heading ;
+
+    newAttrNameObj = objv[3] ;
+
+    objc -= 4 ;
+    objv += 4 ;
     /*
-     * HERE --
+     * Compose the heading for the wrapped attribute.  The wrapped tuple
+     * valued attribute will have the same number of attributes as the
+     * remaining arguments.  Accumulate a vector of the attribute indices going
+     * into the tuple valued attribute.
      */
-    return TCL_ERROR ;
+    wrapHeading = Ral_TupleHeadingNew(objc) ;
+    wattrs = Ral_IntVectorNewEmpty(objc) ;
+    for (i = 0 ; i < objc ; ++i) {
+	char const *attrName ;
+        Ral_TupleHeadingIter attrIter ;
+
+	attrName = Tcl_GetString(objv[i]) ;
+	attrIter = Ral_TupleHeadingFind(heading, attrName) ;
+	if (attrIter == Ral_TupleHeadingEnd(heading)) {
+	    Ral_TupleHeadingDelete(wrapHeading) ;
+            Ral_IntVectorDelete(wattrs) ;
+	    Ral_InterpErrorInfo(interp, Ral_CmdTuple, Ral_OptUnwrap,
+                    RAL_ERR_UNKNOWN_ATTR, attrName) ;
+	    return TCL_ERROR ;
+	}
+	if (!Ral_TupleHeadingAppend(heading, attrIter, attrIter + 1,
+                wrapHeading)) {
+	    Ral_TupleHeadingDelete(wrapHeading) ;
+            Ral_IntVectorDelete(wattrs) ;
+	    Ral_InterpErrorInfo(interp, Ral_CmdTuple, Ral_OptUnwrap,
+                    RAL_ERR_DUPLICATE_ATTR, attrName) ;
+	    return TCL_ERROR ;
+	}
+        Ral_IntVectorPushBack(wattrs,
+                attrIter - Ral_TupleHeadingBegin(heading)) ;
+    }
+    /*
+     * Compose the heading for the result relation.  The result relation has
+     * the same number of attributes as the input relation minus the number
+     * that are to be wrapped into the tuple valued attribute plus one for the
+     * new tuple valued attribute itself.
+     */
+    resultHeading = Ral_TupleHeadingNew(Ral_TupleHeadingSize(heading) -
+            objc + 1) ;
+    /*
+     * The complement of the set of attributes in the tuple valued attribute
+     * is the set that form the heading for the result.
+     */
+    rattrs = Ral_IntVectorSetComplement(wattrs, Ral_TupleHeadingSize(heading)) ;
+    for (iviter = Ral_IntVectorBegin(rattrs) ;
+            iviter != Ral_IntVectorEnd(rattrs) ; ++iviter) {
+        int status ;
+        Ral_TupleHeadingIter attrIter ;
+
+        assert(*iviter < Ral_TupleHeadingSize(heading)) ;
+        attrIter = Ral_TupleHeadingBegin(heading) + *iviter ;
+
+        status = Ral_TupleHeadingAppend(heading, attrIter, attrIter + 1,
+                resultHeading) ;
+        assert(status != 0) ;
+    }
+    /*
+     * Add the tuple valued attribute to the result relation heading.
+     */
+    newAttr = Ral_AttributeNewTupleType(Tcl_GetString(newAttrNameObj),
+            wrapHeading) ;
+    newAttrIter = Ral_TupleHeadingPushBack(resultHeading, newAttr) ;
+    if (newAttrIter == Ral_TupleHeadingEnd(resultHeading)) {
+	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_DUPLICATE_ATTR,
+                newAttrNameObj) ;
+	Ral_InterpSetError(interp, &errInfo) ;
+        Ral_AttributeDelete(newAttr) ;
+        Ral_TupleHeadingDelete(resultHeading) ;
+        Ral_TupleHeadingDelete(wrapHeading) ;
+        Ral_IntVectorDelete(wattrs) ;
+        Ral_IntVectorDelete(rattrs) ;
+        return TCL_ERROR ;
+    }
+    /*
+     * Iterate through the original relation, building the tuples for the
+     * result. There will be one tuple in the result for each tuple
+     * in the input relation.
+     */
+    resultRelation = Ral_RelationNew(resultHeading) ;
+    Ral_RelationReserve(resultRelation, Ral_RelationCardinality(relation)) ;
+    for (riter = Ral_RelationBegin(relation) ;
+            riter != Ral_RelationEnd(relation) ; ++riter) {
+        Ral_Tuple tuple ;
+        Ral_Tuple resultTuple ;
+        Ral_TupleIter resultDst ;
+        Ral_Tuple wrapTuple ;
+        Ral_TupleIter wrapDst ;
+
+        tuple = *riter ;
+        resultTuple = Ral_TupleNew(resultHeading) ;
+        resultDst = Ral_TupleBegin(resultTuple) ;
+        /*
+         * Copy the values from the tuple in the input relation to the
+         * new tuple for the result.
+         */
+        for (iviter = Ral_IntVectorBegin(rattrs) ;
+                iviter != Ral_IntVectorEnd(rattrs) ; ++iviter) {
+            Ral_TupleIter src ;
+
+            assert(*iviter < Ral_TupleDegree(tuple)) ;
+            src = Ral_TupleBegin(tuple) + *iviter ;
+            resultDst += Ral_TupleCopyValues(src, src + 1, resultDst) ;
+        }
+        /*
+         * Copy the values from the tuple in the input relation to the
+         * tuple valued attribute.
+         */
+        wrapTuple = Ral_TupleNew(wrapHeading) ;
+        wrapDst = Ral_TupleBegin(wrapTuple) ;
+        for (iviter = Ral_IntVectorBegin(wattrs) ;
+                iviter != Ral_IntVectorEnd(wattrs) ; ++iviter) {
+            Ral_TupleIter src ;
+
+            assert(*iviter < Ral_TupleDegree(tuple)) ;
+            src = Ral_TupleBegin(tuple) + *iviter ;
+            wrapDst += Ral_TupleCopyValues(src, src + 1, wrapDst) ;
+        }
+        /*
+         * Make the wrapped tuple into an object and store it into the
+         * result tuple.
+         */
+        *resultDst = Ral_TupleObjNew(wrapTuple) ;
+        /*
+         * Add the result tuple to the result relation. We ignore any
+         * duplicates that result, but there should not be any.
+         */
+        Ral_RelationPushBack(resultRelation, resultTuple, NULL) ;
+    }
+
+    Ral_IntVectorDelete(wattrs) ;
+    Ral_IntVectorDelete(rattrs) ;
+
+    Tcl_SetObjResult(interp, Ral_RelationObjNew(resultRelation)) ;
+    return TCL_OK ;
 }

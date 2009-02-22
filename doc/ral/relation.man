@@ -46,8 +46,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.28.2.3 $
-# $Date: 2009/02/17 02:28:11 $
+# $Revision: 1.28.2.4 $
+# $Date: 2009/02/22 01:46:36 $
 #  *--
 }]
 [moddesc "Relation Operators"]
@@ -1317,6 +1317,25 @@ and has a body consisting of all tuples present in any of the
 [arg relationValue] arguments.
 Since the union operation is both associative and commutative,
 the order of the [arg relationValue] arguments has no effect the result.
+
+[call [cmd "::ral::relation unwrap"] [arg relationValue] [arg attribute]]
+The [cmd unwrap] subcommand operates on relation values in a manner similar to
+the way that the [cmd "tuple unwrap"] command operates on tuple values.
+The [arg attribute] argument is the name of a tuple valued attribute.
+The result relation has the same heading as [arg relationValue] minus
+the [arg attribute] plus all the attributes contained in the
+tuple valued attribute, [arg attribute].
+In essense the tuple valued attribute, [arg attribute], is flattened
+by one level.
+
+[call [cmd "::ral::relation wrap"] [arg relationValue] [arg tupleattr]\
+    [opt [arg "attr1 attr2 ..."]]]
+The [cmd wrap] subcommand operates on relation values in a manner similar
+to the way that the [cmd "tuple wrap"] command operates on tuple values.
+The result relation has a heading that is the same as [arg relationValue]
+plus an attribute named, [arg tupleattr], minus the [arg attrN] attributes.
+The values of the [arg attrN] attributes are converted into a tuple
+valued attribute that is stored in [arg tupleattr].
 
 [list_end]
 
