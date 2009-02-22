@@ -51,8 +51,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.47.2.9 $
-# $Date: 2009/02/22 01:46:37 $
+# $Revision: 1.47.2.10 $
+# $Date: 2009/02/22 19:11:09 $
 #  *--
 
 package require tcltest 2.2
@@ -1110,11 +1110,11 @@ namespace eval ::ral::test {
     } -match relation
 
     # relation create subcommand
-    test relation-create-1.0 {one id, one tuple} -body {
+    test relation-create-1.0 {one tuple} -body {
         relation create {A1 string} {A1 a1}
     } -result {{A1 string} {{A1 a1}}} -match relation
 
-    test relation-create-2.0 {one id, zero tuple} -body {
+    test relation-create-2.0 {zero tuple} -body {
         relation create {A1 string}
     } -result {{A1 string} {}} -match relation
 
@@ -1145,6 +1145,49 @@ namespace eval ::ral::test {
             A2 {Tuple {B1 string}}
         } {
             {A1 foo A2 {B1 bar}}
+        }
+    } -match relation
+
+    # relation table subcommand
+    test relation-table-1.0 {one attribute - one tuple} -body {
+        relation table {A1 string} a1
+    } -result {{A1 string} {{A1 a1}}} -match relation
+
+    test relation-table-2.0 {one attribute - multiple tuples} -body {
+        relation table {A1 string} a1 a2 a3
+    } -result {
+        {A1 string} {
+            {A1 a1}
+            {A1 a2}
+            {A1 a3}
+        }
+    } -match relation
+
+    test relation-table-3.0 {multiple attributes and tuples} -body {
+        relation table\
+            {A1 string  B2 int  C3 double}\
+            {a1         1       1.0}\
+            {a2         2       2.0}\
+            {a3         3       3}
+    } -result {
+        {A1 string B2 int C3 double} {
+            {A1 a1 B2 1 C3 1.0}
+            {A1 a2 B2 2 C3 2.0}
+            {A1 a3 B2 3 C3 3.0}
+        }
+    } -match relation
+
+    test relation-table-4.0 {tuple valued attributes} -body {
+        relation table\
+            {A1 string  B2 {Tuple {C3 int}}}\
+            {a1         {C3 1}}\
+            {a2         {C3 2}}\
+            {a3         {C3 3}}
+    } -result {
+        {A1 string B2 {Tuple {C3 int}}} {
+            {A1 a1 B2 {C3 1}}
+            {A1 a2 B2 {C3 2}}
+            {A1 a3 B2 {C3 3}}
         }
     } -match relation
 
@@ -2828,6 +2871,25 @@ namespace eval ::ral::test {
             {[tuple extract $t Age] < 20 &&\
             [string index [tuple extract $t City] 0] ne "S"}
     } -result {{Name string Age int City string} {}
+    } -match relation
+
+    test relation-restrict-2.1 {
+        match on a tuple valued attribute
+    } -setup {
+        set r {
+            {Name string Address {Tuple {Street string City string}}} {
+                {Name John Address {City Stockton Street Elm}}
+                {Name Sue Address {Street Main City Modesto}}
+                {Name Frank Address {Street 2nd City {Palo Alto}}}
+            }
+        }
+    } -body {
+        set m {{City string Street string} {Street Main City Modesto}}
+        relation restrict $r t {[tuple equal [tuple extract $t Address] $m]}
+    } -result {
+        {Name string Address {Tuple {Street string City string}}} {
+            {Name Sue Address {Street Main City Modesto}}
+        }
     } -match relation
 
     test relation-restrict-3.0 {bad expression} -body {

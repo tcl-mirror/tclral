@@ -46,8 +46,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.28.2.4 $
-# $Date: 2009/02/22 01:46:36 $
+# $Revision: 1.28.2.5 $
+# $Date: 2009/02/22 19:11:08 $
 #  *--
 }]
 [moddesc "Relation Operators"]
@@ -408,7 +408,13 @@ how division can be used to find all the Dogs owned by both Sue and George.
 
 [example {
 % set dividend [relation project $::DOG DogName]
-{DogName string} {{DogName Fido} {DogName Sam} {DogName Spot} {DogName Rover} {DogName Fred} {DogName Jumper}}
+{DogName string} {\ 
+{DogName Fido}\ 
+{DogName Sam}\ 
+{DogName Spot}\ 
+{DogName Rover}\ 
+{DogName Fred}\ 
+{DogName Jumper}}
 % puts [relformat $dividend Dividend:]
 +-------+
 |DogName|
@@ -423,8 +429,8 @@ how division can be used to find all the Dogs owned by both Sue and George.
 +-------+
 Dividend:
 ---------
-% set divisor [relation project [relation restrict $::OWNER t\
-  {[tuple extract $t OwnerName] eq "Sue" ||\
+% set divisor [relation project [relation restrict $::OWNER t\ 
+  {[tuple extract $t OwnerName] eq "Sue" ||\ 
   [tuple extract $t OwnerName] eq "George"}] OwnerName]
 {OwnerName string} {{OwnerName Sue} {OwnerName George}}
 % puts [relformat $divisor Divisor:]
@@ -438,7 +444,14 @@ Dividend:
 Divisor:
 --------
 % set mediator [relation eliminate $::OWNERSHIP Acquired]
-{OwnerName string DogName string} {{OwnerName Sue DogName Fido} {OwnerName Sue DogName Sam} {OwnerName George DogName Fido} {OwnerName George DogName Sam} {OwnerName Alice DogName Spot} {OwnerName Mike DogName Rover} {OwnerName Jim DogName Fred}}
+{OwnerName string DogName string} {\ 
+{OwnerName Sue DogName Fido}\ 
+{OwnerName Sue DogName Sam}\ 
+{OwnerName George DogName Fido}\ 
+{OwnerName George DogName Sam}\ 
+{OwnerName Alice DogName Spot}\ 
+{OwnerName Mike DogName Rover}\ 
+{OwnerName Jim DogName Fred}}
 % puts [relformat $mediator Mediator:]
 +---------+-------+
 |OwnerName|DogName|
@@ -840,7 +853,12 @@ For example, to find the names and ages of the two oldest owners:
 
 [example {
 % set ro [relation rank $OWNER -descending Age AgeRank]
-{OwnerName string Age int City string AgeRank int} {{OwnerName Sue Age 24 City Cupertino AgeRank 5} {OwnerName George Age 35 City Sunnyvale AgeRank 3} {OwnerName Alice Age 30 City {San Jose} AgeRank 4} {OwnerName Mike Age 50 City {San Jose} AgeRank 1} {OwnerName Jim Age 42 City {San Francisco} AgeRank 2}}
+{OwnerName string Age int City string AgeRank int} {\ 
+{OwnerName Sue Age 24 City Cupertino AgeRank 5}\ 
+{OwnerName George Age 35 City Sunnyvale AgeRank 3}\ 
+{OwnerName Alice Age 30 City {San Jose} AgeRank 4}\ 
+{OwnerName Mike Age 50 City {San Jose} AgeRank 1}\ 
+{OwnerName Jim Age 42 City {San Francisco} AgeRank 2}}
 % relformat [relation project [relation restrictwith $ro {$AgeRank <= 2}] OwnerName Age]
 +---------+---+
 |OwnerName|Age|
@@ -1073,8 +1091,8 @@ proc ravg {rel attr} {
     return [expr {$sum / [relation cardinality $rel]}]
 }
 
-% set dee {Relation {} {{}} {{}}}
-Relation {} {{}} {{}}
+% set dee {{} {{}}}
+{} {{}}
 % relformat [relation summarize $OWNER $dee o AverageAge int {[ravg $o Age]}]
 +----------+
 |AverageAge|
@@ -1082,6 +1100,29 @@ Relation {} {{}} {{}}
 +----------+
 |36        |
 +----------+
+}]
+
+[call [cmd "::ral::relation table"] [arg heading]\
+        [arg [opt "value-list1 value-list2 ..."]]]
+The [cmd table] subcommand creates a new relation whose heading
+is given by [arg heading] and tuples of the body are given by the
+[arg value-listN] arguments.
+The [arg heading] is an list containing an even number of elements
+consisting of alternating attribute names and attribute data types.
+The [arg value-listN] arguments are a list of attribute values.
+It is assumed that the attribute values are given in the same order as
+the attributes of the [arg heading] argument.
+This command is a convenience command that is much like [cmd "relation create"]
+but avoids having to give the attribute name for each attribute value
+when specifying the tuples of the body.
+This allows literal relation values to be specified in a tabular layout.
+
+[example {
+set o [relation table\ 
+    {OwnerName string   Age int     City string}\ 
+    {Sue                24          Cupertino}\ 
+    {George             35          Sunnyvale}\ 
+    {Alice              30          {San Jose}}]
 }]
 
 [call [cmd "::ral::relation tag"] [arg relationValue]\
@@ -1157,9 +1198,7 @@ to John, then we have:
 
 [example {
 % set REPORTS_TO {
-  Relation
   {Employee string Supervisor string}
-  {{Employee Supervisor}}
   {
     {Employee Sue Supervisor John}
     {Employee Bob Supervisor John}
@@ -1170,7 +1209,9 @@ to John, then we have:
   }
 }
 
-% relformat [relation project [relation restrictwith [relation tclose $REPORTS_TO] {$Supervisor eq "John"} ] Employee  ] "Direct/Indirect Reports to John"
+% relformat [relation project [relation restrictwith\ 
+[relation tclose $REPORTS_TO] {$Supervisor eq "John"}] Employee]\ 
+"Direct/Indirect Reports to John"
 +--------+
 |Employee|
 |string  |
@@ -1258,10 +1299,7 @@ components from [arg relationValue].
 
 [example {
 set OwnerContacts {
-    Relation
-    {OwnerName string Contact {Relation {Type string Number string} Type}}
-    OwnerName
-    {
+    {OwnerName string Contact {Relation {Type string Number string} Type}} {
 	{OwnerName Sue Contact {
 	    {Type Home Number 555-1212}
 	    {Type Work Number 555-6635}}
@@ -1336,6 +1374,33 @@ The result relation has a heading that is the same as [arg relationValue]
 plus an attribute named, [arg tupleattr], minus the [arg attrN] attributes.
 The values of the [arg attrN] attributes are converted into a tuple
 valued attribute that is stored in [arg tupleattr].
+
+[example {
+% set r {
+    {Name string Street string City string State string Zip string} {
+        {Name Arnold Street Main City Sacramento State CA Zip 94444}
+        {Name Mary Street Elm City Stockton State CA Zip 95555}
+    }
+}
+% relformat [relation wrap $r Address Street City State Zip]
++------+---------------------------------+
+|Name  |Address                          |
+|string|Tuple                            |
++------+---------------------------------+
+|Arnold|+------+----------+------+------+|
+|      ||Street|City      |State |Zip   ||
+|      ||string|string    |string|string||
+|      |+------+----------+------+------+|
+|      ||Main  |Sacramento|CA    |94444 ||
+|      |+------+----------+------+------+|
+|Mary  |+------+--------+------+------+  |
+|      ||Street|City    |State |Zip   |  |
+|      ||string|string  |string|string|  |
+|      |+------+--------+------+------+  |
+|      ||Elm   |Stockton|CA    |95555 |  |
+|      |+------+--------+------+------+  |
++------+---------------------------------+
+}]
 
 [list_end]
 

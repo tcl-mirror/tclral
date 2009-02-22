@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleobj.h,v $
-$Revision: 1.7.2.2 $
-$Date: 2009/02/02 01:30:33 $
+$Revision: 1.7.2.3 $
+$Date: 2009/02/22 19:11:09 $
  *--
  */
 #ifndef _ral_tupleobj_h_
@@ -98,6 +98,8 @@ extern Ral_IntVector Ral_TupleHeadingAttrsFromVect(Ral_TupleHeading,
         Tcl_Interp *, int, Tcl_Obj *const*) ;
 
 extern int Ral_TupleSetFromObj(Ral_Tuple, Tcl_Interp *, Tcl_Obj *,
+        Ral_ErrorInfo *) ;
+extern int Ral_TupleSetFromValueList(Ral_Tuple tuple, Tcl_Interp *, Tcl_Obj *,
         Ral_ErrorInfo *) ;
 extern Tcl_Obj *Ral_TuplePartialSetFromObj(Ral_TupleHeading, Tcl_Interp *,
         Tcl_Obj *, Ral_ErrorInfo *) ;

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_utils.c,v $
-$Revision: 1.19.2.5 $
-$Date: 2009/02/17 02:28:11 $
+$Revision: 1.19.2.6 $
+$Date: 2009/02/22 19:11:09 $
  *--
  */
 
@@ -150,6 +150,7 @@ static char const * const optStrings[] = {
     "semiminus",
     "set",
     "summarize",
+    "table",
     "tag",
     "tclose",
     "times",

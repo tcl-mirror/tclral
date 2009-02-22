@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleobj.c,v $
-$Revision: 1.14.2.5 $
-$Date: 2009/02/17 02:28:11 $
+$Revision: 1.14.2.6 $
+$Date: 2009/02/22 19:11:09 $
  *--
  */
 
@@ -336,6 +336,60 @@ errorOut:
     Ral_IntVectorDelete(attrStatus) ;
     Ral_InterpSetError(interp, errInfo) ;
     return TCL_ERROR ;
+}
+
+/*
+ * The Tcl object must be a list of attribute values in the same
+ * order as the tuple heading. A value must be given for every attribute.
+ */
+int
+Ral_TupleSetFromValueList(
+    Ral_Tuple tuple,
+    Tcl_Interp *interp,
+    Tcl_Obj *objPtr,
+    Ral_ErrorInfo *errInfo)
+{
+    int elemc ;
+    Tcl_Obj **elemv ;
+    Ral_TupleIter tIter ;
+    Ral_TupleHeadingIter hIter ;
+
+    if (Tcl_ListObjGetElements(interp, objPtr, &elemc, &elemv) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    /*
+     * Make sure we get the correct number of attributes.
+     */
+    if (elemc != Ral_TupleDegree(tuple)) {
+	Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_WRONG_NUM_ATTRS, objPtr) ;
+	Ral_InterpSetError(interp, errInfo) ;
+	return TCL_ERROR ;
+    }
+    /*
+     * Go through the attributes in the tuple and update the value to that
+     * given in the value list.
+     */
+    hIter = Ral_TupleHeadingBegin(tuple->heading) ;
+    for (tIter = Ral_TupleBegin(tuple) ; tIter != Ral_TupleEnd(tuple) ;
+            ++tIter) {
+        Tcl_Obj *cvtValue ;
+        Tcl_Obj *oldValue ;
+
+        cvtValue = Ral_AttributeConvertValueToType(interp, *hIter++, *elemv++,
+            errInfo) ;
+        if (cvtValue == NULL) {
+            Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_BAD_VALUE, *(elemv - 1)) ;
+            return TCL_ERROR ;
+        }
+        oldValue = *tIter ;
+        if (oldValue) {
+            Tcl_DecrRefCount(oldValue) ;
+        }
+        Tcl_IncrRefCount(cvtValue) ;
+        *tIter = cvtValue ;
+    }
+
+    return TCL_OK ;
 }
 
 /*

@@ -46,8 +46,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.39.2.8 $
-$Date: 2009/02/22 01:46:37 $
+$Revision: 1.39.2.9 $
+$Date: 2009/02/22 19:11:08 $
  *--
  */
 
@@ -128,6 +128,7 @@ static int RelationRestrictWithCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationSemijoinCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationSemiminusCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationSummarizeCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
+static int RelationTableCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationTagCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationTcloseCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationTimesCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
@@ -205,6 +206,7 @@ relationCmd(
 	{"semijoin", RelationSemijoinCmd},
 	{"semiminus", RelationSemiminusCmd},
 	{"summarize", RelationSummarizeCmd},
+	{"table", RelationTableCmd},
 	{"tag", RelationTagCmd},
 	{"tclose", RelationTcloseCmd},
 	{"times", RelationTimesCmd},
@@ -525,7 +527,7 @@ RelationComposeCmd(
 }
 
 /*
- * relation create attrs ?tuple1 tuple2 ...?
+ * relation create heading ?tuple1 tuple2 ...?
  *
  * Returns a relation value with the given heading and body.
  * Cf. "tuple create"
@@ -542,7 +544,7 @@ RelationCreateCmd(
     Ral_Relation relation ;
 
     if (objc < 3) {
-	Tcl_WrongNumArgs(interp, 2, objv, "attrs ?tuple1 tuple2 ...?") ;
+	Tcl_WrongNumArgs(interp, 2, objv, "heading ?tuple1 tuple2 ...?") ;
 	return TCL_ERROR ;
     }
 
@@ -2366,6 +2368,75 @@ errorOut:
 }
 
 /*
+ * relation table heading ?value-list1 value-list2 ...?
+ *
+ * Create a relation using a tabular input form. <heading> is an attribute
+ * name / type list. The <value-listN> arguments are lists of attribute
+ * values only and are presumed to be in the same order as the <heading>.
+ * This command is meant to save re-typing the attributes names over and
+ * over when trying to create literal relation values.
+ */
+static int
+RelationTableCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Ral_TupleHeading heading ;
+    Ral_ErrorInfo errInfo ;
+    Ral_Relation relation ;
+
+    if (objc < 3) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+                "heading ?value-list1 value-list2 ...?") ;
+	return TCL_ERROR ;
+    }
+
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptTable) ;
+    /*
+     * Create the relation heading from the arguments.
+     */
+    heading = Ral_TupleHeadingNewFromObj(interp, objv[2], &errInfo) ;
+    if (heading == NULL) {
+	return TCL_ERROR ;
+    }
+    relation = Ral_RelationNew(heading) ;
+
+    /*
+     * Offset the argument bookkeeping to reference the value lists.
+     */
+    objc -= 3 ;
+    objv += 3 ;
+    Ral_RelationReserve(relation, objc) ;
+    /*
+     * Iterate through the value list arguments, inserting them into the
+     * relation. Values correspond to the same order as the heading.  Here
+     * duplicates matter as we deem creation to have "insert" semantics.
+     */
+    for ( ; objc > 0 ; --objc, ++objv) {
+        Ral_Tuple tuple ;
+
+        tuple = Ral_TupleNew(heading) ;
+        if (Ral_TupleSetFromValueList(tuple, interp, *objv, &errInfo)
+                != TCL_OK) {
+            Ral_TupleDelete(tuple) ;
+            Ral_RelationDelete(relation) ;
+            return TCL_ERROR ;
+        }
+
+        if (!Ral_RelationPushBack(relation, tuple, NULL)) {
+            Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_DUPLICATE_TUPLE, *objv) ;
+            Ral_InterpSetError(interp, &errInfo) ;
+            Ral_RelationDelete(relation) ;
+            return TCL_ERROR ;
+        }
+    }
+
+    Tcl_SetObjResult(interp, Ral_RelationObjNew(relation)) ;
+    return TCL_OK ;
+}
+
+/*
  * relation tag relation attrName ?-ascending | -descending sort-attr-list?
  *	?-within {attr-list}?
  *
@@ -2851,7 +2922,7 @@ RelationWrapCmd(
 	if (attrIter == Ral_TupleHeadingEnd(heading)) {
 	    Ral_TupleHeadingDelete(wrapHeading) ;
             Ral_IntVectorDelete(wattrs) ;
-	    Ral_InterpErrorInfo(interp, Ral_CmdTuple, Ral_OptUnwrap,
+	    Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptUnwrap,
                     RAL_ERR_UNKNOWN_ATTR, attrName) ;
 	    return TCL_ERROR ;
 	}
@@ -2859,7 +2930,7 @@ RelationWrapCmd(
                 wrapHeading)) {
 	    Ral_TupleHeadingDelete(wrapHeading) ;
             Ral_IntVectorDelete(wattrs) ;
-	    Ral_InterpErrorInfo(interp, Ral_CmdTuple, Ral_OptUnwrap,
+	    Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptUnwrap,
                     RAL_ERR_DUPLICATE_ATTR, attrName) ;
 	    return TCL_ERROR ;
 	}
@@ -2957,6 +3028,7 @@ RelationWrapCmd(
          * result tuple.
          */
         *resultDst = Ral_TupleObjNew(wrapTuple) ;
+        Tcl_IncrRefCount(*resultDst) ;
         /*
          * Add the result tuple to the result relation. We ignore any
          * duplicates that result, but there should not be any.
