@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.36.2.8 $
-$Date: 2009/02/22 01:46:37 $
+$Revision: 1.36.2.9 $
+$Date: 2009/02/22 21:13:30 $
  *--
  */
 
@@ -586,7 +586,7 @@ Ral_RelationProject(
             iter != Ral_RelationEnd(relation) ; ++iter) {
 	Ral_Tuple projTuple = Ral_TupleSubset(*iter, projHeading, attrSet) ;
 	/*
-	 * Ignore the return. Projecting, in general, results in
+	 * Ignore any duplicates. Projecting, in general, results in
 	 * duplicated tuples.
 	 */
 	Ral_RelationPushBack(projRel, projTuple, NULL) ;

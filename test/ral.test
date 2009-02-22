@@ -51,8 +51,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.47.2.10 $
-# $Date: 2009/02/22 19:11:09 $
+# $Revision: 1.47.2.11 $
+# $Date: 2009/02/22 21:13:30 $
 #  *--
 
 package require tcltest 2.2
@@ -3411,8 +3411,7 @@ in expression "_@_< 20"} -returnCodes error
         relation summarize $OWNERSHIP $ac r\
             NumAcquired int {[relation cardinality $r]}
     } -result {
-        {Acquired string NumAcquired int}
-        {
+        {Acquired string NumAcquired int} {
             {Acquired 2001 NumAcquired 3}
             {Acquired 2000 NumAcquired 2}
             {Acquired 2002 NumAcquired 1}
@@ -3420,12 +3419,81 @@ in expression "_@_< 20"} -returnCodes error
         }
     } -match relation
 
+    # relation summarizeby subcommand
+    test relation-summarizeby-1.0 {
+        count
+    } -constraints {
+        tcl8.5
+    } -body {
+        relation summarizeby $SP P# r Total int {rsum($r, "QTY")}
+    } -result {
+        {P# string Total int} {
+            {P# P1 Total 600}
+            {P# P2 Total 1000}
+            {P# P3 Total 400}
+            {P# P4 Total 500}
+            {P# P5 Total 500}
+            {P# P6 Total 100}
+        }
+    } -match relation
+
+    test relation-summarizeby-2.0 {
+        summarize no attributes
+    } -constraints {
+        tcl8.5
+    } -body {
+        relation summarizeby $SP {} r GrandTotal int {rsum($r, "QTY")}
+    } -result {
+        {GrandTotal int} {
+            {GrandTotal 3100}
+        }
+    } -match relation
+
+    test relation-summarizeby-3.0 {
+        bad attribute
+    } -body {
+        relation summarizeby $SP A r GrandTotal int {rsum($r, "QTY")}
+    } -result {unknown attribute name, "A"} -returnCodes error
+
+    test relation-summarizeby-3.1 {
+        duplicate attribute
+    } -body {
+        relation summarizeby $SP {P# P#} r GrandTotal int {rsum($r, "QTY")}
+    } -result {duplicate attribute name, "P#"} -returnCodes error
+
+    test relation-summarizeby-4.0 {
+        projection, counting
+    } -body {
+        relation summarizeby $OWNERSHIP Acquired r\
+            NumAcquired int {[relation cardinality $r]}
+    } -result {
+        {Acquired string NumAcquired int} {
+            {Acquired 2001 NumAcquired 3}
+            {Acquired 2000 NumAcquired 2}
+            {Acquired 2002 NumAcquired 1}
+            {Acquired 2003 NumAcquired 1}
+        }
+    } -match relation
+
+    test relation-summarizeby-4.1 {
+        multiple attributes
+    } -body {
+        relation summarizeby $S {STATUS CITY} r\
+            TOTAL int {[relation cardinality $r]}
+    } -result {
+        {STATUS int CITY string TOTAL int} {
+            {STATUS 20 CITY London TOTAL 2}
+            {STATUS 10 CITY Paris TOTAL 1}
+            {STATUS 30 CITY Paris TOTAL 1}
+            {STATUS 30 CITY Athens TOTAL 1}
+        }
+    } -match relation
+
     # relation tag subcommand
     test relation-tag-1.0 {relation scope -- ascending} -body {
         relation tag $S NameOrder -ascending SNAME
     } -result {
-        {S# string SNAME string STATUS int CITY string NameOrder int}
-        {
+        {S# string SNAME string STATUS int CITY string NameOrder int} {
             {S# S1 SNAME Smith STATUS 20 CITY London NameOrder 4}
             {S# S2 SNAME Jones STATUS 10 CITY Paris NameOrder 3}
             {S# S3 SNAME Blake STATUS 30 CITY Paris NameOrder 1}

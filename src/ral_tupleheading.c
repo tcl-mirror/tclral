@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleheading.c,v $
-$Revision: 1.15.2.3 $
-$Date: 2009/02/15 23:34:59 $
+$Revision: 1.15.2.4 $
+$Date: 2009/02/22 21:13:30 $
  *--
  */
 
@@ -717,7 +717,8 @@ Ral_TupleHeadingCommonAttributes(
 	if (iter2 != Ral_TupleHeadingEnd(h2) &&
                 Ral_AttributeEqual(attr1, *iter2)) {
 	    if (map) {
-		Ral_JoinMapAddAttrMapping(map, iter1 - Ral_TupleHeadingBegin(h1),
+		Ral_JoinMapAddAttrMapping(map,
+                        iter1 - Ral_TupleHeadingBegin(h1),
                         iter2 - Ral_TupleHeadingBegin(h2)) ;
 	    }
 	    ++count ;

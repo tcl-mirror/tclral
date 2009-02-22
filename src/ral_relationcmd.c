@@ -46,8 +46,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.39.2.9 $
-$Date: 2009/02/22 19:11:08 $
+$Revision: 1.39.2.10 $
+$Date: 2009/02/22 21:13:30 $
  *--
  */
 
@@ -128,6 +128,7 @@ static int RelationRestrictWithCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationSemijoinCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationSemiminusCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationSummarizeCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
+static int RelationSummarizebyCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationTableCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationTagCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationTcloseCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
@@ -206,6 +207,7 @@ relationCmd(
 	{"semijoin", RelationSemijoinCmd},
 	{"semiminus", RelationSemiminusCmd},
 	{"summarize", RelationSummarizeCmd},
+	{"summarizeby", RelationSummarizebyCmd},
 	{"table", RelationTableCmd},
 	{"tag", RelationTagCmd},
 	{"tclose", RelationTcloseCmd},
@@ -2283,15 +2285,18 @@ RelationSummarizeCmd(
 	Ral_TupleHeadingIter inserted ;
 
 	if (attr == NULL) {
-	    Ral_TupleHeadingDelete(sumHeading) ;
 	    Ral_InterpSetError(interp, &errInfo) ;
+	    Ral_TupleHeadingDelete(sumHeading) ;
+            Ral_JoinMapDelete(joinMap) ;
 	    return TCL_ERROR ;
 	}
 	inserted = Ral_TupleHeadingPushBack(sumHeading, attr) ;
 	if (inserted == Ral_TupleHeadingEnd(sumHeading)) {
-	    Ral_TupleHeadingDelete(sumHeading) ;
 	    Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_DUPLICATE_ATTR, *v) ;
 	    Ral_InterpSetError(interp, &errInfo) ;
+	    Ral_TupleHeadingDelete(sumHeading) ;
+            Ral_JoinMapDelete(joinMap) ;
+	    return TCL_ERROR ;
 	}
     }
     sumRelation = Ral_RelationNew(sumHeading) ;
@@ -2363,6 +2368,198 @@ RelationSummarizeCmd(
 errorOut:
     Tcl_UnsetVar(interp, Tcl_GetString(varNameObj), 0) ;
     Tcl_DecrRefCount(varNameObj) ;
+    Ral_RelationDelete(sumRelation) ;
+    return TCL_ERROR ;
+}
+
+static int
+RelationSummarizebyCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_Obj *relObj ;
+    Ral_Relation relation ;
+    Ral_TupleHeading heading ;
+    Tcl_Obj *varNameObj ;
+    Ral_Relation sumRelation ;
+    Ral_TupleHeading sumHeading ;
+    int elemc ;
+    Tcl_Obj **elemv ;
+    int c ;
+    Tcl_Obj *const*v ;
+    Ral_JoinMap joinMap ;
+    Ral_IntVector perAttrs ;
+    Ral_Relation perRelation ;
+    int index = 0 ;
+    Ral_RelationIter perIter ;
+    Ral_TupleHeadingIter sumHeadingIter ;
+    Ral_ErrorInfo errInfo ;
+    /*
+     * relation summarizeby relationValue attrList relationVarName
+     * ?attr1 type1 expr1 ... attrN typeN exprN?
+     */
+    if (objc < 5) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+	    "relationValue perRelation relationVarName"
+	    " ?attr1 type1 expr1 ... attrN typeN exprN?") ;
+	return TCL_ERROR ;
+    }
+
+    relObj = objv[2] ;
+    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relObj->internalRep.otherValuePtr ;
+    heading = relation->heading ;
+
+    if (Tcl_ListObjGetElements(interp, objv[3], &elemc, &elemv) != TCL_OK) {
+        return TCL_ERROR ;
+    }
+
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptSummarizeby) ;
+
+    varNameObj = objv[4] ;
+    objc -= 5 ;
+    objv += 5 ;
+    if (objc % 3 != 0) {
+	Ral_ErrorInfoSetError(&errInfo, RAL_ERR_BAD_TRIPLE_LIST,
+	    "attribute / type / expression arguments "
+	    "must be given in triples") ;
+	Ral_InterpSetError(interp, &errInfo) ;
+	return TCL_ERROR ;
+    }
+    /*
+     * Iterate through the given attributes. We need to create a heading for
+     * the result and we can do that as we iterate through the attributes.
+     * Create a join map that we will use to find the sub relations for the
+     * summarization.
+     */
+    sumHeading = Ral_TupleHeadingNew(elemc + objc / 3) ;
+    joinMap = Ral_JoinMapNew(elemc, Ral_RelationCardinality(relation)) ;
+    for (c = 0, v = elemv ; c < elemc ; ++c, ++v) {
+        Ral_TupleHeadingIter attrIter ;
+
+	attrIter = Ral_TupleHeadingFind(heading, Tcl_GetString(*v)) ;
+        if (attrIter == Ral_TupleHeadingEnd(heading)) {
+            Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_UNKNOWN_ATTR, *v) ;
+            Ral_InterpSetError(interp, &errInfo) ;
+	    Ral_TupleHeadingDelete(sumHeading) ;
+            Ral_JoinMapDelete(joinMap) ;
+            return TCL_ERROR ;
+        }
+	if (!Ral_TupleHeadingAppend(heading, attrIter, attrIter + 1,
+                sumHeading)) {
+            Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_DUPLICATE_ATTR, *v) ;
+            Ral_InterpSetError(interp, &errInfo) ;
+	    Ral_TupleHeadingDelete(sumHeading) ;
+            Ral_JoinMapDelete(joinMap) ;
+	    return TCL_ERROR ;
+	}
+        Ral_JoinMapAddAttrMapping(joinMap, c,
+                attrIter - Ral_TupleHeadingBegin(heading)) ;
+    }
+
+    /*
+     * Add in the summary attributes to result tuple heading.
+     */
+    for (c = objc, v = objv ; c > 0 ; c -= 3, v += 3) {
+	Ral_Attribute attr ;
+	Ral_TupleHeadingIter inserted ;
+
+	attr = Ral_AttributeNewFromObjs(interp, *v, *(v + 1), &errInfo) ;
+	if (attr == NULL) {
+	    Ral_InterpSetError(interp, &errInfo) ;
+	    Ral_TupleHeadingDelete(sumHeading) ;
+            Ral_JoinMapDelete(joinMap) ;
+	    return TCL_ERROR ;
+	}
+	inserted = Ral_TupleHeadingPushBack(sumHeading, attr) ;
+	if (inserted == Ral_TupleHeadingEnd(sumHeading)) {
+	    Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_DUPLICATE_ATTR, *v) ;
+	    Ral_InterpSetError(interp, &errInfo) ;
+	    Ral_TupleHeadingDelete(sumHeading) ;
+            Ral_JoinMapDelete(joinMap) ;
+	    return TCL_ERROR ;
+	}
+    }
+    sumRelation = Ral_RelationNew(sumHeading) ;
+    /*
+     * Compute the "per" relation as the projection of the input
+     * relation across the given attributes.
+     */
+    perAttrs = Ral_JoinMapGetAttr(joinMap, 1) ;
+    perRelation = Ral_RelationProject(relation, perAttrs) ;
+    Ral_IntVectorDelete(perAttrs) ;
+    /*
+     * The strategy is to iterate over each tuple in the per-relation and to
+     * construct subsets of the relation that match the tuple. That subset
+     * relation is then assigned to the variable name and each summary
+     * attribute is computed by evaluating the expression and assigning the
+     * result to the attribute.
+     */
+    Tcl_IncrRefCount(varNameObj) ;
+    Ral_RelationFindJoinTuples(perRelation, relation, joinMap) ;
+    sumHeadingIter = Ral_TupleHeadingBegin(sumHeading) +
+            Ral_RelationDegree(perRelation) ;
+    for (perIter = Ral_RelationBegin(perRelation) ;
+            perIter != Ral_RelationEnd(perRelation) ; ++perIter) {
+	Ral_Tuple perTuple = *perIter ;
+	Ral_IntVector matchSet = Ral_JoinMapMatchingTupleSet(joinMap, 0,
+	    index++) ;
+	Ral_Relation matchRel = Ral_RelationExtract(relation, matchSet) ;
+	Tcl_Obj *matchObj = Ral_RelationObjNew(matchRel) ;
+	Ral_Tuple sumTuple = Ral_TupleNew(sumHeading) ;
+	Ral_TupleIter sumIter = Ral_TupleBegin(sumTuple) ;
+	Ral_TupleHeadingIter attrIter = sumHeadingIter ;
+	int status ;
+
+	Ral_IntVectorDelete(matchSet) ;
+
+	if (Tcl_ObjSetVar2(interp, varNameObj, NULL, matchObj,
+	    TCL_LEAVE_ERR_MSG) == NULL) {
+	    Ral_TupleDelete(sumTuple) ;
+	    Tcl_DecrRefCount(matchObj) ;
+	    goto errorOut ;
+	}
+
+	sumIter += Ral_TupleCopyValues(Ral_TupleBegin(perTuple),
+	    Ral_TupleEnd(perTuple), sumIter) ;
+
+	for (c = objc, v = objv + 2 ; c > 0 ; c -= 3, v += 3) {
+	    Tcl_Obj *exprResult ;
+            Tcl_Obj *cvtResult ;
+
+	    if (Tcl_ExprObj(interp, *v, &exprResult) != TCL_OK) {
+		Ral_TupleDelete(sumTuple) ;
+		goto errorOut ;
+	    }
+	    cvtResult = Ral_AttributeConvertValueToType(interp, *attrIter++,
+		exprResult, &errInfo) ;
+	    if (cvtResult == NULL) {
+		Tcl_DecrRefCount(exprResult) ;
+		Ral_TupleDelete(sumTuple) ;
+		Ral_InterpSetError(interp, &errInfo) ;
+		goto errorOut ;
+	    }
+            Tcl_IncrRefCount(cvtResult) ;
+            Tcl_DecrRefCount(exprResult) ;
+            *sumIter++ = cvtResult ;
+	}
+	status = Ral_RelationPushBack(sumRelation, sumTuple, NULL) ;
+	assert(status != 0) ;
+    }
+
+    Tcl_UnsetVar(interp, Tcl_GetString(varNameObj), 0) ;
+    Tcl_DecrRefCount(varNameObj) ;
+    Ral_RelationDelete(perRelation) ;
+    Tcl_SetObjResult(interp, Ral_RelationObjNew(sumRelation)) ;
+    return TCL_OK ;
+
+errorOut:
+    Tcl_UnsetVar(interp, Tcl_GetString(varNameObj), 0) ;
+    Tcl_DecrRefCount(varNameObj) ;
+    Ral_RelationDelete(perRelation) ;
     Ral_RelationDelete(sumRelation) ;
     return TCL_ERROR ;
 }
