@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuplecmd.c,v $
-$Revision: 1.20.2.5 $
-$Date: 2009/02/22 01:46:37 $
+$Revision: 1.20.2.6 $
+$Date: 2009/02/23 02:35:37 $
  *--
  */
 
@@ -889,35 +889,21 @@ TupleUpdateCmd(
 {
     Tcl_Obj *tupleObj ;
     Ral_Tuple tuple ;
+    Ral_Tuple result ;
     Ral_ErrorInfo errInfo ;
 
-    /* tuple update tupleVar ?attr1 value1 attr2 value2 ...? */
+    /* tuple update tupleValue ?attr1 value1 attr2 value2 ...? */
     if (objc < 3) {
 	Tcl_WrongNumArgs(interp, 2, objv,
 	    "tupleValue ?attr1 value1 attr2 value2?") ;
 	return TCL_ERROR ;
     }
 
-    tupleObj = Tcl_ObjGetVar2(interp, objv[2], NULL, TCL_LEAVE_ERR_MSG) ;
-    if (tupleObj == NULL) {
-	return TCL_ERROR ;
-    }
-    if (Tcl_IsShared(tupleObj)) {
-	Tcl_Obj *dupObj ;
-
-	dupObj = Tcl_DuplicateObj(tupleObj) ;
-	tupleObj = Tcl_ObjSetVar2(interp, objv[2], NULL, dupObj,
-	    TCL_LEAVE_ERR_MSG) ;
-	if (tupleObj == NULL) {
-	    Tcl_DecrRefCount(dupObj) ;
-	    return TCL_ERROR ;
-	}
-    }
+    tupleObj = objv[2] ;
     if (Tcl_ConvertToType(interp, tupleObj, &Ral_TupleObjType) != TCL_OK) {
 	return TCL_ERROR ;
     }
     tuple = tupleObj->internalRep.otherValuePtr ;
-    assert(tuple->refCount == 1) ;
 
     objc -= 3 ;
     objv += 3 ;
@@ -927,22 +913,29 @@ TupleUpdateCmd(
 	    "for attribute name / attribute value arguments") ;
 	return TCL_ERROR ;
     }
-
+    /*
+     * Clone the tuple so that we can overlay it with the updated
+     * attribute values. Note that we don't use "Ral_TupleDup()" because
+     * there is no need to duplicate the heading.
+     */
+    result = Ral_TupleNew(tuple->heading) ;
+    Ral_TupleCopyValues(Ral_TupleBegin(tuple), Ral_TupleEnd(tuple),
+            Ral_TupleBegin(result)) ;
     /*
      * Go through the attribute / value pairs updating the attribute values.
      */
     Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdTuple, Ral_OptUpdate) ;
     for ( ; objc > 0 ; objc -= 2, objv += 2) {
-	const char *attrName = Tcl_GetString(objv[0]) ;
+	char const *attrName = Tcl_GetString(objv[0]) ;
 
-	if (!Ral_TupleUpdateAttrValue(tuple, attrName, objv[1], &errInfo)) {
+	if (!Ral_TupleUpdateAttrValue(result, attrName, objv[1], &errInfo)) {
 	    Ral_InterpSetError(interp, &errInfo) ;
+            Ral_TupleDelete(result) ;
 	    return TCL_ERROR ;
 	}
     }
 
-    Tcl_InvalidateStringRep(tupleObj) ;
-    Tcl_SetObjResult(interp, tupleObj) ;
+    Tcl_SetObjResult(interp, Ral_TupleObjNew(result)) ;
     return TCL_OK ;
 }
 

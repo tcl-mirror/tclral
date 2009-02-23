@@ -51,8 +51,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.47.2.11 $
-# $Date: 2009/02/22 21:13:30 $
+# $Revision: 1.47.2.12 $
+# $Date: 2009/02/23 02:35:37 $
 #  *--
 
 package require tcltest 2.2
@@ -620,7 +620,7 @@ namespace eval ::ral::test {
         set t [tuple create {Name string Age int Size double}\
             {Name Andrew Age 20 Size 3.0}]
     } -body {
-        tuple update t Age 40
+        tuple update $t Age 40
     } -result {{Name string Age int Size double}\
             {Name Andrew Age 40 Size 3.0}} -match tuple
 
@@ -628,7 +628,7 @@ namespace eval ::ral::test {
         set t [tuple create {Name string Age int Size double}\
             {Name Andrew Age 20 Size 3.0}]
     } -body {
-        tuple update t Age 40 Size 33.0
+        tuple update $t Age 40 Size 33.0
     } -result {{Name string Age int Size double}\
             {Name Andrew Age 40 Size 33.0}} -match tuple
 
@@ -636,14 +636,14 @@ namespace eval ::ral::test {
         set t [tuple create {Name string Age int Size double}\
             {Name Andrew Age 20 Size 3.0}]
     } -body {
-        tuple update t foo 40
+        tuple update $t foo 40
     } -result {unknown attribute name, "foo"} -returnCodes error
 
     test tuple-update-4.0 {bad type} -setup {
         set t [tuple create {Name string Age int Size double}\
             {Name Andrew Age 20 Size 3.0}]
     } -body {
-        tuple update t Age foo
+        tuple update $t Age foo
     } -result {bad value type for value, "foo"} -returnCodes error
 
     # tuple wrap subcommand
@@ -1483,7 +1483,7 @@ namespace eval ::ral::test {
         set nameList [list]
         relation foreach sup $S {
             set t [relation tuple $sup]
-            tuple update t CITY Sunnyvale
+            tuple update $t CITY Sunnyvale
         }
         set S
     } -result {
@@ -4267,6 +4267,15 @@ in expression "_@_< 20"} -returnCodes error
         relvar create N {A1 string B1 int} \{
     } -result {unmatched open brace in list}\
     -returnCodes error
+
+    test relvar-create-2.6 {
+        duplicate relvar name
+    } -cleanup {
+        relvar unset N
+    } -body {
+        relvar create N {Name string} Name
+        relvar create N {Addr string} Addr
+    } -result {duplicate relvar name, "::ral::test::N"} -returnCodes error
 
     # relvar names subcommand
     test relvar-names-1.0 {simple list of names} -setup {

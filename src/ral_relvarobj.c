@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.41.2.6 $
-$Date: 2009/02/15 23:34:59 $
+$Revision: 1.41.2.7 $
+$Date: 2009/02/23 02:35:37 $
  *--
  */
 
@@ -179,15 +179,16 @@ Ral_RelvarObjNew(
      */
     resolvedName = relvarResolveName(interp, name, &resolve) ;
     relvar = Ral_RelvarNew(info, resolvedName, heading, idCnt) ;
-    Tcl_DStringFree(&resolve) ;
     if (relvar == NULL) {
 	/*
 	 * Duplicate name.
 	 */
         Ral_ErrorInfoSetError(errInfo, RAL_ERR_DUP_NAME, resolvedName) ;
         Ral_InterpSetError(interp, errInfo) ;
+        Tcl_DStringFree(&resolve) ;
 	return TCL_ERROR ;
     }
+    Tcl_DStringFree(&resolve) ;
     /*
      * Deal with the identifiers. At this point the relvar structure
      * has the space allocated for identifier information, but we need
@@ -608,7 +609,7 @@ Ral_RelvarObjUpdateTuple(
     Ral_Relvar relvar,
     Ral_RelationIter tupleIter,
     Tcl_Obj *scriptObj,
-    Tcl_Obj *tupleVarNameObj,
+    Tcl_Obj *tupleObj,
     Ral_Relation updated,
     Ral_ErrorInfo *errInfo)
 {
@@ -617,6 +618,7 @@ Ral_RelvarObjUpdateTuple(
     Tcl_Obj *newTupleObj ;
     Tcl_Obj *oldTupleObj ;
     Tcl_Obj *resultTupleObj ;
+    Ral_Tuple resultTuple ;
 
     assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
     relation = relvar->relObj->internalRep.otherValuePtr ;
@@ -638,21 +640,16 @@ Ral_RelvarObjUpdateTuple(
 #endif
 	Tcl_AddObjErrorInfo(interp, msg, -1) ;
 	return TCL_ERROR ;
-    } else if (result != TCL_OK) {
+    } else if (!(result == TCL_OK || result == TCL_RETURN
+            || result == TCL_CONTINUE)) {
 	return result ;
     }
     /*
-     * Fetch the value of the tuple variable. It could be different now that
-     * the script has been executed. Once we get the new tuple value, we can
-     * use it to update the relvar.
+     * Fetch the return value of the script.  Once we get the new tuple value,
+     * we can use it to update the relvar.
      */
-    newTupleObj = Tcl_ObjGetVar2(interp, tupleVarNameObj, NULL,
-	TCL_LEAVE_ERR_MSG) ;
-    if (newTupleObj == NULL) {
-	return TCL_ERROR ;
-    }
+    newTupleObj = Tcl_GetObjResult(interp) ;
     if (Tcl_ConvertToType(interp, newTupleObj, &Ral_TupleObjType) != TCL_OK) {
-	Tcl_DecrRefCount(newTupleObj) ;
 	return TCL_ERROR ;
     }
     assert(newTupleObj->typePtr == &Ral_TupleObjType) ;
@@ -671,6 +668,18 @@ Ral_RelvarObjUpdateTuple(
     Tcl_DecrRefCount(oldTupleObj) ;
     Tcl_DecrRefCount(newTupleObj) ;
     if (resultTupleObj == NULL) {
+	return TCL_ERROR ;
+    }
+    if (Tcl_ConvertToType(interp, resultTupleObj, &Ral_TupleObjType)
+            != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    resultTuple = resultTupleObj->internalRep.otherValuePtr ;
+    if (!Ral_TupleHeadingEqual(relation->heading, resultTuple->heading)) {
+        Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_HEADING_NOT_EQUAL,
+                resultTupleObj) ;
+        Ral_InterpSetError(interp, errInfo) ;
+        Tcl_DecrRefCount(resultTupleObj) ;
 	return TCL_ERROR ;
     }
     /*
@@ -697,13 +706,11 @@ Ral_RelvarObjUpdateTuple(
         status = Ral_RelvarIdIndexTuple(relvar, *tupleIter,
                 tupleIter - Ral_RelationBegin(relation), NULL) ;
         if (status == 0) {
-            Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_DUPLICATE_TUPLE,
-                resultTupleObj) ;
+            Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_IDENTITY_CONSTRAINT,
+                    resultTupleObj) ;
             Ral_InterpSetError(interp, errInfo) ;
             result = TCL_ERROR ;
         }
-    } else {
-        Ral_InterpSetError(interp, errInfo) ;
     }
     Tcl_DecrRefCount(resultTupleObj) ;
 

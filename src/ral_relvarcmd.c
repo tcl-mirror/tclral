@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.32.2.7 $
-$Date: 2009/02/17 02:28:11 $
+$Revision: 1.32.2.8 $
+$Date: 2009/02/23 02:35:37 $
  *--
  */
 
@@ -1549,12 +1549,10 @@ RelvarUpdateCmd(
 	int boolValue ;
 
 	/*
-	 * Clone the tuple into a Tcl object and store it into the
-	 * given variable. Note that we duplicate the tuple here
-	 * so to avoid the possiblity that it might be modified
-	 * in place by the expression evaluation.
+	 * Place the tuple into a Tcl object and store it into the
+	 * given variable.
 	 */
-	tupleObj = Ral_TupleObjNew(Ral_TupleDup(*rIter)) ;
+	tupleObj = Ral_TupleObjNew(*rIter) ;
         Tcl_IncrRefCount(tupleObj) ;
 	if (Tcl_ObjSetVar2(interp, tupleVarNameObj, NULL, tupleObj,
 	    TCL_LEAVE_ERR_MSG) == NULL) {
@@ -1576,15 +1574,13 @@ RelvarUpdateCmd(
              * Evaluate the script, run the traces and update the relation.
              */
             result = Ral_RelvarObjUpdateTuple(interp, relvar, rIter, scriptObj,
-                    tupleVarNameObj, updatedTuples, &errInfo) ;
-
+                    tupleObj, updatedTuples, &errInfo) ;
             if (result != TCL_OK) {
-                if (result == TCL_CONTINUE) {
+                Tcl_DecrRefCount(tupleObj) ;
+                if (result == TCL_BREAK) {
                     result = TCL_OK ;
-                } else {
-                    Tcl_DecrRefCount(tupleObj) ;
-                    break ;
                 }
+                break ;
             }
         }
         Tcl_DecrRefCount(tupleObj) ;
@@ -1604,7 +1600,7 @@ RelvarUpdateCmd(
 
     if (result == TCL_ERROR) {
 	Ral_RelationDelete(updatedTuples) ;
-    } else if (result != TCL_RETURN) {
+    } else {
 	Tcl_SetObjResult(interp, Ral_RelationObjNew(updatedTuples)) ;
     }
 
@@ -1673,10 +1669,11 @@ RelvarUpdateOneCmd(
 	Tcl_Obj *tupleObj ;
 
 	/*
-	 * Clone the tuple into a Tcl object and store it into the
+	 * Make the tuple into a Tcl object and store it into the
 	 * given variable.
 	 */
-	tupleObj = Ral_TupleObjNew(Ral_TupleDup(*found)) ;
+	tupleObj = Ral_TupleObjNew(*found) ;
+        Tcl_IncrRefCount(tupleObj) ;
 	if (Tcl_ObjSetVar2(interp, tupleVarNameObj, NULL, tupleObj,
 	    TCL_LEAVE_ERR_MSG) == NULL) {
             result = TCL_ERROR ;
@@ -1686,7 +1683,7 @@ RelvarUpdateOneCmd(
              * Evaluate the script, run the traces and update the relation.
              */
             result = Ral_RelvarObjUpdateTuple(interp, relvar, found,
-                objv[5], tupleVarNameObj, updatedTuples, &errInfo) ;
+                objv[5], tupleObj, updatedTuples, &errInfo) ;
             if (result != TCL_ERROR) {
                 Tcl_InvalidateStringRep(relvar->relObj) ;
             }
@@ -1695,6 +1692,7 @@ RelvarUpdateOneCmd(
 	 * Delete the variable.
 	 */
 	Tcl_UnsetVar(interp, Tcl_GetString(tupleVarNameObj), 0) ;
+        Tcl_DecrRefCount(tupleObj) ;
     }
 
     result = Ral_RelvarObjEndCmd(interp, rInfo, result == TCL_ERROR) == TCL_OK ?

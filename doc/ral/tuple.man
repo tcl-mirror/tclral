@@ -46,8 +46,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: tuple.man,v $
-# $Revision: 1.16.2.4 $
-# $Date: 2009/02/22 01:46:37 $
+# $Revision: 1.16.2.5 $
+# $Date: 2009/02/23 02:35:37 $
 #  *--
 }]
 [moddesc "Tuple Operators"]
@@ -486,26 +486,23 @@ duplicate attribute name, "while unwrapping tuple"
 }]
 
 
-[call [cmd "::ral::tuple update"] [arg tupleVarName]\
-    [opt "attr1 value1 attr2 value2 ..."]]
+[call [cmd "::ral::tuple update"] [arg tupleValue]\
+    [arg [opt "attr1 value1 attr2 value2 ..."]]]
 
-The [cmd update] subcommand modifies the attribute values of a tuple in place.
-The [arg tupleVarName] argument is the name of a variable that contains a
-tuple value.
-The remaining arguments are treated as 
-pairs giving the attribute name and the
-new value to which that attribute is to be set.
-The command modifies the attributes in place
-and returns the updated tuple.
+The [cmd update] subcommand returns a new tuple that has the same
+heading as [arg tupleValue] and that is modified by
+replacing the attribute values given by the [arg attrN] arguments
+with their corresponding values as given by the [arg valueN] arguments.
+modifies the attribute values of a tuple in place.
 It is an error to attempt to update an attribute that does exist,
 [emph i.e.] the structure of the tuple may not be changed by this command.
 
 [example {
 % set t {{Name string Age int} {Name {Fred Jones} Age 27}}
 {Name string Age int} {Name {Fred Jones} Age 27}
-% tuple update t Name {Jane Jones}
+% tuple update $t Name {Jane Jones}
 {Name string Age int} {Name {Jane Jones} Age 27}
-% tuple update t Status 20
+% tuple update $t Status 20
 unknown attribute name, "Status"
 }]
 

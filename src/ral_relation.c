@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.36.2.9 $
-$Date: 2009/02/22 21:13:30 $
+$Revision: 1.36.2.10 $
+$Date: 2009/02/23 02:35:37 $
  *--
  */
 
@@ -92,6 +92,7 @@ FORWARD FUNCTION REFERENCES
 static int Ral_HeadingMatch(Ral_TupleHeading, Ral_TupleHeading,
         Ral_ErrorInfo *) ;
 static int Ral_RelationIndexTuple(Ral_Relation, Ral_Tuple, Ral_RelationIter) ;
+static int Ral_RelationUnindexTuple(Ral_Relation, Ral_Tuple) ;
 static int Ral_RelationUpdateTupleIndex(Ral_Relation, Ral_Tuple,
         Ral_RelationIter) ;
 static void Ral_RelationIndexByAttrs(Tcl_HashTable *, Ral_Relation,
@@ -354,8 +355,8 @@ Ral_RelationUpdate(
     Ral_IntVector orderMap)
 {
     int result = 0 ;
-    Ral_Tuple newTuple ;
-    Ral_RelationIter found ;
+    Ral_Tuple oldTuple ;
+    int status ;
 
     if (pos >= relation->finish) {
 	Tcl_Panic("Ral_RelationUpdate: attempt to update non-existant tuple") ;
@@ -363,38 +364,39 @@ Ral_RelationUpdate(
 
     assert(*pos != NULL) ;
     assert(pos < Ral_RelationEnd(relation)) ;
-
+    /*
+     * Overwrite the old tuple but hold on to a reference just in case we need
+     * to put it back.
+     */
+    oldTuple = *pos ;
+    Ral_RelationUnindexTuple(relation, *pos) ;
     /*
      * If reordering is required, we create a new tuple with the correct
      * attribute ordering to match the relation.
-     * Again, careful management of the tuple reference counts.
      */
-    Ral_TupleReference(tuple) ;
-    newTuple = orderMap ?
-	Ral_TupleDupOrdered(tuple, relation->heading, orderMap) : tuple ;
-    Ral_TupleReference(newTuple) ;
+    *pos = orderMap ?
+            Ral_TupleDupOrdered(tuple, relation->heading, orderMap) : tuple ;
     /*
-     * Hash the new tuple to determine if it is unique.
+     * Compute a new index for the updated tuple. It is possible that
+     * inserting this new tuple will cause a duplicate. In this case we
+     * have to back things out.
      */
-    found = Ral_RelationFind(relation, newTuple, NULL) ;
-    if (found == Ral_RelationEnd(relation)) {
-        int status ;
-	/*
-         * If the new tuple is unique, then discard the old one and install the
-         * new one into the same place. Note that we increment the reference
-         * count of the new tuple before decrementing the reference count of
-         * the old one, just in case that they are the same tuple (i.e. we are
-         * updating the same physical location).
-	 */
-        status = Ral_RelationIndexTuple(relation, newTuple, pos) ;
-        assert(status != 0) ;
-	Ral_TupleReference(newTuple) ;
-	Ral_TupleUnreference(*pos) ;
-	*pos = newTuple ;
+    status = Ral_RelationIndexTuple(relation, *pos, pos) ;
+    if (status != 0) {
+        Ral_TupleReference(*pos) ;
+        Ral_TupleUnreference(oldTuple) ;
         result = 1 ;
+    }  else {
+        /*
+         * Dispose of any copy made for reordering purposes.
+         */
+        if (*pos != tuple) {
+            Ral_TupleDelete(*pos) ;
+        }
+        *pos = oldTuple ;
+        status = Ral_RelationIndexTuple(relation, *pos, pos) ;
+        assert(status != 0) ;
     }
-    Ral_TupleUnreference(newTuple) ;
-    Ral_TupleUnreference(tuple) ;
 
     return result ;
 }
@@ -2437,6 +2439,23 @@ Ral_RelationIndexTuple(
 	Tcl_SetHashValue(entry, where - Ral_RelationBegin(relation)) ;
     }
     return newPtr ;
+}
+
+static int
+Ral_RelationUnindexTuple(
+    Ral_Relation relation,
+    Ral_Tuple tuple)
+{
+    Tcl_HashEntry *entry ;
+
+    entry = Tcl_FindHashEntry(&relation->index, (char const *)tuple) ;
+    /*
+     * Check that an entry was actually created and if so, set its value.
+     */
+    if (entry) {
+	Tcl_DeleteHashEntry(entry) ;
+    }
+    return entry != NULL ;
 }
 
 /*

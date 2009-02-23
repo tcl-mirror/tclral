@@ -48,8 +48,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: update.test,v $
-# $Revision: 1.4.2.1 $
-# $Date: 2009/02/15 23:34:59 $
+# $Revision: 1.4.2.2 $
+# $Date: 2009/02/23 02:35:37 $
 #  *--
 
 package require tcltest 2.2
@@ -96,7 +96,7 @@ namespace eval ::ral::test {
 	relvar unset X
     } -body {
 	relation cardinality\
-            [relvar update X t {0} {tuple update t Status -1}]
+            [relvar update X t {0} {tuple update $t Status -1}]
     } -result {0}
 
     test relvar-update-2.0 {
@@ -111,7 +111,7 @@ namespace eval ::ral::test {
 	relvar unset X
     } -body {
 	relation cardinality\
-            [relvar update X t {1} {tuple update t Status -1}]
+            [relvar update X t {1} {tuple update $t Status -1}]
     } -result {3}
 
     test relvar-update-2.1 {
@@ -126,7 +126,7 @@ namespace eval ::ral::test {
 	relvar unset X
     } -body {
 	relvar update X t {1} {
-	    tuple update t Status -1
+	    tuple update $t Status -1
 	}
 	relvar set X
     } -result {
@@ -151,7 +151,7 @@ namespace eval ::ral::test {
     } -body {
 	relation cardinality\
             [relvar update X t {[tuple extract $t Name] eq "George"} {
-		tuple update t Status -1}]
+		tuple update $t Status -1}]
     } -result {1}
 
     test relvar-update-3.1 {
@@ -166,7 +166,7 @@ namespace eval ::ral::test {
 	relvar unset X
     } -body {
 	relvar update X t {[tuple extract $t Name] eq "George"} {
-	    tuple update t Status -1
+	    tuple update $t Status -1
 	}
 	relvar set X
     } -result {
@@ -189,9 +189,9 @@ namespace eval ::ral::test {
 	relvar unset X
     } -body {
 	relvar update X t {[tuple extract $t Name] eq "George"} {
-	    tuple update t Name Fred
+	    tuple update $t Name Fred
 	}
-    } -result {duplicate tuple, "{Name string Status int} {Name Fred Status 20}"}\
+    } -result {tuple has duplicate values for an identifier, "{Name string Status int} {Name Fred Status 20}"}\
     -returnCodes error
 
     test relvar-update-5.0 {
@@ -210,20 +210,23 @@ namespace eval ::ral::test {
     -returnCodes error
 
     test relvar-update-6.0 {
-	break status propagated to outer loop
+	break stops script implied loop
     } -setup {
 	cloneRelvar S SX
     } -cleanup {
 	relvar unset SX
     } -body {
-	while {1} {
+        for {set i 0} {$i < 10} {incr i} {
 	    relvar update SX sup {[tuple extract $sup S#] eq "S1"} {
 		set status [tuple extract $sup STATUS]
-		incr status 10
-		if {$status >= 50} break
-		# Since the break is before the tuple is updated
-		# the last status value will be < 50
-		tuple update sup STATUS $status
+		if {$status >= 40} {
+                    break
+                } else {
+                    incr status 10
+                    # Since the break is before the tuple is updated
+                    # the last status value will be < 50
+                    tuple update $sup STATUS $status
+                }
 	    }
 	}
 	relvar set SX
@@ -246,7 +249,7 @@ namespace eval ::ral::test {
 	    relvar update S sup {[tuple extract $sup STATUS] == 30} {
 		set status [tuple extract $sup STATUS]
 		incr status 1
-		tuple update sup STATUS $status
+		tuple update $sup STATUS $status
 		set a 50 50
 	    }
 	}
@@ -272,34 +275,72 @@ namespace eval ::ral::test {
 	relvar update SX sup {[tuple extract $sup STATUS] > 10} {
 	    set status [tuple extract $sup STATUS]
 	    incr status 1
-	    tuple update sup STATUS $status
+	    set new [tuple update $sup STATUS $status]
 	    incr cnt
-	    if {$cnt > 1} break
+	    if {$cnt > 1} {
+                break
+            } else {
+                return $new
+            }
 	}
     } -result {
         {S# string SNAME string STATUS int CITY string} {
             {S# S1 SNAME Smith STATUS 21 CITY London}
         }
-    } -match relation -returnCodes break
+    } -match relation
 
     test relvar-update-8.1 {
 	return in script
     } -setup {
 	cloneRelvar S SX
-	proc tp {} {
-	    relvar update SX sup {[tuple extract $sup STATUS] > 20} {
-		return $sup
-	    }
-	}
     } -cleanup {
 	relvar unset SX
-        rename tp {}
     } -body {
-	tp
+        relvar update SX sup {[tuple extract $sup STATUS] > 20} {
+            return $sup
+        }
     } -result {
-	{S# string SNAME string STATUS int CITY string}
-	{S# S3 SNAME Blake STATUS 30 CITY Paris}
-    } -match tuple
+	{S# string SNAME string STATUS int CITY string} {
+            {S# S3 SNAME Blake STATUS 30 CITY Paris}
+            {S# S5 SNAME Adams STATUS 30 CITY Athens}
+        }
+    } -match relation
+
+    test relvar-update-8.2 {
+	script return bad tuple
+    } -setup {
+	cloneRelvar S SX
+    } -cleanup {
+	relvar unset SX
+    } -body {
+        relvar update SX sup {[tuple extract $sup STATUS] > 20} {
+            return [tuple eliminate $sup CITY]
+        }
+    } -result {headings not equal, "{S# string SNAME string STATUS int} {S# S3 SNAME Blake STATUS 30}"} -returnCodes error
+
+    test relvar-update-8.3 {
+	script returns duplicate tuple
+    } -setup {
+	cloneRelvar S SX
+    } -cleanup {
+	relvar unset SX
+    } -body {
+        relvar update SX sup {[tuple extract $sup SNAME] eq "Blake"} {
+            return [tuple update $sup S# S5 SNAME Adams CITY Athens]
+        }
+    } -result {duplicate tuple, "{S# string SNAME string STATUS int CITY string} {S# S5 SNAME Adams STATUS 30 CITY Athens}"} -returnCodes error
+
+    test relvar-update-8.4 {
+	script returns tuple that violates identity constraint
+    } -setup {
+	cloneRelvar S SX
+    } -cleanup {
+	relvar unset SX
+    } -body {
+        relvar update SX sup {[tuple extract $sup SNAME] eq "Blake"} {
+            return [tuple update $sup S# S5]
+        }
+    } -result {tuple has duplicate values for an identifier, "{S# string SNAME string STATUS int CITY string} {S# S5 SNAME Blake STATUS 30 CITY Paris}"} -returnCodes error
 
     test relvar-update-9.0 {
 	recursively updating the same relvar
@@ -308,11 +349,11 @@ namespace eval ::ral::test {
     } -body {
 	relvar update S sup {[tuple extract $sup S#] eq "S1"} {
 	    relvar updateone S s2 {S# S1} {
-		tuple update s2 CITY "New York"
+		tuple update $s2 CITY "New York"
 	    }
 	    set status [tuple extract $sup STATUS]
 	    incr status 1
-	    tuple update sup STATUS $status
+	    tuple update $sup STATUS $status
 	}
     } -result {recursively invoking a relvar command outside of a transaction, "S"} -returnCodes error
 
@@ -328,7 +369,7 @@ namespace eval ::ral::test {
     } -body {
 	relation cardinality\
             [relvar updateone X xTup {Name Jane}\
-                {tuple update xTup Status 10}]
+                {tuple update $xTup Status 10}]
     } -result {0}
 
     test relvar-updateone-2.0 {match} -setup {
@@ -342,7 +383,7 @@ namespace eval ::ral::test {
     } -body {
 	relation cardinality\
             [relvar updateone X xTup {Name Fred} {
-		tuple update xTup Status 10
+		tuple update $xTup Status 10
 	    }]
     } -result {1}
 
@@ -356,7 +397,7 @@ namespace eval ::ral::test {
 	relvar unset X
     } -body {
 	relvar updateone X xTup {Name Fred} {
-	    tuple update xTup Status 10
+	    tuple update $xTup Status 10
 	}
     } -result {
 	{Name string Status int} {
@@ -374,7 +415,7 @@ namespace eval ::ral::test {
 	relvar unset X
     } -body {
 	relvar updateone X xTup {Status 20} {
-	    tuple update xTup Status 10
+	    tuple update $xTup Status 10
 	}
     } -result {attributes do not constitute an identifier, "during identifier construction operation"}\
     -returnCodes error
@@ -389,9 +430,9 @@ namespace eval ::ral::test {
 	relvar unset X
     } -body {
 	relvar updateone X xTup {Name George} {
-	    tuple update xTup Name Fred
+	    tuple update $xTup Name Fred
 	}
-    } -result {duplicate tuple, "{Name string Status int} {Name Fred Status 20}"}\
+    } -result {tuple has duplicate values for an identifier, "{Name string Status int} {Name Fred Status 20}"}\
     -returnCodes error
 
     test relvar-updateone-5.0 {

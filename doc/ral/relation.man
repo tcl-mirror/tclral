@@ -46,8 +46,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.28.2.5 $
-# $Date: 2009/02/22 19:11:08 $
+# $Revision: 1.28.2.6 $
+# $Date: 2009/02/23 02:35:37 $
 #  *--
 }]
 [moddesc "Relation Operators"]
@@ -1033,8 +1033,7 @@ For example, to find all dogs that have no owner:
     [arg relationVarName] [arg attr] [arg type] [arg expression]\
     [opt "[arg attr] [arg type] [arg expression] ..."]]
 
-The [cmd summarize] subcommand allows for computations across sets of
-attributes.
+The [cmd summarize] subcommand allows for computations across sets of tuples.
 The [arg perRelation] must be of the same type as a projection of
 [arg relationValue].
 The returned relation has the same heading as [arg perRelation] extended
@@ -1054,15 +1053,15 @@ all the tuples in [arg relationValue] whose attributes match the
 corresponding attributes in [arg perRelation].
 The [arg expression] expression may then access the value of that relation
 using the given [arg relationVarName] variable name.
-The [arg expression] is expected to return a result of the
-same type as the new attribute.
+The [arg expression] must return a result that matches the
+type of the new attribute.
 
 In this example we determine the years when dogs were acquired and the
 number of dogs acquired in each year.
 
 [example {
 % set ac [relation project $OWNERSHIP Acquired]
-Relation {Acquired string} Acquired {{Acquired 2001} {Acquired 2000} {Acquired 2002} {Acquired 2003}}
+{Acquired string} {{Acquired 2001} {Acquired 2000} {Acquired 2002} {Acquired 2003}}
 % relformat [relation summarize $OWNERSHIP $ac s NumAcquired int {[relation cardinality $s]}]
 +--------+-----------+
 |Acquired|NumAcquired|
@@ -1100,6 +1099,32 @@ proc ravg {rel attr} {
 +----------+
 |36        |
 +----------+
+}]
+
+[call [cmd "::ral::relation summarizeby"] [arg relationValue] [arg attrList]\
+    [arg relationVarName] [arg attr] [arg type] [arg expression]\
+    [opt "[arg attr] [arg type] [arg expression] ..."]]
+
+The [cmd summarizeby] subcommand is a more convenient form of
+[cmd summarize] where the [emph per] relation is a projection of the
+relation value that is to be summarized.
+Rather than supplying a [emph per] relation, instead a list of attributes
+is given by the [arg attrList] argument and [arg relationValue] is
+projected on those attributes and used as the [arg per] relation.
+The arguments and results are otherwise the same as for the [cmd summarize]
+command.
+[example {
+% relformat [relation summarizeby $OWNERSHIP Acquired s\ 
+    NumAcquired int {[relation cardinality $s]}]
++--------+-----------+
+|Acquired|NumAcquired|
+|string  |int        |
++--------+-----------+
+|2001    |3          |
+|2000    |2          |
+|2002    |1          |
+|2003    |1          |
++--------+-----------+
 }]
 
 [call [cmd "::ral::relation table"] [arg heading]\

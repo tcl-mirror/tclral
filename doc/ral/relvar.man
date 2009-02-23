@@ -48,8 +48,8 @@
 #   This command is part of TclRAL. This file is in Tcl Markup Language
 #   format.
 # $RCSfile: relvar.man,v $
-# $Revision: 1.26.2.2 $
-# $Date: 2009/02/17 02:28:11 $
+# $Revision: 1.26.2.3 $
+# $Date: 2009/02/23 02:35:37 $
 #  *--
 }]
 [moddesc "Relvar Operators"]
@@ -899,23 +899,20 @@ Each tuple in [arg relvarName] is successively assigned to the tuple
 variable given by [arg tupleVarName] and [arg expression] is evaluated.
 If the result of the evaluation is true,
 then [arg script] is evaluated.
-The value of [arg tupleVarName] at the end of executing
-[arg script] is then updated into [arg relvarName].
-Typically, [arg script] will invoke [cmd "::ral::tuple update"]
-to modify the value of [arg tupleVarName].
+The return value of [arg script] is then used to update the corresponding
+tuple in [arg relvarName].
 The return value of the subcommand
 is a relation value with the same heading as the
 value held in [arg relvarName] and whose body contains the tuples as they
-were actually updated.
+were actually updated into the relvar.
 This gives the caller access to any attributes that might have been modified
 by a relvar trace.
 If the [arg script] throws an error or the modified value of a tuple cannot
 be updated into [arg relvarName], all changes to [arg relvarName] are
 discarded and the value of [arg relvarName] is restored to its previous value.
-Should [arg script] execute a [cmd break] or [cmd return] command,
-then [arg relvarName] is updated (if possible) and the return code
-is propagated to any surrounding command.
-
+Should [arg script] execute a [cmd break] or otherwise arrange to
+return a break result code,
+then tuple is updated, but no further tuples in the relvar are considered.
 
 [example {
 % puts [relformat $::OWNER]
@@ -930,7 +927,7 @@ is propagated to any surrounding command.
 |Jim      |42 |San Francisco|
 +---------+---+-------------+
 % relvar update OWNER o {[tuple extract $o OwnerName] eq "Sue"} {
->       tuple update o Age [expr {[tuple extract $o Age] + 1}]
+>       tuple update $o Age [expr {[tuple extract $o Age] + 1}]
 >     }
 1
 % puts [relformat $::OWNER]
@@ -945,7 +942,7 @@ is propagated to any surrounding command.
 |Jim      |42 |San Francisco|
 +---------+---+-------------+
 % relvar update OWNER o {[tuple extract $o OwnerName] eq "George"} {
->       tuple update o OwnerName Alfonse
+>       tuple update $o OwnerName Alfonse
 >     }
 for association ::A1(::OWNERSHIP [+] ==> [1] ::OWNER), in relvar ::OWNER
 tuple {OwnerName Alfonse Age 35 City Sunnyvale} is not referenced by any tuple
@@ -978,10 +975,8 @@ identifiers of [arg relvarName].
 If [arg relvarName] contains a tuple whose attribute values match those
 in [arg name-value-list] then
 that tuple is assigned to [arg tupleVarName] and [arg script] is executed.
-After executing [arg script] the value contained in [arg tupleVarName]
+The tuple value returned by [arg script]
 replaces the original tuple, modifying [arg relvarName] in place.
-Typically, [arg script] will invoke [cmd "::ral::tuple update"]
-to modify the value of [arg tupleVarName].
 If no matching tuple is found, then [arg relvarName] is unchanged.
 This subcommand is useful in those contexts where the attribute values of an
 identifier are known and evaluating an expression over all the tuples
@@ -1005,7 +1000,7 @@ by a relvar trace.
 |Jim      |42 |San Francisco|
 +---------+---+-------------+
 % relvar updateone OWNER o {OwnerName George} {
-> tuple update o Age 37 City {New York}
+> tuple update $o Age 37 City {New York}
 > }
 1
 % puts [relformat $::OWNER]

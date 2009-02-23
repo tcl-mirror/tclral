@@ -48,8 +48,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: trace.test,v $
-# $Revision: 1.10.2.2 $
-# $Date: 2009/02/15 23:34:59 $
+# $Revision: 1.10.2.3 $
+# $Date: 2009/02/23 02:35:37 $
 #  *--
 
 package require tcltest 2.2
@@ -83,18 +83,16 @@ namespace eval ::ral::test {
     }
 
     proc constAttr {attr op relvarName tup} {
-	tuple update tup $attr 1
-	return $tup
+	return [tuple update $tup $attr 1]
     }
 
     proc incrAttr {attrName op relvarName tup} {
-	tuple update tup $attrName [expr {[tuple extract $tup $attrName] + 1}]
-	return $tup
+	return [tuple update $tup $attrName\
+                [expr {[tuple extract $tup $attrName] + 1}]]
     }
 
     proc modTuple {attrName attrValue op relvarName tup} {
-	::ral::tuple update tup $attrName $attrValue
-	return $tup
+	return [tuple update $tup $attrName $attrValue]
     }
 
     set S [relation create\
@@ -259,7 +257,7 @@ namespace eval ::ral::test {
 	if {$oldS ne $newS} {
 	    relvar eval {
 		relvar updateone SMap sm [list S# $oldS] {
-		    tuple update sm S# $newS
+		    tuple update $sm S# $newS
 		}
 	    }
 	}
@@ -349,7 +347,7 @@ namespace eval ::ral::test {
 	relvar trace remove variable S update [namespace code updateMap]
     } -body {
 	relvar updateone S supp {S# S3} {
-	    tuple update supp S# S6
+	    tuple update $supp S# S6
 	}
 	relvar set SMap
     } -result {

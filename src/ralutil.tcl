@@ -49,8 +49,8 @@
 # without cluttering the TclRAL package proper.
 # 
 # $RCSfile: ralutil.tcl,v $
-# $Revision: 1.15.2.3 $
-# $Date: 2009/02/17 02:28:11 $
+# $Revision: 1.15.2.4 $
+# $Date: 2009/02/23 02:35:37 $
 #  *--
 
 package provide ralutil 0.9.0
@@ -145,7 +145,7 @@ proc ::ralutil::sysIdsCreateIdFor {attrName op relvarName tup} {
 	    relvar updateone __ral_systemids__ sysid\
 		[list RelvarName $relvarName IdAttr $attrName] {
 		set idValue [tuple extract $sysid IdNum]
-		tuple update sysid IdNum [incr idValue]
+		tuple update $sysid IdNum [incr idValue]
 	    }]
 	if {[relation isempty $updated]} {
 	    # If we don't update then we need to 
@@ -157,7 +157,7 @@ proc ::ralutil::sysIdsCreateIdFor {attrName op relvarName tup} {
 		IdAttr $attrName IdNum [incr idValue]]
 	}
     }
-    return [tuple update tup $attrName $idValue]
+    return [tuple update $tup $attrName $idValue]
 }
 
 # A helper procedure in finding the value for a system identifiers
