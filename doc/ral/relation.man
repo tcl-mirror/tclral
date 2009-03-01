@@ -46,8 +46,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.28.2.6 $
-# $Date: 2009/02/23 02:35:37 $
+# $Revision: 1.28.2.7 $
+# $Date: 2009/03/01 02:05:57 $
 #  *--
 }]
 [moddesc "Relation Operators"]
@@ -1390,6 +1390,21 @@ the [arg attribute] plus all the attributes contained in the
 tuple valued attribute, [arg attribute].
 In essense the tuple valued attribute, [arg attribute], is flattened
 by one level.
+
+[call [cmd "::ral::relation update"] [arg relationValue] [arg tupleVarName]\
+    [arg expr] [arg script]]
+The [cmd update] subcommand returns a new relation value that has the
+same heading as [arg relationValue] and whose tuple have been modified.
+Each tuple in [arg relationValue] is assigned to the Tcl variable
+given by [arg tupleVarName] and [arg expr] is evaluated.
+If [arg expr] is true then [arg script] is evaluated.
+The return value of [arg script] is added to the result relation and it
+must be a tuple that has the same heading as [arg relationValue].
+If [arg expr] is false then the unmodified tuple from [arg relationValue]
+is added to the result.
+This command serves the same role for relation values as the
+[cmd "relvar update"] command does for relvars.
+
 
 [call [cmd "::ral::relation wrap"] [arg relationValue] [arg tupleattr]\
     [opt [arg "attr1 attr2 ..."]]]

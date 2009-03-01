@@ -51,8 +51,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.47.2.12 $
-# $Date: 2009/02/23 02:35:37 $
+# $Revision: 1.47.2.13 $
+# $Date: 2009/03/01 02:05:58 $
 #  *--
 
 package require tcltest 2.2
@@ -3244,8 +3244,6 @@ in expression "_@_< 20"} -returnCodes error
         relation semijoin $A $B -using {A_ID}
     } -result {bad list of pairs, "A_ID"} -returnCodes error
 
-    # HERE -- add tests
-
     # relation semiminus subcommand
     test relation-semiminus-1.0 {one common attribute} -body {
         relation semiminus $SP $S
@@ -3286,7 +3284,6 @@ in expression "_@_< 20"} -returnCodes error
                 {Age 10 Name Fred Town {New York}}
             }
     } -match relation
-    # HERE -- add tests
 
     # relation summarize subcommand
     test relation-summarize-1.0 {count} -constraints {
@@ -4065,6 +4062,135 @@ in expression "_@_< 20"} -returnCodes error
             {Name Andrew Age 30 City Sunnyvale}
             {Name George Age 20 City {San Jose}}
         }
+    } -match relation
+
+    # relation update subcommand
+    test relation-update-1.0 {
+	expression is false
+    } -setup {
+        set x [relation create {Name string Status int}\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}]
+    } -cleanup {
+    } -body {
+	relation update $x xt {0} {tuple update $xt Status -1}
+    } -result {
+        {Name string Status int} {
+	    {Name George Status 20}
+	    {Name Fred Status 30}
+	    {Status 40 Name Alice}
+        }
+    } -match relation
+
+    test relation-update-2.0 {
+	expression is true
+    } -setup {
+        set x [relation create {Name string Status int}\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}]
+    } -cleanup {
+    } -body {
+	relation update $x xt {1} {tuple update $xt Status -1}
+    } -result {
+        {Name string Status int} {
+	    {Name George Status -1}
+	    {Name Fred Status -1}
+	    {Status -1 Name Alice}
+        }
+    } -match relation
+
+    test relvar-update-3.0 {
+	subset is updated
+    } -setup {
+        set x [relation create {Name string Status int}\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}]
+    } -cleanup {
+    } -body {
+	relation update $x xt {[tuple extract $xt Name] eq "George"} {
+	    tuple update $xt Status -1
+	}
+    } -result {
+	{Name string Status int} {
+	    {Name George Status -1}
+	    {Name Fred Status 30}
+	    {Status 40 Name Alice}
+	}
+    } -match relation
+
+    test relvar-update-3.1 {
+	subset is updated, original is deleted
+    } -setup {
+        set x [relation create {Name string Status int}\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}]
+    } -cleanup {
+    } -body {
+	set y [relation update $x xt {[tuple extract $xt Name] eq "George"} {
+	    tuple update $xt Status -1
+	}]
+        unset x
+        set y
+    } -result {
+	{Name string Status int} {
+	    {Name George Status -1}
+	    {Name Fred Status 30}
+	    {Status 40 Name Alice}
+	}
+    } -match relation
+
+    test relvar-update-4.0 {
+	wrong tuple from script
+    } -setup {
+        set x [relation create {Name string Status int}\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}]
+    } -cleanup {
+    } -body {
+	relation update $x xt {[tuple extract $xt Name] eq "George"} {
+	    tuple eliminate $xt Status
+	}
+    } -result {headings not equal, "{Name string} {Name George}"} -returnCodes error
+
+    test relvar-update-4.1 {
+	script throws error
+    } -setup {
+        set x [relation create {Name string Status int}\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}]
+    } -cleanup {
+    } -body {
+	relation update $x xt {[tuple extract $xt Name] eq "George"} {
+            set a 4 3
+	}
+    } -result {wrong # args: should be "set varName ?newValue?"} -returnCodes error
+
+    test relvar-update-4.2 {
+	script throws error
+    } -setup {
+        set x [relation create {Name string Status int}\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}]
+    } -cleanup {
+    } -body {
+	relation update $x xt {[tuple extract $xt Name] eq "George"} {
+            set a $xt
+            unset xt
+	    tuple update $a Status -1
+	}
+    } -result {
+	{Name string Status int} {
+	    {Name George Status -1}
+	    {Name Fred Status 30}
+	    {Status 40 Name Alice}
+	}
     } -match relation
 
     # relation unwrap subcommand
