@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_utils.c,v $
-$Revision: 1.19.2.7 $
-$Date: 2009/02/22 21:13:30 $
+$Revision: 1.19.2.8 $
+$Date: 2009/03/22 00:27:46 $
  *--
  */
 
@@ -163,6 +163,7 @@ static char const * const optStrings[] = {
     "unwrap",
     "update",
     "updateone",
+    "updateper",
     "wrap",
 } ;
 

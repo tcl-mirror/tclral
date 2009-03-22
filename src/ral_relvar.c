@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.c,v $
-$Revision: 1.19.2.6 $
-$Date: 2009/02/15 23:34:59 $
+$Revision: 1.19.2.7 $
+$Date: 2009/03/22 00:27:46 $
  *--
  */
 
@@ -262,7 +262,7 @@ Ral_RelvarDeleteInfo(
     }
     Tcl_DeleteHashTable(&info->constraints) ;
     /*
-     * Clean up the eval trace list.
+     * Clean up the transaction trace list.
      */
     for (trace = info->traces ; trace ; ) {
 	Ral_TraceInfo temp = trace->next ; /* make sure not to access the trace

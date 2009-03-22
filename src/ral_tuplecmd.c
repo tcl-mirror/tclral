@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuplecmd.c,v $
-$Revision: 1.20.2.6 $
-$Date: 2009/02/23 02:35:37 $
+$Revision: 1.20.2.7 $
+$Date: 2009/03/22 00:27:46 $
  *--
  */
 
@@ -915,12 +915,9 @@ TupleUpdateCmd(
     }
     /*
      * Clone the tuple so that we can overlay it with the updated
-     * attribute values. Note that we don't use "Ral_TupleDup()" because
-     * there is no need to duplicate the heading.
+     * attribute values.
      */
-    result = Ral_TupleNew(tuple->heading) ;
-    Ral_TupleCopyValues(Ral_TupleBegin(tuple), Ral_TupleEnd(tuple),
-            Ral_TupleBegin(result)) ;
+    result = Ral_TupleDupShallow(tuple) ;
     /*
      * Go through the attribute / value pairs updating the attribute values.
      */

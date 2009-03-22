@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleheading.h,v $
-$Revision: 1.11.2.2 $
-$Date: 2009/01/12 00:45:36 $
+$Revision: 1.11.2.3 $
+$Date: 2009/03/22 00:27:46 $
  *--
  */
 #ifndef _ral_tupleheading_h_
@@ -140,8 +140,8 @@ extern Ral_Attribute Ral_TupleHeadingFetch(Ral_TupleHeading, int) ;
 extern Ral_TupleHeadingIter Ral_TupleHeadingPushBack(Ral_TupleHeading,
     Ral_Attribute) ;
 extern Ral_TupleHeadingIter Ral_TupleHeadingFind(Ral_TupleHeading,
-    const char *) ;
-extern int Ral_TupleHeadingIndexOf(Ral_TupleHeading, const char *) ;
+    char const *) ;
+extern int Ral_TupleHeadingIndexOf(Ral_TupleHeading, char const *) ;
 
 extern Ral_TupleHeading Ral_TupleHeadingUnion(Ral_TupleHeading,
     Ral_TupleHeading) ;

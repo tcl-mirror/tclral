@@ -48,8 +48,8 @@
 #   This command is part of TclRAL. This file is in Tcl Markup Language
 #   format.
 # $RCSfile: relvar.man,v $
-# $Revision: 1.26.2.3 $
-# $Date: 2009/02/23 02:35:37 $
+# $Revision: 1.26.2.4 $
+# $Date: 2009/03/22 00:27:46 $
 #  *--
 }]
 [moddesc "Relvar Operators"]
@@ -124,7 +124,7 @@ identification constraints and referential constraints.
 Identification constraints define a set of attributes that must have
 unique values.
 Each relvar must specify at least one identifier.
-An identifier is one or attributes whose values taken together must
+An identifier is one or more attributes whose values taken together must
 be unique for all tuples stored in the relvar.
 Identifiers must also be minimal in the sense that no two identifiers
 for a given relvar are allowed to be a subset of one another.
@@ -171,8 +171,8 @@ It is similar in some ways to two Association Constraints.
 
 [list_end]
 
-At the end of each [cmd ::ral::eval] command (see below) or,
-if outside of an [cmd eval] command,
+At the end of each [cmd ::ral::eval] command or after a [cmd ::ral::transaction
+end] command(see below) or, if outside of an [cmd eval] command,
 at the end of any command that modifies a relvar
 that participates in a referential constraint,
 all of the referential constraints defined for the modified relvars
@@ -631,7 +631,10 @@ and relvar traces may extend the given [arg name-value-list] argument.
 
 [example {
 % relvar insert DOG {DogName Skippy Breed Dalmation}
-Relation {DogName string Breed string} DogName {{DogName Fido Breed Poodle} {DogName Sam Breed Collie} {DogName Spot Breed Terrier} {DogName Rover Breed Retriever} {DogName Fred Breed Spaniel} {DogName Jumper Breed Mutt} {DogName Skippy Breed Dalmation}}
+{DogName string Breed string} {{DogName Fido Breed Poodle} \\ 
+{DogName Sam Breed Collie} {DogName Spot Breed Terrier} \\ 
+{DogName Rover Breed Retriever} {DogName Fred Breed Spaniel} \\ 
+{DogName Jumper Breed Mutt} {DogName Skippy Breed Dalmation}}
 % relvar insert OWNER {OwnerName Tom Age 22 City Tulsa}
 for association ::A1(::OWNERSHIP [+] ==> [1] ::OWNER), in relvar ::OWNER
 tuple {OwnerName Tom Age 22 City Tulsa} is not referenced by any tuple
@@ -710,26 +713,14 @@ completely partitioned into the disjoint sub sets given by the the
 [arg subN] relvars.
 
 [example {
-% relvar create Lamp {
->       Relation
->       {SerialNo string ModelNo string Make string}
->       SerialNo
->     }
-Relation {SerialNo string ModelNo string Make string} SerialNo {}
-% relvar create TableLamp {
->       Relation
->       {SerialNo string Shade string}
->       SerialNo
->     }
-Relation {SerialNo string Shade string} SerialNo {}
-% relvar create FloorLamp {
->       Relation
->       {SerialNo string Height int Sockets int}
->       SerialNo
->     }
-Relation {SerialNo string Height int Sockets int} SerialNo {}
+% relvar create Lamp {SerialNo string ModelNo string Make string} SerialNo
+{SerialNo string ModelNo string Make string} {}
+% relvar create TableLamp {SerialNo string Shade string} SerialNo
+{SerialNo string Shade string} {}
+% relvar create FloorLamp {SerialNo string Height int Sockets int} SerialNo
+{SerialNo string Height int Sockets int} {}
 % relvar partition P1 Lamp SerialNo TableLamp SerialNo FloorLamp SerialNo
-% relvar insert Lamp {SerialNo NF100 ModelNo FCN-22  Make Falcon}
+% relvar insert Lamp {SerialNo NF100 ModelNo FCN-22 Make Falcon}
 for partition ::P1(::Lamp is partitioned [::TableLamp | ::FloorLamp]), in relvar ::Lamp
 tuple {SerialNo NF100 ModelNo FCN-22 Make Falcon} is not referred to by any tuple
 
@@ -901,7 +892,7 @@ If the result of the evaluation is true,
 then [arg script] is evaluated.
 The return value of [arg script] is then used to update the corresponding
 tuple in [arg relvarName].
-The return value of the subcommand
+The return value of the [cmd "relvar update"] subcommand
 is a relation value with the same heading as the
 value held in [arg relvarName] and whose body contains the tuples as they
 were actually updated into the relvar.
@@ -912,7 +903,7 @@ be updated into [arg relvarName], all changes to [arg relvarName] are
 discarded and the value of [arg relvarName] is restored to its previous value.
 Should [arg script] execute a [cmd break] or otherwise arrange to
 return a break result code,
-then tuple is updated, but no further tuples in the relvar are considered.
+then the tuple is updated, but no further tuples in the relvar are considered.
 
 [example {
 % puts [relformat $::OWNER]
@@ -929,7 +920,6 @@ then tuple is updated, but no further tuples in the relvar are considered.
 % relvar update OWNER o {[tuple extract $o OwnerName] eq "Sue"} {
 >       tuple update $o Age [expr {[tuple extract $o Age] + 1}]
 >     }
-1
 % puts [relformat $::OWNER]
 +---------+---+-------------+
 |OwnerName|Age|City         |
@@ -984,7 +974,7 @@ in [arg relvarName] is superfluous.
 The return value is a relation value with the same heading as the
 value held in [arg relvarName] and whose body contains either the single
 tuple that was updated or is empty if no matching tuple was found.
-This give the caller access to any attributes that might have been modified
+This gives the caller access to any attributes that might have been modified
 by a relvar trace.
 
 [example {
@@ -1002,7 +992,6 @@ by a relvar trace.
 % relvar updateone OWNER o {OwnerName George} {
 > tuple update $o Age 37 City {New York}
 > }
-1
 % puts [relformat $::OWNER]
 +---------+---+-------------+
 |OwnerName|Age|City         |
@@ -1013,6 +1002,42 @@ by a relvar trace.
 |Alice    |30 |San Jose     |
 |Mike     |50 |San Jose     |
 |Jim      |42 |San Francisco|
++---------+---+-------------+
+}]
+
+[call [cmd "::ral::relvar updateper"] [arg relvarName] [arg relationValue]]
+The [cmd updateper] subcommand modifies the relation value held in
+[arg relvarName] according to the tuples found in [arg relationValue].
+The heading of [arg relationValue] must be a subset (possibly improper)
+of the heading of the value held in [arg relvarName].
+The heading of [arg relationValue] must also contain all of the attributes
+of at least one of the identifiers of [arg relvarName].
+The action of [cmd updateper] is to update the non-identifying attributes of
+all the tuples in [arg relvarName] whose identifying attributes are equal to
+the corresponding attributes in [arg relationValue].
+The return value of the command is a relation value with the same heading as
+the value held in [arg relvarName] and whose body contains tuples that were
+updated.
+This gives the caller access to any attributes that might have been modified
+by a relvar trace.
+This command is most useful when a subset of tuple from a relvar
+are modified by a series of relational expressions and the results of those
+modification need to be updated back into the original relvar.
+
+[example {
+% relvar updateper OWNER [relation table {OwnerName string Age int} {
+        George 37} {
+        Jim 44}]
+% puts [relformat $::OWNER]
++---------+---+-------------+
+|OwnerName|Age|City         |
+|string   |int|string       |
++---------+---+-------------+
+|Sue      |25 |Cupertino    |
+|George   |37 |Sunnyvale    |
+|Alice    |30 |San Jose     |
+|Mike     |50 |San Jose     |
+|Jim      |44 |San Francisco|
 +---------+---+-------------+
 }]
 
@@ -1028,7 +1053,7 @@ There are five operations that may be traced on the relation values
 held in relvars and one operation that allows tracing of transactions
 on relvars.
 For these operations, if a command prefix has been registered using
-[cmd "relvar trace add variable"] or [cmd "relvar trace add eval"]
+[cmd "relvar trace add variable"] or [cmd "relvar trace add transaction"]
 then that command prefix will have
 additional arguments appended and will be invoked as described below.
 Relvar traces operate in a very similar fashion as traces on ordinary
@@ -1175,27 +1200,28 @@ If [cmd cmdPrefix] throws an error, then no other update traces in the chain of
 update traces for the relvar are invoked and [arg tupleValue] is not updated
 into the relvar value.
 
-[def eval]
-An eval trace is invoked each time that a [cmd "relvar eval"] begins and
+[def transaction]
+A transaction trace is invoked each time that a [cmd "relvar eval"] begins and
 ends or when [cmd "relvar transaction"] commands are invoked.
 Eval traces are different from other relvar traces in that they provide a
 means of determining the boundaries of a transaction rather than specific
 operations on a relvar.
-The eval trace command is invoked as:
+The transaction trace command is invoked as:
 [para]
-[cmd cmdPrefix] [cmd eval] [arg op] [arg level]
+[cmd cmdPrefix] [cmd transaction] [arg op] [arg level]
 [para]
 where [cmd cmdPrefix] is the command prefix of the trace as given
-in [cmd "relvar trace add eval"], 
-the string [cmd eval] indicates that the relvar transaction is in progress,
-the [arg op] is either the string "begin" or "end" indicating whether
-or not the [cmd "relvar eval"] is just starting or is ending and
+in [cmd "relvar trace add transaction"], 
+the string [cmd transaction] indicates that the relvar transaction is in
+progress, the [arg op] is either the string "begin" or "end" indicating whether
+or not the [cmd "relvar transaction"] is just starting or is ending and
 [arg level] is an integer greater than zero indicating the nesting depth
 of the transaction.
-The eval trace is invoked with the "begin" op before the script associated
-with a [cmd "relvar eval"] is executed and is invoked with the "end" op
-after the script is executed but before the relvar constraints are evaluated
-for the transaction.
+The transaction trace is invoked with the "begin" op before the script
+associated with a [cmd "relvar eval"] or [cmd "relvar transaction"]
+is executed and
+is invoked with the "end" op after the script is executed but before the relvar
+constraints are evaluated for the transaction.
 Any errors thown by [cmd cmdPrefix] are ignored.
 
 [list_end]

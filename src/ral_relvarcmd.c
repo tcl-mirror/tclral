@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.32.2.8 $
-$Date: 2009/02/23 02:35:37 $
+$Revision: 1.32.2.9 $
+$Date: 2009/03/22 00:27:46 $
  *--
  */
 
@@ -82,37 +82,39 @@ EXTERNAL FUNCTION REFERENCES
 FORWARD FUNCTION REFERENCES
 */
 static int RelvarAssociationCmd(Tcl_Interp *, int, Tcl_Obj *const*,
-    Ral_RelvarInfo) ;
+        Ral_RelvarInfo) ;
 static int RelvarConstraintCmd(Tcl_Interp *, int, Tcl_Obj *const*,
-    Ral_RelvarInfo) ;
+        Ral_RelvarInfo) ;
 static int RelvarCorrelationCmd(Tcl_Interp *, int, Tcl_Obj *const*,
-    Ral_RelvarInfo) ;
+        Ral_RelvarInfo) ;
 static int RelvarCreateCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarDeleteCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarDeleteOneCmd(Tcl_Interp *, int, Tcl_Obj *const*,
-    Ral_RelvarInfo) ;
+        Ral_RelvarInfo) ;
 static int RelvarEvalCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarExistsCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarIdentifiersCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarInsertCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarIntersectCmd(Tcl_Interp *, int, Tcl_Obj *const*,
-    Ral_RelvarInfo) ;
+        Ral_RelvarInfo) ;
 static int RelvarMinusCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarNamesCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarPartitionCmd(Tcl_Interp *, int, Tcl_Obj *const*,
-    Ral_RelvarInfo) ;
+        Ral_RelvarInfo) ;
 static int RelvarPathCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarRestrictOneCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarSetCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarTraceCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarTransactionCmd(Tcl_Interp *, int, Tcl_Obj *const*,
-    Ral_RelvarInfo) ;
+        Ral_RelvarInfo) ;
 static int RelvarUnionCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarUnsetCmd(Tcl_Interp *, int, Tcl_Obj *const*,
-    Ral_RelvarInfo) ;
+        Ral_RelvarInfo) ;
 static int RelvarUpdateCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarUpdateOneCmd(Tcl_Interp *, int, Tcl_Obj *const*,
-    Ral_RelvarInfo) ;
+        Ral_RelvarInfo) ;
+static int RelvarUpdatePerCmd(Tcl_Interp *, int, Tcl_Obj *const*,
+        Ral_RelvarInfo) ;
 
 /*
 EXTERNAL DATA REFERENCES
@@ -164,6 +166,7 @@ relvarCmd(
 	{"unset", RelvarUnsetCmd},
 	{"update", RelvarUpdateCmd},
 	{"updateone", RelvarUpdateOneCmd},
+	{"updateper", RelvarUpdatePerCmd},
 	{NULL, NULL},
     } ;
     int index ;
@@ -1169,9 +1172,9 @@ RelvarSetCmd(
  * relvar trace remove variable relvarName ops cmdPrefix
  * relvar trace info variable relvarname
  *
- * relvar trace add eval cmdPrefix
- * relvar trace remove eval cmdPrefix
- * relvar trace info eval
+ * relvar trace add transaction cmdPrefix
+ * relvar trace remove transaction cmdPrefix
+ * relvar trace info transaction
  */
 static int
 RelvarTraceCmd(
@@ -1197,7 +1200,7 @@ RelvarTraceCmd(
     } ;
     static char const *traceTypes[] = {
 	"variable",
-	"eval",
+	"transaction",
 	NULL
     } ;
     int option ;
@@ -1272,32 +1275,33 @@ RelvarTraceCmd(
 	}
     }
     /*
-     * Deal with eval tracing.
+     * Deal with transaction tracing.
      */
     else if ((enum TraceType)type == TraceEval) {
 	switch ((enum TraceOption)option) {
 	case TraceAdd:
-	    /* relvar trace add eval cmdPrefix */
+	    /* relvar trace add transaction cmdPrefix */
 	    if (objc != 5) {
-		Tcl_WrongNumArgs(interp, 2, objv, "add eval cmdPrefix") ;
+		Tcl_WrongNumArgs(interp, 2, objv, "add transaction cmdPrefix") ;
 		return TCL_ERROR ;
 	    }
 	    result = Ral_RelvarObjTraceEvalAdd(interp, rInfo, objv[4]) ;
 	    break ;
 
 	case TraceRemove:
-	    /* relvar trace remove eval cmdPrefix */
+	    /* relvar trace remove transaction cmdPrefix */
 	    if (objc != 5) {
-		Tcl_WrongNumArgs(interp, 2, objv, "remove eval cmdPrefix") ;
+		Tcl_WrongNumArgs(interp, 2, objv,
+                        "remove transaction cmdPrefix") ;
 		return TCL_ERROR ;
 	    }
 	    result = Ral_RelvarObjTraceEvalRemove(interp, rInfo, objv[4]) ;
 	    break ;
 
 	case TraceInfo:
-	    /* relvar trace info eval*/
+	    /* relvar trace info transaction*/
 	    if (objc != 4) {
-		Tcl_WrongNumArgs(interp, 2, objv, "info eval") ;
+		Tcl_WrongNumArgs(interp, 2, objv, "info transaction") ;
 		return TCL_ERROR ;
 	    }
 	    result = Ral_RelvarObjTraceEvalInfo(interp, rInfo) ;
@@ -1702,5 +1706,322 @@ RelvarUpdateOneCmd(
     } else if (result != TCL_RETURN) {
 	Tcl_SetObjResult(interp, Ral_RelationObjNew(updatedTuples)) ;
     }
+    return result ;
+}
+
+/*
+ * relvar updateper relvarName relationValue
+ * 1. "relationValue" is a projection of "relvarName"
+ * 2. At least one identifier of "relvarName" must be present in "relationValue"
+ * 3. For each tuple in "relationValue", find the tuple
+ *    in "relvarName" that matches the identifying attributes and update
+ *    the non-identifying attributes to match the those in "relationValue"
+ *
+ * This is one big whacking function for this command. It could be factored
+ * into sub-functions, but they would all be called only once and so
+ * there is really no common code to factor. There is a little common
+ * code at the end shared with other update commands but this command is
+ * quite unique in the way the logic turned out.
+ */
+static int
+RelvarUpdatePerCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv,
+    Ral_RelvarInfo rInfo)
+{
+    Ral_Relvar relvar ;
+    Ral_Relation relation ;
+    Tcl_Obj *relValueObj ;
+    Ral_Relation perRelation ;
+    Ral_TupleHeadingIter hIter ;
+    Ral_PtrVector idSet ;
+    Ral_IntVector idNums ;
+    int idCount ;
+    struct relvarId *idIter ;
+    Ral_IntVector idAttrSet ;
+    Ral_PtrVectorIter sIter ;
+    Ral_IntVector nonIdAttrSet ;
+    Ral_Relation updatedTuples ;
+    Ral_RelationIter perIter ;
+    int result = TCL_OK ;
+    Ral_ErrorInfo errInfo ;
+
+    /* relvar updateper relvarName relationValue */
+    if (objc != 4) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relvarName relationValue") ;
+	return TCL_ERROR ;
+    }
+
+    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2])) ;
+    if (relvar == NULL) {
+	return TCL_ERROR ;
+    }
+    if (Tcl_ConvertToType(interp, relvar->relObj, &Ral_RelationObjType)
+		!= TCL_OK ||
+	    Ral_RelvarObjCopyOnShared(interp, rInfo, relvar) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relvar->relObj->internalRep.otherValuePtr ;
+
+    relValueObj = objv[3] ;
+    if (Tcl_ConvertToType(interp, relValueObj, &Ral_RelationObjType)
+        != TCL_OK) {
+        return TCL_ERROR ;
+    }
+    perRelation = relValueObj->internalRep.otherValuePtr ;
+    /*
+     * First we insist the all the attibutes of the "perRelation" also
+     * be attributes of the relvar relation.
+     */
+    for (hIter = Ral_TupleHeadingBegin(perRelation->heading) ;
+            hIter != Ral_TupleHeadingEnd(perRelation->heading) ; ++hIter) {
+        Ral_Attribute pattr = *hIter ;
+        Ral_TupleHeadingIter riter ;
+
+        riter = Ral_TupleHeadingFind(relation->heading, pattr->name) ;
+        if (riter == Ral_TupleHeadingEnd(relation->heading)) {
+            Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptUpdateper,
+                    RAL_ERR_UNKNOWN_ATTR, pattr->name) ;
+            return TCL_ERROR ;
+        }
+        if (!Ral_AttributeEqual(pattr, *riter)) {
+            Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptUpdateper,
+                    RAL_ERR_TYPE_MISMATCH, pattr->name) ;
+            return TCL_ERROR ;
+        }
+    }
+    /*
+     * Iterate through the identifiers for the relvar and determine
+     * if the "per" relation contains attributes that correspond to
+     * one or more identifiers. Create a vector of int vectors that
+     * contain the corresponding attribute indices.
+     */
+    idSet = Ral_PtrVectorNew(relvar->idCount) ;
+    idNums = Ral_IntVectorNewEmpty(relvar->idCount) ;
+    idCount = 0 ;
+    /*
+     * Iterate through the identifiers.
+     */
+    for (idIter = relvar->identifiers ;
+            idIter != relvar->identifiers + relvar->idCount ;
+            ++idIter, ++idCount) {
+        Ral_IntVector idVect ;
+        Ral_IntVectorIter idxIter ;
+        int refIndex ;
+        int refCount = 0 ;
+        /*
+         * Create a new vector that will be used to store the indices
+         * of the attributes from "perRelation".
+         */
+        idVect = Ral_IntVectorNewEmpty(Ral_IntVectorSize(idIter->idAttrs)) ;
+        /*
+         * Iterate throught indices for a given identifier.
+         */
+        for (idxIter = Ral_IntVectorBegin(idIter->idAttrs) ;
+                idxIter != Ral_IntVectorEnd(idIter->idAttrs) ; ++idxIter) {
+            Ral_Attribute attr ;
+
+            attr = Ral_TupleHeadingFetch(relation->heading, *idxIter) ;
+            refIndex = Ral_TupleHeadingIndexOf(perRelation->heading,
+                    attr->name) ;
+            if (refIndex == -1 || !Ral_AttributeEqual(attr,
+                    Ral_TupleHeadingFetch(perRelation->heading, refIndex))) {
+                /*
+                 * We insist that any attributes in "perRelation" that are part
+                 * of an identifier must be a complete identifier.
+                 */
+                Ral_IntVectorDelete(idVect) ;
+                if (refCount > 0) {
+                    Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar,
+                            Ral_OptUpdateper, RAL_ERR_NOT_AN_IDENTIFIER,
+                            objv[3]) ;
+                    result = TCL_ERROR ;
+                    goto cleanup ;
+                } else {
+                    /*
+                     * In case we got here because the name matched but
+                     * the data type didn't.
+                     */
+                    refIndex = -1 ;
+                    break ;
+                }
+            }
+            Ral_IntVectorPushBack(idVect, refIndex) ;
+            ++refCount ;
+        }
+        if (refIndex >= 0) {
+            Ral_PtrVectorPushBack(idSet, idVect) ;
+            Ral_IntVectorPushBack(idNums, idCount) ;
+        }
+    }
+    /*
+     * We insist that the attibutes for at least one identifier show
+     * up in the "perRelation".
+     */
+    if (Ral_PtrVectorSize(idSet) == 0) {
+        Ral_PtrVectorDelete(idSet) ;
+        Ral_IntVectorDelete(idNums) ;
+        Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptUpdateper,
+                RAL_ERR_NOT_AN_IDENTIFIER, objv[3]) ;
+        return TCL_ERROR ;
+    }
+    /*
+     * Now we need to find all the non-identifing attributes. We do that
+     * by tallying all the identifying ones and then take the complement
+     * of that set.
+     */
+    idAttrSet = Ral_IntVectorNewEmpty(
+            Ral_TupleHeadingSize(perRelation->heading));
+    for (sIter = Ral_PtrVectorBegin(idSet) ; sIter != Ral_PtrVectorEnd(idSet) ;
+            ++sIter) {
+        Ral_IntVector idVect = *sIter ;
+        Ral_IntVectorIter idxIter ;
+
+        for (idxIter = Ral_IntVectorBegin(idVect) ;
+                idxIter != Ral_IntVectorEnd(idVect) ; ++idxIter) {
+            Ral_IntVectorSetAdd(idAttrSet, *idxIter) ;
+        }
+    }
+    /*
+     * Now we can compute those attributes that are not part of
+     * an identifier. These are the attributes that will be updated.
+     */
+    nonIdAttrSet = Ral_IntVectorSetComplement(idAttrSet,
+            Ral_TupleHeadingSize(perRelation->heading)) ;
+    Ral_IntVectorDelete(idAttrSet) ;
+
+    if (!Ral_RelvarStartCommand(rInfo, relvar)) {
+        Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptUpdateper,
+            RAL_ERR_ONGOING_CMD, objv[2]) ;
+        return TCL_ERROR ;
+    }
+    updatedTuples = Ral_RelationNew(relation->heading) ;
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelvar, Ral_OptUpdateper) ;
+    /*
+     * Iterate through the tuples of the "perRelation" and for each tuple find
+     * the corresponding tuple in the relvar. Update the non-identifying
+     * attributes. Run the traces and add the resulting tuple to the result
+     * value that is to be returned.
+     */
+    for (perIter = Ral_RelationBegin(perRelation) ;
+            perIter != Ral_RelationEnd(perRelation) ; ++perIter) {
+        Ral_Tuple perTuple ;
+        Ral_PtrVectorIter idSetIter ;
+        Ral_IntVectorIter numIter ;
+        int tupleOffset ;
+        int prevTupleOffset = -1 ;
+        int idCount = 0 ;
+
+        /*
+         * Iterate across the identifiers and make sure that we find a tuple
+         * that matches all the attributes that were contained in the
+         * perRelation heading.  We want to find that tuple in "relvar" that
+         * matches the values of the corresponding identifying attributes in
+         * "perTuple".  Make sure that all matches are to the same tuple.
+         */
+        perTuple = *perIter ;
+        for (idSetIter = Ral_PtrVectorBegin(idSet),
+                numIter = Ral_IntVectorBegin(idNums) ;
+                idSetIter != Ral_PtrVectorEnd(idSet) ;
+                ++idSetIter, ++numIter) {
+            /*
+             * Hash into the hash table for the identifier using the
+             * attribute vector and values from the "perTuple".
+             */
+            struct Ral_TupleAttrHashKey key ;
+            Tcl_HashEntry *entry ;
+
+            key.tuple = perTuple ;
+            key.attrs = *idSetIter ;
+            entry = Tcl_FindHashEntry(&relvar->identifiers[*numIter].idIndex,
+                    (char const *)&key) ;
+            if (entry) {
+                tupleOffset = (int)Tcl_GetHashValue(entry) ;
+                if (!(prevTupleOffset == -1 ||
+                        prevTupleOffset == tupleOffset)) {
+                    break ;
+                }
+                prevTupleOffset = tupleOffset ;
+                ++idCount ;
+            }
+        }
+        if (idCount == Ral_PtrVectorSize(idSet)) {
+            /*
+             * Found a match. Update the values of the non-identifying
+             * attributes.
+             */
+            Ral_RelationIter relIter ;
+            Ral_Tuple matchTuple ;
+            Ral_IntVectorIter nidIter ;
+
+            relIter = Ral_RelationBegin(relation) + tupleOffset ;
+            matchTuple = *relIter ;
+            /*
+             * Make a copy if this tuple is shared. Use "shallow" duplication
+             * since we want to share the tuple heading.
+             */
+            if (matchTuple->refCount > 1) {
+                matchTuple = Ral_TupleDupShallow(*relIter) ;
+            }
+            /*
+             * Iterate through the non-identifying attributes.  Update values
+             * from the perTuple into the matching tuple.
+             */
+            for (nidIter = Ral_IntVectorBegin(nonIdAttrSet) ;
+                    nidIter != Ral_IntVectorEnd(nonIdAttrSet) ; ++nidIter) {
+                Ral_TupleIter tIter ;
+                Ral_TupleHeadingIter thIter ;
+                Ral_TupleHeadingIter aIter ;
+                Tcl_Obj *newValue ;
+                Tcl_Obj *oldValue ;
+                int valueIndex ;
+
+                tIter = Ral_TupleBegin(perTuple) + *nidIter ;
+                thIter = Ral_TupleHeadingBegin(perTuple->heading) + *nidIter ;
+                aIter = Ral_TupleHeadingFind(matchTuple->heading,
+                        (*thIter)->name) ;
+                assert(aIter != Ral_TupleHeadingEnd(matchTuple->heading)) ;
+                newValue = Ral_AttributeConvertValueToType(interp, *aIter,
+                        *tIter, &errInfo) ;
+                assert(newValue != NULL) ;
+                valueIndex = aIter -
+                        Ral_TupleHeadingBegin(matchTuple->heading) ;
+                oldValue = matchTuple->values[valueIndex] ;
+                if (oldValue) {
+                    Tcl_DecrRefCount(oldValue) ;
+                }
+                matchTuple->values[valueIndex] = newValue ;
+                Tcl_IncrRefCount(newValue) ;
+            }
+            /*
+             * Now we have updated the "matchTuple" with new values
+             * from the matching "perRelation" tuple. Create an object,
+             * run the traces and perform the update.
+             */
+            result = Ral_RelvarObjTraceUpdate(interp, relvar, relIter,
+                    Ral_TupleObjNew(matchTuple), updatedTuples, &errInfo) ;
+            if (result != TCL_OK) {
+                break ;
+            }
+        }
+    }
+
+    result = Ral_RelvarObjEndCmd(interp, rInfo, result == TCL_ERROR) == TCL_OK ?
+            result : TCL_ERROR ;
+    if (result == TCL_ERROR) {
+	Ral_RelationDelete(updatedTuples) ;
+    } else {
+	Tcl_SetObjResult(interp, Ral_RelationObjNew(updatedTuples)) ;
+    }
+
+cleanup:
+    Ral_IntVectorDelete(nonIdAttrSet) ;
+    Ral_IntVectorDelete(idNums) ;
+    for (sIter = Ral_PtrVectorBegin(idSet) ; sIter != Ral_PtrVectorEnd(idSet) ;
+            ++sIter) {
+        Ral_IntVectorDelete(*sIter) ;
+    }
+    Ral_PtrVectorDelete(idSet) ;
     return result ;
 }

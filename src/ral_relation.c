@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.36.2.10 $
-$Date: 2009/02/23 02:35:37 $
+$Revision: 1.36.2.11 $
+$Date: 2009/03/22 00:27:46 $
  *--
  */
 
@@ -220,11 +220,7 @@ Ral_RelationDup(
 	Ral_Tuple dupTuple ;
 	int appended ;
 
-	dupTuple = Ral_TupleNew(dupRelation->heading) ;
-	Ral_TupleCopyValues(srcTuple->values,
-	    srcTuple->values + Ral_RelationDegree(srcRelation),
-	    dupTuple->values) ;
-
+	dupTuple = Ral_TupleDupShallow(srcTuple) ;
 	appended = Ral_RelationPushBack(dupRelation, dupTuple, NULL) ;
 	assert(appended != 0) ;
     }

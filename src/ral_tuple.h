@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuple.h,v $
-$Revision: 1.10.2.3 $
-$Date: 2009/01/19 01:45:46 $
+$Revision: 1.10.2.4 $
+$Date: 2009/03/22 00:27:46 $
  *--
  */
 #ifndef _ral_tuple_h_
@@ -149,6 +149,7 @@ extern int Ral_TupleCopy(Ral_Tuple, Ral_TupleHeadingIter,
     Ral_TupleHeadingIter, Ral_Tuple) ;
 extern int Ral_TupleCopyValues(Ral_TupleIter, Ral_TupleIter, Ral_TupleIter) ;
 extern Ral_Tuple Ral_TupleDup(Ral_Tuple) ;
+extern Ral_Tuple Ral_TupleDupShallow(Ral_Tuple) ;
 extern Ral_Tuple Ral_TupleDupOrdered(Ral_Tuple, Ral_TupleHeading,
     Ral_IntVector) ;
 extern int Ral_TupleScan(Ral_Tuple, Ral_AttributeTypeScanFlags *,

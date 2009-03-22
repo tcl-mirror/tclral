@@ -48,8 +48,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: trace.test,v $
-# $Revision: 1.10.2.3 $
-# $Date: 2009/02/23 02:35:37 $
+# $Revision: 1.10.2.4 $
+# $Date: 2009/03/22 00:27:46 $
 #  *--
 
 package require tcltest 2.2
@@ -401,15 +401,15 @@ namespace eval ::ral::test {
 	lappend evalInfo [list $op $begin $level]
     }
 
-    test relvar-trace-6.1 {eval tracing} -setup {
-	relvar trace add eval [namespace code evalTrace]
+    test relvar-trace-6.1 {transaction tracing} -setup {
+	relvar trace add transaction [namespace code evalTrace]
     } -cleanup {
-	relvar trace remove eval [namespace code evalTrace]
+	relvar trace remove transaction [namespace code evalTrace]
     } -body {
 	relvar eval {
 	}
 	set evalInfo
-    } -result {{eval begin 1} {eval end 1}}
+    } -result {{transaction begin 1} {transaction end 1}}
 
     cleanupTests
 }

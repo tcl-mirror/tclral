@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_utils.h,v $
-$Revision: 1.16.2.6 $
-$Date: 2009/02/22 21:13:30 $
+$Revision: 1.16.2.7 $
+$Date: 2009/03/22 00:27:46 $
  *--
  */
 #ifndef _ral_utils_h_
@@ -143,6 +143,7 @@ typedef enum {
     Ral_OptUnwrap,
     Ral_OptUpdate,
     Ral_OptUpdateone,
+    Ral_OptUpdateper,
     Ral_OptWrap,
 } Ral_CmdOption ;
 

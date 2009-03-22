@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.41.2.7 $
-$Date: 2009/02/23 02:35:37 $
+$Revision: 1.41.2.8 $
+$Date: 2009/03/22 00:27:46 $
  *--
  */
 
@@ -616,9 +616,6 @@ Ral_RelvarObjUpdateTuple(
     Ral_Relation relation ;
     int result ;
     Tcl_Obj *newTupleObj ;
-    Tcl_Obj *oldTupleObj ;
-    Tcl_Obj *resultTupleObj ;
-    Ral_Tuple resultTuple ;
 
     assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
     relation = relvar->relObj->internalRep.otherValuePtr ;
@@ -649,6 +646,27 @@ Ral_RelvarObjUpdateTuple(
      * we can use it to update the relvar.
      */
     newTupleObj = Tcl_GetObjResult(interp) ;
+    return Ral_RelvarObjTraceUpdate(interp, relvar, tupleIter, newTupleObj,
+            updated, errInfo) ;
+}
+
+int
+Ral_RelvarObjTraceUpdate(
+    Tcl_Interp *interp,
+    Ral_Relvar relvar,
+    Ral_RelationIter tupleIter,
+    Tcl_Obj *newTupleObj,
+    Ral_Relation updated,
+    Ral_ErrorInfo *errInfo)
+{
+    Ral_Relation relation ;
+    int result ;
+    Tcl_Obj *oldTupleObj ;
+    Tcl_Obj *resultTupleObj ;
+    Ral_Tuple resultTuple ;
+
+    assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
+    relation = relvar->relObj->internalRep.otherValuePtr ;
     if (Tcl_ConvertToType(interp, newTupleObj, &Ral_TupleObjType) != TCL_OK) {
 	return TCL_ERROR ;
     }
@@ -2109,7 +2127,7 @@ Ral_RelvarObjExecEvalTraces(
     int level)
 {
     if (rInfo->traces) {
-	Tcl_Obj *evalObj = Tcl_NewStringObj("eval", -1) ;
+	Tcl_Obj *evalObj = Tcl_NewStringObj("transaction", -1) ;
 	Tcl_Obj *beginObj = isBegin ?
 	    Tcl_NewStringObj("begin", -1) : Tcl_NewStringObj("end", -1) ;
 	Tcl_Obj *levelObj = Tcl_NewIntObj(level) ;
@@ -2120,7 +2138,7 @@ Ral_RelvarObjExecEvalTraces(
 	Tcl_IncrRefCount(beginObj) ;
 	Tcl_IncrRefCount(levelObj) ;
 	/*
-	 * Since we ignore any errors from eval traces, we preserve
+	 * Since we ignore any errors from transaction traces, we preserve
 	 * the current value of the interpreter result while executing
 	 * the trace commands.
 	 */

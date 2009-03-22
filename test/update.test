@@ -48,8 +48,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: update.test,v $
-# $Revision: 1.4.2.2 $
-# $Date: 2009/02/23 02:35:37 $
+# $Revision: 1.4.2.3 $
+# $Date: 2009/03/22 00:27:46 $
 #  *--
 
 package require tcltest 2.2
@@ -448,6 +448,209 @@ namespace eval ::ral::test {
     } -result {
 	{S# string SNAME string STATUS int CITY string} {}
     } -match relation -returnCodes break
+
+    test relvar-updateper-1.0 {
+        change a single tuple
+    } -setup {
+	relvar create X {Name string Status int} Name
+	relvar insert X {Name George Status 20}
+    } -cleanup {
+	relvar unset X
+    } -body {
+        relvar updateper X [relation create {Name string Status int}\
+            {Name George Status 30}]
+    } -result {
+        {Name string Status int} {
+            {Name George Status 30}
+        }
+    } -match relation
+
+    test relvar-updateper-1.1 {
+        make sure relvar changed
+    } -setup {
+	relvar create X {Name string Status int} Name
+	relvar insert X {Name George Status 20}
+    } -cleanup {
+	relvar unset X
+    } -body {
+        relvar updateper X [relation create {Name string Status int}\
+            {Name George Status 30}]
+        relvar set X
+    } -result {
+        {Name string Status int} {
+            {Name George Status 30}
+        }
+    } -match relation
+
+    test relvar-updateper-2.0 {
+        no update
+    } -setup {
+	relvar create X {Name string Status int} Name
+	relvar insert X {Name George Status 20}
+    } -cleanup {
+	relvar unset X
+    } -body {
+        relvar updateper X [relation create {Name string Status int}\
+            {Name Fred Status 30}]
+    } -result {
+        {Name string Status int} {
+        }
+    } -match relation
+
+    test relvar-updateper-3.0 {
+        change multiple tuples
+    } -setup {
+	relvar create X {Name string Status int} Name
+        relvar set X [relation table {Name string Status int} {
+            George 20} {
+            Fred 30} {
+            Alice 40
+        }]
+    } -cleanup {
+	relvar unset X
+    } -body {
+        relvar updateper X [relation table {Name string Status int} {
+            George 21} {
+            Alice 13}]
+    } -result {
+        {Name string Status int} {
+            {Name George Status 21}
+            {Name Alice Status 13}
+        }
+    } -match relation
+
+    test relvar-updateper-4.0 {
+        bad per relation
+    } -setup {
+	relvar create X {Name string Status int} Name
+	relvar insert X {Name George Status 20}
+    } -cleanup {
+	relvar unset X
+    } -body {
+        relvar updateper X [relation create {Name string Foo int}\
+            {Name George Foo 30}]
+    } -result {unknown attribute name, "Foo"} -returnCodes error
+
+    test relvar-updateper-4.2 {
+        bad per relation attribute type
+    } -setup {
+	relvar create X {Name string Status int} Name
+	relvar insert X {Name George Status 20}
+    } -cleanup {
+	relvar unset X
+    } -body {
+        relvar updateper X [relation create {Name string Status string}\
+            {Name George Status 30}]
+    } -result {attributes must have the same type, "Status"} -returnCodes error
+
+    test relvar-updateper-4.3 {
+        per relation doesn't have an identifier
+    } -setup {
+	relvar create X {Name string Status int} Name
+	relvar insert X {Name George Status 20}
+    } -cleanup {
+	relvar unset X
+    } -body {
+        relvar updateper X [relation create {Status int} {Status 30}]
+    } -result {attributes do not constitute an identifier, "{Status int} {{Status 30}}"}\
+    -returnCodes error
+
+    test relvar-updateper-4.3 {
+        per relation only has an identifier ==> no update takes place
+    } -setup {
+	relvar create X {Name string Status int} Name
+	relvar insert X {Name George Status 20}
+    } -cleanup {
+	relvar unset X
+    } -body {
+        relvar updateper X [relation create {Name string} {Name George}]
+    } -result {
+	{Name string Status int} {
+            {Name George Status 20}
+        }
+    } -match relation
+
+    test relvar-updateper-5.0 {
+        multiple identfiers, single tuple update
+    } -setup {
+	relvar create X {Name string Number int Status int} Name Number
+        relvar set X [relation table {Name string Number int Status int} {
+            George 1 20} {
+            Fred 2 30} {
+            Alice 3 40
+        }]
+    } -cleanup {
+	relvar unset X
+    } -body {
+        relvar updateper X [relation table {Name string Status int} {
+            Alice 13}]
+    } -result {
+        {Name string Number int Status int} {
+            {Name Alice Number 3 Status 13}
+        }
+    } -match relation
+
+    test relvar-updateper-5.1 {
+        multiple identfiers, single tuple update, match both identfiers
+    } -setup {
+	relvar create X {Name string Number int Status int} Name Number
+        relvar set X [relation table {Name string Number int Status int} {
+            George 1 20} {
+            Fred 2 30} {
+            Alice 3 40
+        }]
+    } -cleanup {
+	relvar unset X
+    } -body {
+        relvar updateper X [relation table {Name string Status int Number int} {
+            Alice 13 3}]
+    } -result {
+        {Name string Number int Status int} {
+            {Name Alice Number 3 Status 13}
+        }
+    } -match relation
+
+    test relvar-updateper-5.1 {
+        multiple identfiers, mismatch one identifier ==> no update
+    } -setup {
+	relvar create X {Name string Number int Status int} Name Number
+        relvar set X [relation table {Name string Number int Status int} {
+            George 1 20} {
+            Fred 2 30} {
+            Alice 3 40
+        }]
+    } -cleanup {
+	relvar unset X
+    } -body {
+        relvar updateper X [relation table {Name string Status int Number int} {
+            Alice 13 1}]
+    } -result {
+        {Name string Number int Status int} {}
+    } -match relation
+
+    test relvar-updateper-5.2 {
+        multiple identfiers update multiple attributes
+    } -setup {
+	relvar create X {Name string Number int Status int City string}\
+                Name Number
+        relvar set X [relation table {
+            Name string Number int  Status int  City string     } {
+            George      1           20          {Menlo Park}    } {
+            Fred        2           30          Sunnyvale       } {
+            Alice       3           40          {San Jose}      }]
+    } -cleanup {
+	relvar unset X
+    } -body {
+        relvar updateper X [relation table {
+            Name string     City string     Status int  } {
+            Alice           Sacramento      44          } {
+            Fred            Cupertino       33          }]
+    } -result {
+        {Name string Number int  Status int  City string} {
+            {Name Fred City Cupertino Number 2 Status 33}
+            {Name Alice City Sacramento Status 44 Number 3}
+        }
+    } -match relation
 
 
 

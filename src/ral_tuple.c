@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuple.c,v $
-$Revision: 1.13.2.6 $
-$Date: 2009/02/17 02:28:11 $
+$Revision: 1.13.2.7 $
+$Date: 2009/03/22 00:27:46 $
  *--
  */
 
@@ -474,6 +474,21 @@ Ral_TupleDup(
     }
 
     return dst ;
+}
+
+/*
+ * duplicate a tuple, but reuse the heading.
+ */
+Ral_Tuple
+Ral_TupleDupShallow(
+    Ral_Tuple src)
+{
+    Ral_Tuple newTuple ;
+
+    newTuple = Ral_TupleNew(src->heading) ;
+    Ral_TupleCopyValues(Ral_TupleBegin(src), Ral_TupleEnd(src),
+            Ral_TupleBegin(newTuple)) ;
+    return newTuple ;
 }
 
 /*
