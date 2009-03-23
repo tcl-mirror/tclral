@@ -48,8 +48,8 @@
 #   This command is part of TclRAL. This file is in Tcl Markup Language
 #   format.
 # $RCSfile: relvar.man,v $
-# $Revision: 1.26.2.4 $
-# $Date: 2009/03/22 00:27:46 $
+# $Revision: 1.26.2.5 $
+# $Date: 2009/03/23 01:38:17 $
 #  *--
 }]
 [moddesc "Relvar Operators"]
@@ -171,8 +171,9 @@ It is similar in some ways to two Association Constraints.
 
 [list_end]
 
-At the end of each [cmd ::ral::eval] command or after a [cmd ::ral::transaction
-end] command(see below) or, if outside of an [cmd eval] command,
+At the end of each [cmd ::ral::eval] command or after a
+[cmd "::ral::transaction end"] command(see below) or,
+if outside of an [cmd eval] command,
 at the end of any command that modifies a relvar
 that participates in a referential constraint,
 all of the referential constraints defined for the modified relvars

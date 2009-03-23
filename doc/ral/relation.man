@@ -46,8 +46,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.28.2.8 $
-# $Date: 2009/03/22 00:27:46 $
+# $Revision: 1.28.2.9 $
+# $Date: 2009/03/23 01:38:17 $
 #  *--
 }]
 [moddesc "Relation Operators"]
@@ -1143,11 +1143,11 @@ when specifying the tuples of the body.
 This allows literal relation values to be specified in a tabular layout.
 
 [example {
-set o [relation table\ 
-    {OwnerName string   Age int     City string}\ 
-    {Sue                24          Cupertino}\ 
-    {George             35          Sunnyvale}\ 
-    {Alice              30          {San Jose}}]
+set o [relation table {\ 
+    OwnerName string   Age int     City string     } {
+    Sue                24          Cupertino       } {
+    George             35          Sunnyvale       } {
+    Alice              30          {San Jose}      }]
 }]
 
 [call [cmd "::ral::relation tag"] [arg relationValue]\
