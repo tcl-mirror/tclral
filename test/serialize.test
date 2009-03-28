@@ -48,8 +48,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: serialize.test,v $
-# $Revision: 1.4.2.2 $
-# $Date: 2009/02/17 02:28:11 $
+# $Revision: 1.4.2.3 $
+# $Date: 2009/03/28 19:36:12 $
 #  *--
 
 package require tcltest 2.2
@@ -114,6 +114,34 @@ namespace eval ::ral::test {
 	namespace delete $dstNs
     } -body {
 	deserialize $s $dstNs
+	cmpRelvars [namespace current] $dstNs
+    } -result {1}
+
+    test deserialize-0.8.X-1.0 {
+        deserialize from old format data
+    } -setup {
+	set dstNs ::ral::deserial
+    } -cleanup {
+	eval relvar constraint delete\
+	    [relvar constraint names ${dstNs}::*]
+	eval relvar unset [relvar names ${dstNs}::*]
+	namespace delete $dstNs
+    } -body {
+	deserializeFromFile-0.8.X serialized0.8.9.ral $dstNs
+	cmpRelvars [namespace current] $dstNs
+    } -result {1}
+
+    test deserialize-0.8.X-2.0 {
+        deserialize from old format data using 0.9 command
+    } -setup {
+	set dstNs ::ral::deserial
+    } -cleanup {
+	eval relvar constraint delete\
+	    [relvar constraint names ${dstNs}::*]
+	eval relvar unset [relvar names ${dstNs}::*]
+	namespace delete $dstNs
+    } -body {
+	deserializeFromFile serialized0.8.9.ral $dstNs
 	cmpRelvars [namespace current] $dstNs
     } -result {1}
 

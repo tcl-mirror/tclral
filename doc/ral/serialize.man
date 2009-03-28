@@ -46,8 +46,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: serialize.man,v $
-# $Revision: 1.13.2.2 $
-# $Date: 2009/02/17 02:28:11 $
+# $Revision: 1.13.2.3 $
+# $Date: 2009/03/28 19:36:12 $
 #  *--
 }]
 [moddesc "Relation persistence"]
@@ -61,12 +61,11 @@ All of the output commands below take an optional [arg pattern] argument.
 If present, then the command is applied to relvars that match the given
 [arg pattern].
 Otherwise by default all relvars are considered.
-All of the input commands below take an optiona [arg namespace] argument.
-If present, then the command will restore the relvars into the given
+All of the input commands below take an optional [arg namespace] argument.
+If present, then the command will restore the relvars relative to the given
 [arg namespace].
-Otherwise, relvars are restored in the global namespace.
-Upon serialization and output, the entire relvar name path is maintained,
-only the leading "::" is stripped away.
+Otherwise, relvars are restored relative to the global namespace.
+Upon serialization and output, the entire relvar name path is maintained.
 This allows relvars to be restored to their same relative positions
 in a different namespace from which they were originally taken.
 Since TclRAL manages relvar names using [cmd namespace]-like syntax,
@@ -96,11 +95,25 @@ The [arg serialization] argument must be a value returned from the
 If the [arg namespace] argument is given,
 then the relvars and constraints are placed in the given namespace which
 need not exist prior to invoking the command.
+The [cmd deserialize] command also uses a set of heuristics to attempt
+to deserialize relvar data originally composed by the 0.8.X revisions
+of [package ral].
+If it determines that the data may be from an older version, then
+[cmd deserialize-0.8.X] is invoked to restore the values.
+The [cmd deserialize-0.8.X] command may be invoked directly, see below.
 
 [call [cmd "::ral::deserializeFromFile"] [arg fileName] [opt namespace]]
 
 The [cmd deserializeFromFile] command reads the file given by the
 [arg fileName] argument and invokes [cmd deserialize] on its contents.
+
+[call [cmd "::ral::deserialize-0.8.X"] [arg serialization] [opt namespace]]
+The [cmd deserialize-0.8.X] command provides a way to read relvar values
+and constraints that were stored using the 0.8.X revisions of [package ral].
+
+[call [cmd "::ral::deserializeFromFile-0.8.X"] [arg fileName] [opt namespace]]
+The [cmd deserializeFromFile-0.8.X] command invokes
+[cmd deserialize-0.8.X] on the contents of the [arg fileName] file.
 
 [call [cmd "::ral::storeToMk"] [arg fileName] [opt pattern]]
 

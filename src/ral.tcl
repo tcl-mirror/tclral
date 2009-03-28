@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.40.2.4 $
-# $Date: 2009/02/17 02:28:11 $
+# $Revision: 1.40.2.5 $
+# $Date: 2009/03/28 19:36:12 $
 #  *--
 
 namespace eval ::ral {
@@ -58,6 +58,8 @@ namespace eval ::ral {
     namespace export serializeToFile
     namespace export deserialize
     namespace export deserializeFromFile
+    namespace export deserialize-0.8.X
+    namespace export deserializeFromFile-0.8.X
     namespace export storeToMk
     namespace export loadFromMk
     namespace export dump
@@ -242,7 +244,7 @@ proc ::ral::serialize {{pattern *}} {
     set names [lsort [relvar names $pattern]]
     set relNameList [list]
     foreach name $names {
-        lappend relNameList [string trimleft $name ":"]\
+        lappend relNameList $name\
             [relation heading [relvar set $name]] [relvar identifiers $name]
     }
     lappend result Relvars $relNameList
@@ -257,7 +259,7 @@ proc ::ral::serialize {{pattern *}} {
 
     set bodies [list]
     foreach name $names {
-        lappend bodies [list [string trimleft $name ":"] [relvar set $name]]
+        lappend bodies [list $name [relvar set $name]]
     }
 
     lappend result Values $bodies
@@ -277,9 +279,12 @@ proc ::ral::serializeToFile {fileName {pattern *}} {
 
 # Restore the relvar values from a string.
 proc ::ral::deserialize {value {ns {}}} {
-    if {$ns eq "::"} {
-        set ns ""
+    if {[llength $value] == 4} {
+        # Assume it is 0.8.X style serialization.
+        deserialize-0.8.X $value [expr {$ns eq {} ? "::" : $ns}]
+        return
     }
+    set ns [string trimright $ns :]
     if {[llength $value] != 8} {
         error "bad value format, expected list of 8 items,\
                 got [llength $value] items"
@@ -296,7 +301,7 @@ proc ::ral::deserialize {value {ns {}}} {
     if {$versionKeyWord ne "Version"} {
         error "expected keyword \"Version\", got \"$versionKeyWord\""
     }
-    if {![package vsatisfies [getVersion] $versionNumber]} {
+    if {![package vsatisfies $versionNumber [getVersion]]} {
         error "incompatible version number, \"$versionNumber\",\
             current library version is, \"[getVersion]\""
     }
@@ -305,7 +310,7 @@ proc ::ral::deserialize {value {ns {}}} {
         error "expected keyword \"Relvars\", got \"$revarKeyWord\""
     }
     foreach {rvName rvHead rvIds} $relvarDefs {
-        set fullName ${ns}::$rvName
+        set fullName ${ns}$rvName
         set quals [namespace qualifiers $fullName]
         if {![namespace exists $quals]} {
             namespace eval $quals {}
@@ -326,7 +331,7 @@ proc ::ral::deserialize {value {ns {}}} {
     relvar eval {
         foreach body $bodyDefs {
             foreach {relvarName relvarBody} $body {
-                ::ral::relvar set ${ns}::$relvarName $relvarBody
+                ::ral::relvar set ${ns}$relvarName $relvarBody
             }
         }
     }
@@ -336,12 +341,87 @@ proc ::ral::deserialize {value {ns {}}} {
 
 proc ::ral::deserializeFromFile {fileName {ns {}}} {
     set chan [::open $fileName r]
-    set gotErr [catch {deserialize [read $chan] $ns} result]
+    set gotErr [catch {deserialize [read $chan] $ns} result opts]
     ::close $chan
-    if {$gotErr} {
-        error $result
+    return -options $opts $result
+}
+
+proc ::ral::deserialize-0.8.X {value {ns ::}} {
+    if {[llength $value] != 4} {
+        error "bad value format, expected list of 4 items,\
+                got [llength $value] items"
     }
+    set version [lindex $value 0]
+    set relvars [lindex $value 1]
+    set constraints [lindex $value 2]
+    set bodies [lindex $value 3]
+
+    lassign $version versionKeyWord verNum
+    if {$versionKeyWord ne "Version"} {
+	error "expected keyword \"Version\", got \"$versionKeyWord\""
+    }
+    if {![package vsatisfies $verNum 0.8]} {
+	error "incompatible version number, \"$verNum\",\
+            while attempting to deserialize version 0.8 data"
+    }
+
+    lassign $relvars relvarKeyWord revarDefs
+    if {$relvarKeyWord ne "Relvars"} {
+	error "expected keyword \"Relvars\", got \"$revarKeyWord\""
+    }
+    # In version 0.8.X, relvar headings consisted of a list
+    # of 3 items: a) the "Relation" keyword, b) the relation heading
+    # and c) a list of identifiers. We must adapt this to 0.9.X
+    # syntax
+    foreach {rvName rvHead} $revarDefs {
+        lassign $rvHead keyword heading ids
+        # In 0.8.X, relation valued attributes have an embedded relation
+        # heading that includes a list of identifiers. So we have to
+        # examine the heading for any relation valued attribute and
+        # patch things up accordingly. Fortunately, the tuple valued
+        # attrbutes don't have any syntax change.
+        set newHeading [list]
+        foreach {attrName attrType} $heading {
+            lappend newHeading $attrName\
+                [expr {[lindex $attrType 0] eq "Relation" ?\
+                [lrange $attrType 0 1] : $attrType}]
+        }
+	namespace eval $ns [list ::ral::relvar create $rvName $newHeading] $ids
+    }
+
+    # Constraint syntax is unmodified between 0.8.X and 0.9.X
+    lassign $constraints cnstrKeyWord cnstrDef
+    if {$cnstrKeyWord ne "Constraints"} {
+	error "expected keyword \"Constraints\", got \"$cnstrKeyWord\""
+    }
+    foreach constraint $cnstrDef {
+	namespace eval $ns ::ral::relvar $constraint
+    }
+
+    lassign $bodies bodyKeyWord bodyDefs
+    if {$bodyKeyWord ne "Bodies"} {
+	error "expected keyword \"Bodies\", got \"$bodyKeyWord\""
+    }
+
+    # The 0.8.X serialization format uses a list of tuple values
+    # to represent the body. This works fine with "relvar insert".
+    relvar eval {
+	foreach body $bodyDefs {
+	    foreach {relvarName relvarBody} $body {
+		namespace eval $ns ::ral::relvar insert [list $relvarName]\
+		    $relvarBody
+	    }
+	}
+    }
+
     return
+}
+
+proc ::ral::deserializeFromFile-0.8.X {fileName {ns ::}} {
+    set chan [::open $fileName r]
+    set gotErr [catch {deserialize-0.8.X [read $chan] $ns} result opts]
+    ::close $chan
+    return -options $opts $result
 }
 
 proc ::ral::storeToMk {fileName {pattern *}} {
@@ -820,7 +900,7 @@ proc ::ral::mkCheckVersion {dbName} {
         {Version_ral string Date_ral string Comment_ral string}\
         [::mk::get $dbName.__ral_version!0]]
     set verNum [tuple extract $result Version_ral]
-    if {![package vsatisfies [getVersion] $verNum]} {
+    if {![package vsatisfies $verNum [getVersion]]} {
         error "incompatible version number, \"$verNum\",\
             current library version is, \"[getVersion]\""
     }
