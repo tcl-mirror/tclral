@@ -48,8 +48,8 @@
 #   This command is part of TclRAL. This file is in Tcl Markup Language
 #   format.
 # $RCSfile: relvar.man,v $
-# $Revision: 1.26.2.5 $
-# $Date: 2009/03/23 01:38:17 $
+# $Revision: 1.26.2.6 $
+# $Date: 2009/03/29 18:58:37 $
 #  *--
 }]
 [moddesc "Relvar Operators"]
@@ -285,6 +285,12 @@ The [cmd "constraint delete"] subcommand deletes all the
 constraints given by the [arg nameN] arguments.
 The return value is the empty string.
 
+[call [cmd "::ral::relvar constraint exists"] [arg name]]
+The [cmd "constraint exists"] subcommand returns a boolean value of
+true if the relvar named [arg name] exists and false otherwise.
+The relvar [arg name] argument is resolved according to the rules
+described above.
+
 [call [cmd "::ral::relvar constraint info"] [arg name]]
 The [cmd "constraint info"] subcommand returns the detailed information
 about the constraint named [arg name].
@@ -333,7 +339,7 @@ The returned names are fully qualified.
 The [cmd "constraint path"] subcommand returns the fully qualified constraint
 name of [arg constraintName].
 
-[call [cmd "::ral::relvar correlation"] [opt -complete] [arg name]\
+[call [cmd "::ral::relvar correlation"] [arg [opt -complete]] [arg name]\
 [arg correlRelvar]\
 [arg correlAttrListA] [arg refToSpecA] [arg refToRelvarA] [arg refToAttrListA]\
 [arg correlAttrListB] [arg refToSpecB] [arg refToRelvarB] [arg refToAttrListB]]
@@ -342,7 +348,7 @@ The [cmd correlation] subcommand creates a referential correlation
 called [arg name].
 The referential correlation is between a correlation relvar, [arg correlRelvar],
 and two other relvars, [arg refToRelvarA] and [arg refToRelvarB].
-The return value of [cmd correlation] is the empty string.
+The return value of the [cmd correlation] command is the empty string.
 
 Correlations declare that every tuple in [arg correlRelvar] refers to
 exactly one tuple of [arg refToRelvarA] and exactly one tuple of
@@ -359,15 +365,16 @@ The [arg refToSpecA] and [arg refToSpecB] arguments can have the same values
 as for the [cmd "::ral::relvar association"] command and specify
 the multiplicity and conditionality of how [arg refToRelvarA] and
 [arg refToRelvarB] are referred to by the tuples of [arg correlRelvar].
-If the [opt -complete] option is given,
+If the [arg -complete] option is given,
 then every tuple of [arg refToRelvarA] must be correlated to every
 tuple of [arg refToRelvarB] and [emph "vice versa"].
-That is, the cardinality of [arg correlRelvar] must equal the product
+The [arg -complete] option implies
+the cardinality of [arg correlRelvar] must equal the product
 of the cardinality of [arg refToRelvarA] and [arg refToRelvarB].
-If the [opt -complete] option is missing,
-then [arg correlRelvar] is allowed to have a subset of the cartesian product
+If the [arg -complete] option is missing,
+then [arg correlRelvar] is allowed to have a subset of the Cartesian product
 of the references.
-
+[para]
 Correlation constraints are often used to enforce the referential
 constraints for relvars that are related in a many to many fashion.
 However, they also arise in situations where the multiplicity is not

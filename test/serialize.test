@@ -48,8 +48,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: serialize.test,v $
-# $Revision: 1.4.2.3 $
-# $Date: 2009/03/28 19:36:12 $
+# $Revision: 1.4.2.4 $
+# $Date: 2009/03/29 18:58:37 $
 #  *--
 
 package require tcltest 2.2
@@ -128,6 +128,8 @@ namespace eval ::ral::test {
 	namespace delete $dstNs
     } -body {
 	deserializeFromFile-0.8.X serialized0.8.9.ral $dstNs
+        #puts [relvar names]
+        #puts [relvar constraint names]
 	cmpRelvars [namespace current] $dstNs
     } -result {1}
 
@@ -176,6 +178,36 @@ namespace eval ::ral::test {
 	namespace eval $dstNs $d
 	cmpRelvars [namespace current] $dstNs
     } -result {1}
+
+    test merge-1.0 {
+        merge data from separate files
+    } -setup {
+	set dstNs ::ral::deserial
+        deserializeFromFile merge1.ral $dstNs
+    } -cleanup {
+	eval relvar constraint delete\
+	    [relvar constraint names ${dstNs}::*]
+	eval relvar unset [relvar names ${dstNs}::*]
+	namespace delete $dstNs
+    } -body {
+        mergeFromFile merge2.ral $dstNs
+        relation cardinality [relvar set ${dstNs}::Domain]
+    } -result {2}
+
+    test mergeFromMk-1.0 {
+        merge data from metakit files
+    } -setup {
+	set dstNs ::ral::deserial
+        loadFromMk merge1.mk $dstNs
+    } -cleanup {
+	eval relvar constraint delete\
+	    [relvar constraint names ${dstNs}::*]
+	eval relvar unset [relvar names ${dstNs}::*]
+	namespace delete $dstNs
+    } -body {
+        mergeFromMk merge2.mk $dstNs
+        relation cardinality [relvar set ${dstNs}::Domain]
+    } -result {2}
 
 if 0 {
     test -1.0 {

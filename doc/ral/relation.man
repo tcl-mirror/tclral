@@ -46,8 +46,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.28.2.9 $
-# $Date: 2009/03/23 01:38:17 $
+# $Revision: 1.28.2.10 $
+# $Date: 2009/03/29 18:58:37 $
 #  *--
 }]
 [moddesc "Relation Operators"]
@@ -652,9 +652,9 @@ The heading is a list consisting attributes and corresponding data types.
 DogName string Breed string
 }]
 
-[call [cmd "::ral::relation include"] [arg relationValue]\
+[call [cmd "::ral::relation insert"] [arg relationValue]\
         [opt [arg "name-value-list1 name-value-list2 ..."]]]
-The [cmd include] command returns a new relation value whose heading
+The [cmd insert] command returns a new relation value whose heading
 is the same as [arg relationValue] and whose body includes all the
 tuples of [arg relationValue] plus all the tuples given as the
 [arg name-value-listN] arguments.

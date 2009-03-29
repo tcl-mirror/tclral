@@ -12,7 +12,7 @@ store relation variables, did the identification constraints get associated
 with relvars. This was wrong. Relation values only enforce the set notion and
 insist that all tuples be distinct in a relation.  The fact that subsets of
 attributes are all that is necessary to identify a particular tuple is a
-"relvar" identity constraint and is only enforce on relation values that are
+"relvar" identity constraint and is only enforced on relation values that are
 actually stored in a relvar.
 
 This seemingly simple change has many ramifications for TclRAL and the required
@@ -26,39 +26,57 @@ is the list of major changes going from 0.8.9 to 0.9.0:
 representation of tuples and relations. This was probably a design misfeature
 in the first place. At the time I was concerned about being able to adequately
 distinguish tuple and relation values from other Tcl strings and lists. That
-concern proved to be inconsequential in practices.
+concern proved to be inconsequential in practice.
 
 2. The string representation of a relation value now no longer has a list
 of identifiers.
 
 3. Added the commands:
     relation table
+    relation summarizeby
     relation wrap
     relation unwrap
     relation update
+    relvar exists
+    relvar constraint exists
+    relvar identifiers
     relvar restrictone
     relvar updateper
+    merge
+    mergeFromFile
+    mergeFromMk
 
-4. Changed the names of:
+4. Deleted the commands:
+    relation choose (replaced by "relvar restrictone")
+    relation identifiers (replaced by "relvar identifiers")
+    relation reidentify
+
+5. Changed the names of:
     relation include ==> relation insert
 
-5. The "tuple update" command no longer operates on a tuple variable but
+6. The following commands have new argument interfaces.
+    tuple relation
+    tuple wrap
+    relation array
+
+7. The "tuple update" command no longer operates on a tuple variable but
 rather a tuple value, returning a new tuple value. This command no longer
 serves the same role as previously in the operation of "relvar update".
 
-6. The script part of the "relvar update" and "relvar updateone" commands must
+8. The script part of the "relvar update" and "relvar updateone" commands must
 return a tuple value.  Previously, the updated tuple value was placed back in a
 tuple variable.  Now it is the return value of the script that is used to
 update the matching tuple values. This is more in keeping with the interfaces
 used by relvar traces and eliminates the need for a tuple operation that
 updates a variable in place. Hence the change in semantics of "tuple update".
 
-7. The serialization formats used produced and consumed by "serialize",
+9. The serialization formats used produced and consumed by "serialize",
 "deserialize", "storeToMk" and "loadFromMk" are not backward compatible.
 These changes have simplified the serialization formats and corrected
 a number of problems with the metakit storage. Also, the namespace of
 the relvar is no longer "flattened out" and what is stored is the full
-path from the global namespace down.
+path from the global namespace down. To aid in the transition to 0.9.X,
+the deserialize command can interpret the 0.8.X serialization format.
 
 
 ========= ral 0.8.9 =========
