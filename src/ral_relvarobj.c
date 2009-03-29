@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.41.2.8 $
-$Date: 2009/03/22 00:27:46 $
+$Revision: 1.41.2.9 $
+$Date: 2009/03/29 18:56:29 $
  *--
  */
 
@@ -100,8 +100,6 @@ static int relvarGetNamespaceName(Tcl_Interp *, char const *, Tcl_DString *) ;
 static Tcl_Obj *relvarConstraintAttrNames(Tcl_Interp *, Ral_Relvar,
     Ral_JoinMap, int) ;
 static Tcl_Obj *relvarAssocSpec(int, int) ;
-static Ral_Constraint Ral_RelvarObjFindConstraint(Tcl_Interp *, Ral_RelvarInfo,
-    char const *) ;
 static int Ral_RelvarObjDecodeTraceOps(Tcl_Interp *, Tcl_Obj *, int *) ;
 static int Ral_RelvarObjEncodeTraceFlag(Tcl_Interp *, int, Tcl_Obj **) ;
 static Tcl_Obj *Ral_RelvarObjExecTraces(Tcl_Interp *, Ral_Relvar, Tcl_ObjType *,
@@ -1789,6 +1787,63 @@ Ral_RelvarObjConstraintPath(
     return TCL_OK ;
 }
 
+/*
+ * Just like RelvarObjFindRelvar, except for constraint names.
+ * (1) If name is fully resolved, then try to match it directly.
+ * (2) else construct a fully resolved name for the current namespace and
+ *     try to find that.
+ * (3) If that fails, construct a fully resolved name for the global
+ *     namespace.
+ * (4) If that fails, then it is an unknown relvar.
+ */
+Ral_Constraint
+Ral_RelvarObjFindConstraint(
+    Tcl_Interp *interp,
+    Ral_RelvarInfo info,
+    char const *name)
+{
+    Ral_Constraint constraint ;
+
+    if (relvarNameIsAbsName(name)) {
+	/*
+	 * Absolute name.
+	 */
+	constraint = Ral_ConstraintFindByName(name, info) ;
+    } else {
+	/*
+	 * Relative name. First try the current namespace.
+	 */
+	Tcl_DString resolve ;
+	int globalName ;
+	char const *resolvedName ;
+
+	globalName = relvarGetNamespaceName(interp, name, &resolve) ;
+	resolvedName = Tcl_DStringValue(&resolve) ;
+	constraint = Ral_ConstraintFindByName(resolvedName, info) ;
+	/*
+	 * Check if we found the constraint by the namespace name. If not and
+	 * we were not in the global namespace, then we have to try the
+	 * global one. This matches the normal rules of Tcl name resolution.
+	 */
+	if (constraint == NULL && !globalName) {
+	    Tcl_DStringFree(&resolve) ;
+	    Tcl_DStringInit(&resolve) ;
+	    Tcl_DStringAppend(&resolve, "::", -1) ;
+	    Tcl_DStringAppend(&resolve, name, -1) ;
+	    resolvedName = Tcl_DStringValue(&resolve) ;
+	    constraint = Ral_ConstraintFindByName(resolvedName, info) ;
+	}
+
+	Tcl_DStringFree(&resolve) ;
+    }
+
+    if (constraint == NULL) {
+	Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptNone,
+	    RAL_ERR_UNKNOWN_NAME, name) ;
+    }
+    return constraint ;
+}
+
 int
 Ral_RelvarObjEndTrans(
     Tcl_Interp *interp,
@@ -2326,63 +2381,6 @@ relvarAssocSpec(
     assert (cond < 2) ;
     assert (mult < 2) ;
     return Tcl_NewStringObj(condMultStrings[cond][mult], -1) ;
-}
-
-/*
- * Just like RelvarObjFindRelvar, except for constraint names.
- * (1) If name is fully resolved, then try to match it directly.
- * (2) else construct a fully resolved name for the current namespace and
- *     try to find that.
- * (3) If that fails, construct a fully resolved name for the global
- *     namespace.
- * (4) If that fails, then it is an unknown relvar.
- */
-static Ral_Constraint
-Ral_RelvarObjFindConstraint(
-    Tcl_Interp *interp,
-    Ral_RelvarInfo info,
-    char const *name)
-{
-    Ral_Constraint constraint ;
-
-    if (relvarNameIsAbsName(name)) {
-	/*
-	 * Absolute name.
-	 */
-	constraint = Ral_ConstraintFindByName(name, info) ;
-    } else {
-	/*
-	 * Relative name. First try the current namespace.
-	 */
-	Tcl_DString resolve ;
-	int globalName ;
-	char const *resolvedName ;
-
-	globalName = relvarGetNamespaceName(interp, name, &resolve) ;
-	resolvedName = Tcl_DStringValue(&resolve) ;
-	constraint = Ral_ConstraintFindByName(resolvedName, info) ;
-	/*
-	 * Check if we found the constraint by the namespace name. If not and
-	 * we were not in the global namespace, then we have to try the
-	 * global one. This matches the normal rules of Tcl name resolution.
-	 */
-	if (constraint == NULL && !globalName) {
-	    Tcl_DStringFree(&resolve) ;
-	    Tcl_DStringInit(&resolve) ;
-	    Tcl_DStringAppend(&resolve, "::", -1) ;
-	    Tcl_DStringAppend(&resolve, name, -1) ;
-	    resolvedName = Tcl_DStringValue(&resolve) ;
-	    constraint = Ral_ConstraintFindByName(resolvedName, info) ;
-	}
-
-	Tcl_DStringFree(&resolve) ;
-    }
-
-    if (constraint == NULL) {
-	Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptNone,
-	    RAL_ERR_UNKNOWN_NAME, name) ;
-    }
-    return constraint ;
 }
 
 static int

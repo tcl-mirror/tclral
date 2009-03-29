@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.h,v $
-$Revision: 1.17.2.6 $
-$Date: 2009/03/22 00:27:46 $
+$Revision: 1.17.2.7 $
+$Date: 2009/03/29 18:56:29 $
  *--
  */
 #ifndef _ral_relvarobj_h_
@@ -114,6 +114,8 @@ extern int Ral_RelvarObjConstraintMember(Tcl_Interp *, Tcl_Obj * const,
     Ral_RelvarInfo) ;
 extern int Ral_RelvarObjConstraintPath(Tcl_Interp *, Tcl_Obj *const,
     Ral_RelvarInfo) ;
+extern Ral_Constraint Ral_RelvarObjFindConstraint(Tcl_Interp *, Ral_RelvarInfo,
+    char const *) ;
 extern int Ral_RelvarObjEndTrans(Tcl_Interp *, Ral_RelvarInfo, int) ;
 extern int Ral_RelvarObjEndCmd(Tcl_Interp *, Ral_RelvarInfo, int) ;
 

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.32.2.9 $
-$Date: 2009/03/22 00:27:46 $
+$Revision: 1.32.2.10 $
+$Date: 2009/03/29 18:56:29 $
  *--
  */
 
@@ -218,6 +218,7 @@ RelvarConstraintCmd(
 {
     enum ConstraintCmdType {
 	ConstraintDelete,
+	ConstraintExists,
 	ConstraintInfo,
 	ConstraintNames,
 	ConstraintMember,
@@ -225,6 +226,7 @@ RelvarConstraintCmd(
     } ;
     static char const *constraintCmds[] = {
 	"delete",
+	"exists",
 	"info",
 	"names",
 	"member",
@@ -233,6 +235,7 @@ RelvarConstraintCmd(
     } ;
     int result = TCL_OK ;
     int index ;
+    Ral_Constraint constraint ;
 
     if (objc < 3) {
 	Tcl_WrongNumArgs(interp, 2, objv,
@@ -257,6 +260,17 @@ RelvarConstraintCmd(
 		return result ;
 	    }
 	}
+	break ;
+
+    /* relvar constraint exists name */
+    case ConstraintExists:
+	if (objc != 4) {
+	    Tcl_WrongNumArgs(interp, 3, objv, "name") ;
+	    return TCL_ERROR ;
+	}
+        constraint = Ral_RelvarObjFindConstraint(interp, rInfo,
+                Tcl_GetString(objv[3])) ;
+        Tcl_SetObjResult(interp, Tcl_NewBooleanObj(constraint != NULL)) ;
 	break ;
 
     /* relvar constraint info name */
