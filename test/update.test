@@ -48,8 +48,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: update.test,v $
-# $Revision: 1.4.2.3 $
-# $Date: 2009/03/22 00:27:46 $
+# $Revision: 1.4.2.4 $
+# $Date: 2009/03/29 19:08:42 $
 #  *--
 
 package require tcltest 2.2
@@ -555,7 +555,19 @@ namespace eval ::ral::test {
     } -result {attributes do not constitute an identifier, "{Status int} {{Status 30}}"}\
     -returnCodes error
 
-    test relvar-updateper-4.3 {
+    test relvar-updateper-4.4 {
+        per relation has only part of an identifier
+    } -setup {
+	relvar create X {Name string Status int} {Name Status}
+	relvar insert X {Name George Status 20}
+    } -cleanup {
+	relvar unset X
+    } -body {
+        relvar updateper X [relation create {Status int} {Status 30}]
+    } -result {attributes do not constitute an identifier, "{Status int} {{Status 30}}"}\
+    -returnCodes error
+
+    test relvar-updateper-4.5 {
         per relation only has an identifier ==> no update takes place
     } -setup {
 	relvar create X {Name string Status int} Name
@@ -610,7 +622,7 @@ namespace eval ::ral::test {
         }
     } -match relation
 
-    test relvar-updateper-5.1 {
+    test relvar-updateper-5.2 {
         multiple identfiers, mismatch one identifier ==> no update
     } -setup {
 	relvar create X {Name string Number int Status int} Name Number
@@ -628,7 +640,7 @@ namespace eval ::ral::test {
         {Name string Number int Status int} {}
     } -match relation
 
-    test relvar-updateper-5.2 {
+    test relvar-updateper-5.3 {
         multiple identfiers update multiple attributes
     } -setup {
 	relvar create X {Name string Number int Status int City string}\
