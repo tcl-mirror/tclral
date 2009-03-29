@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_utils.c,v $
-$Revision: 1.19.2.8 $
-$Date: 2009/03/22 00:27:46 $
+$Revision: 1.19.2.9 $
+$Date: 2009/03/29 18:56:52 $
  *--
  */
 
@@ -233,10 +233,12 @@ static char const * const errorStrings[] = {
     "BAD_KEYWORD",
     "WRONG_NUM_ATTRS",
     "BAD_PAIRS_LIST",
+    "DUPLICATE_OPTION",
 
     "NO_IDENTIFIER",
     "IDENTIFIER_FORMAT",
     "IDENTIFIER_SUBSET",
+    "IDENTITY_CONSTRAINT",
     "DUP_ATTR_IN_ID",
     "DUPLICATE_TUPLE",
     "HEADING_NOT_EQUAL",
