@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.36.2.11 $
-$Date: 2009/03/22 00:27:46 $
+$Revision: 1.36.2.12 $
+$Date: 2009/04/05 18:27:39 $
  *--
  */
 
@@ -220,7 +220,14 @@ Ral_RelationDup(
 	Ral_Tuple dupTuple ;
 	int appended ;
 
-	dupTuple = Ral_TupleDupShallow(srcTuple) ;
+        /*
+         * Duplicate the tuple values keeping the heading refering
+         * back to the newly duplicated heading. Copying values is really
+         * just incrementing reference counts.
+         */
+	dupTuple = Ral_TupleNew(dupHeading) ;
+        Ral_TupleCopyValues(Ral_TupleBegin(srcTuple), Ral_TupleEnd(srcTuple),
+                Ral_TupleBegin(dupTuple)) ;
 	appended = Ral_RelationPushBack(dupRelation, dupTuple, NULL) ;
 	assert(appended != 0) ;
     }
