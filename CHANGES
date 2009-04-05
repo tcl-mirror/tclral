@@ -1,5 +1,5 @@
 ========= ral 0.9.0 =========
-2009/02/28 mangoa01
+2009/03/29 mangoa01
 
 Revision 0.9.0 is a major change in TclRAL.
 N.B. 0.9.0 breaks script level compatibility with previous versions of TclRAL.
@@ -9,8 +9,9 @@ this revision, relation values do not have identifiers. Identifiers are only
 found in relvars. In all previous revision of TclRAL, identifiers were
 associated with relation values and only by virtue of the fact that relvar
 store relation variables, did the identification constraints get associated
-with relvars. This was wrong. Relation values only enforce the set notion and
-insist that all tuples be distinct in a relation.  The fact that subsets of
+with relvars. This was wrong. Relation values should only enforce the notion of
+a relation begin a set and insist that all tuples be distinct in a relation.
+This only require a definition of tuple equality.  The fact that subsets of
 attributes are all that is necessary to identify a particular tuple is a
 "relvar" identity constraint and is only enforced on relation values that are
 actually stored in a relvar.
@@ -47,8 +48,8 @@ of identifiers.
     mergeFromMk
 
 4. Deleted the commands:
-    relation choose (replaced by "relvar restrictone")
-    relation identifiers (replaced by "relvar identifiers")
+    relation choose (cf. "relvar restrictone")
+    relation identifiers (cf. "relvar identifiers")
     relation reidentify
 
 5. Changed the names of:
@@ -56,6 +57,7 @@ of identifiers.
 
 6. The following commands have new argument interfaces.
     tuple relation
+    tuple update
     tuple wrap
     relation array
 
@@ -64,8 +66,8 @@ rather a tuple value, returning a new tuple value. This command no longer
 serves the same role as previously in the operation of "relvar update".
 
 8. The script part of the "relvar update" and "relvar updateone" commands must
-return a tuple value.  Previously, the updated tuple value was placed back in a
-tuple variable.  Now it is the return value of the script that is used to
+now return a tuple value.  Previously, the updated tuple value was placed back
+in a tuple variable.  Now it is the return value of the script that is used to
 update the matching tuple values. This is more in keeping with the interfaces
 used by relvar traces and eliminates the need for a tuple operation that
 updates a variable in place. Hence the change in semantics of "tuple update".
