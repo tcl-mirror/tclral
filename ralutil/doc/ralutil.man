@@ -46,8 +46,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: ralutil.man,v $
-# $Revision: 1.1.2.1 $
-# $Date: 2009/03/23 01:38:17 $
+# $Revision: 1.1.2.2 $
+# $Date: 2009/04/05 18:28:11 $
 #  *--
 }]
 [moddesc "Ralutil Package"]
@@ -117,7 +117,7 @@ but the idea is the same.
 [emph N.B.] that here is nothing about the [cmd pipe] command that is
 specific to relational algebra.
 It can be used to sequence any Tcl commands.
-
+[para]
 To obtain a list of the breeds of all dogs whose name starts with "S":
 [example {
 set sdogs [::ralutil::pipe {

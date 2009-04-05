@@ -48,8 +48,8 @@
 #   This command is part of TclRAL. This file is in Tcl Markup Language
 #   format.
 # $RCSfile: relvar.man,v $
-# $Revision: 1.26.2.6 $
-# $Date: 2009/03/29 18:58:37 $
+# $Revision: 1.26.2.7 $
+# $Date: 2009/04/05 18:28:11 $
 #  *--
 }]
 [moddesc "Relvar Operators"]
@@ -90,11 +90,13 @@ to the Tcl way of doing things.
 
 [section "RELVAR NAMES"]
 
-The namespace of relvar names follows the familiar Tcl method of naming
-ordinary Tcl variables.
-Thus relvars have Tcl namespace-like names.
+Relvar names follows the familiar Tcl method of naming
+ordinary Tcl variables and thus relvars have Tcl namespace-like names.
 For example, a relvar named [var Dog] created at the global level
 will be named [var ::Dog].
+However, relvars names are held separately from Tcl variable names
+and despite the similar syntax and appearance,
+relvars are a concept only of TclRAL.
 Thus it is possible and indeed encouraged to group related relvars
 together in a namespace.
 If an application uses only one set of relvars,
@@ -104,10 +106,12 @@ set is placed in their own relvar namespace.
 
 [para]
 Since it is possible to store a relation value in an ordinary Tcl variable
-and since Tcl variables are convenient to use when formulating expressions,
+and since Tcl variables are convenient to use when formulating relational
+expressions ([emph i.e.] it is sometimes more convenient to say [var \$Dog]
+rather than [cmd "\[relvar set Dog]"]),
 creating a relvar also creates a corresponding Tcl variable by the same name.
-The Tcl variable created is traced to prevent writing to it, since all
-modifications to a relvar should come via the [cmd relvar] commands.
+The Tcl variable created is traced to prevent accidental writing to it,
+since all modifications to a relvar should come via the [cmd relvar] commands.
 So, creating a relvar name [var Dog] at the global level creates a
 relvar named [var ::Dog] and a read-only Tcl variable named [var ::Dog].
 
@@ -390,20 +394,20 @@ themselves.
     [arg id1] [opt [arg "id2 ..."]]]
 
 The [cmd create] subcommand creates a new relation variable whose name is given
-by [arg relvarName] and that will store a relation value heading whose
+by [arg relvarName] and that will store a relation value whose
 heading matches that of the [arg heading] argument.
+The [arg heading] argument is a list with an even number of
+elements consisting of alternating attribute names and attribute data types
+as described for the [cmd ::ral::relation] command.
 The tuples of the relation value will be identified by [arg id1] and
 any other supplied [arg idN] arguments.
 Each [arg idN] argument is a list of attribute names that appear in the
 [arg heading].
 The subcommand returns the relation value of the newly created relvar,
 which necessarily will have cardinality of 0.
-The [arg heading] argument is a valid relation value heading
-as described for the [cmd ::ral::relation] commands or
-as returned from [cmd "::ral::relation heading"].
 If [arg relvarName] name begins with "::", then it is interpreted
 as a fully resolved name and will be created in the given namespace.
-Otherwize [arg relvarName] is interpreted as relative the to current namespace.
+Otherwise, [arg relvarName] is interpreted as relative the to current namespace.
 In either case,
 an ordinary Tcl variable is also created by the same fully resolved
 name as the relvar.
@@ -639,10 +643,10 @@ and relvar traces may extend the given [arg name-value-list] argument.
 
 [example {
 % relvar insert DOG {DogName Skippy Breed Dalmation}
-{DogName string Breed string} {{DogName Fido Breed Poodle} \\ 
-{DogName Sam Breed Collie} {DogName Spot Breed Terrier} \\ 
-{DogName Rover Breed Retriever} {DogName Fred Breed Spaniel} \\ 
-{DogName Jumper Breed Mutt} {DogName Skippy Breed Dalmation}}
+    {DogName string Breed string} {{DogName Fido Breed Poodle} \ 
+    {DogName Sam Breed Collie} {DogName Spot Breed Terrier} \ 
+    {DogName Rover Breed Retriever} {DogName Fred Breed Spaniel} \ 
+    {DogName Jumper Breed Mutt} {DogName Skippy Breed Dalmation}}
 % relvar insert OWNER {OwnerName Tom Age 22 City Tulsa}
 for association ::A1(::OWNERSHIP [+] ==> [1] ::OWNER), in relvar ::OWNER
 tuple {OwnerName Tom Age 22 City Tulsa} is not referenced by any tuple

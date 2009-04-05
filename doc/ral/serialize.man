@@ -46,8 +46,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: serialize.man,v $
-# $Revision: 1.13.2.4 $
-# $Date: 2009/03/29 18:58:37 $
+# $Revision: 1.13.2.5 $
+# $Date: 2009/04/05 18:28:11 $
 #  *--
 }]
 [moddesc "Relation persistence"]
@@ -153,6 +153,12 @@ a new file is created with the current state of the relvars.
 The [cmd loadFromMk] command restores the state of a set of relvars
 from the information contained in a metaKit database.
 That database must have been created using the [cmd storeToMk] command.
+
+[call [cmd "::ral::mergeFromMk"] [arg fileName] [arg [opt namespace]]]
+The [cmd mergeFromMk] command merges the contents of the metakit contained
+in [arg fileName] into the namespace given by [arg namespace].
+The rules of merging are the same as described for the [cmd merge]
+command above.
 
 [call [cmd "::ral::dump"] [arg [opt pattern]]]
 

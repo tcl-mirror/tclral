@@ -46,8 +46,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: tuple.man,v $
-# $Revision: 1.16.2.5 $
-# $Date: 2009/02/23 02:35:37 $
+# $Revision: 1.16.2.6 $
+# $Date: 2009/04/05 18:28:11 $
 #  *--
 }]
 [moddesc "Tuple Operators"]
@@ -94,7 +94,17 @@ list
 dict
 [item]
 bytearray
+[item]
+Tuple
+[item]
+Relation
 [list_end]
+
+If the attribute data type is [emph Tuple] or [emph Relation],
+then the data type specifier must be a list of two elements,
+the first being the type name Tuple or Relation and the second being
+another list contain the tuple or relation heading.
+Tuples and relations thus may contain tuple-value or relation-valued attributes.
 
 [para]
 These types have the same name as the corresponding Tcl type
@@ -171,6 +181,11 @@ The following is a literal string representation of a tuple with
 three attributes.
 [example {
 {Name string Breed string Age int} {Name Fido Breed Terrier Age 2}
+}]
+The following is a string representation that is equivalent to the
+same tuple.
+[example {
+{Name string Breed string Age int} {Breed Terrier Name Fido Age 2}
 }]
 
 [section COMMANDS]
@@ -326,7 +341,7 @@ to determine tuple equality is not reliable and should not be used
 The [cmd extend] subcommand returns a new tuple with the same heading and
 values as the [arg tupleValue] argument except that the new attributes given by
 the [arg "name type value"] arguments are included.
-The extension arguments of [arg name-type-value] must come in sets of three.
+The extension arguments of [arg name-type-value] must come in groups of three.
 The three arguments
 are a new attribute name, attribute data type and attribute
 value in that order.
@@ -376,6 +391,7 @@ The form of the list is the same as that returned by the [cmd "array get"]
 command and accepted by the [cmd "array set"] command.
 The [cmd get] subcommand provides a convenient means to move tuple
 values into an array.
+The form of the list returned may also be used directly the [cmd dict] command.
 
 [example {
 % set t1 {{Name string Age int} {Name {Fred Jones} Age 27}}
