@@ -48,16 +48,16 @@
 #  capabilities of TclOO.
 # 
 # $RCSfile: raloo.tcl,v $
-# $Revision: 1.29 $
-# $Date: 2008/10/12 18:20:54 $
+# $Revision: 1.29.2.1 $
+# $Date: 2009/04/06 01:39:19 $
 #  *--
 
 package require Tcl 8.5
-package require -exact TclOO 0.5.1
-package require ral
-package require ralutil
+package require TclOO
+package require ral 0.9
+package require ralutil 0.9
 
-package provide raloo 0.2
+package provide raloo 0.3
 
 namespace eval ::raloo {
     namespace export Domain
@@ -77,155 +77,107 @@ namespace eval ::raloo::mm {
     # functionality is not currently supported).
 
     relvar create Domain {
-	Relation {
-	    DomName string
-	} {
-	    DomName
-	}
-    }
+        DomName string
+    } DomName
 
     relvar create Class {
-	Relation {
-	    DomName string
-	    ClassName string
-	} {
-	    {DomName ClassName}
-	}
-    }
+        DomName string ClassName string
+    } {DomName ClassName}
 
     relvar association R1\
 	Class DomName *\
 	Domain DomName 1
 
     relvar create Attribute {
-	Relation {
-	    DomName string
-	    ClassName string
-	    AttrName string
-	    AttrType string
-	} {
-	    {DomName ClassName AttrName}
-	}
-    }
+        DomName string
+        ClassName string
+        AttrName string
+        AttrType string
+    } {DomName ClassName AttrName}
 
     relvar association R2\
 	Attribute {DomName ClassName} +\
 	Class {DomName ClassName} 1
 
     relvar create Identifier {
-	Relation {
-	    DomName string
-	    ClassName string
-	    IdNum int
-	} {
-	    {DomName ClassName IdNum}
-	}
-    }
+        DomName string
+        ClassName string
+        IdNum int
+    } {DomName ClassName IdNum}
 
     relvar association R3\
 	Identifier {DomName ClassName} +\
 	Class {DomName ClassName} 1
 
     relvar create IdAttribute {
-	Relation {
-	    DomName string
-	    ClassName string
-	    IdNum int
-	    AttrName string
-	} {
-	    {DomName ClassName IdNum AttrName}
-	}
-    }
+        DomName string
+        ClassName string
+        IdNum int
+        AttrName string
+    } {DomName ClassName IdNum AttrName}
 
     relvar correlation R4 IdAttribute\
 	{DomName ClassName IdNum} + Identifier {DomName ClassName IdNum}\
 	{DomName ClassName AttrName} * Attribute {DomName ClassName AttrName}
 
     relvar create DomainOp {
-	Relation {
-	    DomName string
-	    ServiceName string
-	    Params list
-	    Body string
-	} {
-	    {DomName ServiceName}
-	}
-    }
+        DomName string
+        ServiceName string
+        Params list
+        Body string
+    } {DomName ServiceName}
 
     relvar association R5\
 	DomainOp DomName *\
 	Domain DomName 1
 
     relvar create ClassOp {
-	Relation {
-	    DomName string
-	    ClassName string
-	    OpName string
-	    OpParams list
-	    OpBody string
-	} {
-	    {DomName ClassName OpName}
-	}
-    }
+        DomName string
+        ClassName string
+        OpName string
+        OpParams list
+        OpBody string
+    } {DomName ClassName OpName}
 
     relvar association R6\
 	ClassOp {DomName ClassName} *\
 	Class {DomName ClassName} 1
 
     relvar create InstOp {
-	Relation {
-	    DomName string
-	    ClassName string
-	    OpName string
-	    OpParams list
-	    OpBody string
-	} {
-	    {DomName ClassName OpName}
-	}
-    }
+        DomName string
+        ClassName string
+        OpName string
+        OpParams list
+        OpBody string
+    } {DomName ClassName OpName}
 
     relvar association R20\
 	InstOp {DomName ClassName} *\
 	Class {DomName ClassName} 1
 
     relvar create Relationship {
-	Relation {
-	    DomName string
-	    RelName string
-	} {
-	    {DomName RelName}
-	}
-    }
+        DomName string
+        RelName string
+    } {DomName RelName}
+
     relvar association R7\
 	Relationship DomName *\
 	Domain DomName 1
 
     relvar create SimpleRel {
-	Relation {
-	    DomName string
-	    RelName string
-	} {
-	    {DomName RelName}
-	}
-    }
+        DomName string
+        RelName string
+    } {DomName RelName}
 
     relvar create GenRel {
-	Relation {
-	    DomName string
-	    RelName string
-	} {
-	    {DomName RelName}
-	}
-    }
+        DomName string
+        RelName string
+    } {DomName RelName}
 
     relvar create AssocRel {
-	Relation {
-	    DomName string
-	    RelName string
-	} {
-	    {DomName RelName}
-	}
-    }
+        DomName string
+        RelName string
+    } {DomName RelName}
 
     relvar partition R8\
 	Relationship {DomName RelName}\
@@ -234,62 +186,46 @@ namespace eval ::raloo::mm {
 	    AssocRel {DomName RelName}
 
     relvar create SimpleReferring {
-	Relation {
-	    DomName string
-	    RelName string
-	    ClassName string
-	    RoleId int
-	    Cardinality string
-	} {
-	    {DomName RelName ClassName RoleId}
-	}
-    }
+        DomName string
+        RelName string
+        ClassName string
+        RoleId int
+        Cardinality string
+    } {DomName RelName ClassName RoleId}
 
     relvar association R9\
 	SimpleReferring {DomName RelName} 1\
 	SimpleRel {DomName RelName} 1
 
     relvar create SimpleRefTo {
-	Relation {
-	    DomName string
-	    RelName string
-	    ClassName string
-	    RoleId int
-	    Cardinality string
-	} {
-	    {DomName RelName ClassName RoleId}
-	}
-    }
+        DomName string
+        RelName string
+        ClassName string
+        RoleId int
+        Cardinality string
+    } {DomName RelName ClassName RoleId}
 
     relvar association R10\
 	SimpleRefTo {DomName RelName} 1\
 	SimpleRel {DomName RelName} 1
 
     relvar create SupertypeRole {
-	Relation {
-	    DomName string
-	    RelName string
-	    ClassName string
-	    RoleId int
-	} {
-	    {DomName RelName ClassName RoleId}
-	}
-    }
+        DomName string
+        RelName string
+        ClassName string
+        RoleId int
+    } {DomName RelName ClassName RoleId}
 
     relvar association R11\
 	SupertypeRole {DomName RelName} 1\
 	GenRel {DomName RelName} 1
 
     relvar create SubtypeRole {
-	Relation {
-	    DomName string
-	    RelName string
-	    ClassName string
-	    RoleId int
-	} {
-	    {DomName RelName ClassName RoleId}
-	}
-    }
+        DomName string
+        RelName string
+        ClassName string
+        RoleId int
+    } {DomName RelName ClassName RoleId}
 
     relvar association R12\
 	SubtypeRole {DomName RelName} +\
@@ -314,47 +250,35 @@ namespace eval ::raloo::mm {
     }
 
     relvar create AssocSource {
-	Relation {
-	    DomName string
-	    RelName string
-	    ClassName string
-	    RoleId int
-	    Cardinality string
-	} {
-	    {DomName RelName ClassName RoleId}
-	}
-    }
+        DomName string
+        RelName string
+        ClassName string
+        RoleId int
+        Cardinality string
+    } {DomName RelName ClassName RoleId}
 
     relvar association R13\
 	AssocSource {DomName RelName} 1\
 	AssocRel {DomName RelName} 1
 
     relvar create Associator {
-	Relation {
-	    DomName string
-	    RelName string
-	    ClassName string
-	    RoleId int
-	} {
-	    {DomName RelName ClassName RoleId}
-	}
-    }
+        DomName string
+        RelName string
+        ClassName string
+        RoleId int
+    } {DomName RelName ClassName RoleId}
 
     relvar association R14\
 	Associator {DomName RelName} 1\
 	AssocRel {DomName RelName} 1
 
     relvar create AssocTarget {
-	Relation {
-	    DomName string
-	    RelName string
-	    ClassName string
-	    RoleId int
-	    Cardinality string
-	} {
-	    {DomName RelName ClassName RoleId}
-	}
-    }
+        DomName string
+        RelName string
+        ClassName string
+        RoleId int
+        Cardinality string
+    } {DomName RelName ClassName RoleId}
 
     relvar association R15\
 	AssocTarget {DomName RelName} 1\
@@ -366,7 +290,7 @@ namespace eval ::raloo::mm {
     relvar trace add variable AssocTarget insert [namespace code notAssociator]
     proc notAssociator {op relvarName tupleValue} {
 	set isAssoc [ralutil::pipe {
-	    tuple relation $tupleValue {{DomName RelName ClassName RoleId}} |
+	    tuple relation $tupleValue |
 	    relation semijoin ~ $::raloo::mm::Associator -using\
 		    {DomName DomName RelName RelName ClassName ClassName} |
 	    relation isnotempty
@@ -379,15 +303,11 @@ namespace eval ::raloo::mm {
     }
 
     relvar create ReferringClass {
-	Relation {
-	    DomName string
-	    RelName string
-	    ClassName string
-	    RoleId int
-	} {
-	    {DomName RelName ClassName RoleId}
-	}
-    }
+        DomName string
+        RelName string
+        ClassName string
+        RoleId int
+    } {DomName RelName ClassName RoleId}
 
     relvar partition R16\
 	ReferringClass {DomName RelName ClassName RoleId}\
@@ -396,15 +316,11 @@ namespace eval ::raloo::mm {
 	    Associator {DomName RelName ClassName RoleId}
 
     relvar create RefToClass {
-	Relation {
-	    DomName string
-	    RelName string
-	    ClassName string
-	    RoleId int
-	} {
-	    {DomName RelName ClassName RoleId}
-	}
-    }
+        DomName string
+        RelName string
+        ClassName string
+        RoleId int
+    } {DomName RelName ClassName RoleId}
 
     relvar partition R17\
 	RefToClass {DomName RelName ClassName RoleId}\
@@ -414,15 +330,11 @@ namespace eval ::raloo::mm {
 	    AssocTarget {DomName RelName ClassName RoleId}
 
     relvar create ClassRoleInRel {
-	Relation {
-	    DomName string
-	    RelName string
-	    ClassName string
-	    RoleId int
-	} {
-	    {DomName RelName ClassName RoleId}
-	}
-    }
+        DomName string
+        RelName string
+        ClassName string
+        RoleId int
+    } {DomName RelName ClassName RoleId}
 
     relvar partition R18\
 	ClassRoleInRel {DomName RelName ClassName RoleId}\
@@ -434,17 +346,13 @@ namespace eval ::raloo::mm {
 	{DomName ClassName} * Class {DomName ClassName}
 
     relvar create RefToIdAttribute {
-	Relation {
-	    DomName string
-	    ClassName string
-	    RelName string
-	    RoleId int
-	    AttrName string
-	    IdNum int
-	} {
-	    {DomName ClassName RelName RoleId AttrName IdNum}
-	}
-    }
+        DomName string
+        ClassName string
+        RelName string
+        RoleId int
+        AttrName string
+        IdNum int
+    } {DomName ClassName RelName RoleId AttrName IdNum}
 
     relvar correlation R21 RefToIdAttribute\
 	{DomName ClassName RelName RoleId} +\
@@ -453,21 +361,17 @@ namespace eval ::raloo::mm {
 	    IdAttribute {DomName ClassName IdNum AttrName}
 
     relvar create AttributeRef {
-	Relation {
-	    DomName string
-	    RelName string
-	    RefngClassName string
-	    RefngAttrName string
-	    RefngRoleId int
-	    RefToClassName string
-	    RefToAttrName string
-	    RefToRoleId int
-	    RefToIdNum int
-	} {
-	    {DomName RelName RefngClassName RefngRoleId\
-		RefToClassName RefToAttrName RefToRoleId RefToIdNum}
-	}
-    }
+        DomName string
+        RelName string
+        RefngClassName string
+        RefngAttrName string
+        RefngRoleId int
+        RefToClassName string
+        RefToAttrName string
+        RefToRoleId int
+        RefToIdNum int
+    } {DomName RelName RefngClassName RefngRoleId\
+            RefToClassName RefToAttrName RefToRoleId RefToIdNum}
 
     relvar correlation R22 AttributeRef\
 	{DomName RefngClassName RelName RefngRoleId} +\
@@ -480,50 +384,34 @@ namespace eval ::raloo::mm {
 	Attribute {DomName ClassName AttrName} 1
 
     relvar create InstStateModel {
-	Relation {
-	    DomName string
-	    ClassName string
-	} {
-	    {DomName ClassName}
-	}
-    }
+        DomName string
+        ClassName string
+    } {DomName ClassName}
 
     relvar association R30\
 	InstStateModel {DomName ClassName} ?\
 	Class {DomName ClassName} 1
 
     relvar create AssignerStateModel {
-	Relation {
-	    DomName string
-	    RelName string
-	} {
-	    {DomName RelName}
-	}
-    }
+        DomName string
+        RelName string
+    } {DomName RelName}
 
     relvar association R31\
 	AssignerStateModel {DomName RelName} ?\
 	Relationship {DomName RelName} 1
 
     relvar create SingleAssigner {
-	Relation {
-	    DomName string
-	    RelName string
-	} {
-	    {DomName RelName}
-	}
-    }
+        DomName string
+        RelName string
+    } {DomName RelName}
 
     relvar create MultipleAssigner {
-	Relation {
-	    DomName string
-	    RelName string
-	    ClassName string
-	    IdNum int
-	} {
-	    {DomName RelName}
-	}
-    }
+        DomName string
+        RelName string
+        ClassName string
+        IdNum int
+    } {DomName RelName}
 
     relvar partition R38\
 	AssignerStateModel {DomName RelName}\
@@ -535,15 +423,11 @@ namespace eval ::raloo::mm {
 	Identifier {DomName ClassName IdNum} 1
 
     relvar create StateModel {
-	Relation {
-	    DomName string
-	    ModelName string
-	    InitialState string
-	    DefaultTrans string
-	} {
-	    {DomName ModelName}
-	}
-    }
+        DomName string
+        ModelName string
+        InitialState string
+        DefaultTrans string
+    } {DomName ModelName}
 
     relvar partition R32\
 	StateModel {DomName ModelName}\
@@ -551,40 +435,28 @@ namespace eval ::raloo::mm {
 	    AssignerStateModel {DomName RelName}
 
     relvar create StatePlace {
-	Relation {
-	    DomName string
-	    ModelName string
-	    StateName string
-	} {
-	    {DomName ModelName StateName}
-	}
-    }
+        DomName string
+        ModelName string
+        StateName string
+    } {DomName ModelName StateName}
 
     relvar create State {
-	Relation {
-	    DomName string
-	    ModelName string
-	    StateName string
-	    Action string
-	    SigId int
-	} {
-	    {DomName ModelName StateName}
-	}
-    }
+        DomName string
+        ModelName string
+        StateName string
+        Action string
+        SigId int
+    } {DomName ModelName StateName}
 
     relvar association R33\
 	State {DomName ModelName} +\
 	StateModel {DomName ModelName} 1
 
     relvar create CreationState {
-	Relation {
-	    DomName string
-	    ModelName string
-	    StateName string
-	} {
-	    {DomName ModelName}
-	}
-    }
+        DomName string
+        ModelName string
+        StateName string
+    } {DomName ModelName}
 
     relvar partition R37\
 	StatePlace {DomName ModelName StateName}\
@@ -592,14 +464,10 @@ namespace eval ::raloo::mm {
 	    CreationState {DomName ModelName StateName}
 
     relvar create ActiveState {
-	Relation {
-	    DomName string
-	    ModelName string
-	    StateName string
-	} {
-	    {DomName ModelName StateName}
-	}
-    }
+        DomName string
+        ModelName string
+        StateName string
+    } {DomName ModelName StateName}
 
     relvar association R34\
 	StateModel {DomName ModelName InitialState} ?\
@@ -610,14 +478,10 @@ namespace eval ::raloo::mm {
 	StateModel {DomName ModelName} 1
 
     relvar create DeadState {
-	Relation {
-	    DomName string
-	    ModelName string
-	    StateName string
-	} {
-	    {DomName ModelName StateName}
-	}
-    }
+        DomName string
+        ModelName string
+        StateName string
+    } {DomName ModelName StateName}
 
     relvar partition R36\
 	State {DomName ModelName StateName}\
@@ -625,44 +489,32 @@ namespace eval ::raloo::mm {
 	    DeadState {DomName ModelName StateName}
 
     relvar create TransitionPlace {
-	Relation {
-	    DomName string
-	    ModelName string
-	    EventName string
-	    StateName string
-	} {
-	    {DomName ModelName EventName StateName}
-	}
-    }
+        DomName string
+        ModelName string
+        EventName string
+        StateName string
+    } {DomName ModelName EventName StateName}
 
     relvar create StateTrans {
-	Relation {
-	    DomName string
-	    ModelName string
-	    EventName string
-	    StateName string
-	    NewState string
-	    SigId int
-	} {
-	    {DomName ModelName EventName StateName}
-	}
-    }
+        DomName string
+        ModelName string
+        EventName string
+        StateName string
+        NewState string
+        SigId int
+    } {DomName ModelName EventName StateName}
 
     relvar association R46\
 	StateTrans {DomName ModelName NewState} *\
 	State {DomName ModelName StateName} 1
 
     relvar create NonStateTrans {
-	Relation {
-	    DomName string
-	    ModelName string
-	    EventName string
-	    StateName string
-	    TransRule string
-	} {
-	    {DomName ModelName EventName StateName}
-	}
-    }
+        DomName string
+        ModelName string
+        EventName string
+        StateName string
+        TransRule string
+    } {DomName ModelName EventName StateName}
 
     relvar partition R45\
 	TransitionPlace {DomName ModelName EventName StateName}\
@@ -670,18 +522,10 @@ namespace eval ::raloo::mm {
 	NonStateTrans {DomName ModelName EventName StateName}
 
     relvar create TransitionRule {
-	Relation {
-	    RuleName string
-	} {
-	    RuleName
-	}
-    }
+        RuleName string
+    } RuleName
 
-    relvar insert TransitionRule {
-	RuleName CH
-    } {
-	RuleName IG
-    }
+    relvar insert TransitionRule {RuleName CH} {RuleName IG}
 
     relvar association R44\
 	NonStateTrans TransRule *\
@@ -692,26 +536,18 @@ namespace eval ::raloo::mm {
 	TransitionRule RuleName 1
 
     relvar create NewStateTrans {
-	Relation {
-	    DomName string
-	    ModelName string
-	    EventName string
-	    StateName string
-	} {
-	    {DomName ModelName EventName StateName}
-	}
-    }
+        DomName string
+        ModelName string
+        EventName string
+        StateName string
+    } {DomName ModelName EventName StateName}
 
     relvar create CreationTrans {
-	Relation {
-	    DomName string
-	    ModelName string
-	    EventName string
-	    StateName string
-	} {
-	    {DomName ModelName EventName}
-	}
-    }
+        DomName string
+        ModelName string
+        EventName string
+        StateName string
+    } {DomName ModelName EventName}
 
     relvar partition R47\
 	StateTrans {DomName ModelName EventName StateName}\
@@ -719,14 +555,10 @@ namespace eval ::raloo::mm {
 	    CreationTrans {DomName ModelName EventName StateName}
 
     relvar create EffectiveEvent {
-	Relation {
-	    DomName string
-	    ModelName string
-	    EventName string
-	} {
-	    {DomName ModelName EventName}
-	}
-    }
+        DomName string
+        ModelName string
+        EventName string
+    } {DomName ModelName EventName}
 
     relvar correlation R41 TransitionPlace\
 	{DomName ModelName EventName} *\
@@ -747,25 +579,17 @@ namespace eval ::raloo::mm {
 		CreationState {DomName ModelName}
 
     relvar create Event {
-	Relation {
-	    DomName string
-	    ModelName string
-	    EventName string
-	    SigId int
-	} {
-	    {DomName ModelName EventName}
-	}
-    }
+        DomName string
+        ModelName string
+        EventName string
+        SigId int
+    } {DomName ModelName EventName}
 
     relvar create DeferredEvent {
-	Relation {
-	    DomName string
-	    ModelName string
-	    EventName string
-	} {
-	    {DomName ModelName EventName}
-	}
-    }
+        DomName string
+        ModelName string
+        EventName string
+    } {DomName ModelName EventName}
 
     relvar partition R50\
 	Event {DomName ModelName EventName}\
@@ -773,24 +597,16 @@ namespace eval ::raloo::mm {
 	    EffectiveEvent {DomName ModelName EventName}
 
     relvar create PolymorphicEvent {
-	Relation {
-	    DomName string
-	    ModelName string
-	    EventName string
-	} {
-	    {DomName ModelName EventName}
-	}
-    }
+        DomName string
+        ModelName string
+        EventName string
+    } {DomName ModelName EventName}
 
     relvar create InheritedEvent {
-	Relation {
-	    DomName string
-	    ModelName string
-	    EventName string
-	} {
-	    {DomName ModelName EventName}
-	}
-    }
+        DomName string
+        ModelName string
+        EventName string
+    } {DomName ModelName EventName}
 
     relvar partition R51\
 	DeferredEvent {DomName ModelName EventName}\
@@ -798,29 +614,21 @@ namespace eval ::raloo::mm {
 	    InheritedEvent {DomName ModelName EventName}
 
     relvar create MappedEvent {
-	Relation {
-	    DomName string
-	    ModelName string
-	    EventName string
-	    ParentModel string
-	} {
-	    {DomName ModelName EventName}
-	}
-    }
+        DomName string
+        ModelName string
+        EventName string
+        ParentModel string
+    } {DomName ModelName EventName}
 
     relvar association R53\
 	MappedEvent {DomName ParentModel EventName} *\
 	DeferredEvent {DomName ModelName EventName} 1
 
     relvar create LocalEvent {
-	Relation {
-	    DomName string
-	    ModelName string
-	    EventName string
-	} {
-	    {DomName ModelName EventName}
-	}
-    }
+        DomName string
+        ModelName string
+        EventName string
+    } {DomName ModelName EventName}
 
     relvar partition R52\
 	EffectiveEvent {DomName ModelName EventName}\
@@ -828,16 +636,12 @@ namespace eval ::raloo::mm {
 	    LocalEvent {DomName ModelName EventName}
 
     relvar create NonLocalEvent {
-	Relation {
-	    DomName string
-	    ModelName string
-	    EventName string
-	    RelName string
-	    RoleId int
-	} {
-	    {DomName ModelName EventName}
-	}
-    }
+        DomName string
+        ModelName string
+        EventName string
+        RelName string
+        RoleId int
+    } {DomName ModelName EventName}
 
     relvar partition R54\
 	NonLocalEvent {DomName ModelName EventName}\
@@ -849,16 +653,12 @@ namespace eval ::raloo::mm {
 	SubtypeRole {DomName ClassName RelName RoleId} 1\
 
     relvar create DeferralPath {
-	Relation {
-	    DomName string
-	    ModelName string
-	    EventName string
-	    RelName string
-	    RoleId int
-	} {
-	    {DomName ModelName EventName RelName RoleId}
-	}
-    }
+        DomName string
+        ModelName string
+        EventName string
+        RelName string
+        RoleId int
+    } {DomName ModelName EventName RelName RoleId}
 
     relvar correlation R55 DeferralPath\
 	{DomName ModelName EventName} +\
@@ -867,27 +667,19 @@ namespace eval ::raloo::mm {
 	    SupertypeRole {DomName ClassName RelName RoleId}
 
     relvar create Signature {
-	Relation {
-	    DomName string
-	    ModelName string
-	    SigId int
-	} {
-	    {DomName ModelName SigId}
-	}
-    }
+        DomName string
+        ModelName string
+        SigId int
+    } {DomName ModelName SigId}
 
     relvar create SignatureParam {
-	Relation {
-	    DomName string
-	    ModelName string
-	    SigId int
-	    ParamName string
-	    ParamOrder int
-	} {
-	    {DomName ModelName SigId ParamName}
-	    {DomName ModelName SigId ParamOrder}
-	}
-    }
+        DomName string
+        ModelName string
+        SigId int
+        ParamName string
+        ParamOrder int
+    } {DomName ModelName SigId ParamName}\
+      {DomName ModelName SigId ParamOrder}
 
     relvar association R60\
 	StateTrans {DomName ModelName SigId} *\
@@ -915,8 +707,7 @@ namespace eval ::raloo::mm {
     # R60=R46+R64
     relvar trace add variable StateTrans insert [namespace code sameSig]
     proc sameSig {op relvarName tupleValue} {
-	set trans [tuple relation $tupleValue\
-		{{DomName ModelName EventName StateName}}]
+	set trans [tuple relation $tupleValue]
 	#puts [relformat $trans trans]
 
 	# See what we get if we just directly semijoin across the composite
@@ -998,12 +789,10 @@ namespace eval ::raloo::mm {
 
     # This relvar is used to hold system generated unique identifiers.
     relvar create __uniqueids__ {
-	Relation {
-	    RelvarName string IdAttr string IdNum int
-	} {
-	    {RelvarName IdAttr}
-	}
-    }
+	    RelvarName string
+            IdAttr string
+            IdNum int
+	} {RelvarName IdAttr}
 
     # A convenience proc that installs a trace on an attribute of
     # a relvar in order to have the system assign a unique value
@@ -1029,11 +818,11 @@ namespace eval ::raloo::mm {
 	    relvar updateone __uniqueids__ uid\
 		    [list RelvarName $relvarName IdAttr $attrName] {
 		set idValue [tuple extract $uid IdNum]
-		tuple update uid IdNum [incr idValue]
+		tuple update $uid IdNum [incr idValue]
 	    }
 	}
 	# Return the tuple to insert with the Id value.
-	return [tuple update tup $attrName $idValue]
+	return [tuple update $tup $attrName $idValue]
     }
 
     proc deleteStateModel {domName modelName} {
@@ -1234,7 +1023,7 @@ oo::class create ::raloo::Domain {
     method ExecOpScript {script} {
 	catch {
 	    relvar eval {
-                ::raloo::arch::initTOC [self] [self] {Relation {} {{}} {{}}}
+                ::raloo::arch::initTOC [self] [self] $::ralutil::DEE
 		catch {uplevel 1 $script} sresult soptions
                 ::raloo::arch::checkTOC
                 return -options $soptions $sresult
@@ -1280,7 +1069,7 @@ oo::class create ::raloo::Domain {
 	# If a lifecycle was defined for the class, then we create an
 	# active class. Otherwise a passive one is fine.
 	set classType [expr {[relation isempty\
-	    [relation choose $::raloo::mm::InstStateModel DomName $domName\
+	    [relvar restrictone ::raloo::mm::InstStateModel DomName $domName\
 		ClassName $className]] ?\
 	    "PasvRelvarClass" : "ActiveRelvarClass"}]
 	::raloo::$classType create $className
@@ -1354,8 +1143,7 @@ oo::class create ::raloo::Domain {
 	    ]
 	    my variable attrRefMap
 	    set attrRefMap [relation create\
-		{RefToAttrName string RefngAttrName string}\
-		{RefToAttrName RefngAttrName}]
+		{RefToAttrName string RefngAttrName string}]
 	    my DefineWith Relationship $script\
 		RefMap\
 		Assigner
@@ -1364,15 +1152,16 @@ oo::class create ::raloo::Domain {
 		$attrRefMap
 	}
 	# Check for any assigner behavior
-	if {[relation isempty [relation choose $::raloo::mm::AssignerStateModel\
+	if {[relation isempty [relvar restrictone\
+                ::raloo::mm::AssignerStateModel\
 		DomName $domName RelName $relName]]} {
 	    ::raloo::Relationship create ${domName}::$name
 	} elseif {[relation isnotempty\
-	       [relation choose $::raloo::mm::SingleAssigner\
+	       [relvar restrictone ::raloo::mm::SingleAssigner\
 		DomName $domName RelName $relName]]} {
 	    ::raloo::SingleAssignerRel create ${domName}::$name
 	} elseif {[relation isnotempty\
-		[relation choose $::raloo::mm::MultipleAssigner\
+		[relvar restrictone ::raloo::mm::MultipleAssigner\
 		DomName $domName RelName $relName]]} {
 	    ::raloo::MultipleAssignerRel create ${domName}::$name
 	}
@@ -1581,8 +1370,7 @@ oo::class create ::raloo::Domain {
 	    my variable frwdAttrRefMap
 	    my variable backAttrRefMap
 	    set frwdAttrRefMap [relation create\
-		{RefToAttrName string RefngAttrName string}\
-		{RefToAttrName RefngAttrName}]
+		{RefToAttrName string RefngAttrName string}]
 	    set backAttrRefMap $frwdAttrRefMap
 	    my DefineWith AssocRelationship $script\
 		FwrdRefMap\
@@ -1607,15 +1395,16 @@ oo::class create ::raloo::Domain {
 		$sourceIdNum $backAttrRefMap
 	}
 	# Check for any assigner behavior
-	if {[relation isempty [relation choose $::raloo::mm::AssignerStateModel\
+	if {[relation isempty [relvar restrictone\
+                ::raloo::mm::AssignerStateModel\
 		DomName $domName RelName $relName]]} {
 	    ::raloo::AssocRelationship create ${domName}::$name
 	} elseif {[relation isnotempty\
-	       [relation choose $::raloo::mm::SingleAssigner\
+	       [relvar restrictone ::raloo::mm::SingleAssigner\
 		DomName $domName RelName $relName]]} {
 	    ::raloo::SingleAssignerAssocRel create ${domName}::$name
 	} elseif {[relation isnotempty\
-		[relation choose $::raloo::mm::MultipleAssigner\
+		[relvar restrictone ::raloo::mm::MultipleAssigner\
 		DomName $domName RelName $relName]]} {
 	    ::raloo::MultipleAssignerAssocRel create ${domName}::$name
 	}
@@ -1737,7 +1526,7 @@ oo::class create ::raloo::Domain {
     method AddNonLocalEvent {parent subRole eventName signature} {
 	my variable domName
 	relation assign $subRole
-	set local [relation choose $::raloo::mm::LocalEvent\
+	set local [relvar restrictone ::raloo::mm::LocalEvent\
 	    DomName $domName ModelName $ClassName EventName $eventName]
 	if {[relation isnotempty $local]} {
 	    # Found a local event by the same name as the polymorphic
@@ -1828,11 +1617,10 @@ oo::class create ::raloo::Domain {
 	    ]
 	    foreach idNum $idNumList {
 		relvar union ::raloo::mm::Identifier [relation create\
-		    {DomName string ClassName string IdNum int}\
-		    {{DomName ClassName IdNum}} [list\
-		    DomName $domName\
-		    ClassName $className\
-		    IdNum $idNum\
+		    {DomName string ClassName string IdNum int} [list\
+                        DomName $domName\
+                        ClassName $className\
+                        IdNum $idNum\
 		]]
 		relvar insert ::raloo::mm::IdAttribute [list\
 		    DomName $domName\
@@ -1874,12 +1662,12 @@ oo::class create ::raloo::Domain {
 	# If the default initial state is not already set, then
 	# the first mentioned state becomes the default as long as it
 	# it not a final state.
-	set sm [relation choose $::raloo::mm::StateModel\
+	set sm [relvar restrictone ::raloo::mm::StateModel\
 	    DomName $domName ModelName $modelName]
 	if {[relation extract $sm InitialState] eq "" && !$final} {
 	    relvar updateone ::raloo::mm::StateModel stup [list\
 		    DomName $domName ModelName $modelName] {
-		tuple update stup InitialState $name
+		tuple update $stup InitialState $name
 	    }
 	}
 	set sig [my FindSig $domName $modelName $argList]
@@ -1914,10 +1702,8 @@ oo::class create ::raloo::Domain {
 	    set csTuple [tuple create\
 		{DomName string ModelName string StateName string}\
 		[list DomName $domName ModelName $modelName StateName $current]]
-	    relvar union ::raloo::mm::CreationState\
-		[tuple relation $csTuple {{DomName ModelName}}]
-	    relvar union ::raloo::mm::StatePlace\
-		[tuple relation $csTuple {{DomName ModelName StateName}}]
+	    relvar union ::raloo::mm::CreationState [tuple relation $csTuple]
+	    relvar union ::raloo::mm::StatePlace [tuple relation $csTuple]
 	}
 	# Each transition must start from a Transition Place, the conceptual
 	# cell in the transition matrix.
@@ -1932,7 +1718,7 @@ oo::class create ::raloo::Domain {
 	# TransitionRule then we have a NonState Transition (see R45 in the
 	# meta-model)
 	if {[relation isnotempty\
-		[relation choose $::raloo::mm::TransitionRule RuleName $new]]} {
+            [relvar restrictone ::raloo::mm::TransitionRule RuleName $new]]} {
 	    relvar insert ::raloo::mm::NonStateTrans [list\
 		DomName $domName\
 		ModelName $modelName\
@@ -1943,7 +1729,7 @@ oo::class create ::raloo::Domain {
 	} else {
 	    # Find the signature of the state for which the transition is the
 	    # target. This must be the signature for the event.
-	    set state [relation choose $::raloo::mm::State\
+	    set state [relvar restrictone ::raloo::mm::State\
 		DomName $domName\
 		ModelName $modelName\
 		StateName $new\
@@ -1961,9 +1747,7 @@ oo::class create ::raloo::Domain {
 	    # use "relvar union" here in case the event name is mentioned
 	    # in multiple transitions.
 	    set event [relation create\
-		{DomName string ModelName string EventName string}\
-		{{DomName ModelName EventName}}\
-		[list\
+		{DomName string ModelName string EventName string} [list\
 		    DomName $domName\
 		    ModelName $modelName\
 		    EventName $eventName\
@@ -1998,7 +1782,7 @@ oo::class create ::raloo::Domain {
 	my variable modelName
 	relvar updateone ::raloo::mm::StateModel sm [list\
 		DomName $domName ModelName $modelName] {
-	    tuple update sm DefaultTrans $trans
+	    tuple update $sm DefaultTrans $trans
 	}
 	return
     }
@@ -2007,7 +1791,7 @@ oo::class create ::raloo::Domain {
 	my variable modelName
 	relvar updateone ::raloo::mm::StateModel sm [list\
 		DomName $domName ModelName $modelName] {
-	    tuple update sm InitialState $state
+	    tuple update $sm InitialState $state
 	}
 	return
     }
@@ -2163,8 +1947,8 @@ oo::class create ::raloo::Domain {
 	    relation join $referringClass $refToIdAttribute |
 	    relation extend ~ af RefngAttrName string {
 		[relation extract\
-		    [relation choose $refMap RefToAttrName\
-			[tuple extract $af RefToAttrName]]\
+		    [relation restrictwith $refMap\
+                        {$RefToAttrName eq [tuple extract $af RefToAttrName]}]\
 		    RefngAttrName]
 	    }
 	}]
@@ -2205,8 +1989,7 @@ oo::class create ::raloo::Domain {
 		RefngAttrName $refngAttrName]
 	}
 	return [relation create\
-	    {RefToAttrName string RefngAttrName string}\
-	    {RefToAttrName RefngAttrName} {*}$mapTuples]
+	    {RefToAttrName string RefngAttrName string} {*}$mapTuples]
     }
     # Make a relation that is the identity mapping of referring / referred
     # attributes.
@@ -2215,8 +1998,7 @@ oo::class create ::raloo::Domain {
 	    lappend mapTuples [list RefToAttrName $attr RefngAttrName $attr]
 	}
 	return [relation create\
-	    {RefToAttrName string RefngAttrName string}\
-	    {RefToAttrName RefngAttrName} {*}$mapTuples]
+	    {RefToAttrName string RefngAttrName string} {*}$mapTuples]
     }
 
     # Find out the identifier to which the referred to attributes belongs. They
@@ -2261,9 +2043,7 @@ oo::class create ::raloo::Domain {
 		ParamName $paramName ParamOrder [incr order]]
 	}
 	set dsor [relation create\
-	    {DomName string ModelName string ParamName string\
-		ParamOrder int}\
-	    {{DomName ModelName ParamName} {DomName ModelName ParamOrder}}\
+	    {DomName string ModelName string ParamName string ParamOrder int}\
 	    {*}$paramTuples]
 	#puts [relformat $dsor dsor]
 	# Find the signature Id which matches all of the parameters.
@@ -2304,15 +2084,12 @@ oo::class create ::raloo::Domain {
 	    ralutil::pipe {
 		relation extend $dsor sp\
 			SigId int {[relation extract $sig SigId]} |
-		relation reidentify ~\
-		    {DomName ModelName SigId ParamName}\
-		    {DomName ModelName SigId ParamOrder} |
 		relvar union ::raloo::mm::SignatureParam
 	    }
 	    #puts [relformat $::raloo::mm::Signature Signature]
 	    #puts [relformat $::raloo::mm::SignatureParam SignatureParam]
 	} else {
-	    set sig [relation choose $::raloo::mm::Signature\
+	    set sig [relvar restrictone ::raloo::mm::Signature\
 		DomName $domName\
 		ModelName $modelName\
 		SigId [relation extract $quot SigId]\
@@ -2342,7 +2119,7 @@ oo::class create ::raloo::RelvarClass {
     }
     method update {attrValueList attrName value} {
 	relvar updateone [self] t $attrValueList {
-	    tuple update t $attrName $value
+	    tuple update $t $attrName $value
 	}
     }
     method set {relValue} {
@@ -2380,9 +2157,10 @@ oo::class create ::raloo::RelvarClass {
 	return $obj
     }
     method createInstance {args} {
+	my variable relvarName
 	return [my new {*}[ralutil::pipe {
 	    my insert {*}$args |
-	    ::raloo::InstRef idProjection |
+	    ::raloo::InstRef idProjection $relvarName |
 	    relation tuple |
 	    tuple get
 	}]]
@@ -2405,24 +2183,22 @@ oo::class create ::raloo::PasvRelvarClass {
 	# Create a relvar by the same name as the class to serve as the
 	# backing store for the class.
 	# The main part of the work to construct a relvar is to construct the
-	# heading of the relation that will be in the relvar. The heading
-	# consists of three parts. First the "Relation" keyword.
-	set relHeading [list Relation]
+	# heading of the relation that will be in the relvar and to
+        # come up with the identifiers.
+
 	# Look for any attributes whose types that are given as "UNIQUE". We
 	# turn these into "int" types and put a trace on them to make sure the
 	# identifier is unique within the class. First we have to squirrel
 	# away the attribute names. We place the trace later.
-	set uniqueAttrs [list]
-	relvar update ::raloo::mm::Attribute attr {
-	    [tuple extract $attr DomName] eq $domName &&
-	    [tuple extract $attr ClassName] eq $className &&
-	    [tuple extract $attr AttrType] eq "UNIQUE"} {
-	    lappend uniqueAttrs [tuple extract $attr AttrName]
-	    tuple update attr AttrType int
-	}
+	set uniqueAttrs [relvar update ::raloo::mm::Attribute attr {
+                [tuple extract $attr DomName] eq $domName &&
+                [tuple extract $attr ClassName] eq $className &&
+                [tuple extract $attr AttrType] eq "UNIQUE"} {
+	    tuple update $attr AttrType int
+	}]
 
 	# Second a dictionary of attribute name / attribute type.
-	lappend relHeading [ralutil::pipe {
+	set relHeading [ralutil::pipe {
 	    relation restrictwith $::raloo::mm::Attribute {
 		$DomName eq $domName && $ClassName eq $className} |
 	    relation dict ~ AttrName AttrType
@@ -2439,12 +2215,11 @@ oo::class create ::raloo::PasvRelvarClass {
 	relation foreach id $ids -ascending IdNum {
 	    lappend idList [relation list [relation extract $id IdAttr]]
 	}
-	lappend relHeading $idList
 
 	# Finally create the relvar.
-	relvar create [self] $relHeading
+	relvar create [self] $relHeading {*}$idList
 	# Now that the relvar exists, we can add traces
-	foreach attr $uniqueAttrs {
+	foreach attr [relation list $uniqueAttrs AttrName] {
 	    ::raloo::mm::uniqueId [self] $attr
 	}
 
@@ -2547,7 +2322,7 @@ oo::class create ::raloo::ActiveSingleton {
 	my variable domName
 	my variable modelName
 	return [relation extract\
-	    [relation choose $::raloo::mm::StateModel\
+	    [relvar restrictone ::raloo::mm::StateModel\
 		DomName $domName ModelName $modelName]\
 	    InitialState]
     }
@@ -2555,7 +2330,7 @@ oo::class create ::raloo::ActiveSingleton {
 	my variable domName
 	my variable modelName
 	return [relation extract\
-	    [relation choose $::raloo::mm::StateModel\
+	    [relvar restrictone ::raloo::mm::StateModel\
 		DomName $domName ModelName $modelName]\
 	    DefaultTrans]
     }
@@ -2625,9 +2400,9 @@ oo::class create ::raloo::ActiveRelvarClass {
 }
 
 oo::class create ::raloo::InstRef {
-    self method idProjection {relValue {id 0}} {
+    self method idProjection {relvarName relValue {id 0}} {
 	::ral::relation project $relValue\
-	    {*}[lindex [::ral::relation identifiers $relValue] $id]
+	    {*}[lindex [::ral::relvar identifiers $relvarName] $id]
     }
     # Convert a relation value contained in the base relvar into a reference.
     method set {relValue} {
@@ -2639,7 +2414,7 @@ oo::class create ::raloo::InstRef {
 	    error "relation value:\n[relformat $relValue]\nis not contained\
 		in $relvarName:\n[relformat [relvar set $relvarName]]"
 	}
-	set ref [::raloo::InstRef idProjection $relValue]
+	set ref [::raloo::InstRef idProjection $relvarName $relValue]
     }
     # Find the tuples in the base relvar that this reference actually refers
     # to.
@@ -2687,9 +2462,8 @@ oo::class create ::raloo::RelvarRef {
 	    set ref [relation emptyof [relvar set $relvarName]]
 	} else {
 	    set ref [::ralutil::pipe {
-		relvar set $relvarName |
-		relation choose ~ {*}$args |
-		::raloo::InstRef idProjection
+		relvar restrictone $relvarName {*}$args |
+		::raloo::InstRef idProjection $relvarName
 	    }]
 	}
     }
@@ -2741,10 +2515,7 @@ oo::class create ::raloo::RelvarRef {
     method selectOne {args} {
 	my variable ref
 	my variable relvarName
-	my set [::ralutil::pipe {
-	    relvar set $relvarName |
-	    relation choose ~ {*}$args
-	}]
+	my set [relvar restrictone $relvarName {*}$args]
     }
     method selectAll {} {
 	my variable relvarName
@@ -2764,7 +2535,7 @@ oo::class create ::raloo::RelvarRef {
 	    relvar set $relvarName |
 	    relation restrictwith ~ [list $expr] |
 	    relation tag ~ __Order__ |
-	    relation choose ~ __Order__ 0
+	    relation restrictwith ~ {$ __Order__ == 0}
 	} cmd
 	my set [uplevel 1 $cmd]
     }
@@ -2833,12 +2604,12 @@ oo::class create ::raloo::RelvarRef {
 		dict for {reftoAttr refngAttr} $refAttrMapping {
 		    lappend avList $refngAttr [dict get $reftoDict $reftoAttr]
 		}
-		tuple update tup {*}$avList
+		tuple update $tup {*}$avList
 	    }]
 	    set allupdates [relation union $allupdates $updated]
 	}
-	$refngObj set [relation create {*}[lrange\
-	    [relation heading [relvar set $refngRelvar]] 1 end]\
+	$refngObj set [relation create\
+	    [relation heading [relvar set $refngRelvar]]\
 	    {*}[relation body $allupdates]]
 	return
     }
@@ -2917,12 +2688,12 @@ oo::class create ::raloo::RelvarRef {
 		dict for {reftoAttr refngAttr} $refAttrMapping {
 		    lappend avList $refngAttr {}
 		}
-		tuple update tup {*}$avList
+		tuple update $tup {*}$avList
 	    }]
 	    set allupdates [relation union $allupdates $updated]
 	}
-	$refngObj set [relation create {*}[lrange\
-	    [relation heading [relvar set $refngRelvar]] 1 end]\
+	$refngObj set [relation create\
+	    [relation heading [relvar set $refngRelvar]]\
 	    {*}[relation body $allupdates]]
 	return
     }
@@ -2977,7 +2748,7 @@ oo::class create ::raloo::RelvarRef {
 	    set updates [relation union $updates\
 		    [relvar updateone $relvarName tup\
 			[tuple get [relation tuple $r]] {
-		    tuple update tup $attrName $value
+		    tuple update $tup $attrName $value
 		    }]]
 	}
 	my set $updates
@@ -3124,7 +2895,7 @@ oo::class create ::raloo::Relationship {
 	my variable relName
 	set relName [namespace tail [self]]
 	set simplerel [ralutil::pipe {
-	    relation choose $::raloo::mm::Relationship DomName $domName\
+	    relvar restrictone ::raloo::mm::Relationship DomName $domName\
 		RelName $relName |
 	    relation semijoin ~ $::raloo::mm::SimpleRel
 	}]
@@ -3267,7 +3038,7 @@ oo::class create ::raloo::Generalization {
 	set relName [namespace tail [self]]
 	# construct the "relvar partition"
 	set genrel [ralutil::pipe {
-	    relation choose $::raloo::mm::Relationship DomName $domName\
+	    relvar restrictone ::raloo::mm::Relationship DomName $domName\
 		RelName $relName |
 	    relation semijoin ~ $::raloo::mm::GenRel
 	}]
@@ -3484,7 +3255,7 @@ oo::class create ::raloo::AssocRelationship {
 	set relName [namespace tail [self]]
 
 	set assocrel [ralutil::pipe {
-	    relation choose $::raloo::mm::Relationship DomName $domName\
+	    relvar restrictone ::raloo::mm::Relationship DomName $domName\
 		RelName $relName |
 	    relation semijoin ~ $::raloo::mm::AssocRel
 	}]
@@ -3706,7 +3477,8 @@ oo::class create ::raloo::SingleAssigner {
 	    }
 	}
 	relvar insert [self] [list\
-	    __CS__ [relation extract [relation choose $::raloo::mm::StateModel\
+	    __CS__ [relation extract\
+                    [relvar restrictone ::raloo::mm::StateModel\
 		    DomName $domName ModelName $relName] InitialState]
 	]
 
@@ -3764,7 +3536,8 @@ oo::class create ::raloo::SingleAssignerRef {
 	namespace path [concat [namespace path]\
 		[namespace qualifiers $relvarName]]
 	my variable ref
-	set ref [::raloo::InstRef idProjection [relvar set $relvarName]]
+	set ref [::raloo::InstRef idProjection $relvarName\
+                [relvar set $relvarName]]
     }
     method set {relValue} {
     }
@@ -3787,7 +3560,7 @@ oo::class create ::raloo::MultipleAssigner {
 	# Find the identifying attributes/types associated with multiple
 	# assigner
 	set idAttrs [ralutil::pipe {
-	    relation choose $::raloo::mm::MultipleAssigner\
+	    relvar restrictone ::raloo::mm::MultipleAssigner\
 		DomName $domName RelName $relName |
 	    relation semijoin ~ $::raloo::mm::Identifier\
 		$::raloo::mm::IdAttribute $::raloo::mm::Attribute |
@@ -3864,9 +3637,8 @@ oo::class create ::raloo::MultipleAssignerRef {
 	    set ref [relation emptyof [relvar set $relvarName]]
 	} else {
 	    set ref [::ralutil::pipe {
-		relvar set $relvarName |
-		relation choose ~ {*}$args |
-		::raloo::InstRef idProjection
+		relvar restrictone $relvarName {*}$args |
+		::raloo::InstRef idProjection $relvarName
 	    }]
 	}
     }
@@ -3879,15 +3651,12 @@ oo::class create ::raloo::MultipleAssignerRef {
 	    error "relation value:\n[relformat $relValue]\nis not contained\
 		in $relvarName:\n[relformat [relvar set $relvarName]]"
 	}
-	set ref [::raloo::InstRef idProjection $relValue]
+	set ref [::raloo::InstRef idProjection $relvarName $relValue]
     }
     method selectOne {args} {
 	my variable ref
 	my variable relvarName
-	my set [::ralutil::pipe {
-	    relvar set $relvarName |
-	    relation choose ~ {*}$args
-	}]
+	my set [relvar restrictone $relvarName {*}$args]
     }
 }
 
@@ -4090,7 +3859,7 @@ proc ::raloo::arch::cancelDelayedToInsts {domName srcModel srcRef dstModel\
 
 proc ::raloo::arch::lookUpEvent {domName modelName eventName} {
     # Check if this event even exists.
-    set event [relation choose $::raloo::mm::Event\
+    set event [relvar restrictone ::raloo::mm::Event\
 	DomName $domName\
 	ModelName $modelName\
 	EventName $eventName\
@@ -4272,7 +4041,7 @@ proc ::raloo::arch::deliverEvent {srcEvent dstEvent} {
     set domName [dict get $dstEvent domName]
     set modelName [dict get $dstEvent modelName]
     set eventName [dict get $dstEvent eventName]
-    set effEvent [relation choose $::raloo::mm::EffectiveEvent\
+    set effEvent [relvar restrictone ::raloo::mm::EffectiveEvent\
 	DomName $domName\
 	ModelName $modelName\
 	EventName $eventName\
@@ -4282,7 +4051,7 @@ proc ::raloo::arch::deliverEvent {srcEvent dstEvent} {
 	return
     }
 
-    set defEvent [relation choose $::raloo::mm::DeferredEvent\
+    set defEvent [relvar restrictone ::raloo::mm::DeferredEvent\
 	DomName $domName\
 	ModelName $modelName\
 	EventName $eventName\
@@ -4308,7 +4077,7 @@ proc ::raloo::arch::deliverEffEvent {srcEvent dstEvent} {
     # value to which it refers from the relvar.
     set dstRef [dict get $dstEvent inst]
     set relvarName ${domName}::${dstModel}
-    set instValue [relation choose [relvar set $relvarName]\
+    set instValue [relvar restrictone $relvarName\
 	    {*}[lindex [relation body $dstRef] 0]]
     # Detect the event in flight error
     if {[relation isempty $instValue]} {
@@ -4320,7 +4089,7 @@ proc ::raloo::arch::deliverEffEvent {srcEvent dstEvent} {
     # We need the current state to compute the transition.
     set cs [relation extract $instValue __CS__]
     # Find the transition and the new state to which we are headed.
-    set trans [relation choose $::raloo::mm::TransitionPlace\
+    set trans [relvar restrictone ::raloo::mm::TransitionPlace\
 	DomName $domName\
 	ModelName $dstModel\
 	EventName $eventName\
@@ -4350,7 +4119,7 @@ proc ::raloo::arch::deliverEffEvent {srcEvent dstEvent} {
 		# Update the current state to be the new state
 		relvar updateone $relvarName tup\
 			[lindex [relation body $dstRef] 0] {
-		    tuple update tup __CS__ $newStateName
+		    tuple update $tup __CS__ $newStateName
 		}
 	    }
 	    $inst destroy
@@ -4372,7 +4141,7 @@ proc ::raloo::arch::deliverEffEvent {srcEvent dstEvent} {
 	# R35 of metamodel).  Unspecified creation transitions are always
 	# deemed a "can't happen".
 	set defTrans [expr {$cs eq "@" ? "CH" :\
-	    [relation extract [relation choose $::raloo::mm::StateModel\
+	    [relation extract [relvar restrictone ::raloo::mm::StateModel\
 		DomName $domName ModelName $dstModel] DefaultTrans]}]
 	deliverNonStateTrans $domName $srcModel $srcInst $dstModel\
 	    $dstRef $cs $defTrans $eventName $params

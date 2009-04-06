@@ -47,12 +47,13 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: raloo.test,v $
-# $Revision: 1.21 $
-# $Date: 2008/10/05 20:12:33 $
+# $Revision: 1.21.2.1 $
+# $Date: 2009/04/06 01:39:19 $
 #  *--
 
 package require tcltest 2.2
 
+set auto_path [linsert $auto_path 0 ../../test]
 source ../raloo.tcl
 
 if {"-level" in $argv} {
@@ -502,7 +503,8 @@ tuple {DogName Fred} is not referenced by any tuple
 	    }
 	}
 	A::R1 info
-    } -result {partition ::raloo::test::A::R1 ::raloo::test::A::Dog Name ::raloo::test::A::SmallDog Name ::raloo::test::A::BigDog Name}
+    } -result {partition ::raloo::test::A::R1 ::raloo::test::A::Dog Name ::raloo::test::A::BigDog Name ::raloo::test::A::SmallDog Name}
+
 
     test Domain-4.2 {
 	generalization relationship specifying the reference mapping
@@ -538,7 +540,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	    }
 	}
 	A::R1 info
-    } -result {partition ::raloo::test::A::R1 ::raloo::test::A::Dog Name ::raloo::test::A::SmallDog SDName ::raloo::test::A::BigDog BDName}
+    } -result {partition ::raloo::test::A::R1 ::raloo::test::A::Dog Name ::raloo::test::A::BigDog BDName ::raloo::test::A::SmallDog SDName}
 
     test Domain-4.3 {
 	generalization relationship -- super type error
@@ -704,12 +706,10 @@ tuple {DogName Fred} is not referenced by any tuple
     } -body {
 	B::Dog insert Name Fifi Breed Poodle Age 3
     } -result {
-	Relation {
+	{
 	    Name string
 	    Breed string
 	    Age int
-	} {
-	    Name
 	} {
 	    {Name Fifi Breed Poodle Age 3}
 	}
@@ -1314,10 +1314,8 @@ tuple {DogName Fred} is not referenced by any tuple
 	set players [$dog selectRelated R1]
 	$players get
     } -result {
-	Relation {
+	{
 	    DogName string
-	} {
-	    DogName
 	} {
 	    {DogName Fido}
 	    {DogName Fred}
@@ -1338,10 +1336,8 @@ tuple {DogName Fred} is not referenced by any tuple
 	set dog [$playmate selectRelated ~R1]
 	$dog get
     } -result {
-	Relation {
+	{
 	    DogName string
-	} {
-	    DogName
 	} {
 	    {DogName Fido}
 	    {DogName Alice}
@@ -1361,11 +1357,9 @@ tuple {DogName Fred} is not referenced by any tuple
 	set plays [$playmate selectRelated ~R1.Plays]
 	$plays get
     } -result {
-	Relation {
+	{
 	    DogName string
 	    PlayerName string
-	} {
-	    {DogName PlayerName}
 	} {
 	    {DogName Fido PlayerName Fred}
 	    {DogName Alice PlayerName Fred}
@@ -1385,11 +1379,9 @@ tuple {DogName Fred} is not referenced by any tuple
 	set plays [$dog selectRelated R1.Plays]
 	$plays get
     } -result {
-	Relation {
+	{
 	    DogName string
 	    PlayerName string
-	} {
-	    {DogName PlayerName}
 	} {
 	    {DogName Fred PlayerName Fido}
 	}
@@ -2440,7 +2432,7 @@ tuple {DogName Fred} is not referenced by any tuple
 	A define {
 	    Polymorphic Super E1 {}
 	}
-	relation extract [relation choose $::raloo::mm::PolymorphicEvent\
+	relation extract [relvar restrictone ::raloo::mm::PolymorphicEvent\
 	    DomName ::raloo::test::A ModelName Super EventName E1] EventName
     } -result {E1}
 
@@ -2480,7 +2472,7 @@ tuple {DogName Fred} is not referenced by any tuple
     } -cleanup {
 	A destroy
     } -body {
-	relation extract [relation choose $::raloo::mm::AssignerStateModel\
+	relation extract [relvar restrictone ::raloo::mm::AssignerStateModel\
 	    DomName ::raloo::test::A RelName R1] RelName
     } -result {R1}
 
