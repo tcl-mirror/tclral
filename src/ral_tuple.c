@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuple.c,v $
-$Revision: 1.14 $
-$Date: 2009/04/11 18:18:54 $
+$Revision: 1.15 $
+$Date: 2009/04/11 23:35:44 $
  *--
  */
 
@@ -315,7 +315,7 @@ Ral_TupleAttrEqual(
         assert(*indexIter1 < Ral_TupleDegree(keyTuple1)) ;
         assert(*indexIter2 < Ral_TupleDegree(keyTuple2)) ;
         assert(Ral_AttributeTypeEqual(*hiter1,
-                Ral_TupleHeadingBegin(keyTuple2->heading) + *indexIter2)) ;
+                *(Ral_TupleHeadingBegin(keyTuple2->heading) + *indexIter2))) ;
 
         if (!Ral_AttributeValueEqual(*hiter1, *viter1, *viter2)) {
             return 0 ;
