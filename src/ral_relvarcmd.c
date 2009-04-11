@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.32.2.10 $
-$Date: 2009/03/29 18:56:29 $
+$Revision: 1.32.2.11 $
+$Date: 2009/04/11 17:42:50 $
  *--
  */
 
@@ -1822,7 +1822,7 @@ RelvarUpdatePerCmd(
             ++idIter, ++idCount) {
         Ral_IntVector idVect ;
         Ral_IntVectorIter idxIter ;
-        int refIndex ;
+        int refIndex = -1 ;
         int refCount = 0 ;
         /*
          * Create a new vector that will be used to store the indices
@@ -1906,6 +1906,7 @@ RelvarUpdatePerCmd(
     Ral_IntVectorDelete(idAttrSet) ;
 
     if (!Ral_RelvarStartCommand(rInfo, relvar)) {
+        Ral_IntVectorDelete(nonIdAttrSet) ;
         Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptUpdateper,
             RAL_ERR_ONGOING_CMD, objv[2]) ;
         return TCL_ERROR ;
@@ -1923,7 +1924,7 @@ RelvarUpdatePerCmd(
         Ral_Tuple perTuple ;
         Ral_PtrVectorIter idSetIter ;
         Ral_IntVectorIter numIter ;
-        int tupleOffset ;
+        int tupleOffset = - 1 ;
         int prevTupleOffset = -1 ;
         int idCount = 0 ;
 
@@ -1969,6 +1970,7 @@ RelvarUpdatePerCmd(
             Ral_Tuple matchTuple ;
             Ral_IntVectorIter nidIter ;
 
+            assert(tupleOffset != -1) ;
             relIter = Ral_RelationBegin(relation) + tupleOffset ;
             matchTuple = *relIter ;
             /*
@@ -2020,6 +2022,7 @@ RelvarUpdatePerCmd(
             }
         }
     }
+    Ral_IntVectorDelete(nonIdAttrSet) ;
 
     result = Ral_RelvarObjEndCmd(interp, rInfo, result == TCL_ERROR) == TCL_OK ?
             result : TCL_ERROR ;
@@ -2030,7 +2033,6 @@ RelvarUpdatePerCmd(
     }
 
 cleanup:
-    Ral_IntVectorDelete(nonIdAttrSet) ;
     Ral_IntVectorDelete(idNums) ;
     for (sIter = Ral_PtrVectorBegin(idSet) ; sIter != Ral_PtrVectorEnd(idSet) ;
             ++sIter) {
