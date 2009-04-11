@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.40 $
-# $Date: 2008/11/02 23:37:49 $
+# $Revision: 1.41 $
+# $Date: 2009/04/11 18:18:54 $
 #  *--
 
 namespace eval ::ral {
@@ -58,51 +58,52 @@ namespace eval ::ral {
     namespace export serializeToFile
     namespace export deserialize
     namespace export deserializeFromFile
+    namespace export deserialize-0.8.X
+    namespace export deserializeFromFile-0.8.X
+    namespace export merge
+    namespace export mergeFromFile
     namespace export storeToMk
     namespace export loadFromMk
+    namespace export mergeFromMk
     namespace export dump
     namespace export dumpToFile
     namespace export csv
     namespace export csvToFile
     if {![package vsatisfies [package require Tcl] 8.5]} {
-	namespace export rcount
-	namespace export rcountd
-	namespace export rsum
-	namespace export rsumd
-	namespace export ravg
-	namespace export ravgd
-	namespace export rmin
-	namespace export rmax
+        namespace export rcount
+        namespace export rcountd
+        namespace export rsum
+        namespace export rsumd
+        namespace export ravg
+        namespace export ravgd
+        namespace export rmin
+        namespace export rmax
     }
 
     if {![catch {package require report}]} {
-	# Default report style for Tuple types
-	::report::defstyle ::ral::tupleAsTable {{capRows 2}} {
-	    data set [split [string repeat "| " [columns]]|]
-	    set sepTemplate [split [string repeat "+ - " [columns]]+]
-	    top set $sepTemplate
-	    top enable
-	    bottom set [top get]
-	    bottom enable
-	    topdata set [data get]
-	    topcapsep set [top get]
-	    topcapsep enable
-	    tcaption $capRows
-	}
-	namespace export tupleAsTable
+        # Default report style for Tuple types
+        ::report::defstyle ::ral::tupleAsTable {{capRows 2}} {
+            data set [split [string repeat "| " [columns]]|]
+            set sepTemplate [split [string repeat "+ - " [columns]]+]
+            top set $sepTemplate
+            top enable
+            bottom set [top get]
+            bottom enable
+            topdata set [data get]
+            topcapsep set [top get]
+            topcapsep enable
+            tcaption $capRows
+        }
+        namespace export tupleAsTable
 
-	# Default report style for Relation types
-	::report::defstyle ::ral::relationAsTable {{idCols {}} {capRows 2}} {
-	    ::ral::tupleAsTable $capRows
-	    set sepTemplate [top get]
-	    foreach col $idCols {
-		lset sepTemplate [expr {2 * $col + 1}] =
-	    }
-	    top set $sepTemplate
-	    bottom set [top get]
-	    topcapsep set [top get]
-	}
-	namespace export relationAsTable
+        # Default report style for Relation types
+        ::report::defstyle ::ral::relationAsTable {{capRows 2}} {
+            ::ral::tupleAsTable $capRows
+            top set [top get]
+            bottom set [top get]
+            topcapsep set [top get]
+        }
+        namespace export relationAsTable
     }
 
     variable reportCounter 0 ; # used to make unique names
@@ -112,23 +113,23 @@ namespace eval ::ral {
 
     # We need lassign
     if {[info procs lassign] eq ""} {
-	proc lassign {values args} {
-	    uplevel 1 [list foreach $args $values break]
-	    lrange $values [llength $args] end
-	}
+        proc lassign {values args} {
+            uplevel 1 [list foreach $args $values break]
+            lrange $values [llength $args] end
+        }
     }
     # Define a proc to determine if the version of a serialized file
     # is compatible with the library. We use "pkgconfig" if it is
     # available, "package require" if not. If building for some older
     # versions of Tcl, "pkgconfig" may not be available.
     if {[llength [info commands ::ral::pkgconfig]]} {
-	proc getVersion {} {
-	    return [::ral::pkgconfig get version]
-	}
+        proc getVersion {} {
+            return [::ral::pkgconfig get version]
+        }
     } else {
-	proc getVersion {} {
-	    return [package require ral]
-	}
+        proc getVersion {} {
+            return [package require ral]
+        }
     }
 }
 
@@ -140,7 +141,7 @@ proc ::ral::tuple2matrix {tupleValue {noheading 0}} {
     $m add columns [tuple degree $tupleValue]
     set heading [tuple heading $tupleValue]
     if {!$noheading} {
-	addHeading $m $heading
+        addHeading $m $heading
     }
     addTuple $m $tupleValue [getFormatMap $heading]
 
@@ -156,10 +157,10 @@ proc ::ral::relation2matrix {relValue {sortAttr {}} {noheading 0}} {
     set heading [relation heading $relValue]
     set attrReportMap [getFormatMap $heading]
     if {!$noheading} {
-	addHeading $m $heading
+        addHeading $m $heading
     }
     relation foreach r $relValue -ascending $sortAttr {
-	addTuple $m [relation tuple $r] $attrReportMap
+        addTuple $m [relation tuple $r] $attrReportMap
     }
 
     return $m
@@ -174,23 +175,14 @@ proc ::ral::relation2matrix {relValue {sortAttr {}} {noheading 0}} {
 proc ::ral::relformat {relValue {title {}} {sortAttrs {}} {noheading 0}} {
     package require report
 
-    # Determine which columns hold attributes that are part of some identifier
-    set relAttrs [relation attributes $relValue]
-    set idCols [list]
-    foreach id [relation identifiers $relValue] {
-	foreach idAttr $id {
-	    lappend idCols [lsearch -exact $relAttrs $idAttr]
-	}
-    }
-
     variable reportCounter
     set reportName rep[incr reportCounter]
     ::report::report $reportName [relation degree $relValue]\
-	style ::ral::relationAsTable $idCols [expr {$noheading ? 0 : 2}]
+        style ::ral::relationAsTable [expr {$noheading ? 0 : 2}]
     set m [relation2matrix $relValue $sortAttrs $noheading]
     set result [string trimright [$reportName printmatrix $m]]
     if {$title ne ""} {
-	append result "\n" $title "\n" [string repeat - [string length $title]]
+        append result "\n" $title "\n" [string repeat - [string length $title]]
     }
 
     $reportName destroy
@@ -206,11 +198,11 @@ proc ::ral::tupleformat {tupleValue {title {}} {noheading 0}} {
     variable reportCounter
     set reportName rep[incr reportCounter]
     ::report::report $reportName [tuple degree $tupleValue]\
-	style ::ral::tupleAsTable [expr {$noheading ? 0 : 2}]
+        style ::ral::tupleAsTable [expr {$noheading ? 0 : 2}]
     set m [tuple2matrix $tupleValue $noheading]
     set result [string trimright [$reportName printmatrix $m]]
     if {$title ne ""} {
-	append result "\n" $title "\n" [string repeat - [string length $title]]
+        append result "\n" $title "\n" [string repeat - [string length $title]]
     }
 
     $reportName destroy
@@ -220,78 +212,148 @@ proc ::ral::tupleformat {tupleValue {title {}} {noheading 0}} {
 }
 
 # Serialization format:
-# List:
-#   {Version <library version>}
-#   {Relvars {<list of relvar defs>}}
-#   {Constraints {<list of constraints>}
-#   {Bodies {<list of relvar bodies>}
+# Dictionary with keys:
+#   Version <library version>
+#   Relvars {<list of relvar defs>}
+#   Constraints {<list of constraints>}
+#   Values {<list of relvar names/relation values >}
 #
 #   <list of relvar defs> :
-#	{<relvar name> <relvar heading>}
+#       {<relvar name> <relation heading> <list of relvar identfiers}
 #
 #   <list of constaints> :
-#	{association | partition | correlation <constraint detail>}
+#       {association | partition | correlation <constraint detail>}
 #   <association constaint detail> :
-#	<association name> <relvar name> {<attr list>} <mult/cond>\
-#	    <relvar name> {<attr list>} <mult/cond>
+#       <association name> <relvar name> {<attr list>} <mult/cond>\
+#           <relvar name> {<attr list>} <mult/cond>
 #   <partition constraint detail> :
-#	<partition name> <supertype> {<attr list>} <subtype1> {<attr list>} ...
+#       <partition name> <supertype> {<attr list>} <subtype1> {<attr list>} ...
 #   <correlation constaint detail> :
-#	<?-complete?> <correlation name> <correl relvar>
-#	    {<attr list>} <mult/cond> <relvarA> {<attr list>}
-#	    {<attr list>} <mult/cond> <relvarB> {<attr list>}
+#       <?-complete?> <correlation name> <correl relvar>
+#           {<attr list>} <mult/cond> <relvarA> {<attr list>}
+#           {<attr list>} <mult/cond> <relvarB> {<attr list>}
 #
-#   <list of relvar bodies> :
-#	{<relvar name> {<tuple value>}}
+#   <list of relvar names/relation values> :
+#       {<relvar name> <relation value>}
 
 # Generate a string that encodes all the relvars.
 
-proc ::ral::serialize {{ns {}}} {
+proc ::ral::serialize {{pattern *}} {
     set result [list]
 
-    lappend result [list Version [getVersion]]
+    lappend result Version [getVersion]
 
-    # Convert the names to be relative
-    set names [lsort [relvar names ${ns}*]]
+    # Get the names
+    set names [lsort [relvar names $pattern]]
     set relNameList [list]
     foreach name $names {
-	lappend relNameList [namespace tail $name]\
-	    [relation heading [relvar set $name]]
+        lappend relNameList $name\
+            [relation heading [relvar set $name]] [relvar identifiers $name]
     }
-    lappend result [list Relvars $relNameList]
+    lappend result Relvars $relNameList
 
+    # Constraint information contains fully qualified relvar names
+    # and must be converted to be relative to the global namespace.
     set constraints [list]
-    foreach cname [lsort [relvar constraint names ${ns}*]] {
-	lappend constraints [getConstraint $cname]
+    foreach cname [lsort [relvar constraint names $pattern]] {
+        lappend constraints [relvar constraint info $cname]
     }
-    lappend result [list Constraints $constraints]
+    lappend result Constraints $constraints
 
     set bodies [list]
     foreach name $names {
-	set body [list]
-	relation foreach r [relvar set $name] {
-	    lappend body [tupleValue [relation tuple $r]]
-	}
-	lappend bodies [list [namespace tail $name] $body]
+        lappend bodies [list $name [relvar set $name]]
     }
 
-    lappend result [list Bodies $bodies]
+    lappend result Values $bodies
 
     return $result
 }
 
-proc ::ral::serializeToFile {fileName {ns {}}} {
+proc ::ral::serializeToFile {fileName {pattern *}} {
     set chan [::open $fileName w]
-    set gotErr [catch {puts $chan [serialize $ns]} result]
+    set gotErr [catch {puts $chan [serialize $pattern]} result]
     ::close $chan
     if {$gotErr} {
-	error $result
+        error $result
     }
     return
 }
 
 # Restore the relvar values from a string.
-proc ::ral::deserialize {value {ns ::}} {
+proc ::ral::deserialize {value {ns {}}} {
+    if {[llength $value] == 4} {
+        # Assume it is 0.8.X style serialization.
+        deserialize-0.8.X $value [expr {$ns eq {} ? "::" : $ns}]
+        return
+    }
+    set ns [string trimright $ns :]
+    if {[llength $value] != 8} {
+        error "bad value format, expected list of 8 items,\
+                got [llength $value] items"
+    }
+    set versionKeyWord [lindex $value 0]
+    set versionNumber [lindex $value 1]
+    set relvarKeyWord [lindex $value 2]
+    set relvarDefs [lindex $value 3]
+    set cnstrKeyWord [lindex $value 4]
+    set cnstrDefs [lindex $value 5]
+    set bodyKeyWord [lindex $value 6]
+    set bodyDefs [lindex $value 7]
+
+    if {$versionKeyWord ne "Version"} {
+        error "expected keyword \"Version\", got \"$versionKeyWord\""
+    }
+    if {![package vsatisfies $versionNumber [getVersion]]} {
+        error "incompatible version number, \"$versionNumber\",\
+            current library version is, \"[getVersion]\""
+    }
+
+    if {$relvarKeyWord ne "Relvars"} {
+        error "expected keyword \"Relvars\", got \"$revarKeyWord\""
+    }
+    foreach {rvName rvHead rvIds} $relvarDefs {
+        set fullName $ns$rvName
+        set quals [namespace qualifiers $fullName]
+        if {!($quals eq {} || [namespace exists $quals])} {
+            namespace eval $quals {}
+        }
+        eval [list ::ral::relvar create $fullName $rvHead] $rvIds
+    }
+
+    if {$cnstrKeyWord ne "Constraints"} {
+        error "expected keyword \"Constraints\", got \"$cnstrKeyWord\""
+    }
+    foreach constraint $cnstrDefs {
+        eval ::ral::relvar [setRelativeConstraintInfo $ns $constraint]
+    }
+
+    if {$bodyKeyWord ne "Values"} {
+        error "expected keyword \"Values\", got \"$bodyKeyWord\""
+    }
+    relvar eval {
+        foreach body $bodyDefs {
+            foreach {relvarName relvarBody} $body {
+                ::ral::relvar set $ns$relvarName $relvarBody
+            }
+        }
+    }
+
+    return
+}
+
+proc ::ral::deserializeFromFile {fileName {ns {}}} {
+    set chan [::open $fileName r]
+    catch {deserialize [read $chan] $ns} result opts
+    ::close $chan
+    return -options $opts $result
+}
+
+proc ::ral::deserialize-0.8.X {value {ns ::}} {
+    if {[llength $value] != 4} {
+        error "bad value format, expected list of 4 items,\
+                got [llength $value] items"
+    }
     set version [lindex $value 0]
     set relvars [lindex $value 1]
     set constraints [lindex $value 2]
@@ -301,19 +363,36 @@ proc ::ral::deserialize {value {ns ::}} {
     if {$versionKeyWord ne "Version"} {
 	error "expected keyword \"Version\", got \"$versionKeyWord\""
     }
-    if {![package vsatisfies [getVersion] $verNum]} {
+    if {![package vsatisfies $verNum 0.8]} {
 	error "incompatible version number, \"$verNum\",\
-	    current library version is, \"[getVersion]\""
+            while attempting to deserialize version 0.8 data"
     }
 
     lassign $relvars relvarKeyWord revarDefs
     if {$relvarKeyWord ne "Relvars"} {
 	error "expected keyword \"Relvars\", got \"$revarKeyWord\""
     }
+    # In version 0.8.X, relvar headings consisted of a list
+    # of 3 items: a) the "Relation" keyword, b) the relation heading
+    # and c) a list of identifiers. We must adapt this to 0.9.X
+    # syntax
     foreach {rvName rvHead} $revarDefs {
-	namespace eval $ns [list ::ral::relvar create $rvName $rvHead]
+        lassign $rvHead keyword heading ids
+        # In 0.8.X, relation valued attributes have an embedded relation
+        # heading that includes a list of identifiers. So we have to
+        # examine the heading for any relation valued attribute and
+        # patch things up accordingly. Fortunately, the tuple valued
+        # attrbutes don't have any syntax change.
+        set newHeading [list]
+        foreach {attrName attrType} $heading {
+            lappend newHeading $attrName\
+                [expr {[lindex $attrType 0] eq "Relation" ?\
+                [lrange $attrType 0 1] : $attrType}]
+        }
+	namespace eval $ns [list ::ral::relvar create $rvName $newHeading] $ids
     }
 
+    # Constraint syntax is unmodified between 0.8.X and 0.9.X
     lassign $constraints cnstrKeyWord cnstrDef
     if {$cnstrKeyWord ne "Constraints"} {
 	error "expected keyword \"Constraints\", got \"$cnstrKeyWord\""
@@ -327,6 +406,8 @@ proc ::ral::deserialize {value {ns ::}} {
 	error "expected keyword \"Bodies\", got \"$bodyKeyWord\""
     }
 
+    # The 0.8.X serialization format uses a list of tuple values
+    # to represent the body. This works fine with "relvar insert".
     relvar eval {
 	foreach body $bodyDefs {
 	    foreach {relvarName relvarBody} $body {
@@ -339,255 +420,309 @@ proc ::ral::deserialize {value {ns ::}} {
     return
 }
 
-proc ::ral::deserializeFromFile {fileName {ns ::}} {
+proc ::ral::deserializeFromFile-0.8.X {fileName {ns ::}} {
     set chan [::open $fileName r]
-    set gotErr [catch {deserialize [read $chan] $ns} result]
+    catch {deserialize-0.8.X [read $chan] $ns} result opts
     ::close $chan
-    if {$gotErr} {
-	error $result
-    }
-    return
+    return -options $opts $result
 }
 
-proc ::ral::storeToMk {fileName {ns {}}} {
+proc ::ral::merge {value {ns {}}} {
+    set ns [string trimright $ns :]
+    if {[llength $value] != 8} {
+        error "bad value format, expected list of 8 items,\
+                got [llength $value] items"
+    }
+    set versionKeyWord [lindex $value 0]
+    set versionNumber [lindex $value 1]
+    set relvarKeyWord [lindex $value 2]
+    set relvarDefs [lindex $value 3]
+    set cnstrKeyWord [lindex $value 4]
+    set cnstrDefs [lindex $value 5]
+    set bodyKeyWord [lindex $value 6]
+    set bodyDefs [lindex $value 7]
+
+    if {$versionKeyWord ne "Version"} {
+        error "expected keyword \"Version\", got \"$versionKeyWord\""
+    }
+    if {![package vsatisfies $versionNumber [getVersion]]} {
+        error "incompatible version number, \"$versionNumber\",\
+            current library version is, \"[getVersion]\""
+    }
+
+    if {$relvarKeyWord ne "Relvars"} {
+        error "expected keyword \"Relvars\", got \"$revarKeyWord\""
+    }
+    foreach {rvName rvHead rvIds} $relvarDefs {
+        set rvName $ns$rvName
+        if {![relvar exists $rvName]} {
+            eval [list ::ral::relvar create $rvName $rvHead] $rvIds
+        }
+    }
+
+    if {$cnstrKeyWord ne "Constraints"} {
+        error "expected keyword \"Constraints\", got \"$cnstrKeyWord\""
+    }
+    foreach constraint $cnstrDefs {
+        set cname [lindex $constraint 1]
+        if {$cname eq "-complete"} {
+            set cname [lindex $constraint 2]
+        }
+        set cname $ns$cname
+        if {![relvar constraint exists $cname]} {
+            eval ::ral::relvar [setRelativeConstraintInfo $ns $constraint]
+        }
+    }
+
+    if {$bodyKeyWord ne "Values"} {
+        error "expected keyword \"Values\", got \"$bodyKeyWord\""
+    }
+
+    set failedMerge [list]
+    relvar eval {
+        foreach body $bodyDefs {
+            foreach {relvarName relvarBody} $body {
+                if {[catch {\
+                        ::ral::relvar union ${ns}$relvarName $relvarBody}]} {
+                    lappend failedMerge $relvarName $::errorCode
+                }
+            }
+        }
+    }
+
+    return $failedMerge
+}
+
+proc ::ral::mergeFromFile {fileName {ns {}}} {
+    set chan [::open $fileName r]
+    catch {merge [read $chan] $ns} result opts
+    ::close $chan
+    return -options $opts $result
+}
+
+proc ::ral::storeToMk {fileName {pattern *}} {
     package require Mk4tcl
 
     # Back up an existing file
     if {[file exists $fileName]} {
-	file rename -force $fileName $fileName~
+        file rename -force $fileName $fileName~
     }
 
     ::mk::file open db $fileName
-    set err [catch {
-	# Add some versioning information into a view. Just a sanity check
-	# when the data is loaded later.
-	::mk::view layout db.__ral_version {Version Date Comment}
-	::mk::row append db.__ral_version\
-	    Version [getVersion]\
-	    Date [clock format [clock seconds]]\
-	    Comment "Created by: \"[info level 0]\""
-	# Create a set of views that are used as catalogs to hold
-	# the relvar info that will be needed to reconstruct the values.
-	::mk::view layout db.__ral_relvar {Name Heading}
-	set assocLayout {Name RingRelvar RingAttr RingMC RtoRelvar RtoAttr\
-	    RtoMC}
-	::mk::view layout db.__ral_association $assocLayout
-	::mk::view layout db.__ral_partition\
-	    {Name SupRelvar SupAttr {SubTypes {SubRelvar SubAttr}}}
-	set correlLayout {Complete Name CorrelRelvar\
-	    RingAttrA RingMCA RtoRelvarA RtoAttrA\
-	    RingAttrB RingMCB RtoRelvarB RtoAttrB}
-	::mk::view layout db.__ral_correlation $correlLayout
+    catch {
+        # Add some versioning information into a view. Just a sanity check
+        # when the data is loaded later.
+        ::mk::view layout db.__ral_version {Version_ral Date_ral Comment_ral}
+        ::mk::row append db.__ral_version\
+            Version_ral [getVersion]\
+            Date_ral [clock format [clock seconds]]\
+            Comment_ral "Created by: \"[info level 0]\""
+        # Create a set of views that are used as catalogs to hold
+        # the relvar info that will be needed to reconstruct the values.
+        ::mk::view layout db.__ral_relvar\
+                {Name_ral Heading_ral Ids_ral View_ral}
+        ::mk::view layout db.__ral_constraint Constraint_ral
 
-	# Get the names of the relvars and insert them into the catalog.
-	# Convert the names to be relative before inserting.
-	# Also create the views that will hold the values.
-	set names [relvar names ${ns}*]
-	foreach name $names {
-	    set heading [relation heading [relvar set $name]]
-	    ::mk::row append db.__ral_relvar Name [namespace tail $name]\
-		Heading $heading
-	    # Determine the structure of the view that will hold the relvar
-	    # value.  Be careful of Tuple and Relation valued attributes.
-	    set relvarLayout [list]
-	    foreach {attr type} [lindex $heading 1] {
-		lappend relvarLayout [mkHeading $attr $type]
-	    }
-	    ::mk::view layout db.[namespace tail $name] $relvarLayout
-	}
-	# Get the constraints and put them into the appropriate catalog
-	# depending upon the type of the constraint.
-	set partIndex 0
-	foreach cname [relvar constraint names ${ns}*] {
-	    set cinfo [getConstraint $cname]
-	    switch -exact [lindex $cinfo 0] {
-		association {
-		    set cindex 1
-		    set value [list]
-		    foreach col $assocLayout {
-			lappend value $col [lindex $cinfo $cindex]
-			incr cindex
-		    }
-		    eval [linsert $value 0 ::mk::row append\
-			db.__ral_association]
-		}
-		partition {
-		    ::mk::row append db.__ral_partition Name [lindex $cinfo 1]\
-			SupRelvar [lindex $cinfo 2] SupAttr [lindex $cinfo 3]
-		    foreach {subname subattr} [lrange $cinfo 4 end] {
-			::mk::row append db.__ral_partition!$partIndex.SubTypes\
-			    SubRelvar $subname SubAttr $subattr
-		    }
-		    incr partIndex
-		}
-		correlation {
-		    set value [list]
-		    if {[lindex $cinfo 0] eq "-complete"} {
-			lappend value [lindex $correlLayout 0] 1
-			set cinfo [lrange $cinfo 1 end]
-		    } else {
-			lappend value [lindex $correlLayout 0] 0
-		    }
-		    set cindex 1
-		    foreach col [lrange $correlLayout 1 end] {
-			lappend value $col [lindex $cinfo $cindex]
-			incr cindex
-		    }
-		    eval [linsert $value 0 ::mk::row append\
-			db.__ral_correlation]
-		}
-		default {
-		    error "unknown constraint type, \"[lindex $cinfo 0]\""
-		}
-	    }
-	}
-
-	# Populate the views for each relavar.
-	foreach name $names {
-	    set simpleName [namespace tail $name]
-	    ::mk::cursor create cursor db.$simpleName 0
-	    relation foreach r [relvar set $name] {
-		::mk::row insert $cursor
-		mkStoreTuple $cursor [relation tuple $r]
-		::mk::cursor incr cursor
-	    }
-	}
-    } errMsg]
-
-    if {$err} {
-	set einfo $::errorInfo
-	set ecode $::errorCode
-	catch {::mk::file close db}
-	return -code $err -errorcode $ecode -errorinfo $einfo $errMsg
-    }
-
+        # Get the names of the relvars and insert them into the catalog.
+        # Convert the names to be relative before inserting.  Also create the
+        # views that will hold the values.  In order to preserve the namespace
+        # names for reloading, the view name is constructed from the relvar
+        # name by substituting "::" with "__". Metakit doesn't like "::" in
+        # view names. To insure that the constructed view names are unique, an
+        # integer tag is added (i.e. we need to make sure that two relvars such
+        # as ::a::b and ::a__b don't collide).
+        set tagCtr 0
+        set names [relvar names $pattern]
+        foreach name $names {
+            set heading [relation heading [relvar set $name]]
+            set ids [relvar identifiers $name]
+            # Strip the leading namespace separator. This is restored
+            # when the relvars are loaded back in.
+            set viewName [string map {:: __ - _} $name]_[incr tagCtr]
+            set nameViewMap($name) $viewName
+            ::mk::row append db.__ral_relvar Name_ral $name\
+                Heading_ral $heading Ids_ral $ids View_ral $viewName
+            # Determine the structure of the view that will hold the relvar
+            # value.  Special attention is required for Tuple and Relation
+            # valued attributes.
+            set relvarLayout [list]
+            foreach {attr type} $heading {
+                lappend relvarLayout [mkHeading $attr $type]
+            }
+            ::mk::view layout db.$viewName $relvarLayout
+        }
+        # Get the constraints and put them into the catalog.
+        set partIndex 0
+        foreach cname [relvar constraint names $pattern] {
+            ::mk::row append db.__ral_constraint\
+                Constraint_ral [relvar constraint info $cname]
+        }
+        # Populate the views for each relavar.
+        foreach name [array names nameViewMap] {
+            ::mk::cursor create cursor db.$nameViewMap($name) 0
+            relation foreach r [relvar set $name] {
+                ::mk::row insert $cursor
+                mkStoreTuple $cursor [relation tuple $r]
+                ::mk::cursor incr cursor
+            }
+        }
+    } result opts
     ::mk::file close db
-    return
+    return -options $opts $result
 }
 
-proc ::ral::loadFromMk {fileName {ns ::}} {
+proc ::ral::loadFromMk {fileName {ns {}}} {
     package require Mk4tcl
 
+    set ns [string trimright $ns :]
+
     ::mk::file open db $fileName -readonly
-    set err [catch {
-	# Check that a "version" view exists and that the information
-	# is consistent before we proceed.
-	set views [::mk::file views db]
-	if {[lsearch $views __ral_version] < 0} {
-	    error "Cannot find TclRAL catalogs in \"$fileName\":\
-		file may not contain relvar information"
-	}
-	set result [tuple create\
-	    {Version string Date string Comment string}\
-	    [::mk::get db.__ral_version!0]]
-	set verNum [::mk::get db.__ral_version!0 Version]
-	if {![package vsatisfies [getVersion] $verNum]} {
-	    error "incompatible version number, \"$verNum\",\
-		current library version is, \"[getVersion]\""
-	}
-	# determine the relvar names and types by reading the catalog
-	::mk::loop rvCursor db.__ral_relvar {
-	    array set relvarInfo [::mk::get $rvCursor]
-	    namespace eval $ns [list ::ral::relvar create\
-		$relvarInfo(Name) $relvarInfo(Heading)]
-	}
-	# create the association constraints
-	::mk::loop assocCursor db.__ral_association {
-	    set assocCmd [list ::ral::relvar association]
-	    foreach {col value} [::mk::get $assocCursor] {
-		lappend assocCmd $value
-	    }
-	    namespace eval $ns $assocCmd
-	}
-	# create the partition constraints
-	::mk::loop partCursor db.__ral_partition {
-	    set subtypes [list]
-	    ::mk::loop subCursor $partCursor.SubTypes {
-		foreach {col value} [::mk::get $subCursor] {
-		    lappend subtypes $value
-		}
-	    }
-	    array set partValues [::mk::get $partCursor]
-	    namespace eval $ns [linsert $subtypes 0\
-		::ral::relvar partition\
-		$partValues(Name) $partValues(SupRelvar) $partValues(SupAttr)]
-	}
-	# create the correlation constraints
-	::mk::loop correlCursor db.__ral_correlation {
-	    set correlCmd [list ::ral::relvar correlation]
-	    foreach {col value} [::mk::get $correlCursor] {
-		if {$col eq "Complete"} {
-		    if {$value == 1} {
-			lappend correlCmd -complete
-		    }
-		} else {
-		    lappend correlCmd $value
-		}
-	    }
-	    namespace eval $ns $correlCmd
-	}
-	# fetch the relation values from the views
-	relvar eval {
-	    foreach name [relvar names ${ns}*] {
-		set viewName [namespace tail $name]
-		set heading [relation heading [relvar set $name]]
-		::mk::loop vCursor db.$viewName {
-		    namespace eval $ns [list ::ral::relvar insert $name\
-			[mkLoadTuple $vCursor $heading]]
-		}
-	    }
-	}
-    } errMsg]
-
-    if {$err} {
-	set einfo $::errorInfo
-	set ecode $::errorCode
-	catch {::mk::file close db}
-	return -code $err -errorcode $ecode -errorinfo $einfo $errMsg
-    }
-
+    catch {
+        # Check that a "version" view exists and that the information
+        # is consistent before we proceed.
+        set version [mkCheckVersion db]
+        # determine the relvar names and types by reading the catalog
+        ::mk::loop rvCursor db.__ral_relvar {
+            array set relvarInfo [::mk::get $rvCursor]
+            set relvarName ${ns}$relvarInfo(Name_ral)
+            # check that the parent namespace exists
+            set parent [namespace qualifiers $relvarName]
+            if {!($parent eq {} || [namespace exists $parent])} {
+                namespace eval $parent {}
+            }
+            eval [list ::ral::relvar create $relvarName\
+                    $relvarInfo(Heading_ral)] $relvarInfo(Ids_ral)
+        }
+        # create the constraints
+        set assocCols {Name RingRelvar RtoRelvar}
+        ::mk::loop cnstrCursor db.__ral_constraint {
+            eval ::ral::relvar [setRelativeConstraintInfo\
+                $ns [lindex [::mk::get $cnstrCursor] 1]]
+        }
+        # fetch the relation values from the views
+        relvar eval {
+            ::mk::loop rvCursor db.__ral_relvar {
+                array set relvarInfo [::mk::get $rvCursor]
+                ::mk::loop vCursor db.$relvarInfo(View_ral) {
+                    eval [list ::ral::relvar insert\
+                        ${ns}$relvarInfo(Name_ral)\
+                        [mkLoadTuple $vCursor $relvarInfo(Heading_ral)]]
+                }
+            }
+        }
+        set version
+    } result opts
     ::mk::file close db
-    return $result
+    return -options $opts $result
 }
 
-proc ::ral::dump {{ns {}}} {
+# Merge data from a metakit store of relvars.
+# All relvars that are in the file but not currently defined are created.
+# All relvars whose names and headings match currently defined relvars
+# will have their relation values unioned with those in the file.
+proc ::ral::mergeFromMk {fileName {ns {}}} {
+    package require Mk4tcl
+
+    set ns [string trimright $ns :]
+
+    ::mk::file open db $fileName -readonly
+    catch {
+        mkCheckVersion db
+        # determine the relvar names and types by reading the catalog
+        ::mk::loop rvCursor db.__ral_relvar {
+            array set relvarInfo [::mk::get $rvCursor]
+            set relvarName $ns$relvarInfo(Name_ral)
+            # Check if the relvar already exists
+            if {![relvar exists $relvarName]} {
+                # New relvar
+                # check that the parent namespace exists
+                set parent [namespace qualifiers $relvarName]
+                if {!($parent eq {} || [namespace exists $parent])} {
+                    namespace eval $parent {}
+                }
+                eval [list ::ral::relvar create $relvarName\
+                        $relvarInfo(Heading_ral)] $relvarInfo(Ids_ral)
+            }
+        }
+        # create the constraints
+        set assocCols {Name RingRelvar RtoRelvar}
+        ::mk::loop cnstrCursor db.__ral_constraint {
+            catch {
+                eval ::ral::relvar [setRelativeConstraintInfo\
+                    $ns [lindex [::mk::get $cnstrCursor] 1]]
+            }
+        }
+        # fetch the relation values from the views
+        set failedMerge [list]
+        relvar eval {
+            ::mk::loop rvCursor db.__ral_relvar {
+                array set relvarInfo [::mk::get $rvCursor]
+                set body [list]
+                ::mk::loop vCursor db.$relvarInfo(View_ral) {
+                    lappend body [mkLoadTuple $vCursor $relvarInfo(Heading_ral)]
+                }
+                set value [eval\
+                    [list relation create $relvarInfo(Heading_ral)] $body]
+                if {[catch {::ral::relvar union\
+                        $ns$relvarInfo(Name_ral) $value}]} {
+                    lappend failedMerge $ns$relvarInfo(Name_ral)\
+                        $::errorCode
+                }
+            }
+        }
+        set failedMerge
+    } result opts
+
+    ::mk::file close db
+
+    return -options $opts $result
+}
+
+proc ::ral::dump {{pattern *}} {
     set result {}
-    set names [lsort [relvar names ${ns}*]]
+    set names [lsort [relvar names $pattern]]
 
     append result "# Generated via ::ral::dump\n"
     append result "package require ral [getVersion]\n"
 
+    array set qualMap {}
     # Convert the names to be relative
+    # Strip any leading "::" from names so that if the script is
+    # sourced in, names are created relative to the namespace of the
+    # source.
     foreach name $names {
-	append result "::ral::relvar create [namespace tail $name]\
-	    [list [relation heading [relvar set $name]]]\n"
+        set rName [string trimleft $name ":"]
+        set quals [namespace qualifiers $rName]
+        if {![info exists qualMap($quals)]} {
+            append result "namespace eval $quals {}\n"
+            set qualMap($quals) 1
+        }
+        append result "::ral::relvar create $rName\
+            [list [relation heading [relvar set $name]]]\
+            [relvar identifiers $name]" \n
     }
 
-    foreach cname [lsort [relvar constraint names ${ns}*]] {
-	append result "::ral::relvar [getConstraint $cname]\n"
+    foreach cname [lsort [relvar constraint names $pattern]] {
+        append result "::ral::relvar [getRelativeConstraintInfo $cname]\n"
     }
 
     # perform the inserts inside of a transaction.
     append result "::ral::relvar eval \{\n"
     foreach name $names {
-	relation foreach r [relvar set $name] {
-	    append result "::ral::relvar insert [namespace tail $name]\
-		[list [tupleValue [relation tuple $r]]]\n"
-	}
+        append result\
+            "    ::ral::relvar set [string trimleft $name :]\
+            [list [relvar set $name]]" \n
     }
     append result "\}"
 
     return $result
 }
 
-proc ::ral::dumpToFile {fileName {ns {}}} {
+proc ::ral::dumpToFile {fileName {pattern *}} {
     set chan [::open $fileName w]
-    set gotErr [catch {puts $chan [dump $ns]} result]
+    catch {puts $chan [dump $pattern]} result opts
     ::close $chan
-    if {$gotErr} {
-	error $result
-    }
-    return
+    return -options $opts $result
 }
 
 proc ::ral::csv {relValue {sortAttr {}} {noheading 0}} {
@@ -597,7 +732,7 @@ proc ::ral::csv {relValue {sortAttr {}} {noheading 0}} {
     set gotErr [catch {::csv::report printmatrix $m} result]
     $m destroy
     if {$gotErr} {
-	error $result
+        error $result
     }
     return $result
 }
@@ -611,7 +746,7 @@ proc ::ral::csvToFile {relValue fileName {sortAttr {}} {noheading 0}} {
     $m destroy
     ::close $chan
     if {$gotErr} {
-	error $result
+        error $result
     }
     return
 }
@@ -629,13 +764,13 @@ proc ${sfuncNS}::rcount {relation} {
 # Count the number of distinct values of an attribute in a relation
 proc ${sfuncNS}::rcountd {relation attr} {
     return [::ral::relation cardinality\
-	[::ral::relation project $relation $attr]]
+        [::ral::relation project $relation $attr]]
 }
 # Compute the sum over an attribute
 proc ${sfuncNS}::rsum {relation attr} {
     set result 0
     foreach v [::ral::relation list $relation $attr] {
-	incr result $v
+        incr result $v
     }
     return $result
 }
@@ -643,28 +778,28 @@ proc ${sfuncNS}::rsum {relation attr} {
 proc ${sfuncNS}::rsumd {relation attr} {
     set result 0
     ::ral::relation foreach v [::ral::relation list\
-	[::ral::relation project $relation $attr]] {
-	incr result $v
+        [::ral::relation project $relation $attr]] {
+        incr result $v
     }
     return $result
 }
 if {[package vsatisfies [package require Tcl] 8.5]} {
     # Compute the average of the values of an attribute
     proc ${sfuncNS}::ravg {relation attr} {
-	return [expr {rsum($relation, $attr) / rcount($relation)}]
+        return [expr {rsum($relation, $attr) / rcount($relation)}]
     }
     # Compute the average of the distinct values of an attribute
     proc ${sfuncNS}::ravgd {relation attr} {
-	return [expr {rsumd($relation, $attr) / rcount($relation)}]
+        return [expr {rsumd($relation, $attr) / rcount($relation)}]
     }
 } else {
     # Compute the average of the values of an attribute
     proc ${sfuncNS}::ravg {relation attr} {
-	return [expr {[rsum $relation $attr] / [rcount $relation]}]
+        return [expr {[rsum $relation $attr] / [rcount $relation]}]
     }
     # Compute the average of the distinct values of an attribute
     proc ${sfuncNS}::ravgd {relation attr} {
-	return [expr {[rsumd $relation $attr] / [rcount $relation]}]
+        return [expr {[rsumd $relation $attr] / [rcount $relation]}]
     }
 }
 # Compute the minimum. N.B. this does not handle "empty" relations properly.
@@ -672,9 +807,9 @@ proc ${sfuncNS}::rmin {relation attr} {
     set values [::ral::relation list $relation $attr]
     set min [lindex $values 0]
     foreach v [lrange $values 1 end] {
-	if {$v < $min} {
-	    set min $v
-	}
+        if {$v < $min} {
+            set min $v
+        }
     }
     return $min
 }
@@ -683,9 +818,9 @@ proc ${sfuncNS}::rmax {relation attr} {
     set values [::ral::relation list $relation $attr]
     set max [lindex $values 0]
     foreach v [lrange $values 1 end] {
-	if {$v > $max} {
-	    set max $v
-	}
+        if {$v > $max} {
+            set max $v
+        }
     }
     return $max
 }
@@ -696,13 +831,13 @@ proc ${sfuncNS}::rmax {relation attr} {
 proc ::ral::addHeading {matrix heading} {
     set attrNames [list]
     set attrTypes [list]
-    foreach {name type} [lindex $heading 1] {
-	lappend attrNames $name
-	# For Relation and Tuple types, just use the keyword.
-	# The components of the types will be apparent from the headings
-	# of the relation or tuple valued attributes. This saves quite
-	# a bit of column space for these types of nested attributes.
-	lappend attrTypes [lindex $type 0]
+    foreach {name type} $heading {
+        lappend attrNames $name
+        # For Relation and Tuple types, just use the keyword.
+        # The components of the types will be apparent from the headings
+        # of the relation or tuple valued attributes. This saves quite
+        # a bit of column space for these types of nested attributes.
+        lappend attrTypes [lindex $type 0]
     }
     $matrix add row $attrNames
     $matrix add row $attrTypes
@@ -715,16 +850,16 @@ proc ::ral::addHeading {matrix heading} {
 # and tuple valued attributes will be in the relation keyed by the attribute
 # name with values corresponding to the "relformat" or "tupleformat" command.
 proc ::ral::getFormatMap {heading} {
-    set attrReportMap {Relation {AttrName string AttrFunc string} AttrName {}}
-    foreach {name type} [lindex $heading 1] {
-	set typeKey [lindex $type 0]
-	if {$typeKey eq "Tuple"} {
-	    set attrReportMap [relation include $attrReportMap\
-		    [list AttrName $name AttrFunc ::ral::tupleformat]]
-	} elseif {$typeKey eq "Relation"} {
-	    set attrReportMap [relation include $attrReportMap\
-		    [list AttrName $name AttrFunc ::ral::relformat]]
-	}
+    set attrReportMap {{AttrName string AttrFunc string} {}}
+    foreach {name type} $heading {
+        set typeKey [lindex $type 0]
+        if {$typeKey eq "Tuple"} {
+            set attrReportMap [relation insert $attrReportMap\
+                    [list AttrName $name AttrFunc ::ral::tupleformat]]
+        } elseif {$typeKey eq "Relation"} {
+            set attrReportMap [relation insert $attrReportMap\
+                    [list AttrName $name AttrFunc ::ral::relformat]]
+        }
     }
     return $attrReportMap
 }
@@ -733,70 +868,40 @@ proc ::ral::getFormatMap {heading} {
 proc ::ral::addTuple {matrix tupleValue attrMap} {
     set values [list]
     foreach {attr value} [tuple get $tupleValue] {
-	set mapping [relation choose $attrMap AttrName $attr]
-	if {[relation isnotempty $mapping]} {
-	    set attrfunc [tuple extract [relation tuple $mapping] AttrFunc]
-	    set value [$attrfunc $value]
-	} else {
-	    # Limit the width of scalar values. We use the "textutil"
-	    # package to wrap the text to "maxColLen" characters.
-	    variable maxColLen
-	    if {[string length $value] > $maxColLen} {
-		package require textutil
-		set value [::textutil::adjust $value -justify left\
-		    -length $maxColLen -strictlength true]
-	    }
-	}
-	lappend values $value
+        set mapping [relation restrictwith $attrMap {$AttrName eq $attr}]
+        if {[relation isnotempty $mapping]} {
+            set attrfunc [relation extract $mapping AttrFunc]
+            set value [$attrfunc $value]
+        } else {
+            # Limit the width of scalar values. We use the "textutil"
+            # package to wrap the text to "maxColLen" characters.
+            variable maxColLen
+            if {[string length $value] > $maxColLen} {
+                package require textutil
+                set value [::textutil::adjust $value -justify left\
+                    -length $maxColLen -strictlength true]
+            }
+        }
+        lappend values $value
     }
     $matrix add row $values
 
     return
 }
 
-# Get the contraint info and convert the absolute relvar names
-# to relative ones.
-proc ::ral::getConstraint {cname} {
-    set cinfo [relvar constraint info $cname]
-    switch -exact [lindex $cinfo 0] {
-	association {
-	    lset cinfo 1 [namespace tail [lindex $cinfo 1]]
-	    lset cinfo 2 [namespace tail [lindex $cinfo 2]]
-	    lset cinfo 5 [namespace tail [lindex $cinfo 5]]
-	}
-	partition {
-	    lset cinfo 1 [namespace tail [lindex $cinfo 1]]
-	    lset cinfo 2 [namespace tail [lindex $cinfo 2]]
-	    for {set index 4} {$index < [llength $cinfo]} {incr index 2} {
-		lset cinfo $index [namespace tail [lindex $cinfo $index]]
-	    }
-	}
-	correlation {
-	    lset cinfo 1 [namespace tail [lindex $cinfo 1]]
-	    lset cinfo 2 [namespace tail [lindex $cinfo 2]]
-	    lset cinfo 5 [namespace tail [lindex $cinfo 5]]
-	    lset cinfo 9 [namespace tail [lindex $cinfo 9]]
-	}
-	default {
-	    error "unknown constraint type, \"[lindex $cinfo 0]\""
-	}
-    }
-    return $cinfo
-}
-
 proc ::ral::tupleValue {tuple} {
     set result [list]
-    foreach {attr type} [lindex [tuple heading $tuple] 1]\
-	{attr value} [tuple get $tuple] {
-	switch [lindex $type 0] {
-	    Tuple {
-		set value [tupleValue $value]
-	    }
-	    Relation {
-		set value [relationValue $value]
-	    }
-	}
-	lappend result $attr $value
+    foreach {attr type} [tuple heading $tuple]\
+        {attr value} [tuple get $tuple] {
+        switch [lindex $type 0] {
+            Tuple {
+                set value [tupleValue $value]
+            }
+            Relation {
+                set value [relationValue $value]
+            }
+        }
+        lappend result $attr $value
     }
 
     return $result
@@ -805,45 +910,63 @@ proc ::ral::tupleValue {tuple} {
 proc ::ral::relationValue {relation} {
     set result [list]
     relation foreach r $relation {
-	lappend result [tupleValue [relation tuple $r]]
+        lappend result [tupleValue [relation tuple $r]]
     }
 
+    return $result
+}
+
+proc ::ral::mkCheckVersion {dbName} {
+    # Check that a "version" view exists and that the information
+    # is consistent before we proceed.
+    set views [::mk::file views $dbName]
+    if {[lsearch $views __ral_version] < 0} {
+        error "Cannot find TclRAL catalogs:\
+            file may not contain relvar information"
+    }
+    set result [tuple create\
+        {Version_ral string Date_ral string Comment_ral string}\
+        [::mk::get $dbName.__ral_version!0]]
+    set verNum [tuple extract $result Version_ral]
+    if {![package vsatisfies $verNum [getVersion]]} {
+        error "incompatible version number, \"$verNum\",\
+            current library version is, \"[getVersion]\""
+    }
     return $result
 }
 
 proc ::ral::mkHeading {attr type} {
     switch [lindex $type 0] {
-	Tuple -
-	Relation {
-	    set subHead [list]
-	    foreach {subattr subtype} [lindex $type 1] {
-		lappend subHead [mkHeading $subattr $subtype]
-	    }
-	    set result [list $attr $subHead]
-	}
-	default {
-	    set result $attr
-	}
+        Tuple -
+        Relation {
+            set subHead [list]
+            foreach {subattr subtype} [lindex $type 1] {
+                lappend subHead [mkHeading $subattr $subtype]
+            }
+            set result [list $attr $subHead]
+        }
+        default {
+            set result $attr
+        }
     }
     return $result
 }
 
 proc ::ral::mkStoreTuple {cursor tuple} {
-    foreach {attr type} [lindex [tuple heading $tuple] 1]\
-	{attr value} [tuple get $tuple] {
-	switch -exact [lindex $type 0] {
-	    Tuple {
-		set tupCursor $cursor.$attr!0
-		::mk::row insert $tupCursor
-		mkStoreTuple $tupCursor [tuple extract $tuple $attr]
-	    }
-	    Relation {
-		mkStoreRelation $cursor.$attr [tuple extract $tuple $attr]
-	    }
-	    default {
-		::mk::set $cursor $attr $value
-	    }
-	}
+    foreach {attr type} [tuple heading $tuple] {attr value} [tuple get $tuple] {
+        switch -exact [lindex $type 0] {
+            Tuple {
+                set tupCursor $cursor.$attr!0
+                ::mk::row insert $tupCursor
+                mkStoreTuple $tupCursor [tuple extract $tuple $attr]
+            }
+            Relation {
+                mkStoreRelation $cursor.$attr [tuple extract $tuple $attr]
+            }
+            default {
+                ::mk::set $cursor $attr $value
+            }
+        }
     }
     return
 }
@@ -852,38 +975,110 @@ proc ::ral::mkStoreRelation {cursor relation} {
     ::mk::cursor create relCursor $cursor 0
     ::mk::row insert $relCursor [relation cardinality $relation]
     relation foreach r $relation {
-	mkStoreTuple $relCursor [relation tuple $r]
-	::mk::cursor incr relCursor
+        mkStoreTuple $relCursor [relation tuple $r]
+        ::mk::cursor incr relCursor
     }
     return
 }
 
 proc ::ral::mkLoadTuple {cursor heading} {
     set value [list]
-    foreach {attr type} [lindex $heading 1] {
-	switch -exact [lindex $type 0] {
-	    Tuple {
-		lappend value $attr [mkLoadTuple $cursor.$attr!0 $type]
-	    }
-	    Relation {
-		lappend value $attr [mkLoadRelation $cursor.$attr $type]
-	    }
-	    default {
-		lappend value $attr [::mk::get $cursor $attr]
-	    }
-	}
+    foreach {attr type} $heading {
+        switch -exact [lindex $type 0] {
+            Tuple {
+                lappend value $attr [mkLoadTuple $cursor.$attr!0\
+                        [lindex $type 1]]
+            }
+            Relation {
+                lappend value $attr [mkLoadRelation $cursor.$attr\
+                        [lindex $type 1]]
+            }
+            default {
+                lappend value $attr [::mk::get $cursor $attr]
+            }
+        }
     }
-
     return $value
 }
 
 proc ::ral::mkLoadRelation {cursor heading} {
     set value [list]
-    lset heading 0 Tuple
     ::mk::loop rCursor $cursor {
-	lappend value [mkLoadTuple $rCursor $heading]
+        lappend value [mkLoadTuple $rCursor $heading]
     }
     return $value
 }
 
-package provide ral 0.8.9
+namespace eval ::ral {
+    # The set of indices into the constraint information where fully qualified
+    # path names exist.
+    variable assocIndices {1 2 5}
+    variable correlIndices {1 2 5 9}
+    variable compCorrelIndices {2 3 6 10}
+}
+
+proc ::ral::getRelativeConstraintInfo {cname} {
+    set cinfo [relvar constraint info $cname]
+    switch -exact [lindex $cinfo 0] {
+        association {
+            variable assocIndices
+            foreach index $assocIndices {
+                lset cinfo $index [string trimleft [lindex $cinfo $index] ":"]
+            }
+        }
+        partition {
+            lset cinfo 1 [string trimleft [lindex $cinfo 1] ":"]
+            lset cinfo 2 [string trimleft [lindex $cinfo 2] ":"]
+            for {set index 4} {$index < [llength $cinfo]} {incr index 2} {
+                lset cinfo $index [string trimleft [lindex $cinfo $index] ":"]
+            }
+        }
+        correlation {
+            variable correlIndices
+            variable compCorrelIndices
+            set cIndices [expr {[lindex $cinfo 1] eq "-complete" ?\
+                $compCorrelIndices : $correlIndices}]
+            foreach index $cIndices {
+                lset cinfo $index [string trimleft [lindex $cinfo $index] ":"]
+            }
+        }
+        default {
+            error "unknown constraint type, \"[lindex $cinfo 0]\""
+        }
+    }
+    return $cinfo
+}
+
+proc ::ral::setRelativeConstraintInfo {ns cinfo} {
+    switch -exact [lindex $cinfo 0] {
+        association {
+            variable assocIndices
+            foreach index $assocIndices {
+                lset cinfo $index ${ns}[lindex $cinfo $index]
+            }
+        }
+        partition {
+            lset cinfo 1 ${ns}[lindex $cinfo 1]
+            lset cinfo 2 ${ns}[lindex $cinfo 2]
+            for {set index 4} {$index < [llength $cinfo]} {incr index 2} {
+                lset cinfo $index ${ns}[lindex $cinfo $index]
+            }
+        }
+        correlation {
+            variable correlIndices
+            variable compCorrelIndices
+            set cIndices [expr {[lindex $cinfo 1] eq "-complete" ?\
+                $compCorrelIndices : $correlIndices}]
+            foreach index $cIndices {
+                lset cinfo $index ${ns}[lindex $cinfo $index]
+            }
+        }
+        default {
+            error "unknown constraint type, \"[lindex $cinfo 0]\""
+        }
+    }
+
+    return $cinfo
+}
+
+package provide ral 0.9.0

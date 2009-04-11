@@ -49,13 +49,13 @@
 # without cluttering the TclRAL package proper.
 # 
 # $RCSfile: ralutil.tcl,v $
-# $Revision: 1.16 $
+# $Revision: 1.2 $
 # $Date: 2009/04/11 18:18:54 $
 #  *--
 
 package provide ralutil 0.9.0
 
-package require ral
+package require ral 0.9.0
 
 namespace eval ::ralutil {
     namespace export pipe
@@ -128,15 +128,6 @@ proc ::ralutil::sysIdsGenSystemId {relvarName attrName} {
 	[list ::ralutil::sysIdsCreateIdFor $attrName]
 }
 
-# Return the last system id assigned to a given attribute
-proc ::ralutil::sysIdsLastId {relvarName attrName} {
-    return [pipe {
-	relvar restrictone  __ral_systemids__\
-                RelvarName $relvarName IdAttr $attrName |
-	relation extract ~ IdNum
-    }]
-}
-
 # This proc can be used in a relvar trace on insert to
 # create a unique identifier for an attribute.
 proc ::ralutil::sysIdsCreateIdFor {attrName op relvarName tup} {
@@ -167,11 +158,11 @@ proc ::ralutil::findMaxAttrValue {relvarName attrName} {
     set idValue 0
     if {[relation isnotempty $relValue]} {
 	# We find the maximum by summarizing over DEE
-	variable DEE
 	set idValue [pipe {
-	    relation summarize $relValue $DEE r\
+	    relation summarizeby $relValue {} r\
 		maxValue int {rmax($r, $attrName)} |
-	    relation extract ~ maxValue}]
+	    relation extract ~ maxValue
+        }]
     }
     return $idValue
 }

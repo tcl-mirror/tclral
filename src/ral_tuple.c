@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuple.c,v $
-$Revision: 1.13 $
-$Date: 2008/01/19 19:16:45 $
+$Revision: 1.14 $
+$Date: 2009/04/11 18:18:54 $
  *--
  */
 
@@ -59,6 +59,7 @@ INCLUDE FILES
 */
 #include "ral_utils.h"
 #include "ral_tuple.h"
+#include "ral_vector.h"
 #include <string.h>
 #include <assert.h>
 
@@ -91,7 +92,6 @@ STATIC DATA ALLOCATION
 */
 static const char openList = '{' ;
 static const char closeList = '}' ;
-static const char rcsid[] = "@(#) $RCSfile: ral_tuple.c,v $ $Revision: 1.13 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -170,42 +170,12 @@ Ral_TupleDelete(
 }
 
 void
-Ral_TupleReference(
-    Ral_Tuple tuple)
-{
-    if (tuple) {
-	++tuple->refCount ;
-    }
-}
-
-void
 Ral_TupleUnreference(
     Ral_Tuple tuple)
 {
     if (tuple && --tuple->refCount <= 0) {
 	Ral_TupleDelete(tuple) ;
     }
-}
-
-int
-Ral_TupleDegree(
-    Ral_Tuple tuple)
-{
-    return Ral_TupleHeadingSize(tuple->heading) ;
-}
-
-Ral_TupleIter
-Ral_TupleBegin(
-    Ral_Tuple tuple)
-{
-    return tuple->values ;
-}
-
-Ral_TupleIter
-Ral_TupleEnd(
-    Ral_Tuple tuple)
-{
-    return tuple->values + Ral_TupleDegree(tuple) ;
 }
 
 int
@@ -270,6 +240,91 @@ Ral_TupleEqualValues(
     return 1 ;
 }
 
+/*
+ * Compute a hash value for a tuple.
+ */
+unsigned int
+Ral_TupleHash(
+    Ral_Tuple tuple)
+{
+    Ral_TupleHeading heading = tuple->heading ;
+    Ral_TupleIter viter = Ral_TupleBegin(tuple) ;
+    Ral_TupleHeadingIter hiter = Ral_TupleHeadingBegin(heading) ;
+    unsigned int hash = 0 ;
+
+    while (hiter != Ral_TupleHeadingEnd(heading)) {
+        hash += Ral_AttributeHashValue(*hiter++, *viter++) ;
+    }
+
+    return hash ;
+}
+
+/*
+ * Compute the hash value for a tuple using only the specified
+ * attributes.
+ */
+unsigned int
+Ral_TupleHashAttr(
+    Ral_Tuple keyTuple,
+    Ral_IntVector keyAttrs)
+{
+    Ral_IntVectorIter indexIter ;
+    unsigned int hash = 0 ;
+
+    for (indexIter = Ral_IntVectorBegin(keyAttrs) ;
+            indexIter != Ral_IntVectorEnd(keyAttrs) ; ++indexIter) {
+        Ral_TupleHeadingIter hiter =
+                Ral_TupleHeadingBegin(keyTuple->heading) + *indexIter ;
+        Ral_TupleIter viter =
+                Ral_TupleBegin(keyTuple) + *indexIter ;
+
+        assert(*indexIter < Ral_TupleDegree(keyTuple)) ;
+        hash += Ral_AttributeHashValue(*hiter, *viter) ;
+    }
+
+    return hash ;
+}
+
+/*
+ * Compare the attributes of two tuples to determine if they are equal.
+ * The attributes must have the same type, but not necessarily the same name.
+ */
+int
+Ral_TupleAttrEqual(
+    Ral_Tuple keyTuple1,
+    Ral_IntVector keyAttrs1,
+    Ral_Tuple keyTuple2,
+    Ral_IntVector keyAttrs2)
+{
+    Ral_IntVectorIter indexIter1 ;
+    Ral_IntVectorIter indexIter2 ;
+
+    assert(Ral_IntVectorSize(keyAttrs1) == Ral_IntVectorSize(keyAttrs2)) ;
+
+    for (   indexIter1 = Ral_IntVectorBegin(keyAttrs1),
+            indexIter2 = Ral_IntVectorBegin(keyAttrs2) ;
+            indexIter1 != Ral_IntVectorEnd(keyAttrs1) ;
+            ++indexIter1, ++indexIter2) {
+        Ral_TupleHeadingIter hiter1 =
+                Ral_TupleHeadingBegin(keyTuple1->heading) + *indexIter1 ;
+        Ral_TupleIter viter1 =
+                Ral_TupleBegin(keyTuple1) + *indexIter1 ;
+        Ral_TupleIter viter2 =
+                Ral_TupleBegin(keyTuple2) + *indexIter2 ;
+
+        assert(*indexIter1 < Ral_TupleDegree(keyTuple1)) ;
+        assert(*indexIter2 < Ral_TupleDegree(keyTuple2)) ;
+        assert(Ral_AttributeTypeEqual(*hiter1,
+                Ral_TupleHeadingBegin(keyTuple2->heading) + *indexIter2)) ;
+
+        if (!Ral_AttributeValueEqual(*hiter1, *viter1, *viter2)) {
+            return 0 ;
+        }
+    }
+
+    return 1 ;
+}
+
 int
 Ral_TupleUpdateAttrValue(
     Ral_Tuple tuple,
@@ -282,6 +337,7 @@ Ral_TupleUpdateAttrValue(
     Ral_Attribute attribute ;
     int valueIndex ;
     Tcl_Obj *oldValue ;
+    Tcl_Obj *cvtValue ;
 
     /*
      * Check that we are abiding by copy-on-write semantics.
@@ -302,8 +358,9 @@ Ral_TupleUpdateAttrValue(
     /*
      * Convert the value to the type of the attribute.
      */
-    if (Ral_AttributeConvertValueToType(NULL, attribute, value, errInfo)
-	!= TCL_OK) {
+    cvtValue = Ral_AttributeConvertValueToType(NULL, attribute, value,
+            errInfo) ;
+    if (cvtValue == NULL) {
 	Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_BAD_VALUE, value) ;
 	return 0 ;
     }
@@ -321,7 +378,7 @@ Ral_TupleUpdateAttrValue(
     /*
      * Update the tuple to the new value.
      */
-    Tcl_IncrRefCount(tuple->values[valueIndex] = value) ;
+    Tcl_IncrRefCount(tuple->values[valueIndex] = cvtValue) ;
     return 1 ;
 }
 
@@ -420,6 +477,21 @@ Ral_TupleDup(
 }
 
 /*
+ * duplicate a tuple, but reuse the heading.
+ */
+Ral_Tuple
+Ral_TupleDupShallow(
+    Ral_Tuple src)
+{
+    Ral_Tuple newTuple ;
+
+    newTuple = Ral_TupleNew(src->heading) ;
+    Ral_TupleCopyValues(Ral_TupleBegin(src), Ral_TupleEnd(src),
+            Ral_TupleBegin(newTuple)) ;
+    return newTuple ;
+}
+
+/*
  * Create a new tuple that contains the same values
  * of a given tuple but reordered to match the heading.
  * The "orderMap" is in the same attribute order as "heading" and
@@ -458,9 +530,9 @@ Ral_TupleScan(
     int length ;
     /*
      * Scan the header.
-     * +1 for space
+     * +1 for "{", +1 for "}" and +1 for the separating space
      */
-    length = Ral_TupleHeadingScan(heading, typeFlags) + 1 ;
+    length = Ral_TupleHeadingScan(heading, typeFlags) + 3 ;
     /*
      * Scan the values.
      */
@@ -478,9 +550,11 @@ Ral_TupleConvert(
     char *p = dst ;
 
     /*
-     * Convert the heading.
+     * Convert the heading adding "{}" to make it a list.
      */
+    *p++ = openList ;
     p += Ral_TupleHeadingConvert(tuple->heading, p, typeFlags) ;
+    *p++ = closeList ;
     /*
      * Separate the heading from the body by space.
      */
@@ -511,7 +585,6 @@ Ral_TupleScanValue(
     Ral_AttributeTypeScanFlags *typeFlag ;
     Ral_AttributeValueScanFlags *valueFlag ;
     Ral_TupleHeadingIter hIter ;
-    Ral_TupleHeadingIter hEnd ;
 
     assert(typeFlags->attrType == Tuple_Type) ;
     assert(typeFlags->flags.compoundFlags.count == Ral_TupleDegree(tuple)) ;
@@ -534,10 +607,10 @@ Ral_TupleScanValue(
      */
     typeFlag = typeFlags->flags.compoundFlags.flags ;
     valueFlag = valueFlags->flags.compoundFlags.flags ;
-    hEnd = Ral_TupleHeadingEnd(heading) ;
 
     length = sizeof(openList) ;
-    for (hIter = Ral_TupleHeadingBegin(heading) ; hIter != hEnd ; ++hIter) {
+    for (hIter = Ral_TupleHeadingBegin(heading) ;
+            hIter != Ral_TupleHeadingEnd(heading) ; ++hIter) {
 	Ral_Attribute a = *hIter ;
 	Tcl_Obj *v = *values++ ;
 
@@ -563,7 +636,6 @@ Ral_TupleConvertValue(
     Ral_AttributeTypeScanFlags *typeFlag ;
     Ral_AttributeValueScanFlags *valueFlag ;
     Ral_TupleHeadingIter hIter ;
-    Ral_TupleHeadingIter hEnd ;
 
     assert(typeFlags->attrType == Tuple_Type) ;
     assert(typeFlags->flags.compoundFlags.count == Ral_TupleDegree(tuple)) ;
@@ -572,10 +644,10 @@ Ral_TupleConvertValue(
 
     typeFlag = typeFlags->flags.compoundFlags.flags ;
     valueFlag = valueFlags->flags.compoundFlags.flags ;
-    hEnd = Ral_TupleHeadingEnd(heading) ;
 
     *p++ = openList ;
-    for (hIter = Ral_TupleHeadingBegin(heading) ; hIter != hEnd ; ++hIter) {
+    for (hIter = Ral_TupleHeadingBegin(heading) ;
+            hIter != Ral_TupleHeadingEnd(heading) ; ++hIter) {
 	Ral_Attribute a = *hIter ;
 	Tcl_Obj *v = *values++ ;
 
@@ -592,23 +664,12 @@ Ral_TupleConvertValue(
      * Remove the trailing space. Check that the tuple actually had
      * some attributes!
      */
-    if (Ral_TupleDegree(tuple)) {
+    if (*(p - 1) == ' ') {
 	--p ;
     }
     *p++ = closeList ;
 
     return p - dst ;
-}
-
-void
-Ral_TuplePrint(
-    Ral_Tuple tuple,
-    const char *format,
-    FILE *f)
-{
-    char *str = Ral_TupleStringOf(tuple) ;
-    fprintf(f, format, str) ;
-    ckfree(str) ;
 }
 
 char *
@@ -661,13 +722,7 @@ Ral_TupleValueStringOf(
      */
     str = ckalloc(Ral_TupleScanValue(tuple, &typeFlags, &valueFlags) + 1) ;
     length = Ral_TupleConvertValue(tuple, str, &typeFlags, &valueFlags) ;
-    str[length] = '\0' ;
+    *(str + length) = '\0' ;
 
     return str ;
-}
-
-const char *
-Ral_TupleVersion(void)
-{
-    return rcsid ;
 }

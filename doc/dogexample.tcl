@@ -1,4 +1,4 @@
-lappend auto_path [file join .. src]
+set auto_path [linsert $auto_path 0 [file join ../test]]
 package require ral
 namespace import ::ral::*
 
@@ -8,7 +8,7 @@ relvar create OWNER\
     {OwnerName string Age int City string} OwnerName
 relvar create OWNERSHIP\
     {OwnerName string DogName string Acquired string}\
-    {{OwnerName DogName}}
+    {OwnerName DogName}
 
 
 relvar insert DOG\
@@ -35,14 +35,13 @@ relvar insert OWNERSHIP\
     {OwnerName Jim DogName Fred Acquired 2003}
 
 set grp [relation group [relvar set OWNERSHIP] DogAcquisition DogName Acquired]
-puts $grp
-#puts [relformat $grp Grouped]
+#puts $grp
+puts [relformat $grp Grouped]
 relation foreach t $grp {
-    set r [tuple extract $t DogAcquisition]
-    puts $r
+    set r [relation extract $t DogAcquisition]
+    puts [relformat $r]
 }
-puts $grp
 
 set ugrp [relation ungroup $grp DogAcquisition]
-puts $ugrp
+#puts $ugrp
 puts [relformat $ugrp Ungrouped]

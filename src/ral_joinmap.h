@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_joinmap.h,v $
-$Revision: 1.6 $
-$Date: 2006/09/23 19:37:23 $
+$Revision: 1.7 $
+$Date: 2009/04/11 18:18:54 $
  *--
  */
 #ifndef _ral_joinmap_h_
@@ -78,7 +78,7 @@ typedef int Ral_JoinMapComponentType ;
 /*
  * Each mapping element is just a pair of integers.
  *
- * For attributes the join map holds a vector of integer pairs.
+ * For attributes, the join map holds a vector of integer pairs.
  * The pairs represent mapping of an attribute index in the first
  * relation to an attribute index in the second relation. This is
  * one of the "join attributes".
@@ -104,22 +104,31 @@ typedef struct Ral_JoinMap {
 } *Ral_JoinMap ;
 
 /*
+ * MEMBER ACCESS MACROS
+ * N.B. many of these macros access their arguments multiple times.
+ * No side effects for the arguments!
+ */
+
+#define Ral_JoinMapAttrBegin(m)     ((m)->attrStart)
+#define Ral_JoinMapAttrEnd(m)       ((m)->attrFinish)
+#define Ral_JoinMapAttrSize(m)      ((m)->attrFinish - (m)->attrStart)
+#define Ral_JoinMapAttrCapacity(m)  ((m)->attrEndStorage - (m)->attrStart)
+#define Ral_JoinMapAttrEmpty(m)     ((m)->attrFinish = (m)->attrStart)
+
+#define Ral_JoinMapTupleBegin(m)    ((m)->tupleStart)
+#define Ral_JoinMapTupleEnd(m)      ((m)->tupleFinish)
+#define Ral_JoinMapTupleSize(m)     ((m)->tupleFinish - (m)->tupleStart)
+#define Ral_JoinMapTupleCapacity(m) ((m)->tupleEndStorage - (m)->tupleStart)
+#define Ral_JoinMapTupleEmpty(m)    ((m)->tupleFinish = (m)->tupleStart)
+
+/*
 FUNCTION DECLARATIONS
 */
 
 extern Ral_JoinMap Ral_JoinMapNew(int, int) ;
 extern void Ral_JoinMapDelete(Ral_JoinMap) ;
-extern Ral_JoinMapIter Ral_JoinMapAttrBegin(Ral_JoinMap) ;
-extern Ral_JoinMapIter Ral_JoinMapAttrEnd(Ral_JoinMap) ;
-extern Ral_JoinMapIter Ral_JoinMapTupleBegin(Ral_JoinMap) ;
-extern Ral_JoinMapIter Ral_JoinMapTupleEnd(Ral_JoinMap) ;
-extern int Ral_JoinMapAttrSize(Ral_JoinMap) ;
-extern int Ral_JoinMapAttrCapacity(Ral_JoinMap) ;
 extern void Ral_JoinMapAttrReserve(Ral_JoinMap, int) ;
-extern int Ral_JoinMapTupleSize(Ral_JoinMap) ;
-extern int Ral_JoinMapTupleCapacity(Ral_JoinMap) ;
 extern void Ral_JoinMapTupleReserve(Ral_JoinMap, int) ;
-extern void Ral_JoinMapTupleEmpty(Ral_JoinMap) ;
 extern void Ral_JoinMapAddAttrMapping(Ral_JoinMap,
     Ral_JoinMapComponentType, Ral_JoinMapComponentType) ;
 extern void Ral_JoinMapAddTupleMapping(Ral_JoinMap,
@@ -132,7 +141,5 @@ extern void Ral_JoinMapSortAttr(Ral_JoinMap, int) ;
 extern Ral_IntVector Ral_JoinMapTupleMap(Ral_JoinMap, int, int) ;
 extern int Ral_JoinMapTupleCounts(Ral_JoinMap, int, Ral_IntVector) ;
 extern Ral_IntVector Ral_JoinMapMatchingTupleSet(Ral_JoinMap, int, int) ;
-
-extern const char *Ral_JoinMapVersion(void) ;
 
 #endif /* _ral_joinmap_h_ */

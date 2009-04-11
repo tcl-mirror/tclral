@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.h,v $
-$Revision: 1.17 $
-$Date: 2008/04/12 23:01:01 $
+$Revision: 1.18 $
+$Date: 2009/04/11 18:18:54 $
  *--
  */
 #ifndef _ral_relvarobj_h_
@@ -61,7 +61,8 @@ INCLUDE FILES
 */
 #include "tcl.h"
 #include "ral_relvar.h"
-#include "ral_relationheading.h"
+#include "ral_tupleheading.h"
+#include "ral_vector.h"
 
 /*
 MACRO DEFINITIONS
@@ -83,15 +84,19 @@ EXTERNAL DATA REFERENCES
 FUNCTION DECLARATIONS
 */
 extern int Ral_RelvarObjNew(Tcl_Interp *, Ral_RelvarInfo, char const *,
-    Ral_RelationHeading) ;
+    Ral_TupleHeading, int, Tcl_Obj *const*, Ral_ErrorInfo *) ;
 extern int Ral_RelvarObjDelete(Tcl_Interp *, Ral_RelvarInfo, Tcl_Obj *) ;
 extern int Ral_RelvarObjCopyOnShared(Tcl_Interp *, Ral_RelvarInfo, Ral_Relvar) ;
 extern Ral_Relvar Ral_RelvarObjFindRelvar(Tcl_Interp *, Ral_RelvarInfo,
     char const *) ;
 extern Tcl_Obj *Ral_RelvarObjInsertTuple(Tcl_Interp *, Ral_Relvar, Tcl_Obj *,
-    Ral_ErrorInfo *) ;
-extern int Ral_RelvarObjUpdateTuple(Tcl_Interp *, Ral_Relvar, Ral_Relation,
-    Ral_RelationIter, Tcl_Obj *, Tcl_Obj *, Ral_Relation, Ral_ErrorInfo *) ;
+    Ral_IntVector *, Ral_ErrorInfo *) ;
+extern Ral_Tuple Ral_RelvarObjKeyTuple(Tcl_Interp *, Ral_Relvar, int,
+        Tcl_Obj *const*, int *, Ral_ErrorInfo *) ;
+extern int Ral_RelvarObjUpdateTuple(Tcl_Interp *, Ral_Relvar, Ral_RelationIter,
+        Tcl_Obj *, Tcl_Obj *, Ral_Relation, Ral_ErrorInfo *) ;
+extern int Ral_RelvarObjTraceUpdate(Tcl_Interp *, Ral_Relvar, Ral_RelationIter,
+        Tcl_Obj *, Ral_Relation, Ral_ErrorInfo *) ;
 
 extern int Ral_RelvarObjCreateAssoc(Tcl_Interp *, Tcl_Obj *const*,
     Ral_RelvarInfo) ;
@@ -109,6 +114,8 @@ extern int Ral_RelvarObjConstraintMember(Tcl_Interp *, Tcl_Obj * const,
     Ral_RelvarInfo) ;
 extern int Ral_RelvarObjConstraintPath(Tcl_Interp *, Tcl_Obj *const,
     Ral_RelvarInfo) ;
+extern Ral_Constraint Ral_RelvarObjFindConstraint(Tcl_Interp *, Ral_RelvarInfo,
+    char const *) ;
 extern int Ral_RelvarObjEndTrans(Tcl_Interp *, Ral_RelvarInfo, int) ;
 extern int Ral_RelvarObjEndCmd(Tcl_Interp *, Ral_RelvarInfo, int) ;
 

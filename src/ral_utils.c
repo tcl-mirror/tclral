@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_utils.c,v $
-$Revision: 1.19 $
-$Date: 2008/11/15 02:38:56 $
+$Revision: 1.20 $
+$Date: 2009/04/11 18:18:54 $
  *--
  */
 
@@ -88,7 +88,6 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_utils.c,v $ $Revision: 1.19 $" ;
 
 static char const * const cmdStrings[] = {
     "unknown command",
@@ -109,7 +108,6 @@ static char const * const optStrings[] = {
     "association",
     "body",
     "cardinality",
-    "choose",
     "compose",
     "constraint",
     "correlation",
@@ -131,7 +129,6 @@ static char const * const optStrings[] = {
     "group",
     "heading",
     "identifiers",
-    "include",
     "insert",
     "intersect",
     "is",
@@ -144,15 +141,17 @@ static char const * const optStrings[] = {
     "partition",
     "project",
     "rank",
-    "reidentify",
     "relation",
     "rename",
     "restrict",
+    "restrictone",
     "restrictwith",
     "semijoin",
     "semiminus",
     "set",
     "summarize",
+    "summarizeby",
+    "table",
     "tag",
     "tclose",
     "times",
@@ -164,6 +163,7 @@ static char const * const optStrings[] = {
     "unwrap",
     "update",
     "updateone",
+    "updateper",
     "wrap",
 } ;
 
@@ -181,10 +181,12 @@ static char const * const resultStrings[] = {
     "bad type keyword",
     "wrong number of attributes specified",
     "bad list of pairs",
+    "duplicate command option",
 
     "relations of non-zero degree must have at least one identifier",
     "identifiers must have at least one attribute",
     "identifiers must not be subsets of other identifiers",
+    "tuple has duplicate values for an identifier",
     "duplicate attribute name in identifier attribute set",
     "duplicate tuple",
     "headings not equal",
@@ -231,10 +233,12 @@ static char const * const errorStrings[] = {
     "BAD_KEYWORD",
     "WRONG_NUM_ATTRS",
     "BAD_PAIRS_LIST",
+    "DUPLICATE_OPTION",
 
     "NO_IDENTIFIER",
     "IDENTIFIER_FORMAT",
     "IDENTIFIER_SUBSET",
+    "IDENTITY_CONSTRAINT",
     "DUP_ATTR_IN_ID",
     "DUPLICATE_TUPLE",
     "HEADING_NOT_EQUAL",

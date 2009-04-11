@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleobj.h,v $
-$Revision: 1.7 $
-$Date: 2006/09/09 16:32:44 $
+$Revision: 1.8 $
+$Date: 2009/04/11 18:18:54 $
  *--
  */
 #ifndef _ral_tupleobj_h_
@@ -88,21 +88,24 @@ FUNCTION DECLARATIONS
 
 extern Tcl_Obj *Ral_TupleObjNew(Ral_Tuple) ;
 extern int Ral_TupleObjConvert(Ral_TupleHeading, Tcl_Interp *, Tcl_Obj *,
-    Tcl_Obj *, Ral_ErrorInfo *) ;
+        Tcl_Obj *, Ral_ErrorInfo *) ;
 
 extern Ral_TupleHeading Ral_TupleHeadingNewFromObj(Tcl_Interp *, Tcl_Obj *,
-    Ral_ErrorInfo *) ;
+        Ral_ErrorInfo *) ;
 extern Ral_IntVector Ral_TupleHeadingAttrsFromObj(Ral_TupleHeading,
-    Tcl_Interp *, Tcl_Obj *) ;
+        Tcl_Interp *, Tcl_Obj *) ;
 extern Ral_IntVector Ral_TupleHeadingAttrsFromVect(Ral_TupleHeading,
-    Tcl_Interp *, int, Tcl_Obj *const*) ;
+        Tcl_Interp *, int, Tcl_Obj *const*) ;
 
 extern int Ral_TupleSetFromObj(Ral_Tuple, Tcl_Interp *, Tcl_Obj *,
-    Ral_ErrorInfo *) ;
+        Ral_ErrorInfo *) ;
+extern int Ral_TupleSetFromValueList(Ral_Tuple tuple, Tcl_Interp *, Tcl_Obj *,
+        Ral_ErrorInfo *) ;
+extern Tcl_Obj *Ral_TuplePartialSetFromObj(Ral_TupleHeading, Tcl_Interp *,
+        Tcl_Obj *, Ral_ErrorInfo *) ;
 extern int Ral_TupleUpdateFromObj(Ral_Tuple, Tcl_Interp *, Tcl_Obj *,
-    Ral_ErrorInfo *) ;
+        Ral_ErrorInfo *) ;
 extern int Ral_TupleAssignToVars(Ral_Tuple, Tcl_Interp *, int, Tcl_Obj *const*,
-    Ral_ErrorInfo *errInfo) ;
-extern const char *Ral_TupleObjVersion(void) ;
+        Ral_ErrorInfo *errInfo) ;
 
 #endif /* _ral_tupleobj_h_ */

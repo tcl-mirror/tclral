@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleheading.h,v $
-$Revision: 1.11 $
-$Date: 2006/04/09 22:15:58 $
+$Revision: 1.12 $
+$Date: 2009/04/11 18:18:54 $
  *--
  */
 #ifndef _ral_tupleheading_h_
@@ -109,8 +109,20 @@ typedef struct Ral_TupleHeading {
 } *Ral_TupleHeading ;
 
 /*
-FUNCTION DECLARATIONS
-*/
+ * MEMBER ACCESS MACROS
+ * N.B. many of these macros access their arguments multiple times.
+ * No side effects for the arguments!
+ */
+#define Ral_TupleHeadingBegin(h)    ((h)->start)
+#define Ral_TupleHeadingEnd(h)      ((h)->finish)
+#define Ral_TupleHeadingSize(h)     ((h)->finish - (h)->start)
+#define Ral_TupleHeadingCapacity(h) ((h)->endStorage - (h)->start)
+#define Ral_TupleHeadingEmpty(h)    ((h)->finish == (h)->start)
+#define Ral_TupleHeadingReference(h)    (++((h)->refCount))
+
+/*
+ * FUNCTION DECLARATIONS
+ */
 
 extern Ral_TupleHeading Ral_TupleHeadingNew(int) ;
 extern Ral_TupleHeading Ral_TupleHeadingSubset(Ral_TupleHeading,
@@ -118,30 +130,29 @@ extern Ral_TupleHeading Ral_TupleHeadingSubset(Ral_TupleHeading,
 extern Ral_TupleHeading Ral_TupleHeadingDup(Ral_TupleHeading) ;
 extern Ral_TupleHeading Ral_TupleHeadingExtend(Ral_TupleHeading, int) ;
 extern void Ral_TupleHeadingDelete(Ral_TupleHeading) ;
-extern void Ral_TupleHeadingReference(Ral_TupleHeading) ;
 extern void Ral_TupleHeadingUnreference(Ral_TupleHeading) ;
 extern int Ral_TupleHeadingAppend(Ral_TupleHeading, Ral_TupleHeadingIter,
     Ral_TupleHeadingIter, Ral_TupleHeading) ;
-extern int Ral_TupleHeadingSize(Ral_TupleHeading) ;
-extern int Ral_TupleHeadingCapacity(Ral_TupleHeading) ;
-extern int Ral_TupleHeadingEmpty(Ral_TupleHeading) ;
 extern int Ral_TupleHeadingEqual(Ral_TupleHeading, Ral_TupleHeading) ;
-extern Ral_TupleHeadingIter Ral_TupleHeadingBegin(Ral_TupleHeading) ;
-extern Ral_TupleHeadingIter Ral_TupleHeadingEnd(Ral_TupleHeading) ;
 extern Ral_TupleHeadingIter Ral_TupleHeadingStore(Ral_TupleHeading,
     Ral_TupleHeadingIter, Ral_Attribute) ;
 extern Ral_Attribute Ral_TupleHeadingFetch(Ral_TupleHeading, int) ;
 extern Ral_TupleHeadingIter Ral_TupleHeadingPushBack(Ral_TupleHeading,
     Ral_Attribute) ;
 extern Ral_TupleHeadingIter Ral_TupleHeadingFind(Ral_TupleHeading,
-    const char *) ;
-extern int Ral_TupleHeadingIndexOf(Ral_TupleHeading, const char *) ;
-extern Ral_TupleHeading Ral_TupleHeadingCompare(Ral_TupleHeading,
-    Ral_TupleHeading) ;
+    char const *) ;
+extern int Ral_TupleHeadingIndexOf(Ral_TupleHeading, char const *) ;
+
 extern Ral_TupleHeading Ral_TupleHeadingUnion(Ral_TupleHeading,
     Ral_TupleHeading) ;
 extern Ral_TupleHeading Ral_TupleHeadingIntersect(Ral_TupleHeading,
     Ral_TupleHeading) ;
+extern Ral_TupleHeading Ral_TupleHeadingJoin( Ral_TupleHeading,
+    Ral_TupleHeading, Ral_JoinMap, Ral_IntVector *, Ral_ErrorInfo *) ;
+extern Ral_TupleHeading Ral_TupleHeadingCompose(Ral_TupleHeading,
+    Ral_TupleHeading, Ral_JoinMap, Ral_IntVector *, Ral_IntVector *,
+    Ral_ErrorInfo *) ;
+
 extern Ral_IntVector Ral_TupleHeadingNewOrderMap(Ral_TupleHeading,
     Ral_TupleHeading) ;
 extern int Ral_TupleHeadingCommonAttributes(Ral_TupleHeading, Ral_TupleHeading,
@@ -151,14 +162,8 @@ extern void Ral_TupleHeadingMapIndices(Ral_TupleHeading, Ral_IntVector,
 
 extern int Ral_TupleHeadingScan(Ral_TupleHeading,
     Ral_AttributeTypeScanFlags *) ;
-extern int Ral_TupleHeadingScanAttr(Ral_TupleHeading,
-    Ral_AttributeTypeScanFlags *) ;
 extern int Ral_TupleHeadingConvert(Ral_TupleHeading, char *,
     Ral_AttributeTypeScanFlags *) ;
-extern int Ral_TupleHeadingConvertAttr(Ral_TupleHeading, char *,
-    Ral_AttributeTypeScanFlags *) ;
-extern void Ral_TupleHeadingPrint(Ral_TupleHeading, const char *, FILE *) ;
 extern char *Ral_TupleHeadingStringOf(Ral_TupleHeading) ;
-extern const char *Ral_TupleHeadingVersion(void) ;
 
 #endif /* _ral_tupleheading_h_ */

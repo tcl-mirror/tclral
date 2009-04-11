@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_joinmap.c,v $
-$Revision: 1.6 $
-$Date: 2006/07/14 04:13:30 $
+$Revision: 1.7 $
+$Date: 2009/04/11 18:18:54 $
  *--
  */
 
@@ -89,7 +89,6 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_joinmap.c,v $ $Revision: 1.6 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -126,48 +125,6 @@ Ral_JoinMapDelete(
     ckfree((char *)map) ;
 }
 
-Ral_JoinMapIter
-Ral_JoinMapAttrBegin(
-    Ral_JoinMap map)
-{
-    return map->attrStart ;
-}
-
-Ral_JoinMapIter
-Ral_JoinMapAttrEnd(
-    Ral_JoinMap map)
-{
-    return map->attrFinish ;
-}
-
-Ral_JoinMapIter
-Ral_JoinMapTupleBegin(
-    Ral_JoinMap map)
-{
-    return map->tupleStart ;
-}
-
-Ral_JoinMapIter
-Ral_JoinMapTupleEnd(
-    Ral_JoinMap map)
-{
-    return map->tupleFinish ;
-}
-
-int
-Ral_JoinMapAttrSize(
-    Ral_JoinMap map)
-{
-    return (int)(map->attrFinish - map->attrStart) ;
-}
-
-int
-Ral_JoinMapAttrCapacity(
-    Ral_JoinMap map)
-{
-    return (int)(map->attrEndStorage - map->attrStart) ;
-}
-
 void
 Ral_JoinMapAttrReserve(
     Ral_JoinMap map,
@@ -182,20 +139,6 @@ Ral_JoinMapAttrReserve(
     }
 }
 
-int
-Ral_JoinMapTupleSize(
-    Ral_JoinMap map)
-{
-    return (int)(map->tupleFinish - map->tupleStart) ;
-}
-
-int
-Ral_JoinMapTupleCapacity(
-    Ral_JoinMap map)
-{
-    return (int)(map->tupleEndStorage - map->tupleStart) ;
-}
-
 void
 Ral_JoinMapTupleReserve(
     Ral_JoinMap map,
@@ -208,13 +151,6 @@ Ral_JoinMapTupleReserve(
 	map->tupleFinish = map->tupleStart + oldSize ;
 	map->tupleEndStorage = map->tupleStart + size ;
     }
-}
-
-void
-Ral_JoinMapTupleEmpty(
-    Ral_JoinMap map)
-{
-    map->tupleFinish = map->tupleStart ;
 }
 
 void
@@ -439,10 +375,4 @@ Ral_JoinMapMatchingTupleSet(
     }
 
     return matchSet ;
-}
-
-const char *
-Ral_JoinMapVersion(void)
-{
-    return rcsid ;
 }

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationobj.h,v $
-$Revision: 1.15 $
-$Date: 2007/02/24 20:34:51 $
+$Revision: 1.16 $
+$Date: 2009/04/11 18:18:54 $
  *--
  */
 #ifndef _ral_relationobj_h_
@@ -61,7 +61,6 @@ INCLUDE FILES
 */
 #include "tcl.h"
 #include "ral_utils.h"
-#include "ral_relationheading.h"
 #include "ral_relation.h"
 #include <stdio.h>
 
@@ -87,12 +86,8 @@ FUNCTION DECLARATIONS
 */
 
 extern Tcl_Obj *Ral_RelationObjNew(Ral_Relation) ;
-extern int Ral_RelationObjConvert(Ral_RelationHeading, Tcl_Interp *, Tcl_Obj *,
+extern int Ral_RelationObjConvert(Ral_TupleHeading, Tcl_Interp *, Tcl_Obj *,
     Tcl_Obj *, Ral_ErrorInfo *) ;
-extern Ral_RelationHeading Ral_RelationHeadingNewFromObjs(Tcl_Interp *,
-    Tcl_Obj *, Tcl_Obj *, Ral_ErrorInfo *) ;
-extern int Ral_RelationHeadingNewIdFromObj(Tcl_Interp *, Ral_RelationHeading,
-    int, Tcl_Obj *, Ral_ErrorInfo *) ;
 extern int Ral_RelationSetFromObj(Ral_Relation, Tcl_Interp *, Tcl_Obj *) ;
 extern int Ral_RelationInsertTupleValue(Ral_Relation, Tcl_Interp *, Tcl_Obj *,
     Ral_ErrorInfo *) ;
@@ -102,8 +97,5 @@ extern int Ral_RelationUpdateTupleObj(Ral_Relation, Ral_RelationIter,
     Tcl_Interp *, Tcl_Obj *, Ral_ErrorInfo *) ;
 extern int Ral_RelationObjParseJoinArgs(Tcl_Interp *, int *, Tcl_Obj *const**,
     Ral_Relation, Ral_Relation, Ral_JoinMap, Ral_ErrorInfo *) ;
-extern Ral_Tuple Ral_RelationObjKeyTuple(Tcl_Interp *, Ral_Relation, int,
-    Tcl_Obj *const*, int *, Ral_ErrorInfo *) ;
-extern const char *Ral_RelationObjVersion(void) ;
 
 #endif /* _ral_relationobj_h_ */

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.41 $
-$Date: 2008/06/09 03:47:00 $
+$Revision: 1.42 $
+$Date: 2009/04/11 18:18:54 $
  *--
  */
 
@@ -100,8 +100,6 @@ static int relvarGetNamespaceName(Tcl_Interp *, char const *, Tcl_DString *) ;
 static Tcl_Obj *relvarConstraintAttrNames(Tcl_Interp *, Ral_Relvar,
     Ral_JoinMap, int) ;
 static Tcl_Obj *relvarAssocSpec(int, int) ;
-static Ral_Constraint Ral_RelvarObjFindConstraint(Tcl_Interp *, Ral_RelvarInfo,
-    char const *) ;
 static int Ral_RelvarObjDecodeTraceOps(Tcl_Interp *, Tcl_Obj *, int *) ;
 static int Ral_RelvarObjEncodeTraceFlag(Tcl_Interp *, int, Tcl_Obj **) ;
 static Tcl_Obj *Ral_RelvarObjExecTraces(Tcl_Interp *, Ral_Relvar, Tcl_ObjType *,
@@ -143,7 +141,6 @@ static const struct traceOpsMap {
 } ;
 static const char specErrMsg[] = "multiplicity specification" ;
 static int relvarTraceFlags = TCL_NAMESPACE_ONLY | TCL_TRACE_WRITES ;
-static const char rcsid[] = "@(#) $RCSfile: ral_relvarobj.c,v $ $Revision: 1.41 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -154,54 +151,141 @@ Ral_RelvarObjNew(
     Tcl_Interp *interp,
     Ral_RelvarInfo info,
     char const *name,
-    Ral_RelationHeading heading)
+    Ral_TupleHeading heading,
+    int idCnt,
+    Tcl_Obj *const*idAttrs,
+    Ral_ErrorInfo *errInfo)
 {
     Tcl_DString resolve ;
     char const *resolvedName ;
     Ral_Relvar relvar ;
     int status ;
+    struct relvarId *idIter ;
+    Ral_IntVector id ;
 
     /*
      * Creating a relvar is not allowed during an "eval" script.
      */
     if (Ral_RelvarIsTransOnGoing(info)) {
-	Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptCreate,
-	    RAL_ERR_BAD_TRANS_OP, "create") ;
+        Ral_ErrorInfoSetError(errInfo, RAL_ERR_BAD_TRANS_OP,
+            "relvar creation not allowed during a transaction") ;
+        Ral_InterpSetError(interp, errInfo) ;
 	return TCL_ERROR ;
     }
     /*
      * Create the relvar.
      */
     resolvedName = relvarResolveName(interp, name, &resolve) ;
-    relvar = Ral_RelvarNew(info, resolvedName, heading) ;
+    relvar = Ral_RelvarNew(info, resolvedName, heading, idCnt) ;
     if (relvar == NULL) {
 	/*
 	 * Duplicate name.
 	 */
-	Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptCreate,
-	    RAL_ERR_DUP_NAME, resolvedName) ;
-	Tcl_DStringFree(&resolve) ;
+        Ral_ErrorInfoSetError(errInfo, RAL_ERR_DUP_NAME, resolvedName) ;
+        Ral_InterpSetError(interp, errInfo) ;
+        Tcl_DStringFree(&resolve) ;
 	return TCL_ERROR ;
+    }
+    Tcl_DStringFree(&resolve) ;
+    /*
+     * Deal with the identifiers. At this point the relvar structure
+     * has the space allocated for identifier information, but we need
+     * to look at the attribute lists to make sure they are well formed.
+     */
+    idIter = relvar->identifiers ;
+    while (idCnt-- != 0) {
+        int elemc ;
+        Tcl_Obj **elemv ;
+        struct relvarId *ckIter ;
+
+        if (Tcl_ListObjGetElements(interp, *idAttrs, &elemc, &elemv)
+                != TCL_OK) {
+            Ral_RelvarDelete(info, relvar) ;
+            return TCL_ERROR ;
+        }
+        if (elemc < 1) {
+            Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_IDENTIFIER_FORMAT,
+                    *idAttrs) ;
+            Ral_InterpSetError(interp, errInfo) ;
+            Ral_RelvarDelete(info, relvar) ;
+            return TCL_ERROR ;
+        }
+        /*
+         * Vector to hold the attribute indices that constitute the
+         * identifier.
+         */
+        id = Ral_IntVectorNewEmpty(elemc) ;
+        /*
+         * Find the attribute in the tuple heading and build up a vector of
+         * attributes indices that will form the identifier.
+         */
+        while (elemc-- > 0) {
+            const char *attrName = Tcl_GetString(*elemv++) ;
+            int index = Ral_TupleHeadingIndexOf(heading, attrName) ;
+            if (index < 0) {
+                Ral_ErrorInfoSetError(errInfo, RAL_ERR_UNKNOWN_ATTR, attrName) ;
+                goto errorOut ;
+            }
+            /*
+             * The indices in an identifier must form a set, i.e. you cannot
+             * have a duplicate attribute in a list of attributes that is
+             * intended to be an identifier of a relation.
+             */
+            if (!Ral_IntVectorSetAdd(id, index)) {
+                Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_DUP_ATTR_IN_ID,
+                        *idAttrs) ;
+                goto errorOut ;
+            }
+        }
+        /*
+         * Add the set of attribute indices as an identifier.
+         * Check if the identifier is not a subset of an existing one.
+         * Make sure the identifier is in canonical order.
+         */
+        Ral_IntVectorSort(id) ;
+        for (ckIter = relvar->identifiers ; ckIter != idIter ; ++ckIter) {
+            if (Ral_IntVectorSubsetOf(id, ckIter->idAttrs) ||
+                    Ral_IntVectorSubsetOf(ckIter->idAttrs, id)) {
+                Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_IDENTIFIER_SUBSET,
+                        *idAttrs) ;
+                goto errorOut ;
+            }
+        }
+        /*
+         * Finally add the attribute vector to the relvar structure and
+         * initialize the hash table that will be used to enforce
+         * the identity constraints.
+         */
+        idIter->idAttrs = id ;
+        Tcl_InitCustomHashTable(&idIter->idIndex, TCL_CUSTOM_PTR_KEYS,
+                &tupleAttrHashType) ;
+        ++idAttrs ;
+        ++idIter ;
     }
     /*
      * Create a variable by the same name.
      */
-    if (Tcl_SetVar2Ex(interp, resolvedName, NULL, relvar->relObj,
-	TCL_LEAVE_ERR_MSG) == NULL) {
-	Ral_RelvarDelete(info, resolvedName) ;
-	Tcl_DStringFree(&resolve) ;
+    if (Tcl_SetVar2Ex(interp, relvar->name, NULL, relvar->relObj,
+            TCL_LEAVE_ERR_MSG) == NULL) {
+        Ral_RelvarDelete(info, relvar) ;
 	return TCL_ERROR ;
     }
     /*
      * Set up a trace to make the Tcl variable read only.
      */
-    status = Tcl_TraceVar(interp, resolvedName, relvarTraceFlags,
+    status = Tcl_TraceVar(interp, relvar->name, relvarTraceFlags,
 	relvarTraceProc, info) ;
     assert(status == TCL_OK) ;
 
-    Tcl_DStringFree(&resolve) ;
     Tcl_SetObjResult(interp, relvar->relObj) ;
     return TCL_OK ;
+
+errorOut:
+    Ral_IntVectorDelete(id) ;
+    Ral_RelvarDelete(info, relvar) ;
+    Ral_InterpSetError(interp, errInfo) ;
+    return TCL_ERROR ;
+    
 }
 
 int
@@ -254,7 +338,7 @@ Ral_RelvarObjDelete(
 	return TCL_ERROR ;
     }
 
-    Ral_RelvarDelete(info, relvar->name) ;
+    Ral_RelvarDelete(info, relvar) ;
 
     Tcl_ResetResult(interp) ;
     return TCL_OK ;
@@ -381,82 +465,158 @@ Ral_RelvarObjInsertTuple(
     Tcl_Interp *interp,
     Ral_Relvar relvar,
     Tcl_Obj *nameValueObj,
+    Ral_IntVector *orderMap,
     Ral_ErrorInfo *errInfo)
 {
     Ral_Relation relation ;
-    Ral_Tuple tuple ;
+    Tcl_Obj *tupleObj ;
     Tcl_Obj *resultObj ;
 
     assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
     relation = relvar->relObj->internalRep.otherValuePtr ;
 
     /*
-     * Make the new tuple refer to the heading contained in the relation.
+     * Create a new tuple object from the list of attribute / value pairs. It
+     * is allowed that there be fewer attributes than the tuple heading so that
+     * variable traces may extend the tuple.
      */
-    tuple = Ral_TupleNew(relation->heading->tupleHeading) ;
-    /*
-     * Set the values of the attributes from the list of attribute / value
-     * pairs.
-     */
-    /*
-     * HERE -- Ral_TupleSetFromObj() insists that all attributes be set.
-     * Need something that is not so strict so that the insert traces
-     * can fill out the rest of the heading.
-     */
-    if (Ral_TupleSetFromObj(tuple, interp, nameValueObj, errInfo) != TCL_OK) {
-	Ral_TupleDelete(tuple) ;
+    tupleObj = Ral_TuplePartialSetFromObj(relation->heading, interp,
+            nameValueObj, errInfo) ;
+    if (tupleObj == NULL) {
 	return NULL ;
     }
+    Tcl_IncrRefCount(tupleObj) ;
     /*
-     * Run the traces and get the result back.
+     * Run the traces and get the result back. "resultObj" will have
+     * a reference count of at least one and will need to be decremented.
      */
-    resultObj = Ral_RelvarObjExecInsertTraces(interp, relvar,
-	Ral_TupleObjNew(tuple)) ;
+    resultObj = Ral_RelvarObjExecInsertTraces(interp, relvar, tupleObj) ;
+    Tcl_DecrRefCount(tupleObj) ;
     if (resultObj) {
+        Ral_Tuple tuple ;
 	/*
 	 * Objects returned have already been converted to tuples.
 	 * Insert the tuple into the relation.
 	 */
 	assert(resultObj->typePtr == &Ral_TupleObjType) ;
 	tuple = resultObj->internalRep.otherValuePtr ;
-	/*
-	 * HERE -- check that the tuple heading did not change after
-	 * the traces. Ral_RelationPushBack() only asserts that.
-	 */
-	if (!Ral_RelationPushBack(relation, tuple, NULL)) {
-	    Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_DUPLICATE_TUPLE,
-		resultObj) ;
-	    Ral_InterpSetError(interp, errInfo) ;
-	    /*
-	     * HERE
-	     * Somethings not quite right here.
-	     * We get a memory crash if we don't increment the ref count
-	     * first.
-	     */
-	    Tcl_IncrRefCount(resultObj) ;
-	    Tcl_DecrRefCount(resultObj) ;
-	    resultObj = NULL ;
-	}
+        /*
+         * Check that the relvar traces did not return a heading
+         * that no longer matches that of the relation value.
+         */
+        if (Ral_TupleHeadingEqual(relation->heading, tuple->heading)) {
+            /*
+             * Since the traces may return a tuple heading of any order
+             * we must make sure to reorder things if necessary. This vector
+             * is also returned by reference, so the caller must delete it.
+             */
+            *orderMap = Ral_TupleHeadingNewOrderMap(relation->heading,
+                    tuple->heading) ;
+            if (!Ral_RelvarInsertTuple(relvar, tuple, *orderMap, errInfo)) {
+                goto errorOut ;
+            }
+        } else {
+            Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_HEADING_NOT_EQUAL,
+                    resultObj) ;
+            goto errorOut ;
+        }
     }
 
     return resultObj ;
+
+errorOut:
+    Ral_InterpSetError(interp, errInfo) ;
+    Tcl_DecrRefCount(resultObj) ;
+    return NULL ;
+}
+
+/*
+ * Returns a tuple that has values set for the given attributes.
+ * The attributes are examined to make sure that they form an identifier of the
+ * relvar so that the resulting tuple can be used as a key to look up a
+ * particular tuple in the relation of the relvar.
+ * Caller must delete the returned tuple.
+ */
+Ral_Tuple
+Ral_RelvarObjKeyTuple(
+    Tcl_Interp *interp,
+    Ral_Relvar relvar,
+    int objc,
+    Tcl_Obj *const*objv,
+    int *idRef,
+    Ral_ErrorInfo *errInfo)
+{
+    Ral_Relation relation ;
+    Ral_IntVector id ;
+    Ral_Tuple key ;
+    int idNum ;
+
+    if (objc % 2 != 0) {
+	Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_BAD_PAIRS_LIST, *objv) ;
+	Ral_InterpSetError(interp, errInfo) ;
+	return NULL ;
+    }
+    assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
+    relation = relvar->relObj->internalRep.otherValuePtr ;
+    /*
+     * Iterate through the name/value list and construct an identifier
+     * vector from the attribute names and a key tuple from the corresponding
+     * values.
+     */
+    id = Ral_IntVectorNewEmpty(objc / 2) ;
+    key = Ral_TupleNew(relation->heading) ;
+    for ( ; objc > 0 ; objc -= 2, objv += 2) {
+	const char *attrName = Tcl_GetString(*objv) ;
+	int attrIndex = Ral_TupleHeadingIndexOf(relation->heading, attrName) ;
+
+	if (attrIndex < 0) {
+	    Ral_ErrorInfoSetError(errInfo, RAL_ERR_UNKNOWN_ATTR, attrName) ;
+	    goto error_out ;
+	}
+	Ral_IntVectorPushBack(id, attrIndex) ;
+
+	if (!Ral_TupleUpdateAttrValue(key, attrName, *(objv + 1), errInfo)) {
+	    goto error_out ;
+	}
+    }
+    /*
+     * Check if the attributes given do constitute an identifier.
+     */
+    idNum = Ral_RelvarFindIdentifier(relvar, id) ;
+    if (idNum < 0) {
+	Ral_ErrorInfoSetError(errInfo, RAL_ERR_NOT_AN_IDENTIFIER,
+	    "during identifier construction operation") ;
+	goto error_out ;
+    } else if (idRef) {
+	*idRef = idNum ;
+    }
+    Ral_IntVectorDelete(id) ;
+
+    return key ;
+
+error_out:
+    Ral_InterpSetError(interp, errInfo) ;
+    Ral_IntVectorDelete(id) ;
+    Ral_TupleDelete(key) ;
+    return NULL ;
 }
 
 int
 Ral_RelvarObjUpdateTuple(
     Tcl_Interp *interp,
     Ral_Relvar relvar,
-    Ral_Relation relation,
     Ral_RelationIter tupleIter,
     Tcl_Obj *scriptObj,
-    Tcl_Obj *tupleVarNameObj,
+    Tcl_Obj *tupleObj,
     Ral_Relation updated,
     Ral_ErrorInfo *errInfo)
 {
+    Ral_Relation relation ;
     int result ;
     Tcl_Obj *newTupleObj ;
-    Tcl_Obj *oldTupleObj ;
-    Tcl_Obj *resultTupleObj ;
+
+    assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
+    relation = relvar->relObj->internalRep.otherValuePtr ;
     /*
      * Evaluate the script.
      */
@@ -466,25 +626,46 @@ Ral_RelvarObjUpdateTuple(
 	    "\n    (\"in ::ral::%s %s\" body line %d)" ;
 	char msg[sizeof(msgfmt) + TCL_INTEGER_SPACE + 50] ;
 
+#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 6
+	sprintf(msg, msgfmt, Ral_ErrorInfoGetCommand(errInfo),
+	    Ral_ErrorInfoGetOption(errInfo), Tcl_GetErrorLine(interp)) ;
+#else
 	sprintf(msg, msgfmt, Ral_ErrorInfoGetCommand(errInfo),
 	    Ral_ErrorInfoGetOption(errInfo), interp->errorLine) ;
+#endif
 	Tcl_AddObjErrorInfo(interp, msg, -1) ;
 	return TCL_ERROR ;
-    } else if (result != TCL_OK) {
+    } else if (!(result == TCL_OK || result == TCL_RETURN
+            || result == TCL_CONTINUE)) {
 	return result ;
     }
     /*
-     * Fetch the value of the tuple variable. It could be different now that
-     * the script has been executed. Once we get the new tuple value, we can
-     * use it to update the relvar.
+     * Fetch the return value of the script.  Once we get the new tuple value,
+     * we can use it to update the relvar.
      */
-    newTupleObj = Tcl_ObjGetVar2(interp, tupleVarNameObj, NULL,
-	TCL_LEAVE_ERR_MSG) ;
-    if (newTupleObj == NULL) {
-	return TCL_ERROR ;
-    }
+    newTupleObj = Tcl_GetObjResult(interp) ;
+    return Ral_RelvarObjTraceUpdate(interp, relvar, tupleIter, newTupleObj,
+            updated, errInfo) ;
+}
+
+int
+Ral_RelvarObjTraceUpdate(
+    Tcl_Interp *interp,
+    Ral_Relvar relvar,
+    Ral_RelationIter tupleIter,
+    Tcl_Obj *newTupleObj,
+    Ral_Relation updated,
+    Ral_ErrorInfo *errInfo)
+{
+    Ral_Relation relation ;
+    int result ;
+    Tcl_Obj *oldTupleObj ;
+    Tcl_Obj *resultTupleObj ;
+    Ral_Tuple resultTuple ;
+
+    assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
+    relation = relvar->relObj->internalRep.otherValuePtr ;
     if (Tcl_ConvertToType(interp, newTupleObj, &Ral_TupleObjType) != TCL_OK) {
-	Tcl_DecrRefCount(newTupleObj) ;
 	return TCL_ERROR ;
     }
     assert(newTupleObj->typePtr == &Ral_TupleObjType) ;
@@ -500,24 +681,55 @@ Ral_RelvarObjUpdateTuple(
      */
     resultTupleObj = Ral_RelvarObjExecUpdateTraces(interp, relvar, oldTupleObj,
 	newTupleObj) ;
+    Tcl_DecrRefCount(oldTupleObj) ;
+    Tcl_DecrRefCount(newTupleObj) ;
     if (resultTupleObj == NULL) {
-	Tcl_DecrRefCount(oldTupleObj) ;
-	Tcl_DecrRefCount(newTupleObj) ;
 	return TCL_ERROR ;
     }
-    Tcl_IncrRefCount(resultTupleObj) ;
-
+    if (Tcl_ConvertToType(interp, resultTupleObj, &Ral_TupleObjType)
+            != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    resultTuple = resultTupleObj->internalRep.otherValuePtr ;
+    if (!Ral_TupleHeadingEqual(relation->heading, resultTuple->heading)) {
+        Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_HEADING_NOT_EQUAL,
+                resultTupleObj) ;
+        Ral_InterpSetError(interp, errInfo) ;
+        Tcl_DecrRefCount(resultTupleObj) ;
+	return TCL_ERROR ;
+    }
+    /*
+     * Remove the old identifier index values.
+     */
+    Ral_RelvarIdUnindexTuple(relvar, *tupleIter) ;
+    /*
+     * Update the tuple values in place.
+     */
     result = Ral_RelationUpdateTupleObj(relation, tupleIter, interp,
 	    resultTupleObj, errInfo) ;
     if (result == TCL_OK) {
+        int status ;
+
 	assert(resultTupleObj->typePtr == &Ral_TupleObjType) ;
 	result = Ral_RelationInsertTupleObj(updated, interp, resultTupleObj,
 	    errInfo) ;
+        assert(result == TCL_OK) ;
+        /*
+         * Re-index the identifiers for the new tuple value. Here is where
+         * we detect if the updated tuple value satisfies the identification
+         * constraints on the relvar.
+         */
+        status = Ral_RelvarIdIndexTuple(relvar, *tupleIter,
+                tupleIter - Ral_RelationBegin(relation), NULL) ;
+        if (status == 0) {
+            Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_IDENTITY_CONSTRAINT,
+                    resultTupleObj) ;
+            Ral_InterpSetError(interp, errInfo) ;
+            result = TCL_ERROR ;
+        }
     }
-
     Tcl_DecrRefCount(resultTupleObj) ;
-    Tcl_DecrRefCount(oldTupleObj) ;
-    Tcl_DecrRefCount(newTupleObj) ;
+
     return result ;
 }
 
@@ -547,7 +759,7 @@ Ral_RelvarObjCreateAssoc(
     Ral_TupleHeading th1 ;
     Ral_TupleHeading th2 ;
     Ral_IntVector refAttrs ;
-    int isNotId ;
+    int refToId ;
     Ral_Constraint constraint ;
     Ral_AssociationConstraint assoc ;
     int result = TCL_OK ;
@@ -628,8 +840,8 @@ Ral_RelvarObjCreateAssoc(
      * to those in the referred to relation.
      */
     refMap = Ral_JoinMapNew(0, 0) ;
-    th1 = r1->heading->tupleHeading ;
-    th2 = r2->heading->tupleHeading ;
+    th1 = r1->heading ;
+    th2 = r2->heading ;
     while (elemc1-- > 0) {
 	int attrIndex1 = Ral_TupleHeadingIndexOf(th1, Tcl_GetString(*elemv1)) ;
 	int attrIndex2 = Ral_TupleHeadingIndexOf(th2, Tcl_GetString(*elemv2)) ;
@@ -651,18 +863,26 @@ Ral_RelvarObjCreateAssoc(
 	++elemv2 ;
     }
     /*
+     * Sort the join map attributes relative to the referred to identifier.
+     * Remember that identifier attribute vectors are kept in sorted order
+     * and we must make sure that the referring attributes are kept in
+     * the same relative order.
+     */
+    Ral_JoinMapSortAttr(refMap, 1) ;
+    /*
      * The referred to attributes in the second relvar must constitute an
      * identifier of the relation.
      */
     refAttrs = Ral_JoinMapGetAttr(refMap, 1) ;
-    isNotId = Ral_RelationHeadingFindIdentifier(r2->heading, refAttrs) < 0 ;
+    refToId = Ral_RelvarFindIdentifier(relvar2, refAttrs) ;
     Ral_IntVectorDelete(refAttrs) ;
-    if (isNotId) {
+    if (refToId < 0) {
 	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptAssociation,
 	    RAL_ERR_NOT_AN_IDENTIFIER, objv[5]) ;
 	Ral_JoinMapDelete(refMap) ;
 	return TCL_ERROR ;
     }
+    assert(refToId < relvar2->idCount) ;
     /*
      * Sort the join map attributes to match the identifier order.
      */
@@ -684,6 +904,7 @@ Ral_RelvarObjCreateAssoc(
     assoc->referredToRelvar = relvar2 ;
     assoc->referredToCond = specTable[specIndex2].conditionality ;
     assoc->referredToMult = specTable[specIndex2].multiplicity ;
+    assoc->referredToIdentifier = refToId ;
     assoc->referenceMap = refMap ;
     /*
      * Record which constraints apply to a given relvar. This is what allows
@@ -730,6 +951,7 @@ Ral_RelvarObjCreatePartition(
     int supElemc ;
     Tcl_Obj **supElemv ;
     Ral_IntVector superAttrs ;
+    int supId ;
     int nSupAttrs ;
     Ral_TupleHeading supth ;
     char const *partName ;
@@ -774,7 +996,7 @@ Ral_RelvarObjCreatePartition(
      * identifier.
      */
     superAttrs = Ral_IntVectorNewEmpty(supElemc) ;
-    supth = superRel->heading->tupleHeading ;
+    supth = superRel->heading ;
     while (supElemc-- > 0) {
 	char const *attrName = Tcl_GetString(*supElemv++) ;
 	int attrIndex = Ral_TupleHeadingIndexOf(supth, attrName) ;
@@ -794,7 +1016,8 @@ Ral_RelvarObjCreatePartition(
 	    return TCL_ERROR ;
 	}
     }
-    if (Ral_RelationHeadingFindIdentifier(superRel->heading, superAttrs) < 0) {
+    supId = Ral_RelvarFindIdentifier(super, superAttrs) ;
+    if (supId < 0) {
 	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptPartition,
 	    RAL_ERR_NOT_AN_IDENTIFIER, objv[2]) ;
 	Ral_IntVectorDelete(superAttrs) ;
@@ -815,6 +1038,7 @@ Ral_RelvarObjCreatePartition(
     }
     partition = constraint->constraint.partition ;
     partition->referredToRelvar = super ;
+    partition->referredToIdentifier = supId ;
 
     Ral_PtrVectorPushBack(super->constraints, constraint) ;
     /*
@@ -879,7 +1103,7 @@ Ral_RelvarObjCreatePartition(
 	subRef->relvar = sub ;
 	subRef->subsetMap = refMap = Ral_JoinMapNew(0, 0) ;
 	Ral_PtrVectorPushBack(partition->subsetReferences, subRef) ;
-	subth = subRel->heading->tupleHeading ;
+	subth = subRel->heading ;
 	supAttrIter = Ral_IntVectorBegin(superAttrs) ;
 	while (subElemc-- > 0) {
 	    char const *attrName = Tcl_GetString(*subElemv++) ;
@@ -962,7 +1186,6 @@ Ral_RelvarObjCreateCorrelation(
     Ral_TupleHeading th1 ;
     Ral_TupleHeading th2 ;
     Ral_IntVector refAttrs ;
-    int isNotId ;
     Ral_Constraint constraint ;
     Ral_CorrelationConstraint correl ;
     int result = TCL_OK ;
@@ -1105,8 +1328,8 @@ Ral_RelvarObjCreateCorrelation(
      * The attributes in relvar 1 and relvar 2 must be identifiers.
      * The attributes in the correlation relvar are the referring attributes.
      */
-    thC = rC->heading->tupleHeading ;
-    th1 = r1->heading->tupleHeading ;
+    thC = rC->heading ;
+    th1 = r1->heading ;
     refMap = correl->aReferenceMap ;
     while (elemc1-- > 0) {
 	int attrIndexC = Ral_TupleHeadingIndexOf(thC, Tcl_GetString(*elemvC1)) ;
@@ -1130,10 +1353,11 @@ Ral_RelvarObjCreateCorrelation(
      * The referred to attributes in the second relvar must constitute an
      * identifier of the relation.
      */
+    Ral_JoinMapSortAttr(refMap, 1) ;
     refAttrs = Ral_JoinMapGetAttr(refMap, 1) ;
-    isNotId = Ral_RelationHeadingFindIdentifier(r1->heading, refAttrs) < 0 ;
+    correl->aIdentifier = Ral_RelvarFindIdentifier(relvar1, refAttrs) ;
     Ral_IntVectorDelete(refAttrs) ;
-    if (isNotId) {
+    if (correl->aIdentifier < 0) {
 	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptCorrelation,
 	    RAL_ERR_NOT_AN_IDENTIFIER, objv[5]) ;
 	goto errorOut ;
@@ -1144,7 +1368,7 @@ Ral_RelvarObjCreateCorrelation(
     Ral_JoinMapSortAttr(refMap, 1) ;
 
     refMap = correl->bReferenceMap ;
-    th2 = r2->heading->tupleHeading ;
+    th2 = r2->heading ;
     while (elemc2-- > 0) {
 	int attrIndexC = Ral_TupleHeadingIndexOf(thC, Tcl_GetString(*elemvC2)) ;
 	int attrIndex2 = Ral_TupleHeadingIndexOf(th2, Tcl_GetString(*elemv2)) ;
@@ -1167,10 +1391,11 @@ Ral_RelvarObjCreateCorrelation(
      * The referred to attributes in the second relvar must constitute an
      * identifier of the relation.
      */
+    Ral_JoinMapSortAttr(refMap, 1) ;
     refAttrs = Ral_JoinMapGetAttr(refMap, 1) ;
-    isNotId = Ral_RelationHeadingFindIdentifier(r2->heading, refAttrs) < 0 ;
+    correl->bIdentifier = Ral_RelvarFindIdentifier(relvar2, refAttrs) ;
     Ral_IntVectorDelete(refAttrs) ;
-    if (isNotId) {
+    if (correl->bIdentifier < 0) {
 	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptCorrelation,
 	    RAL_ERR_NOT_AN_IDENTIFIER, objv[9]) ;
 	goto errorOut ;
@@ -1562,6 +1787,63 @@ Ral_RelvarObjConstraintPath(
     return TCL_OK ;
 }
 
+/*
+ * Just like RelvarObjFindRelvar, except for constraint names.
+ * (1) If name is fully resolved, then try to match it directly.
+ * (2) else construct a fully resolved name for the current namespace and
+ *     try to find that.
+ * (3) If that fails, construct a fully resolved name for the global
+ *     namespace.
+ * (4) If that fails, then it is an unknown relvar.
+ */
+Ral_Constraint
+Ral_RelvarObjFindConstraint(
+    Tcl_Interp *interp,
+    Ral_RelvarInfo info,
+    char const *name)
+{
+    Ral_Constraint constraint ;
+
+    if (relvarNameIsAbsName(name)) {
+	/*
+	 * Absolute name.
+	 */
+	constraint = Ral_ConstraintFindByName(name, info) ;
+    } else {
+	/*
+	 * Relative name. First try the current namespace.
+	 */
+	Tcl_DString resolve ;
+	int globalName ;
+	char const *resolvedName ;
+
+	globalName = relvarGetNamespaceName(interp, name, &resolve) ;
+	resolvedName = Tcl_DStringValue(&resolve) ;
+	constraint = Ral_ConstraintFindByName(resolvedName, info) ;
+	/*
+	 * Check if we found the constraint by the namespace name. If not and
+	 * we were not in the global namespace, then we have to try the
+	 * global one. This matches the normal rules of Tcl name resolution.
+	 */
+	if (constraint == NULL && !globalName) {
+	    Tcl_DStringFree(&resolve) ;
+	    Tcl_DStringInit(&resolve) ;
+	    Tcl_DStringAppend(&resolve, "::", -1) ;
+	    Tcl_DStringAppend(&resolve, name, -1) ;
+	    resolvedName = Tcl_DStringValue(&resolve) ;
+	    constraint = Ral_ConstraintFindByName(resolvedName, info) ;
+	}
+
+	Tcl_DStringFree(&resolve) ;
+    }
+
+    if (constraint == NULL) {
+	Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptNone,
+	    RAL_ERR_UNKNOWN_NAME, name) ;
+    }
+    return constraint ;
+}
+
 int
 Ral_RelvarObjEndTrans(
     Tcl_Interp *interp,
@@ -1796,6 +2078,12 @@ Ral_RelvarObjExecInsertTraces(
     Ral_Relvar relvar,
     Tcl_Obj *insertTuple)
 {
+    /*
+     * Hold on to the insert tuple. This function returns an object that
+     * has a reference count of at least one. The caller must decrement
+     * the reference count.
+     */
+    Tcl_IncrRefCount(insertTuple) ;
     if (relvar->traces && relvar->traceFlags == 0) {
 	relvar->traceFlags = TRACEOP_INSERT_FLAG ;
 	insertTuple = Ral_RelvarObjExecTraces(interp, relvar, &Ral_TupleObjType,
@@ -1812,6 +2100,7 @@ Ral_RelvarObjExecUpdateTraces(
     Tcl_Obj *oldTuple,
     Tcl_Obj *newTuple)
 {
+    Tcl_IncrRefCount(newTuple) ;
     if (relvar->traces && relvar->traceFlags == 0) {
 	relvar->traceFlags = TRACEOP_UPDATE_FLAG ;
 	newTuple = Ral_RelvarObjExecTraces(interp, relvar, &Ral_TupleObjType,
@@ -1828,6 +2117,7 @@ Ral_RelvarObjExecSetTraces(
     Tcl_Obj *relationObj,
     Ral_ErrorInfo *errInfo)
 {
+    Tcl_IncrRefCount(relationObj) ;
     if (relvar->traces && relvar->traceFlags == 0) {
 	relvar->traceFlags = TRACEOP_SET_FLAG ;
 	relationObj = Ral_RelvarObjExecTraces(interp, relvar,
@@ -1857,10 +2147,9 @@ Ral_RelvarObjExecSetTraces(
 		return NULL ;
 	    }
 	    origRel = relvar->relObj->internalRep.otherValuePtr ;
-	    if (!Ral_RelationHeadingEqual(resultRel->heading,
-		    origRel->heading)) {
+	    if (!Ral_TupleHeadingEqual(resultRel->heading, origRel->heading)) {
 		char *headingStr =
-		    Ral_RelationHeadingStringOf(resultRel->heading) ;
+		    Ral_TupleHeadingStringOf(resultRel->heading) ;
 		Ral_ErrorInfoSetError(errInfo, RAL_ERR_HEADING_NOT_EQUAL,
 		    headingStr) ;
 		Ral_InterpSetError(interp, errInfo) ;
@@ -1893,7 +2182,7 @@ Ral_RelvarObjExecEvalTraces(
     int level)
 {
     if (rInfo->traces) {
-	Tcl_Obj *evalObj = Tcl_NewStringObj("eval", -1) ;
+	Tcl_Obj *evalObj = Tcl_NewStringObj("transaction", -1) ;
 	Tcl_Obj *beginObj = isBegin ?
 	    Tcl_NewStringObj("begin", -1) : Tcl_NewStringObj("end", -1) ;
 	Tcl_Obj *levelObj = Tcl_NewIntObj(level) ;
@@ -1904,7 +2193,7 @@ Ral_RelvarObjExecEvalTraces(
 	Tcl_IncrRefCount(beginObj) ;
 	Tcl_IncrRefCount(levelObj) ;
 	/*
-	 * Since we ignore any errors from eval traces, we preserve
+	 * Since we ignore any errors from transaction traces, we preserve
 	 * the current value of the interpreter result while executing
 	 * the trace commands.
 	 */
@@ -1927,7 +2216,7 @@ Ral_RelvarObjExecEvalTraces(
 		 * Break out the list as a array of argments and evaluate it.
 		 */
 		if (Tcl_ListObjGetElements(interp, cmd, &cmdc, &cmdv)
-		    == TCL_OK) {
+                        == TCL_OK) {
 		    Tcl_EvalObjv(interp, cmdc, cmdv, TCL_EVAL_DIRECT) ;
 		}
 		Tcl_DecrRefCount(cmd) ;
@@ -2066,7 +2355,7 @@ relvarConstraintAttrNames(
 
     assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
     relation = relvar->relObj->internalRep.otherValuePtr ;
-    th = relation->heading->tupleHeading ;
+    th = relation->heading ;
 
     for (aIter = Ral_IntVectorBegin(attrIndices) ; aIter != aEnd ; ++aIter) {
 	Ral_Attribute attr = Ral_TupleHeadingFetch(th, *aIter) ;
@@ -2092,63 +2381,6 @@ relvarAssocSpec(
     assert (cond < 2) ;
     assert (mult < 2) ;
     return Tcl_NewStringObj(condMultStrings[cond][mult], -1) ;
-}
-
-/*
- * Just like RelvarObjFindRelvar, except for constraint names.
- * (1) If name is fully resolved, then try to match it directly.
- * (2) else construct a fully resolved name for the current namespace and
- *     try to find that.
- * (3) If that fails, construct a fully resolved name for the global
- *     namespace.
- * (4) If that fails, then it is an unknown relvar.
- */
-static Ral_Constraint
-Ral_RelvarObjFindConstraint(
-    Tcl_Interp *interp,
-    Ral_RelvarInfo info,
-    char const *name)
-{
-    Ral_Constraint constraint ;
-
-    if (relvarNameIsAbsName(name)) {
-	/*
-	 * Absolute name.
-	 */
-	constraint = Ral_ConstraintFindByName(name, info) ;
-    } else {
-	/*
-	 * Relative name. First try the current namespace.
-	 */
-	Tcl_DString resolve ;
-	int globalName ;
-	char const *resolvedName ;
-
-	globalName = relvarGetNamespaceName(interp, name, &resolve) ;
-	resolvedName = Tcl_DStringValue(&resolve) ;
-	constraint = Ral_ConstraintFindByName(resolvedName, info) ;
-	/*
-	 * Check if we found the constraint by the namespace name. If not and
-	 * we were not in the global namespace, then we have to try the
-	 * global one. This matches the normal rules of Tcl name resolution.
-	 */
-	if (constraint == NULL && !globalName) {
-	    Tcl_DStringFree(&resolve) ;
-	    Tcl_DStringInit(&resolve) ;
-	    Tcl_DStringAppend(&resolve, "::", -1) ;
-	    Tcl_DStringAppend(&resolve, name, -1) ;
-	    resolvedName = Tcl_DStringValue(&resolve) ;
-	    constraint = Ral_ConstraintFindByName(resolvedName, info) ;
-	}
-
-	Tcl_DStringFree(&resolve) ;
-    }
-
-    if (constraint == NULL) {
-	Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptNone,
-	    RAL_ERR_UNKNOWN_NAME, name) ;
-    }
-    return constraint ;
 }
 
 static int
@@ -2284,9 +2516,11 @@ Ral_RelvarObjExecTraces(
 		 * Break out the list as a array of argments and evaluate it.
 		 */
 		if (Tcl_ListObjGetElements(interp, cmd, &cmdc, &cmdv)
-			!= TCL_OK ||
-		    Tcl_EvalObjv(interp, cmdc, cmdv, TCL_EVAL_DIRECT)
-			!= TCL_OK) {
+                        != TCL_OK) {
+		    goto cmdError ;
+                }
+                if (Tcl_EvalObjv(interp, cmdc, cmdv, TCL_EVAL_DIRECT)
+                        != TCL_OK) {
 		    goto cmdError ;
 		}
 		if (type != NULL) {
@@ -2296,7 +2530,12 @@ Ral_RelvarObjExecTraces(
 		     * proc we fish it out of the interpreter and make
 		     * sure that it is of the proper type.
 		     */
+                    if (traceObj) {
+                        Tcl_DecrRefCount(traceObj) ;
+                    }
 		    traceObj = Tcl_GetObjResult(interp) ;
+                    Tcl_IncrRefCount(traceObj) ;
+                    Tcl_ResetResult(interp) ;
 		    result = Tcl_ConvertToType(interp, traceObj, type) ;
 		    /*
 		     * If we got the correct object type, then we pass it
@@ -2333,5 +2572,7 @@ Ral_RelvarObjExecTraces(
 
 cmdError:
     Tcl_DecrRefCount(cmd) ;
+    Tcl_DecrRefCount(flagObj) ;
+    Tcl_DecrRefCount(nameObj) ;
     return NULL ;
 }

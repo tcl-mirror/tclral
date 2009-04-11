@@ -3,5 +3,3 @@
 #
 package ifneeded @PACKAGE_NAME@ @PACKAGE_VERSION@ \
     [list load [file join $dir @PKG_LIB_FILE@]]\n[list source [file join $dir @PACKAGE_NAME@.tcl]]
-package ifneeded @PACKAGE_NAME@util @PACKAGE_VERSION@ \
-    [list source [file join $dir @PACKAGE_NAME@util.tcl]]

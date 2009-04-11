@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_utils.h,v $
-$Revision: 1.16 $
-$Date: 2008/11/02 23:37:20 $
+$Revision: 1.17 $
+$Date: 2009/04/11 18:18:54 $
  *--
  */
 #ifndef _ral_utils_h_
@@ -88,7 +88,6 @@ typedef enum {
     Ral_OptAssociation,
     Ral_OptBody,
     Ral_OptCardinality,
-    Ral_OptChoose,
     Ral_OptCompose,
     Ral_OptConstraint,
     Ral_OptCorrelation,
@@ -110,7 +109,6 @@ typedef enum {
     Ral_OptGroup,
     Ral_OptHeading,
     Ral_OptIdentifiers,
-    Ral_OptInclude,
     Ral_OptInsert,
     Ral_OptIntersect,
     Ral_OptIs,
@@ -123,15 +121,17 @@ typedef enum {
     Ral_OptPartition,
     Ral_OptProject,
     Ral_OptRank,
-    Ral_OptReidentify,
     Ral_OptRelation,
     Ral_OptRename,
     Ral_OptRestrict,
+    Ral_OptRestrictone,
     Ral_OptRestrictwith,
     Ral_OptSemijoin,
     Ral_OptSemiminus,
     Ral_OptSet,
     Ral_OptSummarize,
+    Ral_OptSummarizeby,
+    Ral_OptTable,
     Ral_OptTag,
     Ral_OptTclose,
     Ral_OptTimes,
@@ -143,6 +143,7 @@ typedef enum {
     Ral_OptUnwrap,
     Ral_OptUpdate,
     Ral_OptUpdateone,
+    Ral_OptUpdateper,
     Ral_OptWrap,
 } Ral_CmdOption ;
 
@@ -157,10 +158,12 @@ typedef enum {
     RAL_ERR_BAD_KEYWORD,
     RAL_ERR_WRONG_NUM_ATTRS,
     RAL_ERR_BAD_PAIRS_LIST,
+    RAL_ERR_DUPLICATE_OPTION,
 
     RAL_ERR_NO_IDENTIFIER,
     RAL_ERR_IDENTIFIER_FORMAT,
     RAL_ERR_IDENTIFIER_SUBSET,
+    RAL_ERR_IDENTITY_CONSTRAINT,
     RAL_ERR_DUP_ATTR_IN_ID,
     RAL_ERR_DUPLICATE_TUPLE,
     RAL_ERR_HEADING_NOT_EQUAL,

@@ -1,6 +1,6 @@
-#!/bin/sh
-# \
-exec tclsh "$0" "$@"
+#!/usr/bin/env tclsh
+
+set auto_path [linsert $auto_path 0 ../../test]
 
 package require ral
 
@@ -8,9 +8,7 @@ source displayExample.tcl
 
 proc setOwner {} {
     relvar set OWNER {
-	Relation
 	{OwnerName string Age int City string}
-	OwnerName
 	{
 	    {OwnerName Sue Age 24 City Cupertino}
 	    {OwnerName George Age 35 City Sunnyvale}
@@ -23,9 +21,7 @@ proc setOwner {} {
 
 proc setDog {} {
     relvar set DOG {
-	Relation
 	{DogName string Breed string}
-	DogName
 	{
 	    {DogName Fido Breed Poodle}
 	    {DogName Sam Breed Collie}
@@ -39,9 +35,7 @@ proc setDog {} {
 
 proc setOwnership {} {
     relvar set OWNERSHIP {
-	Relation
 	{OwnerName string DogName string Acquired string}
-	{{OwnerName DogName}}
 	{
 	    {OwnerName Sue DogName Fido Acquired 2001}
 	    {OwnerName Sue DogName Sam Acquired 2000}
@@ -68,22 +62,11 @@ namespace import ::ral::*
 
 # relvar create
 displayExample {
-    relvar create OWNER {
-	Relation
-	{OwnerName string Age int City string}
-	OwnerName
-    }
+    relvar create OWNER {OwnerName string Age int City string} OwnerName
     puts [relformat $::OWNER]
-    relvar create DOG {
-	Relation
-	{DogName string Breed string}
-	DogName
-    }
-    relvar create OWNERSHIP {
-	Relation
-	{OwnerName string DogName string Acquired string}
-	{{OwnerName DogName}}
-    }
+    relvar create DOG {DogName string Breed string} DogName
+    relvar create OWNERSHIP {OwnerName string DogName string Acquired string}\
+            {OwnerName DogName}
 }
 
 # relvar association
@@ -166,21 +149,9 @@ displayExample {
 
 #relvar partition
 displayExample {
-    relvar create Lamp {
-	Relation
-	{SerialNo string ModelNo string Make string}
-	SerialNo
-    }
-    relvar create TableLamp {
-	Relation
-	{SerialNo string Shade string}
-	SerialNo
-    }
-    relvar create FloorLamp {
-	Relation
-	{SerialNo string Height int Sockets int}
-	SerialNo
-    }
+    relvar create Lamp {SerialNo string ModelNo string Make string} SerialNo
+    relvar create TableLamp {SerialNo string Shade string} SerialNo
+    relvar create FloorLamp {SerialNo string Height int Sockets int} SerialNo
 
     relvar partition P1 Lamp SerialNo TableLamp SerialNo FloorLamp SerialNo
 
@@ -227,15 +198,9 @@ setAll
 
 #relvar set
 displayExample {
-    relvar create PUPPY {
-	Relation
-	{PuppyName string Dame string Sire string}
-	PuppyName
-    }
+    relvar create PUPPY {PuppyName string Dame string Sire string} PuppyName
     relvar set PUPPY {
-	Relation
 	{PuppyName string Dame string Sire string}
-	PuppyName
 	{
 	    {PuppyName Bitsy Dame Spot Sire Jumper}
 	}

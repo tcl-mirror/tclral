@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.h,v $
-$Revision: 1.12 $
-$Date: 2008/04/12 22:53:59 $
+$Revision: 1.13 $
+$Date: 2009/04/11 18:18:54 $
  *--
  */
 #ifndef _ral_relvar_h_
@@ -63,6 +63,7 @@ INCLUDE FILES
 #include "ral_vector.h"
 #include "ral_relation.h"
 #include "ral_joinmap.h"
+#include "ral_utils.h"
 #include "ral_vector.h"
 
 /*
@@ -89,6 +90,7 @@ typedef struct Ral_AssociationConstraint {
     struct Ral_Relvar *referredToRelvar ;
     int referredToCond ;
     int referredToMult ;
+    int referredToIdentifier ;
     Ral_JoinMap referenceMap ;
 } *Ral_AssociationConstraint ;
 
@@ -99,6 +101,7 @@ typedef struct Ral_SubsetReference {
 
 typedef struct Ral_PartitionConstraint {
     struct Ral_Relvar *referredToRelvar ;
+    int referredToIdentifier ;
     Ral_PtrVector subsetReferences ;	/* list of Ral_SubsetReference */
 } *Ral_PartitionConstraint ;
 
@@ -107,10 +110,12 @@ typedef struct Ral_CorrelationConstraint {
     struct Ral_Relvar *aRefToRelvar ;
     int aCond ;
     int aMult ;
+    int aIdentifier ;
     Ral_JoinMap aReferenceMap ;
     struct Ral_Relvar *bRefToRelvar ;
     int bCond ;
     int bMult ;
+    int bIdentifier ;
     Ral_JoinMap bReferenceMap ;
     int complete ;
 } *Ral_CorrelationConstraint ;
@@ -142,6 +147,20 @@ typedef struct Ral_Relvar {
     Ral_PtrVector constraints ;	/* a list of Ral_Constraint  */
     Ral_TraceInfo traces ;	/* linked list of Ral_TraceInfo */
     int traceFlags ;		/* state of tracing */
+    unsigned idCount ;          /* Number of identifiers for the relvar.
+                                 * This is the actual size of the array of
+                                 * hash tables in the next member. */
+    struct relvarId {
+        Ral_IntVector idAttrs ; /* A set of attribute indices that form an
+                                 * and identifier. */
+        Tcl_HashTable idIndex ; /* Hash tables used to enforce identifier
+                                 * constraints. The tuples are hashed based
+                                 * in the identifying attributes. */
+    } identifiers[1] ;          /* Every relvar must have at least one
+                                 * identifier. This is allocated at the end of
+                                 * the relvar structure so that it can be
+                                 * of variable length and the memory for a
+                                 * relvar can be allocated in one block. */
 } *Ral_Relvar ;
 
 typedef struct Ral_RelvarTransaction {
@@ -165,8 +184,8 @@ FUNCTION DECLARATIONS
 */
 
 extern Ral_Relvar Ral_RelvarNew(Ral_RelvarInfo, char const *,
-    Ral_RelationHeading) ;
-extern void Ral_RelvarDelete(Ral_RelvarInfo, char const *) ;
+    Ral_TupleHeading, int) ;
+extern void Ral_RelvarDelete(Ral_RelvarInfo, Ral_Relvar) ;
 extern Ral_Relvar Ral_RelvarFind(Ral_RelvarInfo, char const *) ;
 
 extern ClientData Ral_RelvarNewInfo(char const *, Tcl_Interp *) ;
@@ -199,7 +218,14 @@ extern Ral_Constraint Ral_ConstraintNewCorrelation(char const *) ;
 extern void Ral_ConstraintDelete(Ral_Constraint) ;
 extern int Ral_RelvarConstraintEval(Ral_Constraint, Tcl_DString *) ;
 
-extern void Ral_RelvarSetRelation(Ral_Relvar, Tcl_Obj *) ;
+extern int Ral_RelvarSetRelation(Ral_Relvar, Tcl_Obj *, Ral_ErrorInfo *) ;
+extern int Ral_RelvarInsertTuple(Ral_Relvar, Ral_Tuple, Ral_IntVector,
+        Ral_ErrorInfo *) ;
+extern Ral_RelationIter Ral_RelvarDeleteTuple(Ral_Relvar, Ral_RelationIter) ;
+extern int Ral_RelvarFindIdentifier(Ral_Relvar, Ral_IntVector) ;
+extern Ral_RelationIter Ral_RelvarFindById(Ral_Relvar, int, Ral_Tuple) ;
+extern int Ral_RelvarIdIndexTuple(Ral_Relvar, Ral_Tuple, int, Ral_ErrorInfo *) ;
+extern void Ral_RelvarIdUnindexTuple(Ral_Relvar relvar, Ral_Tuple tuple) ;
 extern void Ral_RelvarRestorePrev(Ral_Relvar) ;
 extern void Ral_RelvarDiscardPrev(Ral_Relvar) ;
 

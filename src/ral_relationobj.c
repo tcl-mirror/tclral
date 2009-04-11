@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationobj.c,v $
-$Revision: 1.24 $
-$Date: 2008/11/10 01:25:12 $
+$Revision: 1.25 $
+$Date: 2009/04/11 18:18:54 $
  *--
  */
 
@@ -98,7 +98,7 @@ EXTERNAL DATA DEFINITIONS
 */
 
 Tcl_ObjType Ral_RelationObjType = {
-    ral_relationKeyword,
+    ral_relationTypeName,
     FreeRelationInternalRep,
     DupRelationInternalRep,
     UpdateStringOfRelation,
@@ -108,7 +108,6 @@ Tcl_ObjType Ral_RelationObjType = {
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationobj.c,v $ $Revision: 1.24 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -128,7 +127,7 @@ Ral_RelationObjNew(
 
 int
 Ral_RelationObjConvert(
-    Ral_RelationHeading heading,
+    Ral_TupleHeading heading,
     Tcl_Interp *interp,
     Tcl_Obj *value,
     Tcl_Obj *objPtr,
@@ -175,129 +174,10 @@ Ral_RelationObjConvert(
     return TCL_OK ;
 }
 
-
-Ral_RelationHeading
-Ral_RelationHeadingNewFromObjs(
-    Tcl_Interp *interp,
-    Tcl_Obj *headingObj,
-    Tcl_Obj *identObj,
-    Ral_ErrorInfo *errInfo)
-{
-    Ral_TupleHeading tupleHeading ;
-    Ral_RelationHeading heading ;
-    int idc ;
-    Tcl_Obj **idv ;
-    int idNum ;
-
-    /*
-     * Create the tuple heading.
-     */
-    tupleHeading = Ral_TupleHeadingNewFromObj(interp, headingObj, errInfo) ;
-    if (!tupleHeading) {
-	return NULL ;
-    }
-    /*
-     * The identifiers are also in a list.
-     */
-    if (Tcl_ListObjGetElements(interp, identObj, &idc, &idv) != TCL_OK) {
-	Ral_TupleHeadingDelete(tupleHeading) ;
-	return NULL ;
-    }
-    /*
-     * If a relation has any attributes, then it must also have an identifier.
-     */
-    if (idc == 0) {
-	Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_NO_IDENTIFIER, identObj) ;
-	Ral_InterpSetError(interp, errInfo) ;
-	Ral_TupleHeadingDelete(tupleHeading) ;
-	return NULL ;
-    }
-
-    /*
-     * We now know the number of identifers and can create the relation
-     * heading.
-     */
-    heading = Ral_RelationHeadingNew(tupleHeading, idc) ;
-    /*
-     * Iterate over the identifier lists and insert them into the heading.
-     */
-    for (idNum = 0 ; idNum < idc ; ++idNum, ++idv) {
-	if (Ral_RelationHeadingNewIdFromObj(interp, heading, idNum, *idv,
-	    errInfo) != TCL_OK) {
-	    Ral_RelationHeadingDelete(heading) ;
-	    return NULL ;
-	}
-    }
-
-    return heading ;
-}
-
-int
-Ral_RelationHeadingNewIdFromObj(
-    Tcl_Interp *interp,
-    Ral_RelationHeading heading,
-    int idNum,
-    Tcl_Obj *identObj,
-    Ral_ErrorInfo *errInfo)
-{
-    int elemc ;
-    Tcl_Obj **elemv ;
-    Ral_IntVector id ;
-
-    if (Tcl_ListObjGetElements(interp, identObj, &elemc, &elemv) != TCL_OK) {
-	return TCL_ERROR ;
-    }
-    /*
-     * Vector to hold the attribute indices that constitute the
-     * identifier.
-     */
-    id = Ral_IntVectorNewEmpty(elemc) ;
-    /*
-     * Find the attribute in the tuple heading and build up a
-     * vector to install in the relation heading.
-     */
-    while (elemc-- > 0) {
-	const char *attrName = Tcl_GetString(*elemv++) ;
-	int index = Ral_TupleHeadingIndexOf(heading->tupleHeading, attrName) ;
-
-	if (index < 0) {
-	    Ral_ErrorInfoSetError(errInfo, RAL_ERR_UNKNOWN_ATTR, attrName) ;
-	    Ral_InterpSetError(interp, errInfo) ;
-	    Ral_IntVectorDelete(id) ;
-	    return TCL_ERROR ;
-	}
-	/*
-	 * The indices in an identifier must form a set, i.e. you
-	 * cannot have a duplicate attribute in a list of attributes
-	 * that is intended to be an identifier of a relation.
-	 */
-	if (!Ral_IntVectorSetAdd(id, index)) {
-	    Ral_ErrorInfoSetError(errInfo, RAL_ERR_DUP_ATTR_IN_ID,
-		attrName) ;
-	    Ral_InterpSetError(interp, errInfo) ;
-	    Ral_IntVectorDelete(id) ;
-	    return TCL_ERROR ;
-	}
-    }
-    /*
-     * Add the set of attribute indices as an identifier. Adding
-     * the vector checks that we do not have a subset dependency.
-     */
-    if (!Ral_RelationHeadingAddIdentifier(heading, idNum, id)) {
-	Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_IDENTIFIER_SUBSET, identObj) ;
-	Ral_InterpSetError(interp, errInfo) ;
-	Ral_IntVectorDelete(id) ;
-	return TCL_ERROR ;
-    }
-
-    return TCL_OK ;
-}
-
 /*
  * Insert a tuple value body consisting of a list of attribute name / attribute
  * value into a relation.
  */
-
 int
 Ral_RelationInsertTupleValue(
     Ral_Relation relation,
@@ -310,7 +190,7 @@ Ral_RelationInsertTupleValue(
     /*
      * Make the new tuple refer to the heading contained in the relation.
      */
-    tuple = Ral_TupleNew(relation->heading->tupleHeading) ;
+    tuple = Ral_TupleNew(relation->heading) ;
     /*
      * Set the values of the attributes from the list of attribute / value
      * pairs.
@@ -353,8 +233,7 @@ Ral_RelationInsertTupleObj(
     }
     assert(tupleObj->typePtr == &Ral_TupleObjType) ;
     tuple = tupleObj->internalRep.otherValuePtr ;
-    orderMap = Ral_TupleHeadingNewOrderMap(relation->heading->tupleHeading,
-	tuple->heading) ;
+    orderMap = Ral_TupleHeadingNewOrderMap(relation->heading, tuple->heading) ;
     if (!Ral_RelationPushBack(relation, tuple, orderMap)) {
 	Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_DUPLICATE_TUPLE, tupleObj) ;
 	Ral_InterpSetError(interp, errInfo) ;
@@ -388,8 +267,7 @@ Ral_RelationUpdateTupleObj(
     }
     assert(tupleObj->typePtr == &Ral_TupleObjType) ;
     tuple = tupleObj->internalRep.otherValuePtr ;
-    orderMap = Ral_TupleHeadingNewOrderMap(relation->heading->tupleHeading,
-	tuple->heading) ;
+    orderMap = Ral_TupleHeadingNewOrderMap(relation->heading, tuple->heading) ;
     if (!Ral_RelationUpdate(relation, where, tuple, orderMap)) {
 	Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_DUPLICATE_TUPLE, tupleObj) ;
 	Ral_InterpSetError(interp, errInfo) ;
@@ -433,88 +311,10 @@ Ral_RelationObjParseJoinArgs(
 	/*
 	 * Join on common attributes.
 	 */
-	Ral_TupleHeadingCommonAttributes(
-	    r1->heading->tupleHeading, r2->heading->tupleHeading, joinMap) ;
+	Ral_TupleHeadingCommonAttributes(r1->heading, r2->heading, joinMap) ;
     }
 
     return TCL_OK ;
-}
-
-/*
- * Returns a tuple that has values set for the given attributes.
- * The attributes are examined to make sure that they form an identifier
- * so that the resulting tuple can be used as a key to look up a particular
- * tuple in the relation.
- * Caller must delete the returned tuple.
- */
-Ral_Tuple
-Ral_RelationObjKeyTuple(
-    Tcl_Interp *interp,
-    Ral_Relation relation,
-    int objc,
-    Tcl_Obj *const*objv,
-    int *idRef,
-    Ral_ErrorInfo *errInfo)
-{
-    Ral_RelationHeading heading = relation->heading ;
-    Ral_TupleHeading tupleHeading = heading->tupleHeading ;
-    Ral_IntVector id ;
-    Ral_Tuple key ;
-    int idNum ;
-
-    if (objc % 2 != 0) {
-	Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_BAD_PAIRS_LIST, *objv) ;
-	Ral_InterpSetError(interp, errInfo) ;
-	return NULL ;
-    }
-    /*
-     * Iterate through the name/value list and construct an identifier
-     * vector from the attribute names and a key tuple from the corresponding
-     * values.
-     */
-    id = Ral_IntVectorNewEmpty(objc / 2) ;
-    key = Ral_TupleNew(tupleHeading) ;
-    for ( ; objc > 0 ; objc -= 2, objv += 2) {
-	const char *attrName = Tcl_GetString(*objv) ;
-	int attrIndex = Ral_TupleHeadingIndexOf(tupleHeading, attrName) ;
-
-	if (attrIndex < 0) {
-	    Ral_ErrorInfoSetError(errInfo, RAL_ERR_UNKNOWN_ATTR, attrName) ;
-	    goto error_out ;
-	}
-	Ral_IntVectorPushBack(id, attrIndex) ;
-
-	if (!Ral_TupleUpdateAttrValue(key, attrName, *(objv + 1), errInfo)) {
-	    goto error_out ;
-	}
-    }
-
-    /*
-     * Check if the attributes given do constitute an identifier.
-     */
-    idNum = Ral_RelationHeadingFindIdentifier(heading, id) ;
-    if (idNum < 0) {
-	Ral_ErrorInfoSetError(errInfo, RAL_ERR_NOT_AN_IDENTIFIER,
-	    "during identifier construction operation") ;
-	goto error_out ;
-    } else if (idRef) {
-	*idRef = idNum ;
-    }
-    Ral_IntVectorDelete(id) ;
-
-    return key ;
-
-error_out:
-    Ral_InterpSetError(interp, errInfo) ;
-    Ral_IntVectorDelete(id) ;
-    Ral_TupleDelete(key) ;
-    return NULL ;
-}
-
-const char *
-Ral_RelationObjVersion(void)
-{
-    return rcsid ;
 }
 /*
  * ======================================================================
@@ -531,8 +331,8 @@ Ral_RelationFindJoinAttrs(
     Ral_JoinMap joinMap,
     Ral_ErrorInfo *errInfo)
 {
-    Ral_TupleHeading r1TupleHeading = r1->heading->tupleHeading ;
-    Ral_TupleHeading r2TupleHeading = r2->heading->tupleHeading ;
+    Ral_TupleHeading r1TupleHeading = r1->heading ;
+    Ral_TupleHeading r2TupleHeading = r2->heading ;
     int objc ;
     Tcl_Obj **objv ;
 
@@ -620,31 +420,25 @@ SetRelationFromAny(
 {
     int objc ;
     Tcl_Obj **objv ;
-    Ral_RelationHeading heading ;
+    Ral_TupleHeading heading ;
     Ral_ErrorInfo errInfo ;
 
     if (Tcl_ListObjGetElements(interp, objPtr, &objc, &objv) != TCL_OK) {
 	return TCL_ERROR ;
     }
     Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdSetFromAny, Ral_OptNone) ;
-    if (objc != 4) {
+    if (objc != 2) {
 	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_FORMAT_ERR, objPtr) ;
-	Ral_InterpSetError(interp, &errInfo) ;
-	return TCL_ERROR ;
-    }
-    if (strcmp(Ral_RelationObjType.name, Tcl_GetString(*objv)) != 0) {
-	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_BAD_KEYWORD, *objv) ;
 	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
     /*
      * Create the heading from the external representation.
      */
-    heading = Ral_RelationHeadingNewFromObjs(interp, objv[1], objv[2],
-	&errInfo) ;
+    heading = Ral_TupleHeadingNewFromObj(interp, objv[0], &errInfo) ;
     if (!heading) {
 	return TCL_ERROR ;
     }
 
-    return Ral_RelationObjConvert(heading, interp, objv[3], objPtr, &errInfo) ;
+    return Ral_RelationObjConvert(heading, interp, objv[1], objPtr, &errInfo) ;
 }

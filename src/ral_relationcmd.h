@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.h,v $
-$Revision: 1.1 $
-$Date: 2006/02/20 20:15:07 $
+$Revision: 1.2 $
+$Date: 2009/04/11 18:18:54 $
  *--
  */
 #ifndef _ral_relationcmd_h_
@@ -82,6 +82,5 @@ FUNCTION DECLARATIONS
 */
 
 extern int relationCmd(ClientData, Tcl_Interp *, int, Tcl_Obj *const*) ;
-extern const char *Ral_RelationCmdVersion(void) ;
 
 #endif /* _ral_relationcmd_h_ */

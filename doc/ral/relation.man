@@ -1,6 +1,7 @@
-[manpage_begin relation n 0.8.9]
+[manpage_begin relation n 0.9]
 [comment {
-# This software is copyrighted 2004, 2005, 2006, 2007 by G. Andrew Mangogna.
+# This software is copyrighted 2004, 2005, 2006, 2007, 2008, 2009
+# by G. Andrew Mangogna.
 # The following terms apply to all files associated with the software unless
 # explicitly disclaimed in individual files.
 # 
@@ -45,14 +46,14 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.28 $
-# $Date: 2008/11/03 00:26:27 $
+# $Revision: 1.29 $
+# $Date: 2009/04/11 18:18:54 $
 #  *--
 }]
 [moddesc "Relation Operators"]
 [titledesc "Operators for Relation Values"]
-[copyright "2004, 2005, 2006, 2007 by G. Andrew Mangogna"]
-[require ral [opt 0.8.9]]
+[copyright "2004, 2005, 2006, 2007, 2008, 2009 by G. Andrew Mangogna"]
+[require ral [opt 0.9]]
 [description]
 This manpage describes the [cmd relation] command.
 The [cmd relation]
@@ -68,10 +69,6 @@ Formally a relation has a heading and a body.
 The heading, like a tuple heading, defines the attribute names and
 data types of the components of the relation.
 The body consists of tuples, all of which match the heading.
-A relation also has one or more identifiers (also known as candidate keys).
-Each identifier consists of one or more attributes of the relation and
-every tuple in the body of the relation will be unique in all their values
-with respect to all the identifiers.
 Because relations are fundamentally sets, several things should be noted:
 [list_begin enum]
 [enum]
@@ -83,10 +80,11 @@ nor operate on relations with any operators other than those given here.
 [enum]
 There is no top to bottom ordering of tuples.
 Again the implementation is free to store tuples in any order it chooses.
-There are no indexing operations that depend upon a tuple at some fixed
-location.
+There are no access operations that depend upon a tuple at some fixed
+offset or location.
 [enum]
-There are no duplicate tuples and there is no concept of a NULL value.
+There are no duplicate tuples in the body of a relation value
+and there is no concept of a NULL value.
 Relations are sets and sets do not have duplicates.
 All attributes of all tuples of a relation must contain a valid value of
 the data type defined for that attribute.
@@ -97,19 +95,16 @@ Note that all the operators are [emph "read only"] in the sense that
 they operate on relation values without modifying them.
 All of these operators return either a new relation or scalar value and
 do not modify the relation arguments.
-Only the [cmd relvar] command can modify a relation variable in place.
+Only the [cmd relvar] command can modify, in place,
+the relation value that is held in a relation variable.
 
 [section "STRING REPRESENTATION"]
 Like any Tcl value, relations have a string representation.
 The string representation of a relations is a specially formatted list
-consisting of four elements:
+consisting of two elements:
 [list_begin enum]
 [enum]
-The keyword [emph Relation].
-[enum]
 The relation heading.
-[enum]
-The identifiers of the relation.
 [enum]
 The relation body.
 [list_end]
@@ -118,20 +113,15 @@ consisting of alternating
 attribute names and attribute data types.
 It is the same form as a tuple heading.
 [para]
-The identifiers (a.k.a. candidate keys) of a relation are specified as a list.
-Each identifer list element is in turn a list containing the attribute
-names that constitute the identifier.
-Every relation must have at least one identifier.
-[para]
 The body of a relation consists of a list of tuples.
 Each tuple in the body is in a list containing an even number of elements
 consisting alternately of an
-attribute name and an attribute value.
+attribute name and its corresponding attribute value.
 [para]
 The following is a literal string representation of a relation with
 one tuple in its body.
 [example_begin]
-{Relation {DogName string Breed string} DogName {{DogName Fido Breed Poodle}}}
+{DogName string Breed string} {{DogName Fido Breed Poodle}}
 [example_end]
 
 [section "SET OPERATIONS"]
@@ -140,54 +130,11 @@ Several set-like operation are supported by TclRAL
 ([emph e.g.] union and intersection).
 These operations work in much the same way as the familiar mathematical
 operations on sets.
-However, when applied to relations, there are some special considerations.
-First, in order to perform set-like operations on relations they must
+When applied to relation values, there is a special consideration.
+In order to perform set-like operations on relations they must
 have the same heading.
-This means that the headings must have the same attribute names,
-the corresponding attributes must have the same data type and
-the identifiers must be the same for the two relations.
-The second consideration is that the identifying constraints of a relation
-value are always maintained, namely, that every tuple in a relation is
-distinctly identfied by the values of the identifying attributes and only
-those values.
-This makes it possible for two relations that differ only in the values
-of non-identifying attributes to have a conflict as to which tuples
-are included in the set operation result.
-Perhaps the easiest way to see this is with a small example.
-Consider:
-[example {
-set r1 {Relation {Id int Value int} {Id} {
-        {Id 1 Value 2}
-    }
-}
-set r2 {Relation {Id int Value int} {Id} {
-        {Id 1 Value 3}
-    }
-}
-}]
-These relation values both contain a single tuple and they are not equal
-because the tuples in each of the relations are not equal.
-Relation values are equal only if all the contained tuples are equal (and
-the equality can only be determined for relation values that have
-equal headings).
-Notice that for the above relation values
-the inequality of the tuples derives from the [cmd Value]
-attribute which is not part of the identifier of the relation.
-However, the union of these two relations can only have one tuple in the
-result since both relations have the same value for the identifier.
-It is implementation defined as to which tuple is included in the union.
-Thus when non-identifying attributes are involved the union operation is
-not, strictly speaking, commutative since the implementation may choose
-which tuple to include differently.
-So, in the descriptions below, the commutivity of set-like operations
-applies only to the extent that non-identifying attributes are not involved.
-Since the [cmd reidentify] command is available, then it is always possible
-to include in the identifier of a relation value all attributes necessary
-to distinguish the tuples as desired for the set-like operation.
-So in the above example,
-if it is necessary that both tuples be included in a union result,
-then both relations can be reidentified to include the [cmd Value] attribute
-in the identifier.
+This means that the headings must have the same attribute names and
+the corresponding attributes must have the same data type.
 
 [section EXAMPLE]
 [para]
@@ -200,79 +147,70 @@ the namespace of the example.
 
 [example {
 % set DOG {
-  Relation
-  {DogName string Breed string}
-  DogName
-  {
-  {DogName Fido Breed Poodle}
-  {DogName Sam Breed Collie}
-  {DogName Spot Breed Terrier}
-  {DogName Rover Breed Retriever}
-  {DogName Fred Breed Spaniel}
-  {DogName Jumper Breed Mutt}
+  {DogName string Breed string} {
+      {DogName Fido Breed Poodle}
+      {DogName Sam Breed Collie}
+      {DogName Spot Breed Terrier}
+      {DogName Rover Breed Retriever}
+      {DogName Fred Breed Spaniel}
+      {DogName Jumper Breed Mutt}
   }
-  }
+}
 
 % relformat $DOG DOG
-+=======+---------+
++-------+---------+
 |DogName|Breed    |
 |string |string   |
-+=======+---------+
++-------+---------+
 |Fido   |Poodle   |
 |Sam    |Collie   |
 |Spot   |Terrier  |
 |Rover  |Retriever|
 |Fred   |Spaniel  |
 |Jumper |Mutt     |
-+=======+---------+
++-------+---------+
 DOG
 ---
 % set OWNER {
-  Relation
-  {OwnerName string Age int City string}
-  OwnerName
-  {
-  {OwnerName Sue Age 24 City Cupertino}
-  {OwnerName George Age 35 City Sunnyvale}
-  {OwnerName Alice Age 30 City {San Jose}}
-  {OwnerName Mike Age 50 City {San Jose}}
-  {OwnerName Jim Age 42 City {San Francisco}}
+  {OwnerName string Age int City string} {
+      {OwnerName Sue Age 24 City Cupertino}
+      {OwnerName George Age 35 City Sunnyvale}
+      {OwnerName Alice Age 30 City {San Jose}}
+      {OwnerName Mike Age 50 City {San Jose}}
+      {OwnerName Jim Age 42 City {San Francisco}}
   }
-  }
+}
 
 % relformat $OWNER OWNER
-+=========+---+-------------+
++---------+---+-------------+
 |OwnerName|Age|City         |
 |string   |int|string       |
-+=========+---+-------------+
++---------+---+-------------+
 |Sue      |24 |Cupertino    |
 |George   |35 |Sunnyvale    |
 |Alice    |30 |San Jose     |
 |Mike     |50 |San Jose     |
 |Jim      |42 |San Francisco|
-+=========+---+-------------+
++---------+---+-------------+
 OWNER
 -----
 % set OWNERSHIP {
-  Relation
-  {OwnerName string DogName string Acquired string}
-  {{OwnerName DogName}}
-  {
-  {OwnerName Sue DogName Fido Acquired 2001}
-  {OwnerName Sue DogName Sam Acquired 2000}
-  {OwnerName George DogName Fido Acquired 2001}
-  {OwnerName George DogName Sam Acquired 2000}
-  {OwnerName Alice DogName Spot Acquired 2001}
-  {OwnerName Mike DogName Rover Acquired 2002}
-  {OwnerName Jim DogName Fred Acquired 2003}
+  {OwnerName string DogName string Acquired string} {
+    {OwnerName Sue DogName Fido Acquired 2001}
+    {OwnerName Sue DogName Sam Acquired 2000}
+    {OwnerName George DogName Fido Acquired 2001}
+    {OwnerName George DogName Sam Acquired 2000}
+    {OwnerName Alice DogName Spot Acquired 2001}
+    {OwnerName Mike DogName Rover Acquired 2002}
+    {OwnerName Jim DogName Fred Acquired 2003}
   }
-  }
+}
 
 % relformat $OWNERSHIP OWNERSHIP
-+=========+=======+--------+
++---------+-------+--------+
 |OwnerName|DogName|Acquired|
 |string   |string |string  |
-+=========+=======+--------+
++---------+-------+--------+
 |Sue      |Fido   |2001    |
 |Sue      |Sam    |2000    |
 |George   |Fido   |2001    |
@@ -280,7 +218,7 @@ OWNER
 |Alice    |Spot   |2001    |
 |Mike     |Rover  |2002    |
 |Jim      |Fred   |2003    |
-+=========+=======+--------+
++---------+-------+--------+
 OWNERSHIP
 ---------
 }]
@@ -289,34 +227,25 @@ OWNERSHIP
 [list_begin definitions]
 
 [call [cmd "::ral::relation array"] [arg relationValue] [arg arrayVarName]\
-    [opt "[arg keyAttr] [arg valueAttr]"]]
+    [arg keyAttr] [arg valueAttr]]
 
 The [cmd array] subcommand converts the relation value
 given by [arg relationValue] into an array variable named [arg arrayVarName].
-The [arg relationValue] must either
-be a binary relation with a single identifier that has a single attribute
-or the [arg keyAttr] and [arg valueAttr] arguments must be supplied.
-The array variable will be created if necessary.
-For a binary relation,
-the values of the identifying attribute of [arg relationValue] will become
-the array indices of [arg arrayVarName]
-the other attribute values will be set to the corresponding array values.
-When the optional [arg keyAttr] and [arg valueAttr] are supplied, the
-the values of [arg keyAttr] are used as the array indices and the corresponding
+The values of [arg keyAttr] are used as the array indices and the corresponding
 values of [arg valueAttr] are the array value.
-Note, that if a supplied [arg keyAttr] is not an identifier then it is
-possible that more than one tuple in [arg relationValue] will have the
-same value for [arg keyAttr].
+Note, that if the values of the [arg keyAttr] attribute are not unique then it
+is possible that more than one tuple in [arg relationValue] will have the same
+value for [arg keyAttr].
 In this case the array value from [arg valueAttr]
 corresponding to duplicated values of
 [arg keyAttr] is arbitrarily chosen by the implementation.
-Thus the safe approach is to either project any relation value that is
-to be converted into an array to be a
-binary relation or to tag the relation and use the tag attribute name
-as [arg keyAttr] thereby insure that no duplicated array indices can occur.
+Thus the safe approach is to project the relation value that is to be converted
+into an array to be a binary relation or to tag the relation and use the tag
+attribute name as [arg keyAttr] thereby insure that no duplicated array indices
+can occur.
 
 [example {
-% relation array $DOG dogarray
+% relation array $DOG dogarray DogName Breed
 % parray dogarray
 dogarray(Fido)   = Poodle
 dogarray(Fred)   = Spaniel
@@ -389,41 +318,6 @@ in the body of [arg relationValue].
 7
 }]
 
-[call [cmd "::ral::relation choose"] [arg relationValue]\
-    [arg attr] [arg value] [opt "attr2 value2 ..."]]
-
-The [cmd choose] subcommand returns a new relation
-that has the same heading as [arg relationValue] and a body consisting
-of the set of tuples in [arg relationValue] whose identifying attribute values
-match those given as the [arg attr] [arg value] arguments.
-The cardinality of the returned relation will necessarily then be either 0 or 1.
-The [arg attr] [arg value] arguments must be given in pairs
-with attribute names alternating with attribute values.
-The set of attribute names given must form one of the
-identifiers of [arg relationValue].
-If [arg relationValue] contains a tuple whose attribute values match those
-given then the returned relation will contain that single tuple.
-Otherwise the returned relation has cardinality 0.
-This subcommand is useful in those contexts where the attribute values of an
-identifier are known and evaluating an expression over all the tuples
-in [arg relationValue] is superfluous.
-
-[example {
-% relformat [relation choose $::DOG DogName Fred]
-+=======+-------+
-|DogName|Breed  |
-|string |string |
-+=======+-------+
-|Fred   |Spaniel|
-+=======+-------+
-% relformat [relation choose $::DOG DogName Jane]
-+=======+------+
-|DogName|Breed |
-|string |string|
-+=======+------+
-+=======+------+
-}]
-
 [call [cmd "::ral::relation compose"] [arg relationValue1]\
     [arg relationValue2] [opt "-using attrList"] [opt "relationValue3 ..."]]
 
@@ -442,15 +336,13 @@ join is computed across the attributes in [arg relationValue1] and
 Otherwise the [arg attrList] argument is treated the same as for the
 [cmd join] subcommand.
 
-[call [cmd "::ral::relation create"] [arg attrs] [arg ids]\
-    [opt [arg "tuple1 tuple2 ..."]]]
+[call [cmd "::ral::relation create"] [arg header]\
+        [opt [arg "tuple1 tuple2 ..."]]]
 
 The [cmd create] subcommand returns the relation value described by
-the [arg attrs], [arg ids] and [arg tupleN] arguments.
-The [arg attrs] argument is a list of attribute name / attribute type pairs.
-The [arg ids] argument is a list of identifiers, each identifier in turn
-being a list of one or more attribute names.
-Any tuples given by the [opt [arg tupleN]] arguments is inserted into the
+the [arg header] and [arg tupleN] arguments.
+The [arg header] argument is a list of attribute name / attribute type pairs.
+Any tuples given by the [opt [arg tupleN]] arguments are inserted into the
 relation value.
 Each [arg tupleN] argument is a list of attribute name / attribute value pairs.
 This command allows for creating a relation value without having knowledge of
@@ -458,9 +350,9 @@ the string representation of a relation value. Compare with the
 [cmd "::ral::tuple create"] command.
 
 [example {
-% relation create {DogName string Breed string} DogName\
+% relation create {DogName string Breed string}\
     {DogName Fido Breed Poodle}
-Relation {DogName string Breed string} DogName {{DogName Fido Breed Poodle}}
+{DogName string Breed string} {{DogName Fido Breed Poodle}}
 }]
 
 [call [cmd "::ral::relation degree"] [arg relationValue]]
@@ -474,27 +366,18 @@ heading of [arg relationValue]
 }]
 
 [call [cmd "::ral::relation dict"] [arg relationValue]\
-    [opt "[arg keyAttr] [arg valueAttr]"]]
+        [arg keyAttr] [arg valueAttr]]
 
-The [cmd dict] subcommand returns a dictionary object for an appropriately
-structured [arg relationValue].
-The [arg relationValue] must either
-be a binary relation with a single identifier that has a single attribute
-or the optional [arg keyAttr] and [arg valueAttr] must be given.
-If the relation is binary, then
-the returned dictionary will have the values of the identifying attribute
-as the dictionary keys and the other attribute values
-as the corresponding dictionary values.
-If the [arg keyAttr] and [arg valueAttr] arguments are given, then
-the value in the tuples corresponding to [arg keyAttr] will be the dictionary
-keys and the corresponding value of [arg valueAttr] will be the dictionary
-values.
-The same conditions for values of [arg keyAttr] that do not correspond
-to an identifying attribute of [arg relationValue] decribed  above
-for the [cmd "relation array"] command apply to this command also.
+The [cmd dict] subcommand returns a dictionary object whose keys are
+the values of the [arg keyAttr] and whose values are the values of the
+[arg valueAttr].
+Like the [cmd "relation array"] command,
+the values of the [arg keyAttr] attribute should be unique
+to be assured that the correct corresponding values of the [arg valueAttr]
+attribute are in the resulting dictionary.
 
 [example {
-% dict for {name breed} [relation dict $::DOG] {
+% dict for {name breed} [relation dict $::DOG DogName Breed] {
   puts "$name ==> $breed"
   }
 Fred ==> Spaniel
@@ -525,42 +408,55 @@ how division can be used to find all the Dogs owned by both Sue and George.
 
 [example {
 % set dividend [relation project $::DOG DogName]
-Relation {DogName string} DogName {{DogName Fido} {DogName Sam} {DogName Spot} {DogName Rover} {DogName Fred} {DogName Jumper}}
+{DogName string} {\ 
+{DogName Fido}\ 
+{DogName Sam}\ 
+{DogName Spot}\ 
+{DogName Rover}\ 
+{DogName Fred}\ 
+{DogName Jumper}}
 % puts [relformat $dividend Dividend:]
-+=======+
++-------+
 |DogName|
 |string |
-+=======+
++-------+
 |Fido   |
 |Sam    |
 |Spot   |
 |Rover  |
 |Fred   |
 |Jumper |
-+=======+
++-------+
 Dividend:
 ---------
-% set divisor [relation project [relation restrict $::OWNER t\
-  {[tuple extract $t OwnerName] eq "Sue" ||\
+% set divisor [relation project [relation restrict $::OWNER t\ 
+  {[tuple extract $t OwnerName] eq "Sue" ||\ 
   [tuple extract $t OwnerName] eq "George"}] OwnerName]
-Relation {OwnerName string} OwnerName {{OwnerName Sue} {OwnerName George}}
+{OwnerName string} {{OwnerName Sue} {OwnerName George}}
 % puts [relformat $divisor Divisor:]
-+=========+
++---------+
 |OwnerName|
 |string   |
-+=========+
++---------+
 |Sue      |
 |George   |
-+=========+
++---------+
 Divisor:
 --------
 % set mediator [relation eliminate $::OWNERSHIP Acquired]
-Relation {OwnerName string DogName string} {{OwnerName DogName}} {{OwnerName Sue DogName Fido} {OwnerName Sue DogName Sam} {OwnerName George DogName Fido} {OwnerName George DogName Sam} {OwnerName Alice DogName Spot} {OwnerName Mike DogName Rover} {OwnerName Jim DogName Fred}}
+{OwnerName string DogName string} {\ 
+{OwnerName Sue DogName Fido}\ 
+{OwnerName Sue DogName Sam}\ 
+{OwnerName George DogName Fido}\ 
+{OwnerName George DogName Sam}\ 
+{OwnerName Alice DogName Spot}\ 
+{OwnerName Mike DogName Rover}\ 
+{OwnerName Jim DogName Fred}}
 % puts [relformat $mediator Mediator:]
-+=========+=======+
++---------+-------+
 |OwnerName|DogName|
 |string   |string |
-+=========+=======+
++---------+-------+
 |Sue      |Fido   |
 |Sue      |Sam    |
 |George   |Fido   |
@@ -568,19 +464,19 @@ Relation {OwnerName string DogName string} {{OwnerName DogName}} {{OwnerName Sue
 |Alice    |Spot   |
 |Mike     |Rover  |
 |Jim      |Fred   |
-+=========+=======+
++---------+-------+
 Mediator:
 ---------
 % set quotient [relation divide $dividend $divisor $mediator]
-Relation {DogName string} DogName {{DogName Fido} {DogName Sam}}
+{DogName string} {{DogName Fido} {DogName Sam}}
 % puts [relformat $quotient "All dogs owned by both Sue and George"]
-+=======+
++-------+
 |DogName|
 |string |
-+=======+
++-------+
 |Fido   |
 |Sam    |
-+=======+
++-------+
 All dogs owned by both Sue and George
 -------------------------------------
 }]
@@ -601,17 +497,17 @@ to discard and [cmd project] specifies which attribute to keep.
 
 [example {
 % relformat [relation eliminate $::DOG Breed]
-+=======+
++-------+
 |DogName|
 |string |
-+=======+
++-------+
 |Fido   |
 |Sam    |
 |Spot   |
 |Rover  |
 |Fred   |
 |Jumper |
-+=======+
++-------+
 }]
 
 [call [cmd "::ral::relation emptyof"] [arg relationValue]]
@@ -636,16 +532,16 @@ the values of the new attributes.
 
 [example {
 % relformat [relation extend $::OWNER o AgeInMonths int {[tuple extract $o Age] * 12}]
-+=========+---+-------------+-----------+
++---------+---+-------------+-----------+
 |OwnerName|Age|City         |AgeInMonths|
 |string   |int|string       |int        |
-+=========+---+-------------+-----------+
++---------+---+-------------+-----------+
 |Sue      |24 |Cupertino    |288        |
 |George   |35 |Sunnyvale    |420        |
 |Alice    |30 |San Jose     |360        |
 |Mike     |50 |San Jose     |600        |
 |Jim      |42 |San Francisco|504        |
-+=========+---+-------------+-----------+
++---------+---+-------------+-----------+
 }]
 
 [call [cmd "::ral::relation extract"] [arg relationValue]\
@@ -706,98 +602,72 @@ See also the [cmd ungroup] subcommand for the complementary operation.
 
 [example {
 % relformat [relation group $::OWNERSHIP DogAcquisition DogName Acquired]
-+=========+------------------+
++---------+------------------+
 |OwnerName|DogAcquisition    |
 |string   |Relation          |
-+=========+------------------+
-|Sue      |+=======+--------+|
++---------+------------------+
+|Sue      |+-------+--------+|
 |         ||DogName|Acquired||
 |         ||string |string  ||
-|         |+=======+--------+|
+|         |+-------+--------+|
 |         ||Fido   |2001    ||
 |         ||Sam    |2000    ||
-|         |+=======+--------+|
-|George   |+=======+--------+|
+|         |+-------+--------+|
+|George   |+-------+--------+|
 |         ||DogName|Acquired||
 |         ||string |string  ||
-|         |+=======+--------+|
+|         |+-------+--------+|
 |         ||Fido   |2001    ||
 |         ||Sam    |2000    ||
-|         |+=======+--------+|
-|Alice    |+=======+--------+|
+|         |+-------+--------+|
+|Alice    |+-------+--------+|
 |         ||DogName|Acquired||
 |         ||string |string  ||
-|         |+=======+--------+|
+|         |+-------+--------+|
 |         ||Spot   |2001    ||
-|         |+=======+--------+|
-|Mike     |+=======+--------+|
+|         |+-------+--------+|
+|Mike     |+-------+--------+|
 |         ||DogName|Acquired||
 |         ||string |string  ||
-|         |+=======+--------+|
+|         |+-------+--------+|
 |         ||Rover  |2002    ||
-|         |+=======+--------+|
-|Jim      |+=======+--------+|
+|         |+-------+--------+|
+|Jim      |+-------+--------+|
 |         ||DogName|Acquired||
 |         ||string |string  ||
-|         |+=======+--------+|
+|         |+-------+--------+|
 |         ||Fred   |2003    ||
-|         |+=======+--------+|
-+=========+------------------+
+|         |+-------+--------+|
++---------+------------------+
 }]
 
 [call [cmd "::ral::relation heading"] [arg relationValue]]
 
 The [cmd heading] subcommand returns the relation heading of the
 [arg relationValue].
-The heading is a three element list consisting of the keyword
-[emph Relation], a list of attributes and types and a list of identifiers.
+The heading is a list consisting attributes and corresponding data types.
 
 [example {
 % relation heading $DOG
-Relation {DogName string Breed string} DogName
+DogName string Breed string
 }]
 
-[call [cmd "::ral::relation identifiers"] [arg relationValue]]
-
-The [cmd identifiers] subcommand returns the set of identifiers for the
-relation.
-The identifiers are returned as a list each element of which is in turn
-a list of attribute names that constitute the identifer.
-
-[call [cmd "::ral::relation include"] [arg relationValue]\
-    [opt "name-value-list1 name-value-list2 ..."]]
-
-The [cmd include] subcommand returns a new relation that has the same
-heading as [arg relationValue] and a body consisting of the body of
-[arg relationValue] with additional tuples formed by inserting the
-values given in the [arg name-value-listN] arguments.
-Each [arg name-value-list] argument consists of a list of alternating
-attribute names and attribute values.
-All attributes in the heading of [arg relationValue] must appear in
-each [arg name-value-list] argument.
-It is an error to attempt to include duplicate tuples in the relation.
-This is a convenience command that is useful when building relation values
-for other program data.
-
-[example {
-% set d [relation emptyof $DOG]
-Relation {DogName string Breed string} DogName {}
-% relformat [relation include $d {DogName Alfonse Breed Dalmation} {DogName Puffy Breed {Toy Poodle}}]
-+=======+----------+
-|DogName|Breed     |
-|string |string    |
-+=======+----------+
-|Alfonse|Dalmation |
-|Puffy  |Toy Poodle|
-+=======+----------+
-}]
+[call [cmd "::ral::relation insert"] [arg relationValue]\
+        [opt [arg "name-value-list1 name-value-list2 ..."]]]
+The [cmd insert] command returns a new relation value whose heading
+is the same as [arg relationValue] and whose body includes all the
+tuples of [arg relationValue] plus all the tuples given as the
+[arg name-value-listN] arguments.
+If inserting any of the [arg name-value-listN] arguments would result
+in a duplicate tuple,
+then an error is thrown.
 
 [call [cmd "::ral::relation intersect"] [arg relationValue1]\
     [arg relationValue2] [opt "relationValue3 ..."]]
 
 The [cmd intersect] subcommand returns the set intersection of two or
 more relations.
-All relations must be of the same type.
+All relations have equal headings.
 The result relation has a heading that is the same as any of the arguments
 and has a body consisting of all tuples present in all of the
 [arg relationValue] arguments.
@@ -836,7 +706,7 @@ type to be compared.
 
 [example {
 % set sDogs [relation restrictwith $DOG {[string match S* $DogName]}]
-Relation {DogName string Breed string} DogName {{DogName Sam Breed Collie} {DogName Spot Breed Terrier}}
+{DogName string Breed string} {{DogName Sam Breed Collie} {DogName Spot Breed Terrier}}
 % relation is $DOG == $sDogs
 0
 % relation is $DOG != $sDogs
@@ -898,10 +768,10 @@ of the [arg relationValueN] does not affect the result.
 
 [example {
 % relformat [relation join $OWNERSHIP $DOG]
-+=========+=======+--------+---------+
++---------+-------+--------+---------+
 |OwnerName|DogName|Acquired|Breed    |
 |string   |string |string  |string   |
-+=========+=======+--------+---------+
++---------+-------+--------+---------+
 |Sue      |Fido   |2001    |Poodle   |
 |Sue      |Sam    |2000    |Collie   |
 |George   |Fido   |2001    |Poodle   |
@@ -909,7 +779,7 @@ of the [arg relationValueN] does not affect the result.
 |Alice    |Spot   |2001    |Terrier  |
 |Mike     |Rover  |2002    |Retriever|
 |Jim      |Fred   |2003    |Spaniel  |
-+=========+=======+--------+---------+
++---------+-------+--------+---------+
 }]
 
 [call [cmd "::ral::relation list"] [arg relationValue] [opt [arg attrName]]]
@@ -923,8 +793,9 @@ and may be used with the [package struct::set] package.
 If [arg attrName] is present, then the returned list will consist of the
 value of the given attribute taken from all the tuples in the relation
 in an arbitrary order.
-In this case if [arg attrName] does not constitute an identifier of
-[arg relationValue], then, in general, the returned list is not a set.
+In this case if the values of the [arg attrName] attribute are not
+unique then, in general, the returned list is not a set and includes
+the duplicated values.
 
 [example {
 % relation list [relation project $OWNERSHIP Acquired]]
@@ -953,15 +824,15 @@ a subset of the attributes.
 
 [example {
 % relformat [relation project $OWNER City]
-+=============+
++-------------+
 |City         |
 |string       |
-+=============+
++-------------+
 |Cupertino    |
 |Sunnyvale    |
 |San Jose     |
 |San Francisco|
-+=============+
++-------------+
 }]
 
 [call [cmd "::ral::relation rank"] [arg relationValue]\
@@ -982,30 +853,21 @@ For example, to find the names and ages of the two oldest owners:
 
 [example {
 % set ro [relation rank $OWNER -descending Age AgeRank]
-Relation {OwnerName string Age int City string AgeRank int} OwnerName {{OwnerName Sue Age 24 City Cupertino AgeRank 5} {OwnerName George Age 35 City Sunnyvale AgeRank 3} {OwnerName Alice Age 30 City {San Jose} AgeRank 4} {OwnerName Mike Age 50 City {San Jose} AgeRank 1} {OwnerName Jim Age 42 City {San Francisco} AgeRank 2}}
+{OwnerName string Age int City string AgeRank int} {\ 
+{OwnerName Sue Age 24 City Cupertino AgeRank 5}\ 
+{OwnerName George Age 35 City Sunnyvale AgeRank 3}\ 
+{OwnerName Alice Age 30 City {San Jose} AgeRank 4}\ 
+{OwnerName Mike Age 50 City {San Jose} AgeRank 1}\ 
+{OwnerName Jim Age 42 City {San Francisco} AgeRank 2}}
 % relformat [relation project [relation restrictwith $ro {$AgeRank <= 2}] OwnerName Age]
-+=========+---+
++---------+---+
 |OwnerName|Age|
 |string   |int|
-+=========+---+
++---------+---+
 |Mike     |50 |
 |Jim      |42 |
-+=========+---+
++---------+---+
 }]
-
-[call [cmd "::ral::relation reidentify"] [arg relationValue] [arg id1]\
-    [opt "id2 id3 ..."]]
-
-The [cmd reidentify] subcommand returns a relation whose attributes are
-the same as [arg relationValue] but whose identifiers are those given
-by the [arg idN] arguments.
-The body of the returned relation value is the same as [arg relationValue] minus
-any tuples that are duplicates with respect to the new set of identifiers.
-Normally, identifiers are properly inferred by the [cmd relation] subcommands.
-However in certain contexts, the programmer may have knowledge of the
-contents of a relation value and wish to force an identification scheme
-that takes advantage of that knowledge.
-This command can be considered complementary to the [cmd rename] subcommand.
 
 [call [cmd "::ral::relation rename"] [arg relationValue]\
     [opt "oldname newname ..."]]
@@ -1024,16 +886,16 @@ of a relation to suit the needs of particular operators ([emph e.g.]
 
 [example {
 % relformat [relation rename $OWNER City Town]
-+=========+---+-------------+
++---------+---+-------------+
 |OwnerName|Age|Town         |
 |string   |int|string       |
-+=========+---+-------------+
++---------+---+-------------+
 |Sue      |24 |Cupertino    |
 |George   |35 |Sunnyvale    |
 |Alice    |30 |San Jose     |
 |Mike     |50 |San Jose     |
 |Jim      |42 |San Francisco|
-+=========+---+-------------+
++---------+---+-------------+
 % relformat [relation rename $OWNER City Town City Village]
 unknown attribute name, "City"
 }]
@@ -1050,13 +912,13 @@ and a body consisting of all tuples where [arg expression] evaluated to true.
 
 [example {
 % relformat [relation restrict $DOG d {[string match S* [tuple extract $d DogName]]}]
-+=======+-------+
++-------+-------+
 |DogName|Breed  |
 |string |string |
-+=======+-------+
++-------+-------+
 |Sam    |Collie |
 |Spot   |Terrier|
-+=======+-------+
++-------+-------+
 }]
 
 
@@ -1090,13 +952,13 @@ otherwise required.
 
 [example {
 % relformat [relation restrictwith $DOG {[string match S* $DogName]}]
-+=======+-------+
++-------+-------+
 |DogName|Breed  |
 |string |string |
-+=======+-------+
++-------+-------+
 |Sam    |Collie |
 |Spot   |Terrier|
-+=======+-------+
++-------+-------+
 % puts $DogName
 can't read "DogName": no such variable
 }]
@@ -1127,16 +989,16 @@ For example, to find all the dogs that have some owner:
 
 [example {
 % relformat [relation semijoin $OWNERSHIP $DOG]
-+=======+---------+
++-------+---------+
 |DogName|Breed    |
 |string |string   |
-+=======+---------+
++-------+---------+
 |Fido   |Poodle   |
 |Sam    |Collie   |
 |Spot   |Terrier  |
 |Rover  |Retriever|
 |Fred   |Spaniel  |
-+=======+---------+
++-------+---------+
 }]
 
 [call [cmd "::ral::relation semiminus"] [arg relationValue1]\
@@ -1159,20 +1021,19 @@ For example, to find all dogs that have no owner:
 
 [example {
 % relformat [relation semiminus $OWNERSHIP $DOG]
-+=======+------+
++-------+------+
 |DogName|Breed |
 |string |string|
-+=======+------+
++-------+------+
 |Jumper |Mutt  |
-+=======+------+
++-------+------+
 }]
 
 [call [cmd "::ral::relation summarize"] [arg relationValue] [arg perRelation]\
     [arg relationVarName] [arg attr] [arg type] [arg expression]\
     [opt "[arg attr] [arg type] [arg expression] ..."]]
 
-The [cmd summarize] subcommand allows for computations across sets of
-attributes.
+The [cmd summarize] subcommand allows for computations across sets of tuples.
 The [arg perRelation] must be of the same type as a projection of
 [arg relationValue].
 The returned relation has the same heading as [arg perRelation] extended
@@ -1192,25 +1053,25 @@ all the tuples in [arg relationValue] whose attributes match the
 corresponding attributes in [arg perRelation].
 The [arg expression] expression may then access the value of that relation
 using the given [arg relationVarName] variable name.
-The [arg expression] is expected to return a result of the
-same type as the new attribute.
+The [arg expression] must return a result that matches the
+type of the new attribute.
 
 In this example we determine the years when dogs were acquired and the
 number of dogs acquired in each year.
 
 [example {
 % set ac [relation project $OWNERSHIP Acquired]
-Relation {Acquired string} Acquired {{Acquired 2001} {Acquired 2000} {Acquired 2002} {Acquired 2003}}
+{Acquired string} {{Acquired 2001} {Acquired 2000} {Acquired 2002} {Acquired 2003}}
 % relformat [relation summarize $OWNERSHIP $ac s NumAcquired int {[relation cardinality $s]}]
-+========+-----------+
++--------+-----------+
 |Acquired|NumAcquired|
 |string  |int        |
-+========+-----------+
++--------+-----------+
 |2001    |3          |
 |2000    |2          |
 |2002    |1          |
 |2003    |1          |
-+========+-----------+
++--------+-----------+
 }]
 
 The [cmd summarize] command can also be used to perform
@@ -1229,20 +1090,69 @@ proc ravg {rel attr} {
     return [expr {$sum / [relation cardinality $rel]}]
 }
 
-% set dee {Relation {} {{}} {{}}}
-Relation {} {{}} {{}}
+% set dee {{} {{}}}
+{} {{}}
 % relformat [relation summarize $OWNER $dee o AverageAge int {[ravg $o Age]}]
-+==========+
++----------+
 |AverageAge|
 |int       |
-+==========+
++----------+
 |36        |
-+==========+
++----------+
+}]
+
+[call [cmd "::ral::relation summarizeby"] [arg relationValue] [arg attrList]\
+    [arg relationVarName] [arg attr] [arg type] [arg expression]\
+    [opt "[arg attr] [arg type] [arg expression] ..."]]
+
+The [cmd summarizeby] subcommand is a more convenient form of
+[cmd summarize] where the [emph per] relation is a projection of the
+relation value that is to be summarized.
+Rather than supplying a [emph per] relation, instead a list of attributes
+is given by the [arg attrList] argument and [arg relationValue] is
+projected on those attributes and used as the [arg per] relation.
+The arguments and results are otherwise the same as for the [cmd summarize]
+command.
+[example {
+% relformat [relation summarizeby $OWNERSHIP Acquired s\ 
+    NumAcquired int {[relation cardinality $s]}]
++--------+-----------+
+|Acquired|NumAcquired|
+|string  |int        |
++--------+-----------+
+|2001    |3          |
+|2000    |2          |
+|2002    |1          |
+|2003    |1          |
++--------+-----------+
+}]
+
+[call [cmd "::ral::relation table"] [arg heading]\
+        [arg [opt "value-list1 value-list2 ..."]]]
+The [cmd table] subcommand creates a new relation whose heading
+is given by [arg heading] and tuples of the body are given by the
+[arg value-listN] arguments.
+The [arg heading] is an list containing an even number of elements
+consisting of alternating attribute names and attribute data types.
+The [arg value-listN] arguments are a list of attribute values.
+It is assumed that the attribute values are given in the same order as
+the attributes of the [arg heading] argument.
+This command is a convenience command that is much like [cmd "relation create"]
+but avoids having to give the attribute name for each attribute value
+when specifying the tuples of the body.
+This allows literal relation values to be specified in a tabular layout.
+
+[example {
+set o [relation table {\ 
+    OwnerName string   Age int     City string     } {
+    Sue                24          Cupertino       } {
+    George             35          Sunnyvale       } {
+    Alice              30          {San Jose}      }]
 }]
 
 [call [cmd "::ral::relation tag"] [arg relationValue]\
     [opt [arg "-ascending | -descending sort-attr-list"]]\
-    [opt [arg "-within idsubset-attr-list"]] [arg attrName]]
+    [opt [arg "-within attr-list"]] [arg attrName]]
 
 The [cmd tag] subcommand creates a new relation which has the same heading
 as [arg relationValue] extended by a new attribute named [arg attrName].
@@ -1252,38 +1162,33 @@ The tuples in [arg relationValue] will be extended in either [arg ascending]
 or [arg descending] order of the [arg sort-attr-list].
 If no [arg sort-attr-list] argument is given,
 then the tagging order is arbitrary.
-If the [opt [arg -within]] argument is given then the attribute names given
-in [arg idsubset-attr-list] must consist of all the attributes of some
-identifier of [arg relationValue] except one.
-In this case,
-the values of [arg attrName] will be unique within the subset of tuples which
-match the values of [arg idsubset-attr-list]
-and a new identifiers is created consisting of the attributes in
-[arg idsubset-attr-list] plus [arg attrName].
+If the [opt [arg -within]] argument is given then
+the values of [arg attrName] attribute will be unique within the subset of
+tuples which match the values of [arg attr-list].
 
 The [cmd tag] command is useful when a full ordering needs to be placed
 on a relation.
 For example, tagging a relation will allow projecting both the tag and
-another, non-identifying attribute without loosing any values.
+another attribute without losing any values.
 
 [example {
 % relformat [relation tag $DOG -ascending DogName DogId]
-+=======+---------+=====+
++-------+---------+-----+
 |DogName|Breed    |DogId|
 |string |string   |int  |
-+=======+---------+=====+
++-------+---------+-----+
 |Fido   |Poodle   |0    |
 |Fred   |Spaniel  |1    |
 |Jumper |Mutt     |2    |
 |Rover  |Retriever|3    |
 |Sam    |Collie   |4    |
 |Spot   |Terrier  |5    |
-+=======+---------+=====+
++-------+---------+-----+
 % relformat [relation tag $OWNERSHIP -ascending OwnerName -within DogName DogId]
-+=========+=======+--------+=====+
++---------+-------+--------+-----+
 |OwnerName|DogName|Acquired|DogId|
 |string   |string |string  |int  |
-+=========+=======+--------+=====+
++---------+-------+--------+-----+
 |Alice    |Spot   |2001    |0    |
 |George   |Fido   |2001    |0    |
 |George   |Sam    |2000    |0    |
@@ -1291,7 +1196,7 @@ another, non-identifying attribute without loosing any values.
 |Mike     |Rover  |2002    |0    |
 |Sue      |Fido   |2001    |1    |
 |Sue      |Sam    |2000    |1    |
-+=========+=======+--------+=====+
++---------+-------+--------+-----+
 }]
 
 
@@ -1318,9 +1223,7 @@ to John, then we have:
 
 [example {
 % set REPORTS_TO {
-  Relation
   {Employee string Supervisor string}
-  {{Employee Supervisor}}
   {
     {Employee Sue Supervisor John}
     {Employee Bob Supervisor John}
@@ -1331,17 +1234,19 @@ to John, then we have:
   }
 }
 
-% relformat [relation project [relation restrictwith [relation tclose $REPORTS_TO] {$Supervisor eq "John"} ] Employee  ] "Direct/Indirect Reports to John"
-+========+
+% relformat [relation project [relation restrictwith\ 
+[relation tclose $REPORTS_TO] {$Supervisor eq "John"}] Employee]\ 
+"Direct/Indirect Reports to John"
++--------+
 |Employee|
 |string  |
-+========+
++--------+
 |Sue     |
 |Bob     |
 |Jane    |
 |Joe     |
 |Carl    |
-+========+
++--------+
 Direct/Indirect Reports to John
 -------------------------------
 }]
@@ -1361,10 +1266,10 @@ the order of the [arg relationValue] arguments has no effect on the result.
 
 [example {
 % relformat [relation times $DOG $OWNER]
-+=======+---------+=========+---+-------------+
++-------+---------+---------+---+-------------+
 |DogName|Breed    |OwnerName|Age|City         |
 |string |string   |string   |int|string       |
-+=======+---------+=========+---+-------------+
++-------+---------+---------+---+-------------+
 |Fido   |Poodle   |Sue      |24 |Cupertino    |
 |Fido   |Poodle   |George   |35 |Sunnyvale    |
 |Fido   |Poodle   |Alice    |30 |San Jose     |
@@ -1395,7 +1300,7 @@ the order of the [arg relationValue] arguments has no effect on the result.
 |Jumper |Mutt     |Alice    |30 |San Jose     |
 |Jumper |Mutt     |Mike     |50 |San Jose     |
 |Jumper |Mutt     |Jim      |42 |San Francisco|
-+=======+---------+=========+---+-------------+
++-------+---------+---------+---+-------------+
 }]
 
 [call [cmd "::ral::relation tuple"] [arg relationValue]]
@@ -1419,10 +1324,7 @@ components from [arg relationValue].
 
 [example {
 set OwnerContacts {
-    Relation
-    {OwnerName string Contact {Relation {Type string Number string} Type}}
-    OwnerName
-    {
+    {OwnerName string Contact {Relation {Type string Number string} Type}} {
 	{OwnerName Sue Contact {
 	    {Type Home Number 555-1212}
 	    {Type Work Number 555-6635}}
@@ -1435,37 +1337,37 @@ set OwnerContacts {
     }
 }
 % relformat $OwnerContacts
-+=========+-----------------+
++---------+-----------------+
 |OwnerName|Contact          |
 |string   |Relation         |
-+=========+-----------------+
-|Sue      |+======+--------+|
++---------+-----------------+
+|Sue      |+------+--------+|
 |         ||Type  |Number  ||
 |         ||string|string  ||
-|         |+======+--------+|
+|         |+------+--------+|
 |         ||Home  |555-1212||
 |         ||Work  |555-6635||
-|         |+======+--------+|
-|George   |+======+--------+|
+|         |+------+--------+|
+|George   |+------+--------+|
 |         ||Type  |Number  ||
 |         ||string|string  ||
-|         |+======+--------+|
+|         |+------+--------+|
 |         ||Home  |555-8810||
 |         ||Work  |555-1177||
 |         ||Mobile|555-3399||
-|         |+======+--------+|
-+=========+-----------------+
+|         |+------+--------+|
++---------+-----------------+
 % relformat [relation ungroup $OwnerContacts Contact]
-+=========+======+--------+
++---------+------+--------+
 |OwnerName|Type  |Number  |
 |string   |string|string  |
-+=========+======+--------+
++---------+------+--------+
 |Sue      |Home  |555-1212|
 |Sue      |Work  |555-6635|
 |George   |Home  |555-8810|
 |George   |Work  |555-1177|
 |George   |Mobile|555-3399|
-+=========+======+--------+
++---------+------+--------+
 }]
 
 [call [cmd "::ral::relation union"] [arg relationValue1]\
@@ -1478,6 +1380,67 @@ and has a body consisting of all tuples present in any of the
 [arg relationValue] arguments.
 Since the union operation is both associative and commutative,
 the order of the [arg relationValue] arguments has no effect the result.
+
+[call [cmd "::ral::relation unwrap"] [arg relationValue] [arg attribute]]
+The [cmd unwrap] subcommand operates on relation values in a manner similar to
+the way that the [cmd "tuple unwrap"] command operates on tuple values.
+The [arg attribute] argument is the name of a tuple valued attribute.
+The result relation has the same heading as [arg relationValue] minus
+the [arg attribute] plus all the attributes contained in the
+tuple valued attribute, [arg attribute].
+In essense the tuple valued attribute, [arg attribute], is flattened
+by one level.
+
+[call [cmd "::ral::relation update"] [arg relationValue] [arg tupleVarName]\
+    [arg expr] [arg script]]
+The [cmd update] subcommand returns a new relation value that has the
+same heading as [arg relationValue] and whose tuple have been modified.
+Each tuple in [arg relationValue] is assigned to the Tcl variable
+given by [arg tupleVarName] and [arg expr] is evaluated.
+If [arg expr] is true then [arg script] is evaluated.
+The return value of [arg script] is added to the result relation and it
+must be a tuple that has the same heading as [arg relationValue].
+If [arg expr] is false then the unmodified tuple from [arg relationValue]
+is added to the result.
+This command serves the same role for relation values as the
+[cmd "relvar update"] command does for relvars.
+
+
+[call [cmd "::ral::relation wrap"] [arg relationValue] [arg tupleattr]\
+    [opt [arg "attr1 attr2 ..."]]]
+The [cmd wrap] subcommand operates on relation values in a manner similar
+to the way that the [cmd "tuple wrap"] command operates on tuple values.
+The result relation has a heading that is the same as [arg relationValue]
+plus an attribute named, [arg tupleattr], minus the [arg attrN] attributes.
+The values of the [arg attrN] attributes are converted into a tuple
+valued attribute that is stored in [arg tupleattr].
+
+[example {
+% set r {
+    {Name string Street string City string State string Zip string} {
+        {Name Arnold Street Main City Sacramento State CA Zip 94444}
+        {Name Mary Street Elm City Stockton State CA Zip 95555}
+    }
+}
+% relformat [relation wrap $r Address Street City State Zip]
++------+---------------------------------+
+|Name  |Address                          |
+|string|Tuple                            |
++------+---------------------------------+
+|Arnold|+------+----------+------+------+|
+|      ||Street|City      |State |Zip   ||
+|      ||string|string    |string|string||
+|      |+------+----------+------+------+|
+|      ||Main  |Sacramento|CA    |94444 ||
+|      |+------+----------+------+------+|
+|Mary  |+------+--------+------+------+  |
+|      ||Street|City    |State |Zip   |  |
+|      ||string|string  |string|string|  |
+|      |+------+--------+------+------+  |
+|      ||Elm   |Stockton|CA    |95555 |  |
+|      |+------+--------+------+------+  |
++------+---------------------------------+
+}]
 
 [list_end]
 

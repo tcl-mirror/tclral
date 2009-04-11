@@ -1,3 +1,454 @@
+========= ral 0.9.0 =========
+2009/03/29 mangoa01
+
+Revision 0.9.0 is a major change in TclRAL.
+N.B. 0.9.0 breaks script level compatibility with previous versions of TclRAL.
+
+Revision 0.9.0 solves a major conceptual error in the foundation of TclRAL.  In
+this revision, relation values do not have identifiers. Identifiers are only
+found in relvars. In all previous revision of TclRAL, identifiers were
+associated with relation values and only by virtue of the fact that relvar
+store relation variables, did the identification constraints get associated
+with relvars. This was wrong. Relation values should only enforce the notion of
+a relation begin a set and insist that all tuples be distinct in a relation.
+This only require a definition of tuple equality.  The fact that subsets of
+attributes are all that is necessary to identify a particular tuple is a
+"relvar" identity constraint and is only enforced on relation values that are
+actually stored in a relvar.
+
+This seemingly simple change has many ramifications for TclRAL and the required
+changes are script incompatible. I decided to use this opportunity to make other
+incompatible changes that need to be done and have been building up over the
+years. The goal is to stabilize the interface during the 0.9.X releases heading
+for a 1.0 where backward compatibility will be a priority design goal.  Below
+is the list of major changes going from 0.8.9 to 0.9.0:
+
+1. The keywords "Tuple" and "Relation" have been removed from the string
+representation of tuples and relations. This was probably a design misfeature
+in the first place. At the time I was concerned about being able to adequately
+distinguish tuple and relation values from other Tcl strings and lists. That
+concern proved to be inconsequential in practice.
+
+2. The string representation of a relation value now no longer has a list
+of identifiers.
+
+3. Added the commands:
+    relation table
+    relation summarizeby
+    relation wrap
+    relation unwrap
+    relation update
+    relvar exists
+    relvar constraint exists
+    relvar identifiers
+    relvar restrictone
+    relvar updateper
+    merge
+    mergeFromFile
+    mergeFromMk
+
+4. Deleted the commands:
+    relation choose (cf. "relvar restrictone")
+    relation identifiers (cf. "relvar identifiers")
+    relation reidentify
+
+5. Changed the names of:
+    relation include ==> relation insert
+
+6. The following commands have new argument interfaces.
+    tuple relation
+    tuple update
+    tuple wrap
+    relation array
+
+7. The "tuple update" command no longer operates on a tuple variable but
+rather a tuple value, returning a new tuple value. This command no longer
+serves the same role as previously in the operation of "relvar update".
+
+8. The script part of the "relvar update" and "relvar updateone" commands must
+now return a tuple value.  Previously, the updated tuple value was placed back
+in a tuple variable.  Now it is the return value of the script that is used to
+update the matching tuple values. This is more in keeping with the interfaces
+used by relvar traces and eliminates the need for a tuple operation that
+updates a variable in place. Hence the change in semantics of "tuple update".
+
+9. The serialization formats used produced and consumed by "serialize",
+"deserialize", "storeToMk" and "loadFromMk" are not backward compatible.
+These changes have simplified the serialization formats and corrected
+a number of problems with the metakit storage. Also, the namespace of
+the relvar is no longer "flattened out" and what is stored is the full
+path from the global namespace down. To aid in the transition to 0.9.X,
+the deserialize command can interpret the 0.8.X serialization format.
+
+
+2009/04/11 mangoa01
+
+	* src/ral_relvarcmd.c:
+	* src/ral_tuple.c:
+          Minor clean up to get rid of compiler warnings about usage of
+          uninitialized variables.
+
+2009/04/06 mangoa01
+
+	* raloo/pkgIndex.tcl:
+	* raloo/raloo.tcl:
+	* raloo/tests/raloo.test:
+	  First cut at revising raloo to run with ral 0.9.0.
+
+	* ralutil/ralutil.tcl:
+	  Make sure to require the correct version of ral.
+
+2009/04/05 mangoa01
+
+	* CHANGES:
+	  Additions to the change log for 0.9.
+
+	* src/ral_relation.c:
+          Corrected an error in duplicating relation values where the tuples
+          ended up refering to a heading that was not the heading of the
+          relation value.
+
+	* doc/ral/relformat.man:
+	* doc/ral/relvar.man:
+	* doc/ral/serialize.man:
+	* doc/ral/tuple.man:
+	* ralutil/doc/ralutil.man:
+	  Documentation updates.
+
+2009/03/29 mangoa01
+
+	* src/ral_relvarcmd.c:
+	* src/ral_relvarobj.c:
+	* src/ral_relvarobj.h:
+	  Added "relvar constraint exists" command.
+
+	* test/update.test:
+	  Added "relvar updateper" test case.
+
+	* CHANGES:
+	* doc/ral/relation.man:
+	* doc/ral/relvar.man:
+	* doc/ral/serialize.man:
+	* src/ral.tcl:
+	* test/merge1.mk:
+	* test/merge1.ral:
+	* test/merge2.mk:
+	* test/merge2.ral:
+	* test/serialize.test:
+	  Additional work on the documentation.
+	  Added commands to merge relvars from other files.
+	  Additional work on testing serialization commands.
+
+	* src/ral_utils.c:
+	  Corrected error code strings.
+
+2009/03/28 mangoa01
+
+	* doc/ral/serialize.man:
+	* src/ral.tcl:
+	* test/serialize.test:
+	* test/serialized0.8.9.ral:
+	  Added capability to read old serialization format.
+
+2009/03/23 mangoa01
+
+	* doc/dogexample.tcl:
+	* doc/ral/relation.man:
+	* doc/ral/relvar-examples.tcl:
+	* doc/ral/relvar.man:
+	* pkgIndex.tcl.in:
+	* ralutil/doc/ralutil.man:
+	* ralutil/pkgIndex.tcl:
+	* ralutil/ralutil.tcl:
+	  Split out "ralutil" package for easier distribution.
+	  Added docs for "ralutil" package.
+	  Update docs for "ral".
+
+2009/03/22 mangoa01
+
+	* CHANGES:
+	* doc/ral/relation.man:
+	* doc/ral/relvar.man:
+	* src/ral_relation.c:
+	* src/ral_relvar.c:
+	* src/ral_relvarcmd.c:
+	* src/ral_relvarobj.c:
+	* src/ral_relvarobj.h:
+	* src/ral_tuple.c:
+	* src/ral_tuple.h:
+	* src/ral_tuplecmd.c:
+	* src/ral_tupleheading.h:
+	* src/ral_utils.c:
+	* src/ral_utils.h:
+	* test/trace.test:
+	* test/update.test:
+          Added the "relvar updateper" command to update relvars from a
+          relation value.  More doc additions and corrections.
+
+2009/03/01 mangoa01
+
+	* doc/ral/relation.man:
+	* src/ral_relationcmd.c:
+	* test/ral.test:
+	  Added "relation update" command to be able to generate updates
+	  in a relation value.
+
+2009/02/23 mangoa01
+
+	* doc/ral/relation.man:
+	* doc/ral/relvar.man:
+	* doc/ral/tuple.man:
+	* src/ral_relation.c:
+	* src/ral_relvarcmd.c:
+	* src/ral_relvarobj.c:
+	* src/ral_tuplecmd.c:
+	* src/ralutil.tcl:
+	* test/ral.test:
+	* test/trace.test:
+	* test/update.test:
+          Made "tuple update" return an updated tuple value rather than update
+          a tuple variable in place. Also made "relvar update" work on the
+          return value of the script rather than the variable used to store the
+          iterated tuple variable. Now there are not update in place commands
+          except relvar commands. Next is to put a "relation update" command in
+          place corresponding to "tuple update".
+
+2009/02/22 mangoa01
+
+	* src/ral_relation.c:
+	* src/ral_relationcmd.c:
+	* src/ral_tupleheading.c:
+	* src/ral_utils.c:
+	* src/ral_utils.h:
+	* test/ral.test:
+          Added "relation summarizeby" command that will perform the summarize
+          on a relation value whose "per" relation is a project of the same
+          value.
+
+	* doc/ral/relation.man:
+	* doc/ral/tuple.man:
+	* src/ral_relation.c:
+	* src/ral_relationcmd.c:
+	* src/ral_tuplecmd.c:
+	* test/ral.test:
+	  Added "relation wrap" command and changed the interface to
+	  "tuple wrap" to correspond to it.
+
+	* doc/ral/relation.man:
+	* src/ral_relationcmd.c:
+	* src/ral_tupleobj.c:
+	* src/ral_tupleobj.h:
+	* src/ral_utils.c:
+	* src/ral_utils.h:
+	* test/ral.test:
+	  Corrected a problem in "relation wrap" with object reference counts.
+	  Added "relation table" command to make literal relation value creation
+	  easier.
+
+2009/02/17 mangoa01
+
+	* doc/ral/relation.man:
+	* doc/ral/relvar.man:
+	* doc/ral/serialize.man:
+	* doc/ral/tuple.man:
+	* src/ral.tcl:
+	* src/ral_attribute.c:
+	* src/ral_attribute.h:
+	* src/ral_relation.c:
+	* src/ral_relation.h:
+	* src/ral_relationcmd.c:
+	* src/ral_relvarcmd.c:
+	* src/ral_tuple.c:
+	* src/ral_tuplecmd.c:
+	* src/ral_tupleobj.c:
+	* src/ral_utils.c:
+	* src/ral_utils.h:
+	* src/ralutil.tcl:
+	* test/ral.test:
+	* test/serialize.test:
+	* test/testdata.tcl:
+          Corrected a number of problems with internal string representations.
+          Serialization is now much better and the ral utils have been
+          reworked.  Added "relation unwrap" and stub for "relation wrap".
+          Updated relvar docs.
+
+2009/02/15 mangoa01
+
+	* src/ral.c:
+	* src/ral_attribute.c:
+	* src/ral_attribute.h:
+	* src/ral_relation.c:
+	* src/ral_relationcmd.c:
+	* src/ral_relationcmd.h:
+	* src/ral_relationobj.c:
+	* src/ral_relvar.c:
+	* src/ral_relvar.h:
+	* src/ral_relvarcmd.c:
+	* src/ral_relvarcmd.h:
+	* src/ral_relvarobj.c:
+	* src/ral_relvarobj.h:
+	* src/ral_tuple.c:
+	* src/ral_tuplecmd.c:
+	* src/ral_tuplecmd.h:
+	* src/ral_tupleheading.c:
+	* src/ral_tupleobj.c:
+	* src/ral_utils.c:
+	* test/ral.test:
+	* test/serialize.test:
+	* test/testdata.tcl:
+	* test/trace.test:
+	* test/update.test:
+	  Completed the remaining relvar commands. Except for serialization,
+	  the code base is back operational with identifiers now moved to be
+	  only a constraint on relvars.
+
+2009/02/08 mangoa01
+
+	* doc/ral/relation.man:
+	* src/ral_relation.c:
+	* src/ral_relation.h:
+	* src/ral_relationcmd.c:
+	* src/ral_relvar.c:
+	* src/ral_relvar.h:
+	* src/ral_relvarcmd.c:
+	* src/ral_relvarobj.c:
+	* src/ral_relvarobj.h:
+	* src/ralutil.tcl:
+	* test/ral.test:
+	* test/trace.test:
+          Corrected "relvar insert" to return a relation value with the
+          inserted tuples.  Fixed "relvar delete" and "relvar deleteone".
+          Updates to documentation.
+
+2009/02/02 mangoa01
+
+	* src/ral_attribute.c:
+	* src/ral_relation.c:
+	* src/ral_relvar.c:
+	* src/ral_relvar.h:
+	* src/ral_relvarcmd.c:
+	* src/ral_relvarobj.c:
+	* src/ral_relvarobj.h:
+	* src/ral_tuple.c:
+	* src/ral_tupleobj.c:
+	* src/ral_tupleobj.h:
+	* src/ral_utils.c:
+	* src/ral_utils.h:
+	* test/ral.test:
+	  Got relvar insert to work properly with traces. Traces may now add in
+	  attribute not specified in the inserted tuples. This is intended to
+	  clean up system defined identifiers.
+
+2009/01/25 mangoa01
+
+	* src/ral_relation.c:
+	* src/ral_relation.h:
+	* src/ral_relationcmd.c:
+	* src/ral_relvar.c:
+	* src/ral_relvar.h:
+	* src/ral_relvarcmd.c:
+	* src/ral_relvarobj.c:
+	* src/ral_relvarobj.h:
+	* src/ral_tupleobj.c:
+	* src/ral_utils.c:
+	* src/ral_utils.h:
+	* test/ral.test:
+          Checkpoint. "relation tag" is now working. Clean up code for many of
+          the relation commands. Modified relvar data structure and go "relvar
+          create" to work.
+
+2009/01/19 mangoa01
+
+	* src/ral.tcl:
+	  Change invocation of "relation include" to be "relation insert".
+
+	* doc/ral/relation.man:
+	* doc/ral/relformat.man:
+	* doc/ral/relvar.man:
+	* doc/ral/serialize.man:
+	* doc/ral/tuple.man:
+	* src/ral_attribute.c:
+	* src/ral_joinmap.c:
+	* src/ral_joinmap.h:
+	* src/ral_relation.c:
+	* src/ral_relation.h:
+	* src/ral_relationcmd.c:
+	* src/ral_relvar.c:
+	* src/ral_tuple.c:
+	* src/ral_tuple.h:
+	* src/ral_utils.c:
+	* src/ral_utils.h:
+	* src/ral_vector.c:
+	* src/ral_vector.h:
+	* test/ral.test:
+          Checkpoint. Have added three types of custom hash tables to handle
+          the various cases of uniqueness constraints and to help computing the
+          relation join (and friends). Some docs changed. Changed "relation
+          include" to be "relation insert". Should have been named that in the
+          first place.  The "relation tag" command still has problems. Time to
+          start looking at the relvar commands to straighten them out.
+
+2009/01/12 mangoa01
+
+	* configure:
+	* configure.in:
+	* src/ral.tcl:
+	* src/ral_attribute.c:
+	* src/ral_attribute.h:
+	* src/ral_relation.c:
+	* src/ral_relation.h:
+	* src/ral_relationcmd.c:
+	* src/ral_relationheading.c:
+	* src/ral_relationheading.h:
+	* src/ral_relationobj.c:
+	* src/ral_relationobj.h:
+	* src/ral_relvar.c:
+	* src/ral_relvar.h:
+	* src/ral_relvarcmd.c:
+	* src/ral_relvarobj.c:
+	* src/ral_relvarobj.h:
+	* src/ral_tuple.c:
+	* src/ral_tuple.h:
+	* src/ral_tuplecmd.c:
+	* src/ral_tupleheading.c:
+	* src/ral_tupleheading.h:
+	* test/ral.test:
+	  Checkpoint. Many of the changes necessary to remove identifiers from
+	  relation values are in place. Most of the join code (and consequently
+	  all the related operations) does not work.
+
+2009/01/02 mangoa01
+
+	* doc/ral/tuple.man:
+	  Changed man page to reflect new string rep for Tuples.
+
+	* configure:
+	* configure.in:
+	* src/ral.tcl:
+	* src/ral_attribute.c:
+	* src/ral_attribute.h:
+	* src/ral_relationcmd.c:
+	* src/ral_relationheading.c:
+	* src/ral_relvarcmd.c:
+	* src/ral_relvarobj.c:
+	* src/ral_tuple.c:
+	* src/ral_tuple.h:
+	* src/ral_tuplecmd.c:
+	* src/ral_tupleheading.c:
+	* src/ral_tupleheading.h:
+	* src/ral_tupleobj.c:
+	* src/ral_tupleobj.h:
+	* src/ralutil.tcl:
+	* test/ral.test:
+          Work on the tuple commands.  Removed the use of the "Tuple" keyword
+          as part of the string representation for a Tuple. Still use the
+          keyword in headings for tuple valued attributes.  This simplifies the
+          overall scheme for tuples so that now they just look like a two
+          element list, the first element being a list of attribute name / type
+          pairs and the second being a list of attribute name / value pairs.
+
+
+
 ========= ral 0.8.9 =========
 2008/11/10 mangoa01
 

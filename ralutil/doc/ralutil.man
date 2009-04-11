@@ -1,0 +1,194 @@
+[manpage_begin ralutil n 0.9]
+[comment {
+# This software is copyrighted 2004, 2005, 2006, 2007, 2008, 2009
+# by G. Andrew Mangogna.
+# The following terms apply to all files associated with the software unless
+# explicitly disclaimed in individual files.
+# 
+# The authors hereby grant permission to use, copy, modify, distribute,
+# and license this software and its documentation for any purpose, provided
+# that existing copyright notices are retained in all copies and that this
+# notice is included verbatim in any distributions. No written agreement,
+# license, or royalty fee is required for any of the authorized uses.
+# Modifications to this software may be copyrighted by their authors and
+# need not follow the licensing terms described here, provided that the
+# new terms are clearly indicated on the first page of each file where
+# they apply.
+# 
+# IN NO EVENT SHALL THE AUTHORS OR DISTRIBUTORS BE LIABLE TO ANY PARTY FOR
+# DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING
+# OUT OF THE USE OF THIS SOFTWARE, ITS DOCUMENTATION, OR ANY DERIVATIVES
+# THEREOF, EVEN IF THE AUTHORS HAVE BEEN ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
+# 
+# THE AUTHORS AND DISTRIBUTORS SPECIFICALLY DISCLAIM ANY WARRANTIES,
+# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.  THIS SOFTWARE
+# IS PROVIDED ON AN "AS IS" BASIS, AND THE AUTHORS AND DISTRIBUTORS HAVE
+# NO OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS,
+# OR MODIFICATIONS.
+# 
+# GOVERNMENT USE: If you are acquiring this software on behalf of the
+# U.S. government, the Government shall have only "Restricted Rights"
+# in the software and related documentation as defined in the Federal
+# Acquisition Regulations (FARs) in Clause 52.227.19 (c) (2).  If you
+# are acquiring the software on behalf of the Department of Defense,
+# the software shall be classified as "Commercial Computer Software"
+# and the Government shall have only "Restricted Rights" as defined in
+# Clause 252.227-7013 (c) (1) of DFARs.  Notwithstanding the foregoing,
+# the authors grant the U.S. Government and others acting in its behalf
+# permission to use and distribute the software in accordance with the
+# terms specified in this license.
+# 
+#  *++
+# MODULE:
+#	ralutil.man -- Manual page for the TclRal "ralutil" package
+# ABSTRACT:
+# 
+# $RCSfile: ralutil.man,v $
+# $Revision: 1.2 $
+# $Date: 2009/04/11 18:18:54 $
+#  *--
+}]
+[moddesc "Ralutil Package"]
+[titledesc "Commands for the ralutil package"]
+[copyright "2004, 2005, 2006, 2007, 2008, 2009 by G. Andrew Mangogna"]
+[require ral [opt 0.9.0]]
+[description]
+This manpage describes the [package ralutil] package
+The [package ralutil]
+package is part of the Tcl Relational Algebra Library (ral) package.
+
+[section VARIABLES]
+The [package ralutil] defines two variables, [var DUM] and [var DEE].
+These two relation values play a special role as identity and
+annihilator relations.
+
+[list_begin definitions]
+[call [var ::ralutil::DUM]]
+The ordinary Tcl variable [var ::ralutil::DUM] contains a relation value
+whose heading is empty and whose body is empty.
+[call [var ::ralutil::DEE]]
+The ordinary Tcl variable [var ::ralutil::DEE] contains a relation value
+whose heading is empty and whose body contains a single tuple that is the
+empty tuple.
+[list_end]
+
+[section COMMANDS]
+[list_begin definitions]
+[call [cmd "::ralutil::pipe"] [arg script] [arg [opt varName]] [arg [opt sep]]]
+The [cmd pipe] command provides syntactic sugar to execute a sequence
+of commands feeding the output of one command as the input to the next
+one in the sequence.
+The [arg script] argument is a sequence of commands separated by a
+command separator character (by default "|").
+The script is rewritten and executed such that the return value of the first
+command in the sequence is used as an argument to the next and so on for
+all the commands in [arg script].
+The return value of a preceding command is inserted into the succeeding
+command to replace the special argument substitution
+character (default "~").
+If no argument substitution character is found in a command,
+then the value is made the last argument of the command.
+If the [arg varName] argument is present and not the empty string,
+then the rewritten [arg script] is not executed
+but rather is stored in the Tcl variable given by [arg varName].
+This is useful in loops where it is not necessary to recompute script
+reorganization each time.
+Executing [cmd eval] of the contents of [arg varName] can be used
+to execute the rewritten script.
+If the [arg sep] argument is present it is interpreted as a two character
+string giving the command separator and argument place holder syntax
+characters in that order.
+By default these are "|" and "~" respectively, but different values may
+be specified if these characters are otherwise present in the [arg script]
+and would be misinterpreted in the script rewriting.
+It is frequently the case that relational expressions take the output
+of one command directly as the argument of another one.
+This is easily done in Tcl because command evaluation may be nested
+arbitrarily deep.
+However, deeply nested commands can be difficult to read and follow.
+The [cmd pipe] command is a control structure that allows deeply
+nested commands to be written as a linear sequence.
+This command was inspired by code from the Tcl wiki
+[sectref-external http://wiki.tcl.tk/17419].
+The implementation is different than that found on the wiki,
+but the idea is the same.
+[emph N.B.] that here is nothing about the [cmd pipe] command that is
+specific to relational algebra.
+It can be used to sequence any Tcl commands.
+[para]
+To obtain a list of the breeds of all dogs whose name starts with "S":
+[example {
+set sdogs [::ralutil::pipe {
+    relvar set DOG |
+    relation restrictwith ~ {[string match S* $DogName]} |
+    relation project ~ Breed |
+    relation list
+}]
+}]
+
+The same command in natural Tcl nesting order is:
+[example {
+set sdogs [relation list \ 
+    [relation project \ 
+        [[relation restrictwith \ 
+            [relvar set DOG] \ 
+        {[string match S* $DogName]}] \ 
+    Breed]]]
+}]
+
+[call [cmd "::ralutil::crosstab"] [arg relValue] [arg crossAttr]\
+        [arg [opt "attr1 attr2 ..."]]]
+Generate a cross tabulation of [arg relValue] for the [arg crossAttr] attribute
+against the optional [arg attrN] attributes.
+Cross tabulations are sometimes known as [emph pivot] tables.
+The result is relation value whose heading consists of the [arg attrN]
+attributes plus a new attribute for each distinct value of the
+[arg crossAttr] attribute.
+The value of the new cross tabulated attributes is the number of tuples
+in [arg relValue] that have the corresponding value of [arg crossAttr].
+
+[example {
+% set tab [::ralutil::crosstab [relvar set OWNERSHIP] Acquired]
+% puts [relformat $tab]
++----+----+----+----+-----+
+|2000|2001|2002|2003|Total|
+|int |int |int |int |int  |
++----+----+----+----+-----+
+|2   |3   |1   |1   |7    |
++----+----+----+----+-----+
+% set tab [::ralutil::crosstab [relvar set OWNERSHIP] Acquired DogName]
+% puts [relformat $tab]
++-------+----+----+----+----+-----+
+|DogName|2000|2001|2002|2003|Total|
+|string |int |int |int |int |int  |
++-------+----+----+----+----+-----+
+|Fido   |0   |2   |0   |0   |2    |
+|Sam    |2   |0   |0   |0   |2    |
+|Spot   |0   |1   |0   |0   |1    |
+|Rover  |0   |0   |1   |0   |1    |
+|Fred   |0   |0   |0   |1   |1    |
++-------+----+----+----+----+-----+
+}]
+
+[call [cmd ::ralutil::sysIdsInit]]
+The [cmd sysIdsInit] command initializes a scheme whereby attributes of
+relvars can be given system generated identifiers.
+This procedure should be invoked before requesting system generated
+identifiers via [cmd sysIdGenSystemId].
+
+[call [cmd ::ralutil::sysIdsGenSystemId] [arg relvarName] [arg attrName]]
+The [cmd sysIdGenSystemId] command requests that the [arg attrName]
+attribute of the relvar, [arg relvarName], be assigned a system generated
+identifier.
+This procedure uses relvar tracing to assign a unique integer value to
+[arg attrName] when a tuple is inserted into [arg relvarName].
+
+[list_end]
+
+[see_also relvar relation]
+
+[keywords tuple relation relvar]
+
+[manpage_end]

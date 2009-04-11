@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_vector.h,v $
-$Revision: 1.11 $
-$Date: 2006/09/09 21:37:47 $
+$Revision: 1.12 $
+$Date: 2009/04/11 18:18:54 $
  *--
  */
 #ifndef _ral_vector_h_
@@ -90,6 +90,23 @@ typedef struct Ral_PtrVector {
 } *Ral_PtrVector ;
 
 /*
+ * MEMBER ACCESS MACROS
+ * N.B. many of these macros access their arguments multiple times.
+ * No side effects for the arguments!
+ */
+#define Ral_IntVectorBegin(v)   ((v)->start)
+#define Ral_IntVectorEnd(v)     ((v)->finish)
+#define Ral_IntVectorSize(v)    ((v)->finish - (v)->start)
+#define Ral_IntVectorCapacity(v)    ((v)->endStorage - (v)->start)
+#define Ral_IntVectorEmpty(v)   ((v)->start == (v)->finish)
+
+#define Ral_PtrVectorBegin(v)   ((v)->start)
+#define Ral_PtrVectorEnd(v)     ((v)->finish)
+#define Ral_PtrVectorSize(v)    ((v)->finish - (v)->start)
+#define Ral_PtrVectorCapacity(v)    ((v)->endStorage - (v)->start)
+#define Ral_PtrVectorEmpty(v)   ((v)->start == (v)->finish)
+
+/*
 FUNCTION DECLARATIONS
 */
 
@@ -97,15 +114,8 @@ extern Ral_IntVector Ral_IntVectorNew(int, Ral_IntVectorValueType) ;
 extern Ral_IntVector Ral_IntVectorNewEmpty(int) ;
 extern Ral_IntVector Ral_IntVectorDup(Ral_IntVector) ;
 extern void Ral_IntVectorDelete(Ral_IntVector) ;
-
-extern Ral_IntVectorIter Ral_IntVectorBegin(Ral_IntVector) ;
-extern Ral_IntVectorIter Ral_IntVectorEnd(Ral_IntVector) ;
-
-extern int Ral_IntVectorSize(Ral_IntVector) ;
-extern int Ral_IntVectorCapacity(Ral_IntVector) ;
 extern void Ral_IntVectorReserve(Ral_IntVector, int) ;
 
-extern int Ral_IntVectorEmpty(Ral_IntVector) ;
 extern void Ral_IntVectorFill(Ral_IntVector, Ral_IntVectorValueType) ;
 extern void Ral_IntVectorFillConsecutive(Ral_IntVector,
     Ral_IntVectorValueType) ;
@@ -145,15 +155,8 @@ extern const char *Ral_IntVectorPrint(Ral_IntVector, Ral_IntVectorIter) ;
 extern Ral_PtrVector Ral_PtrVectorNew(int) ;
 extern Ral_PtrVector Ral_PtrVectorDup(Ral_PtrVector) ;
 extern void Ral_PtrVectorDelete(Ral_PtrVector) ;
-
-extern Ral_PtrVectorIter Ral_PtrVectorBegin(Ral_PtrVector) ;
-extern Ral_PtrVectorIter Ral_PtrVectorEnd(Ral_PtrVector) ;
-
-extern int Ral_PtrVectorSize(Ral_PtrVector) ;
-extern int Ral_PtrVectorCapacity(Ral_PtrVector) ;
 extern void Ral_PtrVectorReserve(Ral_PtrVector, int) ;
 
-extern int Ral_PtrVectorEmpty(Ral_PtrVector) ;
 extern void Ral_PtrVectorFill(Ral_PtrVector, Ral_PtrVectorValueType) ;
 
 extern Ral_PtrVectorValueType Ral_PtrVectorFetch(Ral_PtrVector, int) ;

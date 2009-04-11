@@ -1,4 +1,4 @@
-[manpage_begin relformat n 0.8.9]
+[manpage_begin relformat n 0.9]
 [comment {
 # This software is copyrighted 2004, 2005, 2006, 2007 by G. Andrew Mangogna.
 # The following terms apply to all files associated with the software unless
@@ -47,14 +47,14 @@
 #   Relformat is part of the TCLRAL package.
 # 
 # $RCSfile: relformat.man,v $
-# $Revision: 1.16 $
-# $Date: 2008/11/03 00:27:15 $
+# $Revision: 1.17 $
+# $Date: 2009/04/11 18:18:54 $
 #  *--
 }]
 [moddesc "Relation formatting"]
 [titledesc "Text formatting for relations"]
 [copyright "2004, 2005, 2006, 2007 by G. Andrew Mangogna"]
-[require ral [opt 0.8.9]]
+[require ral [opt 0.9]]
 [description]
 This manpage describes a set of commands that are used for
 generating text output of relation and tuple values.
@@ -87,29 +87,27 @@ sorted by the list of attributes in [arg sortAttrs] before being displayed.
 If the [arg noheading] argument is set to 1, then two rows of attribute
 name and attribute type that by default are placed as a heading of the output
 are omitted.
-As a visual convenience, any attribute that is part of an identifier
-has its column delimited by an equal sign (=).
 
 [example {
 % puts [relformat $::DOG Dog]
-+=======+---------+
++-------+---------+
 |DogName|Breed    |
 |string |string   |
-+=======+---------+
++-------+---------+
 |Fido   |Poodle   |
 |Sam    |Collie   |
 |Spot   |Terrier  |
 |Rover  |Retriever|
 |Fred   |Spaniel  |
 |Jumper |Mutt     |
-+=======+---------+
++-------+---------+
 Dog
 ---
 % puts [relformat $::OWNERSHIP Ownership {DogName Acquired}]
-+=========+=======+--------+
++---------+-------+--------+
 |OwnerName|DogName|Acquired|
 |string   |string |string  |
-+=========+=======+--------+
++---------+-------+--------+
 |Sue      |Fido   |2001    |
 |George   |Fido   |2001    |
 |Jim      |Fred   |2003    |
@@ -117,57 +115,57 @@ Dog
 |Sue      |Sam    |2000    |
 |George   |Sam    |2000    |
 |Alice    |Spot   |2001    |
-+=========+=======+--------+
++---------+-------+--------+
 Ownership
 ---------
 % puts [relformat $::OWNER Owner "" 1]
-+======+--+-------------+
++------+--+-------------+
 |Sue   |24|Cupertino    |
 |George|35|Sunnyvale    |
 |Alice |30|San Jose     |
 |Mike  |50|San Jose     |
 |Jim   |42|San Francisco|
-+======+--+-------------+
++------+--+-------------+
 Owner
 -----
 % puts [relformat [relation group $::OWNERSHIP Owners OwnerName] "" DogName]
-+=======+--------+-----------+
++-------+--------+-----------+
 |DogName|Acquired|Owners     |
 |string |string  |Relation   |
-+=======+--------+-----------+
-|Fido   |2001    |+=========+|
++-------+--------+-----------+
+|Fido   |2001    |+---------+|
 |       |        ||OwnerName||
 |       |        ||string   ||
-|       |        |+=========+|
+|       |        |+---------+|
 |       |        ||Sue      ||
 |       |        ||George   ||
-|       |        |+=========+|
-|Fred   |2003    |+=========+|
+|       |        |+---------+|
+|Fred   |2003    |+---------+|
 |       |        ||OwnerName||
 |       |        ||string   ||
-|       |        |+=========+|
+|       |        |+---------+|
 |       |        ||Jim      ||
-|       |        |+=========+|
-|Rover  |2002    |+=========+|
+|       |        |+---------+|
+|Rover  |2002    |+---------+|
 |       |        ||OwnerName||
 |       |        ||string   ||
-|       |        |+=========+|
+|       |        |+---------+|
 |       |        ||Mike     ||
-|       |        |+=========+|
-|Sam    |2000    |+=========+|
+|       |        |+---------+|
+|Sam    |2000    |+---------+|
 |       |        ||OwnerName||
 |       |        ||string   ||
-|       |        |+=========+|
+|       |        |+---------+|
 |       |        ||Sue      ||
 |       |        ||George   ||
-|       |        |+=========+|
-|Spot   |2001    |+=========+|
+|       |        |+---------+|
+|Spot   |2001    |+---------+|
 |       |        ||OwnerName||
 |       |        ||string   ||
-|       |        |+=========+|
+|       |        |+---------+|
 |       |        ||Alice    ||
-|       |        |+=========+|
-+=======+--------+-----------+
+|       |        |+---------+|
++-------+--------+-----------+
 }]
 
 

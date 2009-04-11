@@ -1,7 +1,7 @@
 /*
-This software is copyrighted 2005 by G. Andrew Mangogna.  The following
-terms apply to all files associated with the software unless explicitly
-disclaimed in individual files.
+This software is copyrighted 2005, 2006, 2007, 2008, 2009 by G. Andrew Mangogna.
+The following terms apply to all files associated with the software unless
+explicitly disclaimed in individual files.
 
 The authors hereby grant permission to use, copy, modify, distribute,
 and license this software and its documentation for any purpose, provided
@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.h,v $
-$Revision: 1.20 $
-$Date: 2007/05/19 20:18:25 $
+$Revision: 1.21 $
+$Date: 2009/04/11 18:18:54 $
  *--
  */
 #ifndef _ral_relation_h_
@@ -60,13 +60,11 @@ PRAGMAS
 INCLUDE FILES
 */
 #include "ral_utils.h"
-#include "ral_relationheading.h"
+#include "ral_tupleheading.h"
 #include "ral_tuple.h"
 #include "ral_attribute.h"
 #include "ral_vector.h"
 #include "ral_joinmap.h"
-
-#include <stdio.h>
 
 /*
 MACRO DEFINITIONS
@@ -85,22 +83,18 @@ TYPE DECLARATIONS
  * of zero or more tuples.
 
  * The external string representation of a "Relation" is a specially
- * formatted list. The list consists of four elements.
+ * formatted list. The list consists of two elements.
  *
- * 1. The keyword "Relation".
- *
- * 2. A tuple heading. A tuple heading is a list of Name / Type pairs as
+ * 1. A tuple heading. A tuple heading is a list of Name / Type pairs as
  *    described for the Tuple type.
  *
- * 3. A list of identifiers. Each identifier is in turn a list of attribute
- *    names that constitute the identifier
- *
- * 4. A list of tuple values. Each element of the list is a set of
+ * 2. A list of tuple values. Each element of the list is a set of
  *    Attribute Name / Attribute Value pairs.
  * E.G.
- *    {Relation {{{Name string} {Number int} {Wage double}} {{Name}}}\
- *    {{Name Andrew Number 200 Wage 5.75}\
- *     {Name George Number 174 Wage 10.25}}}
+ *    {{Name string Number int Wage double} {
+ *     {Name Andrew Number 200 Wage 5.75}
+ *     {Name George Number 174 Wage 10.25}}
+ *    }
  * is a Relation consisting of a body which has two tuples.
  *
  * All tuples in a relation must have the same heading and all tuples in a
@@ -110,53 +104,65 @@ TYPE DECLARATIONS
 
 typedef Ral_Tuple *Ral_RelationIter ;
 typedef struct Ral_Relation {
-    Ral_RelationHeading heading ;   /* The relation heading */
-    Ral_RelationIter start ;	    /* Tuple values are stored in a dynamic
-				     * vector of tuple pointers. We use the
-				     * usual start, finish, end pointers to
-				     * manipulate the vector.
-				     * Cf. Ral_IntVector and Ral_TupleHeading */
+    Ral_TupleHeading heading ;      /* The heading  of a relation is the
+                                     * same as for a tuple. */
+    Ral_RelationIter start ;        /* Tuple values are stored in a dynamic
+                                     * vector of tuple pointers. We use the
+                                     * usual start, finish, end pointers to
+                                     * manipulate the vector.
+                                     * Cf. Ral_IntVector and Ral_TupleHeading */
     Ral_RelationIter finish ;
     Ral_RelationIter endStorage ;
-    Tcl_HashTable *indexVector ;    /* A vector of hash tables that map the
-				     * the values of identifying attributes
-				     * to the index in the tuple vector where
-				     * the corresponding tuple is found.
-				     * There is one hash table for each
-				     * identifier, i.e. "indexVector" points
-				     * to an array of "heading->idCount" hash
-				     * tables. */
+    Tcl_HashTable index ;           /* A hash table that maps the values of
+                                     * the attributes of the tuples to the
+                                     * index in the tuple vector where the
+                                     * corresponding tuple is found. */
 } *Ral_Relation ;
+
+/*
+ * MEMBER ACCESS MACROS
+ * N.B. many of these macros access their arguments multiple times.
+ * No side effects for the arguments!
+ */
+#define Ral_RelationBegin(r)    ((r)->start)
+#define Ral_RelationEnd(r)      ((r)->finish)
+#define Ral_RelationDegree(r)   (Ral_TupleHeadingSize((r)->heading))
+#define Ral_RelationCardinality(r)  ((r)->finish - (r)->start)
+#define Ral_RelationCapacity(r)  ((r)->endStorage - (r)->start)
+
+/*
+ * Data structure used in a custom hash table for finding tuples
+ * in a relation based on the values of the tuple attributes.
+ */
+typedef struct Ral_TupleAttrHashKey {
+    Ral_Tuple tuple ;       /* reference to tuple that is the hash key */
+    Ral_IntVector attrs ;   /* vector holds the attribute indices that are
+                             * to be used to form the key and for comparison
+                             * purposes.
+                             */
+} *Ral_TupleAttrHashKey ;
 
 /*
 DATA DECLARATIONS
 */
+extern Tcl_HashKeyType tupleAttrHashType ;
 
 /*
 FUNCTION DECLARATIONS
 */
 
-extern Ral_Relation Ral_RelationNew(Ral_RelationHeading) ;
+extern Ral_Relation Ral_RelationNew(Ral_TupleHeading) ;
 extern Ral_Relation Ral_RelationDup(Ral_Relation) ;
 extern Ral_Relation Ral_RelationShallowCopy(Ral_Relation) ;
 extern void Ral_RelationDelete(Ral_Relation) ;
 
-extern Ral_RelationIter Ral_RelationBegin(Ral_Relation) ;
-extern Ral_RelationIter Ral_RelationEnd(Ral_Relation) ;
-
-extern int Ral_RelationDegree(Ral_Relation) ;
-extern int Ral_RelationCardinality(Ral_Relation) ;
-extern int Ral_RelationCapacity(Ral_Relation) ;
 extern void Ral_RelationReserve(Ral_Relation, int) ;
 
 extern int Ral_RelationPushBack(Ral_Relation, Ral_Tuple, Ral_IntVector) ;
-extern Ral_Tuple Ral_RelationTupleAt(Ral_Relation, int) ;
 extern int Ral_RelationUpdate(Ral_Relation, Ral_RelationIter, Ral_Tuple,
     Ral_IntVector) ;
 
-extern Ral_RelationIter Ral_RelationFind(Ral_Relation, int, Ral_Tuple,
-    Ral_IntVector) ;
-extern Ral_RelationIter Ral_RelationFindKey(Ral_Relation, int, Ral_Tuple,
+extern Ral_RelationIter Ral_RelationFind(Ral_Relation, Ral_Tuple,
     Ral_IntVector) ;
 extern Ral_Relation Ral_RelationExtract(Ral_Relation, Ral_IntVector) ;
 extern Ral_RelationIter Ral_RelationErase(Ral_Relation, Ral_RelationIter,
@@ -170,55 +176,59 @@ extern int Ral_RelationProperSubsetOf(Ral_Relation, Ral_Relation) ;
 extern int Ral_RelationSupersetOf(Ral_Relation, Ral_Relation) ;
 extern int Ral_RelationProperSupersetOf(Ral_Relation, Ral_Relation) ;
 
-extern int Ral_RelationRenameAttribute(Ral_Relation, const char *, const char *,
-    Ral_ErrorInfo *) ;
+extern int Ral_RelationRenameAttribute(Ral_Relation, char const *, char const *,
+        Ral_ErrorInfo *) ;
 
 extern Ral_Relation Ral_RelationUnion(Ral_Relation, Ral_Relation,
-    Ral_ErrorInfo *) ;
+        Ral_ErrorInfo *) ;
 extern Ral_Relation Ral_RelationIntersect(Ral_Relation, Ral_Relation,
-    Ral_ErrorInfo *) ;
+        Ral_ErrorInfo *) ;
 extern Ral_Relation Ral_RelationMinus(Ral_Relation, Ral_Relation,
-    Ral_ErrorInfo *) ;
+        Ral_ErrorInfo *) ;
 extern Ral_Relation Ral_RelationTimes(Ral_Relation, Ral_Relation) ;
 extern Ral_Relation Ral_RelationProject(Ral_Relation, Ral_IntVector) ;
-extern Ral_Relation Ral_RelationGroup(Ral_Relation, const char *,
-    Ral_IntVector) ;
-extern Ral_Relation Ral_RelationUngroup(Ral_Relation, const char *,
-    Ral_ErrorInfo *) ;
+extern Ral_Relation Ral_RelationGroup(Ral_Relation, char const *,
+        Ral_IntVector) ;
+extern Ral_Relation Ral_RelationUngroup(Ral_Relation, char const *,
+        Ral_ErrorInfo *) ;
 extern Ral_Relation Ral_RelationJoin(Ral_Relation, Ral_Relation, Ral_JoinMap,
-    Ral_ErrorInfo *) ;
+        Ral_ErrorInfo *) ;
 extern Ral_Relation Ral_RelationCompose(Ral_Relation, Ral_Relation, Ral_JoinMap,
-    Ral_ErrorInfo *) ;
+        Ral_ErrorInfo *) ;
 extern Ral_Relation Ral_RelationSemiJoin(Ral_Relation, Ral_Relation,
-    Ral_JoinMap) ;
+        Ral_JoinMap) ;
 extern Ral_Relation Ral_RelationSemiMinus(Ral_Relation, Ral_Relation,
-    Ral_JoinMap) ;
+        Ral_JoinMap) ;
 extern Ral_Relation Ral_RelationDivide(Ral_Relation, Ral_Relation, Ral_Relation,
-    Ral_ErrorInfo *) ;
+        Ral_ErrorInfo *) ;
+extern Ral_Relation Ral_RelationTag(Ral_Relation, char const *, Ral_IntVector,
+        Ral_ErrorInfo *) ;
+extern Ral_Relation Ral_RelationTagWithin(Ral_Relation, char const *,
+        Ral_IntVector, Ral_IntVector, Ral_ErrorInfo *) ;
+extern Ral_Relation Ral_RelationUnwrap(Ral_Relation, char const *,
+        Ral_ErrorInfo *) ;
 extern Ral_Relation Ral_RelationTclose(Ral_Relation) ;
 
 extern Ral_IntVector Ral_RelationSort(Ral_Relation, Ral_IntVector, int) ;
-
 extern int Ral_RelationCopy(Ral_Relation, Ral_RelationIter,
-    Ral_RelationIter, Ral_Relation, Ral_IntVector) ;
+        Ral_RelationIter, Ral_Relation, Ral_IntVector) ;
 extern void Ral_RelationFindJoinTuples(Ral_Relation, Ral_Relation,
-    Ral_JoinMap) ;
+        Ral_JoinMap) ;
 
 extern int Ral_RelationScan(Ral_Relation, Ral_AttributeTypeScanFlags *,
-    Ral_AttributeValueScanFlags *) ;
+        Ral_AttributeValueScanFlags *) ;
 extern int Ral_RelationConvert(Ral_Relation, char *,
-    Ral_AttributeTypeScanFlags *, Ral_AttributeValueScanFlags *) ;
+        Ral_AttributeTypeScanFlags *, Ral_AttributeValueScanFlags *) ;
 extern int Ral_RelationScanValue(Ral_Relation,
-    Ral_AttributeTypeScanFlags *, Ral_AttributeValueScanFlags *) ;
+        Ral_AttributeTypeScanFlags *, Ral_AttributeValueScanFlags *) ;
 extern int Ral_RelationConvertValue(Ral_Relation, char *,
-    Ral_AttributeTypeScanFlags *, Ral_AttributeValueScanFlags *) ;
-extern void Ral_RelationPrint(Ral_Relation, const char *, FILE *) ;
+        Ral_AttributeTypeScanFlags *, Ral_AttributeValueScanFlags *) ;
 extern char *Ral_RelationStringOf(Ral_Relation) ;
 extern char *Ral_RelationValueStringOf(Ral_Relation) ;
 
-const char *Ral_RelationGetIdKey(Ral_Tuple, Ral_IntVector,
-    Ral_IntVector, Tcl_DString *) ;
-
-extern const char * Ral_RelationVersion(void) ;
+char const *Ral_RelationGetIdKey(Ral_Tuple, Ral_IntVector,
+        Ral_IntVector, Tcl_DString *) ;
 
 #endif /* _ral_relation_h_ */
+
+/* vim:set ts=4 sw=4 sts=4 expandtab: */

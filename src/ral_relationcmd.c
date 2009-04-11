@@ -46,8 +46,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.39 $
-$Date: 2008/04/11 03:50:27 $
+$Revision: 1.40 $
+$Date: 2009/04/11 18:18:54 $
  *--
  */
 
@@ -98,7 +98,6 @@ static int RelationAssignCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationAttributesCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationBodyCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationCardinalityCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
-static int RelationChooseCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationComposeCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationCreateCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationDegreeCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
@@ -113,8 +112,7 @@ static int RelationExtractCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationForeachCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationGroupCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationHeadingCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
-static int RelationIdentifiersCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
-static int RelationIncludeCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
+static int RelationInsertCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationIntersectCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationIsCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationIsemptyCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
@@ -124,19 +122,23 @@ static int RelationListCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationMinusCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationProjectCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationRankCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
-static int RelationReidentifyCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationRenameCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationRestrictCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationRestrictWithCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationSemijoinCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationSemiminusCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationSummarizeCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
+static int RelationSummarizebyCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
+static int RelationTableCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationTagCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationTcloseCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationTimesCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationTupleCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationUngroupCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationUnionCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
+static int RelationUpdateCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
+static int RelationUnwrapCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
+static int RelationWrapCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 
 /*
 EXTERNAL DATA REFERENCES
@@ -149,7 +151,6 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_relationcmd.c,v $ $Revision: 1.39 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -177,7 +178,6 @@ relationCmd(
 	{"attributes", RelationAttributesCmd},
 	{"body", RelationBodyCmd},
 	{"cardinality", RelationCardinalityCmd},
-	{"choose", RelationChooseCmd},
 	{"compose", RelationComposeCmd},
 	{"create", RelationCreateCmd},
 	{"degree", RelationDegreeCmd},
@@ -192,8 +192,7 @@ relationCmd(
 	{"foreach", RelationForeachCmd},
 	{"group", RelationGroupCmd},
 	{"heading", RelationHeadingCmd},
-	{"identifiers", RelationIdentifiersCmd},
-	{"include", RelationIncludeCmd},
+	{"insert", RelationInsertCmd},
 	{"intersect", RelationIntersectCmd},
 	{"is", RelationIsCmd},
 	{"isempty", RelationIsemptyCmd},
@@ -203,19 +202,23 @@ relationCmd(
 	{"minus", RelationMinusCmd},
 	{"project", RelationProjectCmd},
 	{"rank", RelationRankCmd},
-	{"reidentify", RelationReidentifyCmd},
 	{"rename", RelationRenameCmd},
 	{"restrict", RelationRestrictCmd},
 	{"restrictwith", RelationRestrictWithCmd},
 	{"semijoin", RelationSemijoinCmd},
 	{"semiminus", RelationSemiminusCmd},
 	{"summarize", RelationSummarizeCmd},
+	{"summarizeby", RelationSummarizebyCmd},
+	{"table", RelationTableCmd},
 	{"tag", RelationTagCmd},
 	{"tclose", RelationTcloseCmd},
 	{"times", RelationTimesCmd},
 	{"tuple", RelationTupleCmd},
 	{"ungroup", RelationUngroupCmd},
 	{"union", RelationUnionCmd},
+	{"unwrap", RelationUnwrapCmd},
+	{"update", RelationUpdateCmd},
+	{"wrap", RelationWrapCmd},
 	{NULL, NULL},
     } ;
 
@@ -234,11 +237,6 @@ relationCmd(
     return cmdTable[index].cmdFunc(interp, objc, objv) ;
 }
 
-const char *
-Ral_RelationCmdVersion(void)
-{
-    return rcsid ;
-}
 /*
  * ======================================================================
  * Relations Sub-Command Functions
@@ -252,17 +250,18 @@ RelationArrayCmd(
 {
     Tcl_Obj *relObj ;
     Tcl_Obj *arrayNameObj ;
+    char const *keyAttrName ;
+    char const *valueAttrName ;
     Ral_Relation relation ;
-    Ral_RelationHeading heading ;
+    Ral_TupleHeading heading ;
     int keyAttrIndex ;
     int valueAttrIndex ;
-    Ral_RelationIter rEnd ;
     Ral_RelationIter rIter ;
 
-    /* relation array relation arrayName ?keyAttr valueAttr? */
-    if (!(objc == 4 || objc == 6)) {
+    /* relation array relation arrayName keyAttr valueAttr */
+    if (objc != 6) {
 	Tcl_WrongNumArgs(interp, 2, objv,
-	    "relation arrayName ?keyAttr valueAttr?") ;
+	    "relation arrayName keyAttr valueAttr") ;
 	return TCL_ERROR ;
     }
 
@@ -273,50 +272,25 @@ RelationArrayCmd(
     relation = relObj->internalRep.otherValuePtr ;
     heading = relation->heading ;
 
-    if (objc ==4) {
-	if (Ral_RelationDegree(relation) != 2) {
-	    Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptArray,
-		RAL_ERR_DEGREE_TWO, relObj) ;
-	    return TCL_ERROR ;
-	}
+    arrayNameObj = objv[3] ;
+    keyAttrName = Tcl_GetString(objv[4]) ;
+    valueAttrName = Tcl_GetString(objv[5]) ;
 
-	if (heading->idCount != 1) {
-	    Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptArray,
-		RAL_ERR_SINGLE_IDENTIFIER, relObj) ;
-	    return TCL_ERROR ;
-	}
-	if (Ral_IntVectorSize(*heading->identifiers) != 1) {
-	    Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptArray,
-		RAL_ERR_SINGLE_ATTRIBUTE, relObj) ;
-	    return TCL_ERROR ;
-	}
-
-	keyAttrIndex = Ral_IntVectorFetch(*heading->identifiers, 0) ;
-	valueAttrIndex = (keyAttrIndex + 1) % 2 ;
-    } else { /* objc == 6 */
-	const char *keyAttrName = Tcl_GetString(objv[4]) ;
-	const char *valueAttrName = Tcl_GetString(objv[5]) ;
-
-	keyAttrIndex = Ral_TupleHeadingIndexOf(heading->tupleHeading,
-	    keyAttrName) ;
-	if (keyAttrIndex < 0) {
-	    Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptArray,
-		RAL_ERR_UNKNOWN_ATTR, keyAttrName) ;
-	    return TCL_ERROR ;
-	}
-	valueAttrIndex = Ral_TupleHeadingIndexOf(heading->tupleHeading,
-	    valueAttrName) ;
-	if (valueAttrIndex < 0) {
-	    Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptArray,
-		RAL_ERR_UNKNOWN_ATTR, valueAttrName) ;
-	    return TCL_ERROR ;
-	}
+    keyAttrIndex = Ral_TupleHeadingIndexOf(heading, keyAttrName) ;
+    if (keyAttrIndex < 0) {
+        Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptArray,
+            RAL_ERR_UNKNOWN_ATTR, keyAttrName) ;
+        return TCL_ERROR ;
+    }
+    valueAttrIndex = Ral_TupleHeadingIndexOf(heading, valueAttrName) ;
+    if (valueAttrIndex < 0) {
+        Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptArray,
+            RAL_ERR_UNKNOWN_ATTR, valueAttrName) ;
+        return TCL_ERROR ;
     }
 
-    arrayNameObj = objv[3] ;
-
-    rEnd = Ral_RelationEnd(relation) ;
-    for (rIter = Ral_RelationBegin(relation) ; rIter != rEnd ; ++rIter) {
+    for (rIter = Ral_RelationBegin(relation) ;
+            rIter != Ral_RelationEnd(relation) ; ++rIter) {
 	Ral_TupleIter tBegin = Ral_TupleBegin(*rIter) ;
 	if (Tcl_ObjSetVar2(interp, arrayNameObj, *(tBegin + keyAttrIndex),
 	    *(tBegin + valueAttrIndex), TCL_LEAVE_ERR_MSG) == NULL) {
@@ -386,7 +360,7 @@ RelationAttributesCmd(
 	return TCL_ERROR ;
     }
     relation = relObj->internalRep.otherValuePtr ;
-    tupleHeading = relation->heading->tupleHeading ;
+    tupleHeading = relation->heading ;
 
     attrListObj = Tcl_NewListObj(0, NULL) ;
     tEnd = Ral_TupleHeadingEnd(tupleHeading) ;
@@ -477,77 +451,6 @@ RelationCardinalityCmd(
 }
 
 static int
-RelationChooseCmd(
-    Tcl_Interp *interp,
-    int objc,
-    Tcl_Obj *const*objv)
-{
-    Tcl_Obj *relObj ;
-    Ral_Relation relation ;
-    Ral_RelationHeading heading ;
-    Ral_TupleHeading tupleHeading ;
-    Ral_Tuple key ;
-    int idNum ;
-    Ral_Relation newRelation ;
-    Ral_RelationIter found ;
-    Ral_ErrorInfo errInfo ;
-
-    /* relation choose relValue attr value ?attr2 value2 ...? */
-    if (objc < 5) {
-	Tcl_WrongNumArgs(interp, 2, objv,
-	    "relValue attr value ?attr2 value 2 ...?") ;
-	return TCL_ERROR ;
-    }
-
-    relObj = objv[2] ;
-    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationObjType) != TCL_OK) {
-	return TCL_ERROR ;
-    }
-    relation = relObj->internalRep.otherValuePtr ;
-    heading = relation->heading ;
-    tupleHeading = heading->tupleHeading ;
-
-    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptChoose) ;
-    objc -= 3 ;
-    objv += 3 ;
-    if (objc % 2 != 0) {
-	Ral_ErrorInfoSetError(&errInfo, RAL_ERR_BAD_PAIRS_LIST,
-	    "attribute / value arguments must be given in pairs") ;
-	Ral_InterpSetError(interp, &errInfo) ;
-	return TCL_ERROR ;
-    }
-    key = Ral_RelationObjKeyTuple(interp, relation, objc, objv, &idNum,
-	&errInfo) ;
-    if (key == NULL) {
-	return TCL_ERROR ;
-    }
-    /*
-     * Create the result relation.
-     */
-    newRelation = Ral_RelationNew(relation->heading) ;
-    /*
-     * Find the key tuple in the relation.
-     */
-    found = Ral_RelationFindKey(relation, idNum, key, NULL) ;
-    Ral_TupleDelete(key) ;
-    /*
-     * If the key tuple can be found, then insert the tuple into
-     * the result. Otherwise the result will have cardinality 0.
-     */
-    if (found != Ral_RelationEnd(relation)) {
-	int inserted ;
-	/*
-	 * Should always be able to insert into an empty relation.
-	 */
-	inserted = Ral_RelationPushBack(newRelation, *found, NULL) ;
-	assert(inserted != 0) ;
-    }
-
-    Tcl_SetObjResult(interp, Ral_RelationObjNew(newRelation)) ;
-    return TCL_OK ;
-}
-
-static int
 RelationComposeCmd(
     Tcl_Interp *interp,
     int objc,
@@ -628,9 +531,9 @@ RelationComposeCmd(
 }
 
 /*
- * relation create attrs ids ?tuple1 tuple2 ...?
+ * relation create heading ?tuple1 tuple2 ...?
  *
- * Returns a relation value with the given attributes, identifiers and body.
+ * Returns a relation value with the given heading and body.
  * Cf. "tuple create"
  */
 
@@ -640,12 +543,12 @@ RelationCreateCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
-    Ral_RelationHeading heading ;
+    Ral_TupleHeading heading ;
     Ral_ErrorInfo errInfo ;
     Ral_Relation relation ;
 
-    if (objc < 4) {
-	Tcl_WrongNumArgs(interp, 2, objv, "attrs ids ?tuple1 tuple2 ...?") ;
+    if (objc < 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "heading ?tuple1 tuple2 ...?") ;
 	return TCL_ERROR ;
     }
 
@@ -653,8 +556,7 @@ RelationCreateCmd(
     /*
      * Create the relation heading from the arguments.
      */
-    heading = Ral_RelationHeadingNewFromObjs(interp, objv[2], objv[3],
-	&errInfo) ;
+    heading = Ral_TupleHeadingNewFromObj(interp, objv[2], &errInfo) ;
     if (heading == NULL) {
 	return TCL_ERROR ;
     }
@@ -663,8 +565,8 @@ RelationCreateCmd(
     /*
      * Offset the argument bookkeeping to reference the tuples.
      */
-    objc -= 4 ;
-    objv += 4 ;
+    objc -= 3 ;
+    objv += 3 ;
     Ral_RelationReserve(relation, objc) ;
     /*
      * Iterate through the tuple arguments, inserting them into the relation.
@@ -715,16 +617,17 @@ RelationDictCmd(
 {
     Tcl_Obj *relObj ;
     Ral_Relation relation ;
-    Ral_RelationHeading heading ;
+    Ral_TupleHeading heading ;
+    char const *keyAttrName ;
+    char const *valueAttrName ;
     Tcl_Obj *dictObj ;
     int keyAttrIndex ;
     int valueAttrIndex ;
-    Ral_RelationIter rEnd ;
     Ral_RelationIter rIter ;
 
-    /* relation dict relation ?keyAttr valueAttr? */
-    if (!(objc == 3 || objc == 5)) {
-	Tcl_WrongNumArgs(interp, 2, objv, "relation ?keyAttr valueAttr?") ;
+    /* relation dict relation keyAttr valueAttr */
+    if (objc != 5) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relation keyAttr valueAttr") ;
 	return TCL_ERROR ;
     }
 
@@ -735,49 +638,25 @@ RelationDictCmd(
     relation = relObj->internalRep.otherValuePtr ;
     heading = relation->heading ;
 
-    if (objc == 3) {
-	if (Ral_RelationDegree(relation) != 2) {
-	    Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptDict,
-		RAL_ERR_DEGREE_TWO, relObj) ;
-	    return TCL_ERROR ;
-	}
+    keyAttrName = Tcl_GetString(objv[3]) ;
+    valueAttrName = Tcl_GetString(objv[4]) ;
 
-	if (heading->idCount != 1) {
-	    Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptDict,
-		RAL_ERR_SINGLE_IDENTIFIER, relObj) ;
-	    return TCL_ERROR ;
-	}
-	if (Ral_IntVectorSize(*heading->identifiers) != 1) {
-	    Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptDict,
-		RAL_ERR_SINGLE_ATTRIBUTE, relObj) ;
-	    return TCL_ERROR ;
-	}
-
-	keyAttrIndex = Ral_IntVectorFetch(*heading->identifiers, 0) ;
-	valueAttrIndex = (keyAttrIndex + 1) % 2 ;
-    } else { /* objc == 5 */
-	const char *keyAttrName = Tcl_GetString(objv[3]) ;
-	const char *valueAttrName = Tcl_GetString(objv[4]) ;
-
-	keyAttrIndex = Ral_TupleHeadingIndexOf(heading->tupleHeading,
-	    keyAttrName) ;
-	if (keyAttrIndex < 0) {
-	    Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptDict,
-		RAL_ERR_UNKNOWN_ATTR, keyAttrName) ;
-	    return TCL_ERROR ;
-	}
-	valueAttrIndex = Ral_TupleHeadingIndexOf(heading->tupleHeading,
-	    valueAttrName) ;
-	if (valueAttrIndex < 0) {
-	    Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptDict,
-		RAL_ERR_UNKNOWN_ATTR, valueAttrName) ;
-	    return TCL_ERROR ;
-	}
+    keyAttrIndex = Ral_TupleHeadingIndexOf(heading, keyAttrName) ;
+    if (keyAttrIndex < 0) {
+        Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptDict,
+            RAL_ERR_UNKNOWN_ATTR, keyAttrName) ;
+        return TCL_ERROR ;
+    }
+    valueAttrIndex = Ral_TupleHeadingIndexOf(heading, valueAttrName) ;
+    if (valueAttrIndex < 0) {
+        Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptDict,
+            RAL_ERR_UNKNOWN_ATTR, valueAttrName) ;
+        return TCL_ERROR ;
     }
 
     dictObj = Tcl_NewDictObj() ;
-    rEnd = Ral_RelationEnd(relation) ;
-    for (rIter = Ral_RelationBegin(relation) ; rIter != rEnd ; ++rIter) {
+    for (rIter = Ral_RelationBegin(relation) ;
+            rIter != Ral_RelationEnd(relation) ; ++rIter) {
 	Ral_TupleIter tBegin = Ral_TupleBegin(*rIter) ;
 	if (Tcl_DictObjPut(interp, dictObj, *(tBegin + keyAttrIndex),
 	    *(tBegin + valueAttrIndex)) != TCL_OK) {
@@ -870,8 +749,8 @@ RelationEliminateCmd(
     objc -= 3 ;
     objv += 3 ;
 
-    elimAttrs = Ral_TupleHeadingAttrsFromVect(relation->heading->tupleHeading,
-	interp, objc, objv) ;
+    elimAttrs = Ral_TupleHeadingAttrsFromVect(relation->heading,
+            interp, objc, objv) ;
     if (elimAttrs == NULL) {
 	return TCL_ERROR ;
     }
@@ -927,11 +806,9 @@ RelationExtendCmd(
 
     Tcl_Obj *relObj ;
     Ral_Relation relation ;
-    Ral_RelationHeading heading ;
-    Ral_TupleHeading tupleHeading ;
+    Ral_TupleHeading heading ;
     Tcl_Obj *varNameObj ;
-    Ral_RelationHeading extHeading ;
-    Ral_TupleHeading extTupleHeading ;
+    Ral_TupleHeading extHeading ;
     Ral_Relation extRelation ;
     int c ;
     Tcl_Obj *const*v ;
@@ -955,7 +832,6 @@ RelationExtendCmd(
     }
     relation = relObj->internalRep.otherValuePtr ;
     heading = relation->heading ;
-    tupleHeading = heading->tupleHeading ;
 
     varNameObj = objv[3] ;
     objc -= 4 ;
@@ -974,35 +850,34 @@ RelationExtendCmd(
     /*
      * Make a new tuple heading, adding the extended attributes.
      */
-    extTupleHeading = Ral_TupleHeadingExtend(tupleHeading, objc / 3) ;
+    extHeading = Ral_TupleHeadingExtend(heading, objc / 3) ;
     for (c = objc, v = objv ; c > 0 ; c -= 3, v += 3) {
 	Ral_Attribute attr = Ral_AttributeNewFromObjs(interp, *v, *(v + 1),
 	    &errInfo) ;
 	Ral_TupleHeadingIter inserted ;
 
 	if (attr == NULL) {
-	    Ral_TupleHeadingDelete(extTupleHeading) ;
+	    Ral_TupleHeadingDelete(extHeading) ;
 	    return TCL_ERROR ;
 	}
-	inserted = Ral_TupleHeadingPushBack(extTupleHeading, attr) ;
-	if (inserted == Ral_TupleHeadingEnd(extTupleHeading)) {
+	inserted = Ral_TupleHeadingPushBack(extHeading, attr) ;
+	if (inserted == Ral_TupleHeadingEnd(extHeading)) {
 	    Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_DUPLICATE_ATTR, *v) ;
 	    Ral_InterpSetError(interp, &errInfo) ;
-	    Ral_TupleHeadingDelete(extTupleHeading) ;
+	    Ral_TupleHeadingDelete(extHeading) ;
 	    return TCL_ERROR ;
 	}
     }
-    extHeading = Ral_RelationHeadingExtend(heading, extTupleHeading, 0) ;
     extRelation = Ral_RelationNew(extHeading) ;
 
     relEnd = Ral_RelationEnd(relation) ;
-    extHeadingIter = Ral_TupleHeadingBegin(extTupleHeading) +
+    extHeadingIter = Ral_TupleHeadingBegin(extHeading) +
 	Ral_RelationDegree(relation) ;
     for (relIter = Ral_RelationBegin(relation) ; relIter != relEnd ;
 	++relIter) {
 	Ral_Tuple tuple = *relIter ;
 	Tcl_Obj *tupleObj = Ral_TupleObjNew(tuple) ;
-	Ral_Tuple extTuple = Ral_TupleNew(extTupleHeading) ;
+	Ral_Tuple extTuple = Ral_TupleNew(extHeading) ;
 	Ral_TupleIter extIter = Ral_TupleBegin(extTuple) ;
 	Ral_TupleHeadingIter attrIter = extHeadingIter ;
 	int status ;
@@ -1018,24 +893,28 @@ RelationExtendCmd(
 
 	for (c = objc, v = objv + 2 ; c > 0 ; c -= 3, v += 3) {
 	    Tcl_Obj *exprResult ;
+	    Tcl_Obj *cvtResult ;
 
 	    if (Tcl_ExprObj(interp, *v, &exprResult) != TCL_OK) {
 		Ral_TupleDelete(extTuple) ;
 		goto errorOut ;
 	    }
-	    if (Ral_AttributeConvertValueToType(interp, *attrIter++,
-		exprResult, &errInfo) != TCL_OK) {
-		Ral_TupleDelete(extTuple) ;
+	    cvtResult = Ral_AttributeConvertValueToType(interp, *attrIter++,
+		exprResult, &errInfo) ;
+	    if (cvtResult == NULL) {
 		Tcl_DecrRefCount(exprResult) ;
+		Ral_TupleDelete(extTuple) ;
 		Ral_InterpSetError(interp, &errInfo) ;
 		goto errorOut ;
 	    }
-	    Tcl_IncrRefCount(*extIter++ = exprResult) ;
+	    Tcl_IncrRefCount(cvtResult) ;
 	    Tcl_DecrRefCount(exprResult) ;
+	    *extIter++ = cvtResult ;
 	}
 	/*
 	 * Should always be able to insert the extended tuple since
-	 * we have not changed the identifiers from the original relation.
+	 * adding an attribute cannot make a tuple match another one
+         * in the relation.
 	 */
 	status = Ral_RelationPushBack(extRelation, extTuple, NULL) ;
 	assert(status != 0) ;
@@ -1086,7 +965,7 @@ RelationExtractCmd(
 	return TCL_ERROR ;
     }
 
-    heading = relation->heading->tupleHeading ;
+    heading = relation->heading ;
     tuple = *Ral_RelationBegin(relation) ;
 
     objc -= 3 ;
@@ -1137,7 +1016,6 @@ RelationForeachCmd(
     Ral_Relation relation ;
     Ral_IntVector sortMap ;
     Ral_IntVectorIter mapIter ;
-    Ral_IntVectorIter mapEnd ;
     Ral_RelationIter relBegin ;
     int result = TCL_OK ;
 
@@ -1172,7 +1050,7 @@ RelationForeachCmd(
 	 * Attribute list specified, ascending order assumed.
 	 */
 	Ral_IntVector sortAttrs = Ral_TupleHeadingAttrsFromObj(
-	    relation->heading->tupleHeading, interp, objv[4]) ;
+	    relation->heading, interp, objv[4]) ;
 	if (sortAttrs == NULL) {
 	    return TCL_ERROR ;
 	}
@@ -1191,7 +1069,7 @@ RelationForeachCmd(
 	    return TCL_ERROR ;
 	}
 	sortAttrs = Ral_TupleHeadingAttrsFromObj(
-	    relation->heading->tupleHeading, interp, objv[5]) ;
+	    relation->heading, interp, objv[5]) ;
 	if (sortAttrs == NULL) {
 	    return TCL_ERROR ;
 	}
@@ -1212,9 +1090,8 @@ RelationForeachCmd(
     Tcl_ResetResult(interp) ;
 
     relBegin = Ral_RelationBegin(relation) ;
-    mapEnd = Ral_IntVectorEnd(sortMap) ;
     for (mapIter = Ral_IntVectorBegin(sortMap) ;
-	mapIter != mapEnd ; ++mapIter) {
+            mapIter != Ral_IntVectorEnd(sortMap) ; ++mapIter) {
 	int appended ;
 	Tcl_Obj *iterObj ;
 	Ral_Relation iterRel = Ral_RelationNew(relation->heading) ;
@@ -1253,7 +1130,11 @@ RelationForeachCmd(
 		static const char msgfmt[] =
 		    "\n    (\"relation foreach\" body line %d)" ;
 		char msg[sizeof(msgfmt) + TCL_INTEGER_SPACE] ;
+#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 6
+		sprintf(msg, msgfmt, Tcl_GetErrorLine(interp)) ;
+#else
 		sprintf(msg, msgfmt, interp->errorLine) ;
+#endif
 		Tcl_AddObjErrorInfo(interp, msg, -1) ;
 		break ;
 	    } else {
@@ -1281,8 +1162,7 @@ RelationGroupCmd(
 {
     Tcl_Obj *relObj ;
     Ral_Relation rel ;
-    Ral_RelationHeading heading ;
-    Ral_TupleHeading tupleHeading ;
+    Ral_TupleHeading heading ;
     Tcl_Obj *newAttrObj ;
     Ral_IntVector grpAttrs ;
     const char *relAttrName ;
@@ -1301,7 +1181,6 @@ RelationGroupCmd(
     }
     rel = relObj->internalRep.otherValuePtr ;
     heading = rel->heading ;
-    tupleHeading = heading->tupleHeading ;
 
     newAttrObj = objv[3] ;
     objc -= 4 ;
@@ -1315,7 +1194,7 @@ RelationGroupCmd(
     grpAttrs = Ral_IntVectorNewEmpty(objc) ;
     while (objc-- > 0) {
 	const char *attrName = Tcl_GetString(*objv++) ;
-	int attrIndex = Ral_TupleHeadingIndexOf(tupleHeading, attrName) ;
+	int attrIndex = Ral_TupleHeadingIndexOf(heading, attrName) ;
 	if (attrIndex < 0) {
 	    Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptGroup,
 		RAL_ERR_UNKNOWN_ATTR, attrName) ;
@@ -1327,7 +1206,7 @@ RelationGroupCmd(
     /*
      * You may not group away all of the attributes.
      */
-    if (Ral_IntVectorSize(grpAttrs) >= Ral_TupleHeadingSize(tupleHeading)) {
+    if (Ral_IntVectorSize(grpAttrs) >= Ral_TupleHeadingSize(heading)) {
 	Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptGroup,
 	    RAL_ERR_TOO_MANY_ATTRS,
 	    "attempt to group all attributes in the relation") ;
@@ -1340,7 +1219,7 @@ RelationGroupCmd(
      * attributes that are to be grouped into the relation valued attribute.
      */
     relAttrName = Tcl_GetString(newAttrObj) ;
-    index = Ral_TupleHeadingIndexOf(tupleHeading, relAttrName) ;
+    index = Ral_TupleHeadingIndexOf(heading, relAttrName) ;
     if (index >= 0 &&
 	Ral_IntVectorFind(grpAttrs, index) == Ral_IntVectorEnd(grpAttrs)) {
 	Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptGroup,
@@ -1382,7 +1261,7 @@ RelationHeadingCmd(
     }
     relation = relObj->internalRep.otherValuePtr ;
 
-    strRep = Ral_RelationHeadingStringOf(relation->heading) ;
+    strRep = Ral_TupleHeadingStringOf(relation->heading) ;
     resultObj = Tcl_NewStringObj(strRep, -1) ;
     ckfree(strRep) ;
 
@@ -1391,65 +1270,7 @@ RelationHeadingCmd(
 }
 
 static int
-RelationIdentifiersCmd(
-    Tcl_Interp *interp,
-    int objc,
-    Tcl_Obj *const*objv)
-{
-    Tcl_Obj *relObj ;
-    Ral_Relation relation ;
-    Ral_RelationHeading heading ;
-    Ral_TupleHeading tupleHeading ;
-    Tcl_Obj *idListObj ;
-    int idCount ;
-    Ral_IntVector *ids ;
-
-    /* relation identifiers relationValue */
-    if (objc != 3) {
-	Tcl_WrongNumArgs(interp, 2, objv, "relationValue") ;
-	return TCL_ERROR ;
-    }
-
-    relObj = *(objv + 2) ;
-    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationObjType) != TCL_OK) {
-	return TCL_ERROR ;
-    }
-    relation = relObj->internalRep.otherValuePtr ;
-    heading = relation->heading ;
-    tupleHeading = heading->tupleHeading ;
-
-    idListObj = Tcl_NewListObj(0, NULL) ;
-    for (idCount = heading->idCount, ids = heading->identifiers ;
-	idCount > 0 ; --idCount, ++ids) {
-	Tcl_Obj *idObj = Tcl_NewListObj(0, NULL) ;
-	Ral_IntVector idVect = *ids ;
-	Ral_IntVectorIter end = Ral_IntVectorEnd(idVect) ;
-	Ral_IntVectorIter iter ;
-
-	for (iter = Ral_IntVectorBegin(idVect) ; iter != end ; ++iter) {
-	    Ral_Attribute attr = Ral_TupleHeadingFetch(tupleHeading, *iter) ;
-
-	    if (Tcl_ListObjAppendElement(interp, idObj,
-		Tcl_NewStringObj(attr->name, -1)) != TCL_OK) {
-		Tcl_DecrRefCount(idObj) ;
-		Tcl_DecrRefCount(idListObj) ;
-		return TCL_ERROR ;
-	    }
-	}
-
-	if (Tcl_ListObjAppendElement(interp, idListObj, idObj) != TCL_OK) {
-	    Tcl_DecrRefCount(idObj) ;
-	    Tcl_DecrRefCount(idListObj) ;
-	    return TCL_ERROR ;
-	}
-    }
-
-    Tcl_SetObjResult(interp, idListObj) ;
-    return TCL_OK ;
-}
-
-static int
-RelationIncludeCmd(
+RelationInsertCmd(
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const*objv)
@@ -1459,7 +1280,7 @@ RelationIncludeCmd(
     Ral_Relation newRel ;
     Ral_ErrorInfo errInfo ;
 
-    /* relation include relationValue ?name-value-list ...? */
+    /* relation insert relationValue ?name-value-list ...? */
     if (objc < 3) {
 	Tcl_WrongNumArgs(interp, 2, objv,
 	    "relationValue ?name-value-list ...?") ;
@@ -1477,7 +1298,7 @@ RelationIncludeCmd(
 
     newRel = Ral_RelationShallowCopy(relation) ;
     Ral_RelationReserve(newRel, objc) ;
-    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptInclude) ;
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptInsert) ;
     while (objc-- > 0) {
 	/*
 	 * Enforce insert style semantics, i.e. we error out on duplicates
@@ -1642,7 +1463,7 @@ RelationIsemptyCmd(
 	return TCL_ERROR ;
     }
 
-    relationObj = *(objv + 2) ;
+    relationObj = objv[2] ;
     if (Tcl_ConvertToType(interp, relationObj, &Ral_RelationObjType) != TCL_OK)
 	return TCL_ERROR ;
     relation = relationObj->internalRep.otherValuePtr ;
@@ -1667,7 +1488,7 @@ RelationIsnotemptyCmd(
 	return TCL_ERROR ;
     }
 
-    relationObj = *(objv + 2) ;
+    relationObj = objv[2] ;
     if (Tcl_ConvertToType(interp, relationObj, &Ral_RelationObjType) != TCL_OK)
 	return TCL_ERROR ;
     relation = relationObj->internalRep.otherValuePtr ;
@@ -1799,8 +1620,7 @@ RelationListCmd(
 	 * then, in general, the list will not be a set.
 	 */
 	const char *attrName = Tcl_GetString(objv[3]) ;
-	attrIndex = Ral_TupleHeadingIndexOf(relation->heading->tupleHeading,
-	    attrName) ;
+	attrIndex = Ral_TupleHeadingIndexOf(relation->heading, attrName) ;
 	if (attrIndex < 0) {
 	    Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptList,
 		RAL_ERR_UNKNOWN_ATTR, attrName) ;
@@ -1891,7 +1711,7 @@ RelationProjectCmd(
     objc -= 3 ;
     objv += 3 ;
 
-    projAttrs = Ral_TupleHeadingAttrsFromVect(relation->heading->tupleHeading,
+    projAttrs = Ral_TupleHeadingAttrsFromVect(relation->heading,
 	interp, objc, objv) ;
     if (projAttrs == NULL) {
 	return TCL_ERROR ;
@@ -1911,8 +1731,8 @@ RelationProjectCmd(
  * "int" and its value is the number of tuples in "relationValue" where the
  * value of "rankAttr" is <= (-descending) or >= (-ascending) than its value
  * for a given tuple. Default ranking is "-ascending".  "rankAttr" must be of
- * type "int", "double", or "string" so that the comparison operation is well
- * defined.
+ * type "int", "double", "string", or "bytearray" so that the comparison
+ * operation is well defined.
  */
 static int
 RelationRankCmd(
@@ -1922,21 +1742,18 @@ RelationRankCmd(
 {
     Tcl_Obj *relObj ;
     Ral_Relation relation ;
-    Ral_RelationHeading heading ;
-    Ral_TupleHeading tupleHeading ;
+    Ral_TupleHeading heading ;
     const char *rankAttrName ;
     Ral_TupleHeadingIter rankAttrIter ;
     Ral_Attribute rankAttr ;
     int rankAttrIndex ;
     const char *newAttrName ;
     Ral_Attribute newAttr ;
-    Ral_TupleHeading newTupleHeading ;
     Ral_TupleHeadingIter inserted ;
-    Ral_RelationHeading newHeading ;
+    Ral_TupleHeading newHeading ;
     Ral_Relation newRelation ;
     enum Ordering order = SORT_ASCENDING ;
     Ral_RelationIter rIter ;
-    Ral_RelationIter rEnd ;
 
     if (objc < 5 || objc > 6) {
 	Tcl_WrongNumArgs(interp, 2, objv,
@@ -1950,35 +1767,33 @@ RelationRankCmd(
     }
     relation = relObj->internalRep.otherValuePtr ;
     heading = relation->heading ;
-    tupleHeading = heading->tupleHeading ;
 
     /*
      * Find the rank attribute and check its type.
      */
     rankAttrName = Tcl_GetString(objv[objc - 2]) ;
-    rankAttrIter = Ral_TupleHeadingFind(tupleHeading, rankAttrName) ;
-    if (rankAttrIter == Ral_TupleHeadingEnd(tupleHeading)) {
+    rankAttrIter = Ral_TupleHeadingFind(heading, rankAttrName) ;
+    if (rankAttrIter == Ral_TupleHeadingEnd(heading)) {
 	Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptRank,
 	    RAL_ERR_UNKNOWN_ATTR, rankAttrName) ;
 	return TCL_ERROR ;
     }
     rankAttr = *rankAttrIter ;
-    rankAttrIndex = rankAttrIter - Ral_TupleHeadingBegin(tupleHeading) ;
+    rankAttrIndex = rankAttrIter - Ral_TupleHeadingBegin(heading) ;
     /*
      * Create the new ranked relation, extending it by the "newAttr".
      */
     newAttrName = Tcl_GetString(objv[objc - 1]) ;
     newAttr = Ral_AttributeNewTclType(newAttrName, "int") ;
     assert(newAttr != NULL) ;
-    newTupleHeading = Ral_TupleHeadingExtend(tupleHeading, 1) ;
-    inserted = Ral_TupleHeadingPushBack(newTupleHeading, newAttr) ;
-    if (inserted == Ral_TupleHeadingEnd(newTupleHeading)) {
+    newHeading = Ral_TupleHeadingExtend(heading, 1) ;
+    inserted = Ral_TupleHeadingPushBack(newHeading, newAttr) ;
+    if (inserted == Ral_TupleHeadingEnd(newHeading)) {
 	Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptRank,
 	    RAL_ERR_DUPLICATE_ATTR, rankAttrName) ;
-	Ral_TupleHeadingDelete(newTupleHeading) ;
+	Ral_TupleHeadingDelete(newHeading) ;
 	return TCL_ERROR ;
     }
-    newHeading = Ral_RelationHeadingExtend(heading, newTupleHeading, 0) ;
     newRelation = Ral_RelationNew(newHeading) ;
 
     if (objc == 6) {
@@ -1996,8 +1811,8 @@ RelationRankCmd(
      * Now we iterate through the relation and count the number of tuples
      * whose "rankAttr" is <= (-descending) or >= (-ascending).
      */
-    rEnd = Ral_RelationEnd(relation) ;
-    for (rIter = Ral_RelationBegin(relation) ; rIter != rEnd ; ++rIter) {
+    for (rIter = Ral_RelationBegin(relation) ;
+            rIter != Ral_RelationEnd(relation) ; ++rIter) {
 	Ral_RelationIter tIter ;
 	Ral_Tuple rankTuple = *rIter ;
 	Tcl_Obj *rankObj = *(Ral_TupleBegin(rankTuple) + rankAttrIndex) ;
@@ -2006,14 +1821,15 @@ RelationRankCmd(
 	Ral_TupleIter newIter ;
 	int status ;
 
-	for (tIter = Ral_RelationBegin(relation) ; tIter != rEnd ; ++tIter) {
+	for (tIter = Ral_RelationBegin(relation) ;
+                tIter != Ral_RelationEnd(relation) ; ++tIter) {
 	    Tcl_Obj *cmpObj = *(Ral_TupleBegin(*tIter) + rankAttrIndex) ;
 
 	    int cmp = Ral_AttributeValueCompare(rankAttr, cmpObj, rankObj) ;
 	    rankCount += order == SORT_DESCENDING ? cmp > 0 : cmp < 0 ;
 	}
 
-	newTuple = Ral_TupleNew(newTupleHeading) ;
+	newTuple = Ral_TupleNew(newHeading) ;
 	newIter = Ral_TupleBegin(newTuple) ;
 	newIter += Ral_TupleCopyValues(Ral_TupleBegin(rankTuple),
 	    Ral_TupleEnd(rankTuple), newIter) ;
@@ -2022,83 +1838,10 @@ RelationRankCmd(
 	 */
 	Tcl_IncrRefCount(*newIter = Tcl_NewIntObj(rankCount + 1)) ;
 	/*
-	 * Should always be able to insert the new tuple since
-	 * we have not changed the identifiers from the original relation.
+	 * Should always be able to insert the new tuple.
 	 */
 	status = Ral_RelationPushBack(newRelation, newTuple, NULL) ;
 	assert(status != 0) ;
-    }
-
-    Tcl_SetObjResult(interp, Ral_RelationObjNew(newRelation)) ;
-    return TCL_OK ;
-}
-
-/*
- * relation reidentify relationValue id1 ?id2 id3 ...?
- *
- * Returns a new relation value where the identifiers are
- * changed to id1, id2  ...
- * Each "idN" is a list of attribute names that are to form the identifier.
- * The tuples of the new relation are the same as those of "relationValue"
- * less any that are duplicates under the new identification scheme.
- */
-static int
-RelationReidentifyCmd(
-    Tcl_Interp *interp,
-    int objc,
-    Tcl_Obj *const* objv)
-{
-    Tcl_Obj *relObj ;
-    Ral_Relation relation ;
-    Ral_RelationHeading newHeading ;
-    Ral_Relation newRelation ;
-    Ral_ErrorInfo errInfo ;
-    int idNum = 0 ;
-    Ral_RelationIter riter ;
-    Ral_RelationIter rend ;
-
-    if (objc < 4) {
-	Tcl_WrongNumArgs(interp, 2, objv, "relationValue id1 ?id2 id3 ... ?") ;
-	return TCL_ERROR ;
-    }
-
-    relObj = objv[2] ;
-    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationObjType) != TCL_OK) {
-	return TCL_ERROR ;
-    }
-    relation = relObj->internalRep.otherValuePtr ;
-    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptReidentify) ;
-
-    /*
-     * Adjust argument bookkeeping to the beginning of the identifiers.
-     */
-    objc -= 3 ;
-    objv += 3 ;
-    newHeading = Ral_RelationHeadingNew(relation->heading->tupleHeading, objc) ;
-
-    /*
-     * Iterate through the argument lists and add them as identifiers to
-     * the heading.
-     */
-    for ( ; objc > 0 ; --objc, ++objv) {
-	if (Ral_RelationHeadingNewIdFromObj(interp, newHeading, idNum++,
-	    *objv, &errInfo) != TCL_OK) {
-	    Ral_RelationHeadingDelete(newHeading) ;
-	    return TCL_ERROR ;
-	}
-    }
-    /*
-     * Create a new relation with the new heading.
-     */
-    newRelation = Ral_RelationNew(newHeading) ;
-    Ral_RelationReserve(newRelation, Ral_RelationCardinality(relation)) ;
-    /*
-     * Iterate through the tuples of the relation value and insert them
-     * into the new relation. We ignore any duplicates.
-     */
-    rend = Ral_RelationEnd(relation) ;
-    for (riter = Ral_RelationBegin(relation) ; riter != rend ; ++riter) {
-	Ral_RelationPushBack(newRelation, *riter, NULL) ;
     }
 
     Tcl_SetObjResult(interp, Ral_RelationObjNew(newRelation)) ;
@@ -2230,7 +1973,7 @@ RelationRestrictWithCmd(
 {
     Tcl_Obj *relObj ;
     Ral_Relation relation ;
-    Ral_TupleHeading tupleHeading ;
+    Ral_TupleHeading heading ;
     Ral_TupleHeadingIter thBegin ;
     Ral_TupleHeadingIter thEnd ;
     Ral_TupleHeadingIter thIter ;
@@ -2250,9 +1993,9 @@ RelationRestrictWithCmd(
 	return TCL_ERROR ;
     }
     relation = relObj->internalRep.otherValuePtr ;
-    tupleHeading = relation->heading->tupleHeading ;
-    thBegin = Ral_TupleHeadingBegin(tupleHeading) ;
-    thEnd = Ral_TupleHeadingEnd(tupleHeading) ;
+    heading = relation->heading ;
+    thBegin = Ral_TupleHeadingBegin(heading) ;
+    thEnd = Ral_TupleHeadingEnd(heading) ;
 
     exprObj = objv[3] ;
 
@@ -2462,22 +2205,18 @@ RelationSummarizeCmd(
 {
     Tcl_Obj *relObj ;
     Ral_Relation relation ;
-    Ral_RelationHeading heading ;
-    Ral_TupleHeading tupleHeading ;
+    Ral_TupleHeading heading ;
     Tcl_Obj *perObj ;
     Ral_Relation perRelation ;
-    Ral_RelationHeading perHeading ;
-    Ral_TupleHeading perTupleHeading ;
+    Ral_TupleHeading perHeading ;
     Tcl_Obj *varNameObj ;
     Ral_Relation sumRelation ;
-    Ral_RelationHeading sumHeading ;
-    Ral_TupleHeading sumTupleHeading ;
+    Ral_TupleHeading sumHeading ;
     int c ;
     Tcl_Obj *const*v ;
     Ral_JoinMap joinMap ;
     int index = 0 ;
     Ral_RelationIter perIter ;
-    Ral_RelationIter perEnd ;
     Ral_TupleHeadingIter sumHeadingIter ;
     Ral_ErrorInfo errInfo ;
     /*
@@ -2497,7 +2236,6 @@ RelationSummarizeCmd(
     }
     relation = relObj->internalRep.otherValuePtr ;
     heading = relation->heading ;
-    tupleHeading = heading->tupleHeading ;
 
     perObj = objv[3] ;
     if (Tcl_ConvertToType(interp, perObj, &Ral_RelationObjType) != TCL_OK) {
@@ -2505,7 +2243,6 @@ RelationSummarizeCmd(
     }
     perRelation = perObj->internalRep.otherValuePtr ;
     perHeading = perRelation->heading ;
-    perTupleHeading = perHeading->tupleHeading ;
     Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptSummarize) ;
 
     /*
@@ -2514,11 +2251,10 @@ RelationSummarizeCmd(
      * the summarized relation. We will know that because the common attributes
      * must encompass all those in the per relation.
      */
-    joinMap = Ral_JoinMapNew(Ral_TupleHeadingSize(perTupleHeading),
+    joinMap = Ral_JoinMapNew(Ral_TupleHeadingSize(perHeading),
 	Ral_RelationCardinality(relation)) ;
-    c = Ral_TupleHeadingCommonAttributes(perTupleHeading, tupleHeading,
-	joinMap) ;
-    if (c != Ral_TupleHeadingSize(perTupleHeading)) {
+    c = Ral_TupleHeadingCommonAttributes(perHeading, heading, joinMap) ;
+    if (c != Ral_TupleHeadingSize(perHeading)) {
 	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_NOT_A_PROJECTION, perObj) ;
 	Ral_InterpSetError(interp, &errInfo) ;
 	Ral_JoinMapDelete(joinMap) ;
@@ -2541,7 +2277,7 @@ RelationSummarizeCmd(
      * Construct the heading for the result. It the heading of the
      * "per" relation plus the summary attributes.
      */
-    sumTupleHeading = Ral_TupleHeadingExtend(perTupleHeading, objc / 3) ;
+    sumHeading = Ral_TupleHeadingExtend(perHeading, objc / 3) ;
     /*
      * Add in the summary attributes to tuple heading.
      */
@@ -2551,18 +2287,20 @@ RelationSummarizeCmd(
 	Ral_TupleHeadingIter inserted ;
 
 	if (attr == NULL) {
-	    Ral_TupleHeadingDelete(sumTupleHeading) ;
 	    Ral_InterpSetError(interp, &errInfo) ;
+	    Ral_TupleHeadingDelete(sumHeading) ;
+            Ral_JoinMapDelete(joinMap) ;
 	    return TCL_ERROR ;
 	}
-	inserted = Ral_TupleHeadingPushBack(sumTupleHeading, attr) ;
-	if (inserted == Ral_TupleHeadingEnd(sumTupleHeading)) {
-	    Ral_TupleHeadingDelete(sumTupleHeading) ;
+	inserted = Ral_TupleHeadingPushBack(sumHeading, attr) ;
+	if (inserted == Ral_TupleHeadingEnd(sumHeading)) {
 	    Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_DUPLICATE_ATTR, *v) ;
 	    Ral_InterpSetError(interp, &errInfo) ;
+	    Ral_TupleHeadingDelete(sumHeading) ;
+            Ral_JoinMapDelete(joinMap) ;
+	    return TCL_ERROR ;
 	}
     }
-    sumHeading = Ral_RelationHeadingExtend(perHeading, sumTupleHeading, 0) ;
     sumRelation = Ral_RelationNew(sumHeading) ;
 
     /*
@@ -2574,17 +2312,16 @@ RelationSummarizeCmd(
      */
     Tcl_IncrRefCount(varNameObj) ;
     Ral_RelationFindJoinTuples(perRelation, relation, joinMap) ;
-    sumHeadingIter = Ral_TupleHeadingBegin(sumTupleHeading) +
+    sumHeadingIter = Ral_TupleHeadingBegin(sumHeading) +
 	Ral_RelationDegree(perRelation) ;
-    perEnd = Ral_RelationEnd(perRelation) ;
-    for (perIter = Ral_RelationBegin(perRelation) ; perIter != perEnd ;
-	++perIter) {
+    for (perIter = Ral_RelationBegin(perRelation) ;
+            perIter != Ral_RelationEnd(perRelation) ; ++perIter) {
 	Ral_Tuple perTuple = *perIter ;
 	Ral_IntVector matchSet = Ral_JoinMapMatchingTupleSet(joinMap, 0,
 	    index++) ;
 	Ral_Relation matchRel = Ral_RelationExtract(relation, matchSet) ;
 	Tcl_Obj *matchObj = Ral_RelationObjNew(matchRel) ;
-	Ral_Tuple sumTuple = Ral_TupleNew(sumTupleHeading) ;
+	Ral_Tuple sumTuple = Ral_TupleNew(sumHeading) ;
 	Ral_TupleIter sumIter = Ral_TupleBegin(sumTuple) ;
 	Ral_TupleHeadingIter attrIter = sumHeadingIter ;
 	int status ;
@@ -2602,17 +2339,24 @@ RelationSummarizeCmd(
 	    Ral_TupleEnd(perTuple), sumIter) ;
 
 	for (c = objc, v = objv + 2 ; c > 0 ; c -= 3, v += 3) {
-	    if (Tcl_ExprObj(interp, *v, sumIter) != TCL_OK) {
+	    Tcl_Obj *exprResult ;
+            Tcl_Obj *cvtResult ;
+
+	    if (Tcl_ExprObj(interp, *v, &exprResult) != TCL_OK) {
 		Ral_TupleDelete(sumTuple) ;
 		goto errorOut ;
 	    }
-	    if (Ral_AttributeConvertValueToType(interp, *attrIter++,
-		*sumIter, &errInfo) != TCL_OK) {
+	    cvtResult = Ral_AttributeConvertValueToType(interp, *attrIter++,
+		exprResult, &errInfo) ;
+	    if (cvtResult == NULL) {
+		Tcl_DecrRefCount(exprResult) ;
 		Ral_TupleDelete(sumTuple) ;
-		Tcl_DecrRefCount(*sumIter) ;
+		Ral_InterpSetError(interp, &errInfo) ;
 		goto errorOut ;
 	    }
-	    ++sumIter ;
+            Tcl_IncrRefCount(cvtResult) ;
+            Tcl_DecrRefCount(exprResult) ;
+            *sumIter++ = cvtResult ;
 	}
 	status = Ral_RelationPushBack(sumRelation, sumTuple, NULL) ;
 	assert(status != 0) ;
@@ -2630,47 +2374,37 @@ errorOut:
     return TCL_ERROR ;
 }
 
-/*
- * relation tag relation ?-ascending | -descending sort-attr-list?
- *	?-within {idsubset-attr-list}? attrName
- *
- * Create a new relation extended by "attrName". "attrName" will be "int" type
- * and will consist of consecutive integers starting at zero. The tuples in
- * "relation" will extended in the order implied by ascending or descending
- * order of "sort-attr-list" if the option is given. If absent the order is
- * arbitrary.  If the "-within" option is given then "attrName" values will be
- * unique within the identifier for which the attributes in
- * "idsubset-attr-list" is a subset minus one attribute. In either case an
- * additional identifier is created that consists of just "attrName" or of
- * "idsubset-attr-list + attrName" if the -within option is given.
- */
 static int
-RelationTagCmd(
+RelationSummarizebyCmd(
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const*objv)
 {
     Tcl_Obj *relObj ;
     Ral_Relation relation ;
-    Ral_RelationHeading heading ;
-    Ral_TupleHeading tupleHeading ;
-    Tcl_Obj *attrNameObj ;
-    Ral_Attribute tagAttr ;
-    Ral_TupleHeading tagTupleHeading ;
-    Ral_TupleHeadingIter inserted ;
-    Ral_RelationHeading tagHeading ;
-    Ral_Relation tagRelation ;
-    int argc ;
-    Tcl_Obj *const* argv ;
-    int tagAttrIndex ;
-    Ral_IntVector sortMap = NULL ;
-    Ral_IntVector withinAttrs = NULL ;
-    int tagIdNum = -1 ;
-
-    if (objc < 4 || objc > 8) {
-	Tcl_WrongNumArgs(interp, 2, objv, "relation "
-	    "?-ascending | -descending sort-attr-list? "
-	    "?-within idsubset-list? attrName") ;
+    Ral_TupleHeading heading ;
+    Tcl_Obj *varNameObj ;
+    Ral_Relation sumRelation ;
+    Ral_TupleHeading sumHeading ;
+    int elemc ;
+    Tcl_Obj **elemv ;
+    int c ;
+    Tcl_Obj *const*v ;
+    Ral_JoinMap joinMap ;
+    Ral_IntVector perAttrs ;
+    Ral_Relation perRelation ;
+    int index = 0 ;
+    Ral_RelationIter perIter ;
+    Ral_TupleHeadingIter sumHeadingIter ;
+    Ral_ErrorInfo errInfo ;
+    /*
+     * relation summarizeby relationValue attrList relationVarName
+     * ?attr1 type1 expr1 ... attrN typeN exprN?
+     */
+    if (objc < 5) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+	    "relationValue perRelation relationVarName"
+	    " ?attr1 type1 expr1 ... attrN typeN exprN?") ;
 	return TCL_ERROR ;
     }
 
@@ -2680,34 +2414,275 @@ RelationTagCmd(
     }
     relation = relObj->internalRep.otherValuePtr ;
     heading = relation->heading ;
-    tupleHeading = heading->tupleHeading ;
-    /*
-     * The attribute name is always the last argument.
-     */
-    attrNameObj = objv[objc - 1] ;
-    /*
-     * Make a new relation, adding the extended attribute.
-     */
-    tagAttr = Ral_AttributeNewTclType(Tcl_GetString(attrNameObj), "int") ;
-    assert(tagAttr != NULL) ;
-    tagTupleHeading = Ral_TupleHeadingExtend(tupleHeading, 1) ;
-    inserted = Ral_TupleHeadingPushBack(tagTupleHeading, tagAttr) ;
-    if (inserted == Ral_TupleHeadingEnd(tagTupleHeading)) {
-	Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptTag,
-	    RAL_ERR_DUPLICATE_ATTR, attrNameObj) ;
-	Ral_TupleHeadingDelete(tagTupleHeading) ;
-	return TCL_ERROR ;
-    } else {
-	tagAttrIndex = inserted - Ral_TupleHeadingBegin(tagTupleHeading) ;
+
+    if (Tcl_ListObjGetElements(interp, objv[3], &elemc, &elemv) != TCL_OK) {
+        return TCL_ERROR ;
     }
-    tagHeading = Ral_RelationHeadingExtend(heading, tagTupleHeading, 1) ;
-    tagRelation = Ral_RelationNew(tagHeading) ;
+
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptSummarizeby) ;
+
+    varNameObj = objv[4] ;
+    objc -= 5 ;
+    objv += 5 ;
+    if (objc % 3 != 0) {
+	Ral_ErrorInfoSetError(&errInfo, RAL_ERR_BAD_TRIPLE_LIST,
+	    "attribute / type / expression arguments "
+	    "must be given in triples") ;
+	Ral_InterpSetError(interp, &errInfo) ;
+	return TCL_ERROR ;
+    }
+    /*
+     * Iterate through the given attributes. We need to create a heading for
+     * the result and we can do that as we iterate through the attributes.
+     * Create a join map that we will use to find the sub relations for the
+     * summarization.
+     */
+    sumHeading = Ral_TupleHeadingNew(elemc + objc / 3) ;
+    joinMap = Ral_JoinMapNew(elemc, Ral_RelationCardinality(relation)) ;
+    for (c = 0, v = elemv ; c < elemc ; ++c, ++v) {
+        Ral_TupleHeadingIter attrIter ;
+
+	attrIter = Ral_TupleHeadingFind(heading, Tcl_GetString(*v)) ;
+        if (attrIter == Ral_TupleHeadingEnd(heading)) {
+            Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_UNKNOWN_ATTR, *v) ;
+            Ral_InterpSetError(interp, &errInfo) ;
+	    Ral_TupleHeadingDelete(sumHeading) ;
+            Ral_JoinMapDelete(joinMap) ;
+            return TCL_ERROR ;
+        }
+	if (!Ral_TupleHeadingAppend(heading, attrIter, attrIter + 1,
+                sumHeading)) {
+            Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_DUPLICATE_ATTR, *v) ;
+            Ral_InterpSetError(interp, &errInfo) ;
+	    Ral_TupleHeadingDelete(sumHeading) ;
+            Ral_JoinMapDelete(joinMap) ;
+	    return TCL_ERROR ;
+	}
+        Ral_JoinMapAddAttrMapping(joinMap, c,
+                attrIter - Ral_TupleHeadingBegin(heading)) ;
+    }
+
+    /*
+     * Add in the summary attributes to result tuple heading.
+     */
+    for (c = objc, v = objv ; c > 0 ; c -= 3, v += 3) {
+	Ral_Attribute attr ;
+	Ral_TupleHeadingIter inserted ;
+
+	attr = Ral_AttributeNewFromObjs(interp, *v, *(v + 1), &errInfo) ;
+	if (attr == NULL) {
+	    Ral_InterpSetError(interp, &errInfo) ;
+	    Ral_TupleHeadingDelete(sumHeading) ;
+            Ral_JoinMapDelete(joinMap) ;
+	    return TCL_ERROR ;
+	}
+	inserted = Ral_TupleHeadingPushBack(sumHeading, attr) ;
+	if (inserted == Ral_TupleHeadingEnd(sumHeading)) {
+	    Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_DUPLICATE_ATTR, *v) ;
+	    Ral_InterpSetError(interp, &errInfo) ;
+	    Ral_TupleHeadingDelete(sumHeading) ;
+            Ral_JoinMapDelete(joinMap) ;
+	    return TCL_ERROR ;
+	}
+    }
+    sumRelation = Ral_RelationNew(sumHeading) ;
+    /*
+     * Compute the "per" relation as the projection of the input
+     * relation across the given attributes.
+     */
+    perAttrs = Ral_JoinMapGetAttr(joinMap, 1) ;
+    perRelation = Ral_RelationProject(relation, perAttrs) ;
+    Ral_IntVectorDelete(perAttrs) ;
+    /*
+     * The strategy is to iterate over each tuple in the per-relation and to
+     * construct subsets of the relation that match the tuple. That subset
+     * relation is then assigned to the variable name and each summary
+     * attribute is computed by evaluating the expression and assigning the
+     * result to the attribute.
+     */
+    Tcl_IncrRefCount(varNameObj) ;
+    Ral_RelationFindJoinTuples(perRelation, relation, joinMap) ;
+    sumHeadingIter = Ral_TupleHeadingBegin(sumHeading) +
+            Ral_RelationDegree(perRelation) ;
+    for (perIter = Ral_RelationBegin(perRelation) ;
+            perIter != Ral_RelationEnd(perRelation) ; ++perIter) {
+	Ral_Tuple perTuple = *perIter ;
+	Ral_IntVector matchSet = Ral_JoinMapMatchingTupleSet(joinMap, 0,
+	    index++) ;
+	Ral_Relation matchRel = Ral_RelationExtract(relation, matchSet) ;
+	Tcl_Obj *matchObj = Ral_RelationObjNew(matchRel) ;
+	Ral_Tuple sumTuple = Ral_TupleNew(sumHeading) ;
+	Ral_TupleIter sumIter = Ral_TupleBegin(sumTuple) ;
+	Ral_TupleHeadingIter attrIter = sumHeadingIter ;
+	int status ;
+
+	Ral_IntVectorDelete(matchSet) ;
+
+	if (Tcl_ObjSetVar2(interp, varNameObj, NULL, matchObj,
+	    TCL_LEAVE_ERR_MSG) == NULL) {
+	    Ral_TupleDelete(sumTuple) ;
+	    Tcl_DecrRefCount(matchObj) ;
+	    goto errorOut ;
+	}
+
+	sumIter += Ral_TupleCopyValues(Ral_TupleBegin(perTuple),
+	    Ral_TupleEnd(perTuple), sumIter) ;
+
+	for (c = objc, v = objv + 2 ; c > 0 ; c -= 3, v += 3) {
+	    Tcl_Obj *exprResult ;
+            Tcl_Obj *cvtResult ;
+
+	    if (Tcl_ExprObj(interp, *v, &exprResult) != TCL_OK) {
+		Ral_TupleDelete(sumTuple) ;
+		goto errorOut ;
+	    }
+	    cvtResult = Ral_AttributeConvertValueToType(interp, *attrIter++,
+		exprResult, &errInfo) ;
+	    if (cvtResult == NULL) {
+		Tcl_DecrRefCount(exprResult) ;
+		Ral_TupleDelete(sumTuple) ;
+		Ral_InterpSetError(interp, &errInfo) ;
+		goto errorOut ;
+	    }
+            Tcl_IncrRefCount(cvtResult) ;
+            Tcl_DecrRefCount(exprResult) ;
+            *sumIter++ = cvtResult ;
+	}
+	status = Ral_RelationPushBack(sumRelation, sumTuple, NULL) ;
+	assert(status != 0) ;
+    }
+
+    Tcl_UnsetVar(interp, Tcl_GetString(varNameObj), 0) ;
+    Tcl_DecrRefCount(varNameObj) ;
+    Ral_RelationDelete(perRelation) ;
+    Tcl_SetObjResult(interp, Ral_RelationObjNew(sumRelation)) ;
+    return TCL_OK ;
+
+errorOut:
+    Tcl_UnsetVar(interp, Tcl_GetString(varNameObj), 0) ;
+    Tcl_DecrRefCount(varNameObj) ;
+    Ral_RelationDelete(perRelation) ;
+    Ral_RelationDelete(sumRelation) ;
+    return TCL_ERROR ;
+}
+
+/*
+ * relation table heading ?value-list1 value-list2 ...?
+ *
+ * Create a relation using a tabular input form. <heading> is an attribute
+ * name / type list. The <value-listN> arguments are lists of attribute
+ * values only and are presumed to be in the same order as the <heading>.
+ * This command is meant to save re-typing the attributes names over and
+ * over when trying to create literal relation values.
+ */
+static int
+RelationTableCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Ral_TupleHeading heading ;
+    Ral_ErrorInfo errInfo ;
+    Ral_Relation relation ;
+
+    if (objc < 3) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+                "heading ?value-list1 value-list2 ...?") ;
+	return TCL_ERROR ;
+    }
+
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptTable) ;
+    /*
+     * Create the relation heading from the arguments.
+     */
+    heading = Ral_TupleHeadingNewFromObj(interp, objv[2], &errInfo) ;
+    if (heading == NULL) {
+	return TCL_ERROR ;
+    }
+    relation = Ral_RelationNew(heading) ;
+
+    /*
+     * Offset the argument bookkeeping to reference the value lists.
+     */
+    objc -= 3 ;
+    objv += 3 ;
+    Ral_RelationReserve(relation, objc) ;
+    /*
+     * Iterate through the value list arguments, inserting them into the
+     * relation. Values correspond to the same order as the heading.  Here
+     * duplicates matter as we deem creation to have "insert" semantics.
+     */
+    for ( ; objc > 0 ; --objc, ++objv) {
+        Ral_Tuple tuple ;
+
+        tuple = Ral_TupleNew(heading) ;
+        if (Ral_TupleSetFromValueList(tuple, interp, *objv, &errInfo)
+                != TCL_OK) {
+            Ral_TupleDelete(tuple) ;
+            Ral_RelationDelete(relation) ;
+            return TCL_ERROR ;
+        }
+
+        if (!Ral_RelationPushBack(relation, tuple, NULL)) {
+            Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_DUPLICATE_TUPLE, *objv) ;
+            Ral_InterpSetError(interp, &errInfo) ;
+            Ral_RelationDelete(relation) ;
+            return TCL_ERROR ;
+        }
+    }
+
+    Tcl_SetObjResult(interp, Ral_RelationObjNew(relation)) ;
+    return TCL_OK ;
+}
+
+/*
+ * relation tag relation attrName ?-ascending | -descending sort-attr-list?
+ *	?-within {attr-list}?
+ *
+ * Create a new relation extended by "attrName". "attrName" will be "int" type
+ * and will consist of consecutive integers starting at zero. The tuples in
+ * "relation" will be extended in the order implied by ascending or descending
+ * order of "sort-attr-list" if the option is given. If absent the order is
+ * arbitrary.  If the "-within" option is given then "attrName" values will be
+ * unique within the attributes in "attr-list".
+ */
+static int
+RelationTagCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_Obj *relObj ;
+    Ral_Relation relation ;
+    char const *attrName ;
+    Ral_Relation tagRelation ;
+    Ral_IntVector sortMap = NULL ;
+    Ral_IntVector withinAttrs = NULL ;
+    Ral_ErrorInfo errInfo ;
+    int result = TCL_ERROR ;
+
+    if (objc < 4 || objc > 8) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relation attrName "
+	    "?-ascending | -descending sort-attr-list? ?-within attr-list?") ;
+	return TCL_ERROR ;
+    }
+
+    relObj = objv[2] ;
+    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relObj->internalRep.otherValuePtr ;
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptTag) ;
+    /*
+     * The attribute name is always the fourth argument.
+     */
+    attrName = Tcl_GetString(objv[3]) ;
     /*
      * Parse the remaining arguments.
      */
-    argc = objc - 4 ;
-    argv = objv + 3 ;
-    for ( ; argc > 0 ; argc -= 2, argv += 2) {
+    objc -= 4 ;
+    objv += 4 ;
+    for ( ; objc > 0 ; objc -= 2, objv += 2) {
 	static const struct {
 	    const char *optName ;
 	    enum {
@@ -2724,95 +2699,53 @@ RelationTagCmd(
 	Ral_IntVector sortAttrs ;
 	int index ;
 
-	if (Tcl_GetIndexFromObjStruct(interp, argv[0], optTable,
+	if (Tcl_GetIndexFromObjStruct(interp, objv[0], optTable,
 	    sizeof(optTable[0]), "tag option", 0, &index) != TCL_OK) {
-	    Ral_RelationDelete(tagRelation) ;
 	    return TCL_ERROR ;
 	}
-
 	/*
 	 * Make sure that duplicated options are not present, e.g. no
 	 * "-ascending a1 -descending b1" or "-within a1 -within b1".
 	 */
 	if ((sortMap && (optTable[index].opt == TAG_ASCENDING ||
 		optTable[index].opt == TAG_DESCENDING))
-	    || (tagIdNum >= 0 && optTable[index].opt == TAG_WITHIN)) {
+                || (withinAttrs && optTable[index].opt == TAG_WITHIN)) {
 	    Tcl_WrongNumArgs(interp, 2, objv, "relation "
-		"?-ascending | -descending sort-attr-list? "
-		"?-within idsubset-list? attrName") ;
-	    Ral_RelationDelete(tagRelation) ;
-	    return TCL_ERROR ;
+                    "?-ascending | -descending sort-attr-list? "
+                    "?-within attr-list? attrName") ;
+            Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_DUPLICATE_OPTION,
+                    objv[0]) ;
+            Ral_InterpSetError(interp, &errInfo) ;
+	    goto errorOut ;
 	}
 
 	switch (optTable[index].opt) {
 	case TAG_ASCENDING:
-	    sortAttrs = Ral_TupleHeadingAttrsFromObj(tupleHeading, interp,
-		argv[1]) ;
+	    sortAttrs = Ral_TupleHeadingAttrsFromObj(relation->heading, interp,
+                    objv[1]) ;
 	    if (sortAttrs == NULL) {
-		Ral_RelationDelete(tagRelation) ;
-		return TCL_ERROR ;
+                goto errorOut ;
 	    }
 	    sortMap = Ral_RelationSort(relation, sortAttrs, 0) ;
 	    Ral_IntVectorDelete(sortAttrs) ;
 	    break;
 
 	case TAG_DESCENDING:
-	    sortAttrs = Ral_TupleHeadingAttrsFromObj(tupleHeading, interp,
-		argv[1]) ;
+	    sortAttrs = Ral_TupleHeadingAttrsFromObj(relation->heading, interp,
+                    objv[1]) ;
 	    if (sortAttrs == NULL) {
-		Ral_RelationDelete(tagRelation) ;
-		return TCL_ERROR ;
+                goto errorOut ;
 	    }
 	    sortMap = Ral_RelationSort(relation, sortAttrs, 1) ;
 	    Ral_IntVectorDelete(sortAttrs) ;
 	    break ;
 
 	case TAG_WITHIN:
-	{
-	    Ral_RelationIdIter idIter ;
-	    Ral_RelationIdIter idEnd = Ral_RelationHeadingIdEnd(heading) ;
-	    int idCnt = 0 ;
-	    int subSetIdNum = -1 ;
-	    int status ;
-	    Ral_IntVector newId ;
-
-	    withinAttrs = Ral_TupleHeadingAttrsFromObj(tupleHeading, interp,
-		argv[1]) ;
-	    /*
-	     * Check if the attributes are a subset - 1 of some identifier.
-	     */
-	    for (idIter = Ral_RelationHeadingIdBegin(heading) ;
-		idIter != idEnd ; ++idIter, ++idCnt) {
-		Ral_IntVector id = *idIter ;
-		if (Ral_IntVectorSubsetOf(withinAttrs, id) &&
-		    Ral_IntVectorSize(withinAttrs) ==
-			Ral_IntVectorSize(id) - 1) {
-		    subSetIdNum = idCnt ;
-		    break ;
-		}
-	    }
-	    if (subSetIdNum < 0) {
-		Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptTag,
-		    RAL_ERR_WITHIN_NOT_SUBSET, argv[1]) ;
-		Ral_RelationDelete(tagRelation) ;
-		Ral_IntVectorDelete(withinAttrs) ;
-		return TCL_ERROR ;
-	    }
-	    /*
-	     * Construct a new identifier from that subset and the new
-	     * attribute.
-	     */
-	    newId = Ral_IntVectorDup(withinAttrs) ;
-	    Ral_IntVectorPushBack(newId, tagAttrIndex) ;
-	    tagIdNum = tagHeading->idCount - 1 ;
-	    status = Ral_RelationHeadingAddIdentifier(tagHeading, tagIdNum,
-		newId) ;
-	    /*
-	     * Should always be able to add this identifier since we know
-	     * it was formed from a new attribute.
-	     */
-	    assert(status != 0) ;
-	}
+	    withinAttrs = Ral_TupleHeadingAttrsFromObj(relation->heading,
+                    interp, objv[1]) ;
+            if (withinAttrs == NULL) {
+                goto errorOut ;
+            }
 	    break ;
 
 	default:
@@ -2828,106 +2761,26 @@ RelationTagCmd(
 	sortMap = Ral_IntVectorNew(Ral_RelationCardinality(relation), 0) ;
 	Ral_IntVectorFillConsecutive(sortMap, 0) ;
     }
-    /*
-     * "tagIdNum" tells us the scope of the identifier. If the scope is
-     * across the entire relation, then we can just iterate through and
-     * update the tag attribute. Otherwise we have to set up to find the
-     * subsets of tuples that have to be numbered separately.
-     */
-    if (tagIdNum < 0) {
-	Ral_RelationIter relBegin = Ral_RelationBegin(relation) ;
-	Ral_IntVectorIter mIter ;
-	Ral_IntVectorIter mEnd = Ral_IntVectorEnd(sortMap) ;
-	int tagValue = 0 ;
-	int status ;
+    tagRelation = withinAttrs == NULL ?
+            Ral_RelationTag(relation, attrName, sortMap, &errInfo) :
+            Ral_RelationTagWithin(relation, attrName, sortMap, withinAttrs,
+                &errInfo) ;
 
-	tagIdNum = tagHeading->idCount - 1 ;
-	status = Ral_RelationHeadingAddIdentifier(tagHeading, tagIdNum,
-	    Ral_IntVectorNew(1, tagAttrIndex)) ;
-	assert(status != 0) ;
-
-	for (mIter = Ral_IntVectorBegin(sortMap) ; mIter != mEnd ; ++mIter) {
-	    Ral_Tuple tuple = *(relBegin + *mIter) ;
-	    Ral_Tuple tagTuple = Ral_TupleNew(tagTupleHeading) ;
-	    Ral_TupleIter tagIter = Ral_TupleBegin(tagTuple) ;
-	    int status ;
-
-	    tagIter += Ral_TupleCopyValues(Ral_TupleBegin(tuple),
-		Ral_TupleEnd(tuple), tagIter) ;
-
-	    Tcl_IncrRefCount(*tagIter = Tcl_NewIntObj(tagValue++)) ;
-	    /*
-	     * Should always be able to insert the tagged tuple since
-	     * we have not changed the identifiers from the original relation
-	     * and have added a new identifier with the tag value.
-	     */
-	    status = Ral_RelationPushBack(tagRelation, tagTuple, NULL) ;
-	    assert(status != 0) ;
-	}
+    if (tagRelation) {
+        Tcl_SetObjResult(interp, Ral_RelationObjNew(tagRelation)) ;
+        result = TCL_OK ;
     } else {
-	/*
-	 * We must generate values for the tag attribute that are unique
-	 * within the context of an identifier with multiple attributes.
-	 * So we will build a hash table keyed by the attribute values
-	 * in "withinAttrs" and the value of the hash entry will be the
-	 * current value of the tag (starting at zero). Then it is a matter
-	 * of iterating through the relation, computing the hash and
-	 * adding a new tuple to the tagged relation.
-	 */
-	Tcl_HashTable tagHash ;
-	Tcl_DString idKey ;
-	Ral_RelationIter relBegin = Ral_RelationBegin(relation) ;
-	Ral_IntVectorIter mIter ;
-	Ral_IntVectorIter mEnd = Ral_IntVectorEnd(sortMap) ;
-
-	assert(withinAttrs != NULL) ;
-	Tcl_InitHashTable(&tagHash, TCL_STRING_KEYS) ;
-
-	for (mIter = Ral_IntVectorBegin(sortMap) ; mIter != mEnd ; ++mIter) {
-	    Ral_Tuple tuple = *(relBegin + *mIter) ;
-	    Ral_Tuple tagTuple = Ral_TupleNew(tagTupleHeading) ;
-	    Ral_TupleIter tagIter = Ral_TupleBegin(tagTuple) ;
-	    Tcl_HashEntry *entry ;
-	    int newPtr ;
-	    int tagValue ;
-	    int status ;
-
-	    entry = Tcl_CreateHashEntry(&tagHash,
-		Ral_RelationGetIdKey(tuple, withinAttrs, NULL, &idKey),
-		&newPtr) ;
-	    Tcl_DStringFree(&idKey) ;
-	    if (newPtr) {
-		/*
-		 * New subset of tuples, initialize the entry to zero.
-		 */
-		tagValue = 0 ;
-	    } else {
-		tagValue = (int)Tcl_GetHashValue(entry) ;
-	    }
-	    Tcl_SetHashValue(entry, tagValue + 1) ;
-
-	    tagIter += Ral_TupleCopyValues(Ral_TupleBegin(tuple),
-		Ral_TupleEnd(tuple), tagIter) ;
-
-	    Tcl_IncrRefCount(*tagIter = Tcl_NewIntObj(tagValue)) ;
-	    /*
-	     * Should always be able to insert the tagged tuple since
-	     * we have not changed the identifiers from the original relation
-	     * and have added a new identifier with the tag value.
-	     */
-	    status = Ral_RelationPushBack(tagRelation, tagTuple, NULL) ;
-	    assert(status != 0) ;
-	}
-
-	Tcl_DeleteHashTable(&tagHash) ;
+	Ral_InterpSetError(interp, &errInfo) ;
     }
 
-    Ral_IntVectorDelete(sortMap) ;
+errorOut:
+    if (sortMap) {
+        Ral_IntVectorDelete(sortMap) ;
+    }
     if (withinAttrs) {
 	Ral_IntVectorDelete(withinAttrs) ;
     }
-    Tcl_SetObjResult(interp, Ral_RelationObjNew(tagRelation)) ;
-    return TCL_OK ;
+    return result ;
 }
 
 static int
@@ -2938,8 +2791,7 @@ RelationTcloseCmd(
 {
     Tcl_Obj *relObj ;
     Ral_Relation relation ;
-    Ral_RelationHeading heading ;
-    Ral_TupleHeading tupleHeading ;
+    Ral_TupleHeading heading ;
     Ral_TupleHeadingIter thIter ;
 
     /* relation tclose relation */
@@ -2954,7 +2806,6 @@ RelationTcloseCmd(
     }
     relation = relObj->internalRep.otherValuePtr ;
     heading = relation->heading ;
-    tupleHeading = heading->tupleHeading ;
 
     if (Ral_RelationDegree(relation) != 2) {
 	Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptTclose,
@@ -2962,7 +2813,7 @@ RelationTcloseCmd(
 	return TCL_ERROR ;
     }
 
-    thIter = Ral_TupleHeadingBegin(tupleHeading) ;
+    thIter = Ral_TupleHeadingBegin(heading) ;
     if (!Ral_AttributeTypeEqual(*thIter, *(thIter + 1))) {
 	Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptTclose,
 	    RAL_ERR_TYPE_MISMATCH, relObj) ;
@@ -3172,5 +3023,354 @@ RelationUnionCmd(
     }
 
     Tcl_SetObjResult(interp, Ral_RelationObjNew(unionRel)) ;
+    return TCL_OK ;
+}
+
+static int
+RelationUnwrapCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_Obj *relObj ;
+    Ral_Relation relation ;
+    Tcl_Obj *attrObj ;
+    const char *attrName ;
+    Ral_Relation unwrapRel ;
+    Ral_ErrorInfo errInfo ;
+
+    /* relation unwrap relationValue attribute */
+    if (objc != 4) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relationValue attribute") ;
+	return TCL_ERROR ;
+    }
+    relObj = objv[2] ;
+    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relObj->internalRep.otherValuePtr ;
+    attrObj = objv[3] ;
+    attrName = Tcl_GetString(attrObj) ;
+
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptUnwrap) ;
+    unwrapRel = Ral_RelationUnwrap(relation, attrName, &errInfo) ;
+    if (unwrapRel == NULL) {
+	Ral_InterpSetError(interp, &errInfo) ;
+	return TCL_ERROR ;
+    }
+
+    Tcl_SetObjResult(interp, Ral_RelationObjNew(unwrapRel)) ;
+    return TCL_OK ;
+}
+
+static int
+RelationUpdateCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_Obj *relObj ;
+    Ral_Relation relation ;
+    Tcl_Obj *tupleVarNameObj ;
+    Tcl_Obj *exprObj ;
+    Tcl_Obj *scriptObj ;
+    Ral_Relation updatedRel ;
+    Ral_RelationIter rIter ;
+    int result = TCL_OK ;
+
+    /* relation update relationValue tupleVarName expr script */
+    if (objc != 6) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+	    "relationValue tupleVarName expr script") ;
+	return TCL_ERROR ;
+    }
+    relObj = objv[2] ;
+    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relObj->internalRep.otherValuePtr ;
+
+    Tcl_IncrRefCount(tupleVarNameObj = objv[3]) ;
+    Tcl_IncrRefCount(exprObj = objv[4]) ;
+    Tcl_IncrRefCount(scriptObj = objv[5]) ;
+
+    updatedRel = Ral_RelationNew(relation->heading) ;
+
+    for (rIter = Ral_RelationBegin(relation) ;
+            rIter != Ral_RelationEnd(relation) ; ++rIter) {
+	Tcl_Obj *oldTupleObj ;
+	Tcl_Obj *newTupleObj ;
+        Ral_Tuple newTuple ;
+	int boolValue ;
+        Ral_IntVector orderMap ;
+        int status ;
+
+	/*
+	 * Place the tuple into a Tcl object and store it into the
+	 * given variable.
+	 */
+	oldTupleObj = Ral_TupleObjNew(*rIter) ;
+        Tcl_IncrRefCount(oldTupleObj) ;
+	if (Tcl_ObjSetVar2(interp, tupleVarNameObj, NULL, oldTupleObj,
+	    TCL_LEAVE_ERR_MSG) == NULL) {
+	    Tcl_DecrRefCount(oldTupleObj) ;
+	    result = TCL_ERROR ;
+	    break ;
+	}
+	/*
+	 * Evaluate the expression to see if this is a tuple that is
+	 * to be updated.
+	 */
+	if (Tcl_ExprBooleanObj(interp, exprObj, &boolValue) != TCL_OK) {
+	    result = TCL_ERROR ;
+            Tcl_DecrRefCount(oldTupleObj) ;
+	    break ;
+	}
+	if (boolValue) {
+            /*
+             * Evaluate the script and replace the tuple in the relation
+             * with the return value of the script.
+             */
+            /*
+             * Evaluate the script.
+             */
+            result = Tcl_EvalObjEx(interp, scriptObj, 0) ;
+            if (result == TCL_ERROR) {
+                static const char msgfmt[] =
+                    "\n    (\"in ::ral::relation update\" body line %d)" ;
+                char msg[sizeof(msgfmt) + TCL_INTEGER_SPACE + 50] ;
+
+                sprintf(msg, msgfmt,
+#                       if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 6
+                    Tcl_GetErrorLine(interp)
+#                       else
+                    interp->errorLine
+#                       endif
+                ) ;
+                Tcl_AddObjErrorInfo(interp, msg, -1) ;
+                break ;
+            } else if (result == TCL_BREAK) {
+                result = TCL_OK ;
+                break ;
+            }
+            /*
+             * Fetch the return value of the script.  Once we get the new tuple
+             * value, we can use it to update the relvar.
+             */
+            newTupleObj = Tcl_GetObjResult(interp) ;
+            if (Tcl_ConvertToType(interp, newTupleObj, &Ral_TupleObjType)
+                    != TCL_OK) {
+                result = TCL_ERROR ;
+                break ;
+            }
+            assert(newTupleObj->typePtr == &Ral_TupleObjType) ;
+            newTuple = newTupleObj->internalRep.otherValuePtr ;
+            if (!Ral_TupleHeadingEqual(relation->heading, newTuple->heading)) {
+                Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptUpdate,
+                        RAL_ERR_HEADING_NOT_EQUAL, newTupleObj) ;
+                result = TCL_ERROR ;
+                break ;
+            }
+        } else {
+            newTuple = *rIter ;
+        }
+        orderMap = Ral_TupleHeadingNewOrderMap(updatedRel->heading,
+                newTuple->heading) ;
+        status = Ral_RelationPushBack(updatedRel, newTuple, orderMap) ;
+        assert(status != 0) ;
+        Ral_IntVectorDelete(orderMap) ;
+        Tcl_DecrRefCount(oldTupleObj) ;
+    }
+
+    Tcl_UnsetVar(interp, Tcl_GetString(tupleVarNameObj), 0) ;
+    Tcl_DecrRefCount(scriptObj) ;
+    Tcl_DecrRefCount(tupleVarNameObj) ;
+    Tcl_DecrRefCount(exprObj) ;
+
+    if (result == TCL_OK) {
+	Tcl_SetObjResult(interp, Ral_RelationObjNew(updatedRel)) ;
+    } else {
+	Ral_RelationDelete(updatedRel) ;
+    }
+
+    return result ;
+}
+
+static int
+RelationWrapCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_Obj *relationObj ;
+    Tcl_Obj *newAttrNameObj ;
+    Ral_Relation relation ;
+    Ral_TupleHeading heading ;
+    Ral_Relation resultRelation ;
+    Ral_TupleHeading resultHeading ;
+    Ral_TupleHeading wrapHeading ;
+    Ral_IntVector wattrs ;
+    Ral_IntVector rattrs ;
+    Ral_IntVectorIter iviter ;
+    int i ;
+    Ral_Attribute newAttr ;
+    Ral_TupleHeadingIter newAttrIter ;
+    Ral_RelationIter riter ;
+    Ral_ErrorInfo errInfo ;
+
+    /* relation wrap relationValue newAttr ?attr1 attr2 ...? */
+    if (objc < 4) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+                "relationValue newAttr ?attr attr2 ...?") ;
+	return TCL_ERROR ;
+    }
+
+    relationObj = objv[2] ;
+    if (Tcl_ConvertToType(interp, relationObj, &Ral_RelationObjType)
+            != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relationObj->internalRep.otherValuePtr ;
+    heading = relation->heading ;
+
+    newAttrNameObj = objv[3] ;
+
+    objc -= 4 ;
+    objv += 4 ;
+    /*
+     * Compose the heading for the wrapped attribute.  The wrapped tuple
+     * valued attribute will have the same number of attributes as the
+     * remaining arguments.  Accumulate a vector of the attribute indices going
+     * into the tuple valued attribute.
+     */
+    wrapHeading = Ral_TupleHeadingNew(objc) ;
+    wattrs = Ral_IntVectorNewEmpty(objc) ;
+    for (i = 0 ; i < objc ; ++i) {
+	char const *attrName ;
+        Ral_TupleHeadingIter attrIter ;
+
+	attrName = Tcl_GetString(objv[i]) ;
+	attrIter = Ral_TupleHeadingFind(heading, attrName) ;
+	if (attrIter == Ral_TupleHeadingEnd(heading)) {
+	    Ral_TupleHeadingDelete(wrapHeading) ;
+            Ral_IntVectorDelete(wattrs) ;
+	    Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptUnwrap,
+                    RAL_ERR_UNKNOWN_ATTR, attrName) ;
+	    return TCL_ERROR ;
+	}
+	if (!Ral_TupleHeadingAppend(heading, attrIter, attrIter + 1,
+                wrapHeading)) {
+	    Ral_TupleHeadingDelete(wrapHeading) ;
+            Ral_IntVectorDelete(wattrs) ;
+	    Ral_InterpErrorInfo(interp, Ral_CmdRelation, Ral_OptUnwrap,
+                    RAL_ERR_DUPLICATE_ATTR, attrName) ;
+	    return TCL_ERROR ;
+	}
+        Ral_IntVectorPushBack(wattrs,
+                attrIter - Ral_TupleHeadingBegin(heading)) ;
+    }
+    /*
+     * Compose the heading for the result relation.  The result relation has
+     * the same number of attributes as the input relation minus the number
+     * that are to be wrapped into the tuple valued attribute plus one for the
+     * new tuple valued attribute itself.
+     */
+    resultHeading = Ral_TupleHeadingNew(Ral_TupleHeadingSize(heading) -
+            objc + 1) ;
+    /*
+     * The complement of the set of attributes in the tuple valued attribute
+     * is the set that form the heading for the result.
+     */
+    rattrs = Ral_IntVectorSetComplement(wattrs, Ral_TupleHeadingSize(heading)) ;
+    for (iviter = Ral_IntVectorBegin(rattrs) ;
+            iviter != Ral_IntVectorEnd(rattrs) ; ++iviter) {
+        int status ;
+        Ral_TupleHeadingIter attrIter ;
+
+        assert(*iviter < Ral_TupleHeadingSize(heading)) ;
+        attrIter = Ral_TupleHeadingBegin(heading) + *iviter ;
+
+        status = Ral_TupleHeadingAppend(heading, attrIter, attrIter + 1,
+                resultHeading) ;
+        assert(status != 0) ;
+    }
+    /*
+     * Add the tuple valued attribute to the result relation heading.
+     */
+    newAttr = Ral_AttributeNewTupleType(Tcl_GetString(newAttrNameObj),
+            wrapHeading) ;
+    newAttrIter = Ral_TupleHeadingPushBack(resultHeading, newAttr) ;
+    if (newAttrIter == Ral_TupleHeadingEnd(resultHeading)) {
+	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_DUPLICATE_ATTR,
+                newAttrNameObj) ;
+	Ral_InterpSetError(interp, &errInfo) ;
+        Ral_AttributeDelete(newAttr) ;
+        Ral_TupleHeadingDelete(resultHeading) ;
+        Ral_TupleHeadingDelete(wrapHeading) ;
+        Ral_IntVectorDelete(wattrs) ;
+        Ral_IntVectorDelete(rattrs) ;
+        return TCL_ERROR ;
+    }
+    /*
+     * Iterate through the original relation, building the tuples for the
+     * result. There will be one tuple in the result for each tuple
+     * in the input relation.
+     */
+    resultRelation = Ral_RelationNew(resultHeading) ;
+    Ral_RelationReserve(resultRelation, Ral_RelationCardinality(relation)) ;
+    for (riter = Ral_RelationBegin(relation) ;
+            riter != Ral_RelationEnd(relation) ; ++riter) {
+        Ral_Tuple tuple ;
+        Ral_Tuple resultTuple ;
+        Ral_TupleIter resultDst ;
+        Ral_Tuple wrapTuple ;
+        Ral_TupleIter wrapDst ;
+
+        tuple = *riter ;
+        resultTuple = Ral_TupleNew(resultHeading) ;
+        resultDst = Ral_TupleBegin(resultTuple) ;
+        /*
+         * Copy the values from the tuple in the input relation to the
+         * new tuple for the result.
+         */
+        for (iviter = Ral_IntVectorBegin(rattrs) ;
+                iviter != Ral_IntVectorEnd(rattrs) ; ++iviter) {
+            Ral_TupleIter src ;
+
+            assert(*iviter < Ral_TupleDegree(tuple)) ;
+            src = Ral_TupleBegin(tuple) + *iviter ;
+            resultDst += Ral_TupleCopyValues(src, src + 1, resultDst) ;
+        }
+        /*
+         * Copy the values from the tuple in the input relation to the
+         * tuple valued attribute.
+         */
+        wrapTuple = Ral_TupleNew(wrapHeading) ;
+        wrapDst = Ral_TupleBegin(wrapTuple) ;
+        for (iviter = Ral_IntVectorBegin(wattrs) ;
+                iviter != Ral_IntVectorEnd(wattrs) ; ++iviter) {
+            Ral_TupleIter src ;
+
+            assert(*iviter < Ral_TupleDegree(tuple)) ;
+            src = Ral_TupleBegin(tuple) + *iviter ;
+            wrapDst += Ral_TupleCopyValues(src, src + 1, wrapDst) ;
+        }
+        /*
+         * Make the wrapped tuple into an object and store it into the
+         * result tuple.
+         */
+        *resultDst = Ral_TupleObjNew(wrapTuple) ;
+        Tcl_IncrRefCount(*resultDst) ;
+        /*
+         * Add the result tuple to the result relation. We ignore any
+         * duplicates that result, but there should not be any.
+         */
+        Ral_RelationPushBack(resultRelation, resultTuple, NULL) ;
+    }
+
+    Ral_IntVectorDelete(wattrs) ;
+    Ral_IntVectorDelete(rattrs) ;
+
+    Tcl_SetObjResult(interp, Ral_RelationObjNew(resultRelation)) ;
     return TCL_OK ;
 }

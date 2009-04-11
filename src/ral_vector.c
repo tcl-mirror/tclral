@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_vector.c,v $
-$Revision: 1.13 $
-$Date: 2008/02/09 19:42:33 $
+$Revision: 1.14 $
+$Date: 2009/04/11 18:18:54 $
  *--
  */
 
@@ -90,7 +90,6 @@ EXTERNAL DATA DEFINITIONS
 /*
 STATIC DATA ALLOCATION
 */
-static const char rcsid[] = "@(#) $RCSfile: ral_vector.c,v $ $Revision: 1.13 $" ;
 
 /*
 FUNCTION DEFINITIONS
@@ -159,34 +158,6 @@ Ral_IntVectorDelete(
     }
 }
 
-Ral_IntVectorIter
-Ral_IntVectorBegin(
-    Ral_IntVector v)
-{
-    return v->start ;
-}
-
-Ral_IntVectorIter
-Ral_IntVectorEnd(
-    Ral_IntVector v)
-{
-    return v->finish ;
-}
-
-int
-Ral_IntVectorSize(
-    Ral_IntVector v)
-{
-    return (int)(v->finish - v->start) ;
-}
-
-int
-Ral_IntVectorCapacity(
-    Ral_IntVector v)
-{
-    return (int)(v->endStorage - v->start) ;
-}
-
 void
 Ral_IntVectorReserve(
     Ral_IntVector v,
@@ -199,13 +170,6 @@ Ral_IntVectorReserve(
 	v->finish = v->start + oldSize ;
 	v->endStorage = v->start + size ;
     }
-}
-
-int
-Ral_IntVectorEmpty(
-    Ral_IntVector v)
-{
-    return v->start == v->finish ;
 }
 
 void
@@ -412,7 +376,6 @@ Ral_IntVectorSetComplement(
     int max)
 {
     Ral_IntVector cmpl = Ral_IntVectorNew(max - Ral_IntVectorSize(v), -1) ;
-    Ral_IntVectorIter end = Ral_IntVectorEnd(v) ;
     Ral_IntVectorIter iter ;
     Ral_IntVectorIter cmplIter = Ral_IntVectorBegin(cmpl) ;
     int value = 0 ;
@@ -423,7 +386,7 @@ Ral_IntVectorSetComplement(
     /*
      * Iterate through the input.
      */
-    for (iter = Ral_IntVectorBegin(v) ; iter != end ; ++iter) {
+    for (iter = Ral_IntVectorBegin(v) ; iter != Ral_IntVectorEnd(v) ; ++iter) {
 	/*
 	 * Insert all the values less than value found in the input.
 	 */
@@ -713,34 +676,6 @@ Ral_PtrVectorDelete(
     }
 }
 
-Ral_PtrVectorIter
-Ral_PtrVectorBegin(
-    Ral_PtrVector v)
-{
-    return v->start ;
-}
-
-Ral_PtrVectorIter
-Ral_PtrVectorEnd(
-    Ral_PtrVector v)
-{
-    return v->finish ;
-}
-
-int
-Ral_PtrVectorSize(
-    Ral_PtrVector v)
-{
-    return (int)(v->finish - v->start) ;
-}
-
-int
-Ral_PtrVectorCapacity(
-    Ral_PtrVector v)
-{
-    return (int)(v->endStorage - v->start) ;
-}
-
 void
 Ral_PtrVectorReserve(
     Ral_PtrVector v,
@@ -753,13 +688,6 @@ Ral_PtrVectorReserve(
 	v->finish = v->start + oldSize ;
 	v->endStorage = v->start + size ;
     }
-}
-
-int
-Ral_PtrVectorEmpty(
-    Ral_PtrVector v)
-{
-    return v->start == v->finish ;
 }
 
 void
@@ -1046,12 +974,6 @@ Ral_PtrVectorPrint(
     *s++ = '\0' ;
 
     return buf ;
-}
-
-const char *
-Ral_VectorVersion(void)
-{
-    return rcsid ;
 }
 
 /*
