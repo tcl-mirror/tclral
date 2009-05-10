@@ -46,8 +46,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.29 $
-# $Date: 2009/04/11 18:18:54 $
+# $Revision: 1.30 $
+# $Date: 2009/05/10 17:53:05 $
 #  *--
 }]
 [moddesc "Relation Operators"]
@@ -1150,9 +1150,9 @@ set o [relation table {\
     Alice              30          {San Jose}      }]
 }]
 
-[call [cmd "::ral::relation tag"] [arg relationValue]\
+[call [cmd "::ral::relation tag"] [arg relationValue] [arg attrName]\
     [opt [arg "-ascending | -descending sort-attr-list"]]\
-    [opt [arg "-within attr-list"]] [arg attrName]]
+    [opt [arg "-within attr-list"]]]
 
 The [cmd tag] subcommand creates a new relation which has the same heading
 as [arg relationValue] extended by a new attribute named [arg attrName].
