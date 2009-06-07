@@ -48,8 +48,8 @@
 #   This command is part of TclRAL. This file is in Tcl Markup Language
 #   format.
 # $RCSfile: relvar.man,v $
-# $Revision: 1.27 $
-# $Date: 2009/04/11 18:18:54 $
+# $Revision: 1.28 $
+# $Date: 2009/06/07 17:47:57 $
 #  *--
 }]
 [moddesc "Relvar Operators"]
@@ -1183,8 +1183,8 @@ Any errors thown by [cmd cmdPrefix] are ignored.
 
 [def update]
 An update trace is invoked for each tuple in a relvar that is updated.
-Tuples are updated into relvars by invocations of [cmd "relvar update"]
-or [cmd "relvar updateone"].
+Tuples are updated into relvars by invocations of [cmd "relvar update"],
+[cmd "relvar updateone"] or [cmd "relvar updateper"] commands.
 The update trace command is invoked as:
 [para]
 [cmd cmdPrefix] [cmd update] [arg relvarName] [arg oldTupleValue]
