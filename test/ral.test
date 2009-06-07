@@ -51,8 +51,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.48 $
-# $Date: 2009/04/11 18:18:54 $
+# $Revision: 1.49 $
+# $Date: 2009/06/07 17:48:56 $
 #  *--
 
 package require tcltest 2.2
@@ -645,6 +645,22 @@ namespace eval ::ral::test {
     } -body {
         tuple update $t Age foo
     } -result {bad value type for value, "foo"} -returnCodes error
+
+    test tuple-update-4.1 {bad tuple type} -setup {
+        set t [tuple create {Name string Stats {Tuple {Age int Size double}}}\
+            {Name Andrew Stats {Age 20 Size 3.0}}]
+    } -body {
+        tuple update $t Stats {Age 20 Date 5/5/2009}
+    } -result {bad value type for value, "Age 20 Date 5/5/2009"}\
+    -returnCodes error
+
+    test tuple-update-4.2 {bad relatio type} -setup {
+        set t [tuple create {Name string Addresses {Relation {Number int Street string}}}\
+            {Name Andrew Addresses {{Number 20 Street Main} {Number 30 Street Elm}}}]
+    } -body {
+        tuple update $t Addresses {{Number 20 Date 5/5/2009}}
+    } -result {bad value type for value, "{Number 20 Date 5/5/2009}"}\
+    -returnCodes error
 
     # tuple wrap subcommand
     test tuple-wrap-1.0 {wrap 1 attribute} -setup {
