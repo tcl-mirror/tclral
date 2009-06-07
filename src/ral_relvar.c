@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.c,v $
-$Revision: 1.20 $
-$Date: 2009/04/11 18:18:54 $
+$Revision: 1.21 $
+$Date: 2009/06/07 17:51:45 $
  *--
  */
 
@@ -1871,8 +1871,10 @@ relvarConstraintErrorMsg(
     Tcl_DStringAppend(msg, "\n", -1) ;
 
     for (vIter = Ral_IntVectorBegin(violations) ; vIter != vEnd ; ++vIter) {
+	Ral_Tuple errTuple ;
+
         assert(*vIter < Ral_RelationCardinality(rel)) ;
-	Ral_Tuple errTuple = *(Ral_RelationBegin(rel) + *vIter) ;
+	errTuple = *(Ral_RelationBegin(rel) + *vIter) ;
 	char *tupleString = Ral_TupleValueStringOf(errTuple) ;
 
 	Tcl_DStringAppend(msg, "tuple ", -1) ;

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.33 $
-$Date: 2009/04/11 18:18:54 $
+$Revision: 1.34 $
+$Date: 2009/06/07 17:51:45 $
  *--
  */
 
@@ -722,10 +722,11 @@ RelvarInsertCmd(
     resultRel = Ral_RelationNew(relation->heading) ;
 
     while (objc-- > 0) {
-        Ral_IntVectorDelete(orderMap) ;
+        Tcl_Obj *insertedTuple ;
 
-        Tcl_Obj *insertedTuple = Ral_RelvarObjInsertTuple(interp, relvar,
-                *objv++, &orderMap, &errInfo) ;
+        Ral_IntVectorDelete(orderMap) ;
+        insertedTuple = Ral_RelvarObjInsertTuple(interp, relvar, *objv++,
+                &orderMap, &errInfo) ;
         if (insertedTuple) {
             Ral_Tuple tuple ;
 

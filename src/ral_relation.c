@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.37 $
-$Date: 2009/04/11 18:18:54 $
+$Revision: 1.38 $
+$Date: 2009/06/07 17:51:45 $
  *--
  */
 
@@ -744,8 +744,10 @@ Ral_RelationGroup(
             attrTupleIter = Ral_TupleBegin(attrTuple) ;
             for (gaIter = Ral_IntVectorBegin(grpAttrs) ;
                     gaIter != Ral_IntVectorEnd(grpAttrs) ; ++gaIter) {
+                Ral_TupleIter srcIter ;
+
                 assert(*gaIter < Ral_TupleDegree(srcTuple)) ;
-                Ral_TupleIter srcIter = Ral_TupleBegin(srcTuple) + *gaIter ;
+                srcIter = Ral_TupleBegin(srcTuple) + *gaIter ;
                 Ral_TupleCopyValues(srcIter, srcIter + 1, attrTupleIter++) ;
             }
             /*
