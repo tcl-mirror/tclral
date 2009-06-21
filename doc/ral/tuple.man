@@ -1,6 +1,6 @@
-[manpage_begin tuple n 0.9]
+[manpage_begin tuple n 0.9.1]
 [comment {
-# This software is copyrighted 2004, 2005, 2006, 2007, 2008, 2009
+# This software is copyrighted 2004 - 2009
 # by G. Andrew Mangogna.
 # The following terms apply to all files associated with the software unless
 # explicitly disclaimed in individual files.
@@ -46,14 +46,14 @@
 # ABSTRACT:
 # 
 # $RCSfile: tuple.man,v $
-# $Revision: 1.17 $
-# $Date: 2009/04/11 18:18:54 $
+# $Revision: 1.18 $
+# $Date: 2009/06/21 17:43:39 $
 #  *--
 }]
 [moddesc "Tuple Operators"]
 [titledesc "Operators for the Tuple data type"]
-[copyright "2004, 2005, 2006, 2007, 2008, 2009 by G. Andrew Mangogna"]
-[require ral [opt 0.9.0]]
+[copyright "2004 - 2009 by G. Andrew Mangogna"]
+[require ral [opt 0.9.1]]
 [description]
 This manpage describes the
 [cmd tuple]
