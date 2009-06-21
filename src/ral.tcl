@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.41 $
-# $Date: 2009/04/11 18:18:54 $
+# $Revision: 1.42 $
+# $Date: 2009/06/21 17:42:10 $
 #  *--
 
 namespace eval ::ral {
@@ -69,7 +69,7 @@ namespace eval ::ral {
     namespace export dumpToFile
     namespace export csv
     namespace export csvToFile
-    if {![package vsatisfies [package require Tcl] 8.5]} {
+    if {![package vsatisfies [package require Tcl] 8.5-]} {
         namespace export rcount
         namespace export rcountd
         namespace export rsum
@@ -130,6 +130,10 @@ namespace eval ::ral {
         proc getVersion {} {
             return [package require ral]
         }
+    }
+    proc getCompatVersion {} {
+        lassign [split [getVersion] .] maj min rev
+        return $maj.$min-
     }
 }
 
@@ -304,7 +308,7 @@ proc ::ral::deserialize {value {ns {}}} {
     if {$versionKeyWord ne "Version"} {
         error "expected keyword \"Version\", got \"$versionKeyWord\""
     }
-    if {![package vsatisfies $versionNumber [getVersion]]} {
+    if {![package vsatisfies $versionNumber [getCompatVersion]]} {
         error "incompatible version number, \"$versionNumber\",\
             current library version is, \"[getVersion]\""
     }
@@ -363,7 +367,7 @@ proc ::ral::deserialize-0.8.X {value {ns ::}} {
     if {$versionKeyWord ne "Version"} {
 	error "expected keyword \"Version\", got \"$versionKeyWord\""
     }
-    if {![package vsatisfies $verNum 0.8]} {
+    if {![package vsatisfies $verNum 0.8-]} {
 	error "incompatible version number, \"$verNum\",\
             while attempting to deserialize version 0.8 data"
     }
@@ -445,7 +449,7 @@ proc ::ral::merge {value {ns {}}} {
     if {$versionKeyWord ne "Version"} {
         error "expected keyword \"Version\", got \"$versionKeyWord\""
     }
-    if {![package vsatisfies $versionNumber [getVersion]]} {
+    if {![package vsatisfies $versionNumber [getCompatVersion]]} {
         error "incompatible version number, \"$versionNumber\",\
             current library version is, \"[getVersion]\""
     }
@@ -755,7 +759,7 @@ proc ::ral::csvToFile {relValue fileName {sortAttr {}} {noheading 0}} {
 # are useful and have "expr" syntax. If we don't have Tcl 8.5 then we
 # will define these in the "::ral" namespace and they will require
 # "proc" type syntax.
-set sfuncNS [expr {[package vsatisfies [package require Tcl] 8.5] ?\
+set sfuncNS [expr {[package vsatisfies [package require Tcl] 8.5-] ?\
     "::tcl::mathfunc" : "::ral"}]
 # Count the number of tuples in a relation
 proc ${sfuncNS}::rcount {relation} {
@@ -783,7 +787,7 @@ proc ${sfuncNS}::rsumd {relation attr} {
     }
     return $result
 }
-if {[package vsatisfies [package require Tcl] 8.5]} {
+if {[package vsatisfies [package require Tcl] 8.5-]} {
     # Compute the average of the values of an attribute
     proc ${sfuncNS}::ravg {relation attr} {
         return [expr {rsum($relation, $attr) / rcount($relation)}]
@@ -928,7 +932,7 @@ proc ::ral::mkCheckVersion {dbName} {
         {Version_ral string Date_ral string Comment_ral string}\
         [::mk::get $dbName.__ral_version!0]]
     set verNum [tuple extract $result Version_ral]
-    if {![package vsatisfies $verNum [getVersion]]} {
+    if {![package vsatisfies $verNum [getCompatVersion]]} {
         error "incompatible version number, \"$verNum\",\
             current library version is, \"[getVersion]\""
     }
@@ -1081,4 +1085,4 @@ proc ::ral::setRelativeConstraintInfo {ns cinfo} {
     return $cinfo
 }
 
-package provide ral 0.9.0
+package provide ral 0.9.1
