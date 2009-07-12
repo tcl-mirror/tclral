@@ -46,8 +46,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.40 $
-$Date: 2009/04/11 18:18:54 $
+$Revision: 1.41 $
+$Date: 2009/07/12 22:56:10 $
  *--
  */
 
@@ -904,7 +904,6 @@ RelationExtendCmd(
 	    if (cvtResult == NULL) {
 		Tcl_DecrRefCount(exprResult) ;
 		Ral_TupleDelete(extTuple) ;
-		Ral_InterpSetError(interp, &errInfo) ;
 		goto errorOut ;
 	    }
 	    Tcl_IncrRefCount(cvtResult) ;
@@ -2351,7 +2350,6 @@ RelationSummarizeCmd(
 	    if (cvtResult == NULL) {
 		Tcl_DecrRefCount(exprResult) ;
 		Ral_TupleDelete(sumTuple) ;
-		Ral_InterpSetError(interp, &errInfo) ;
 		goto errorOut ;
 	    }
             Tcl_IncrRefCount(cvtResult) ;
@@ -2541,7 +2539,6 @@ RelationSummarizebyCmd(
 	    if (cvtResult == NULL) {
 		Tcl_DecrRefCount(exprResult) ;
 		Ral_TupleDelete(sumTuple) ;
-		Ral_InterpSetError(interp, &errInfo) ;
 		goto errorOut ;
 	    }
             Tcl_IncrRefCount(cvtResult) ;

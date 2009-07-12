@@ -51,8 +51,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.49 $
-# $Date: 2009/06/07 17:48:56 $
+# $Revision: 1.50 $
+# $Date: 2009/07/12 22:56:10 $
 #  *--
 
 package require tcltest 2.2
@@ -441,6 +441,13 @@ namespace eval ::ral::test {
         set t {{Name string} {Name Andrew}}
         tuple extend $t Age foo foo
     } -result {unknown data type, "foo"} -returnCodes error
+
+    test tuple-extend-6.0 {tuple valued extended attribute} -body {
+        set t {{Name string} {Name Andrew}}
+        tuple extend $t Addr {Tuple {Number int Street string}}\
+            {{Number int} {Number 100}}
+    } -result {wrong number of attributes specified, "{Number int} {Number 100}"}\
+    -returnCodes error
 
     # tuple extract subcommand
     test tuple-extract-1.0 {single attribute} -body {
@@ -1388,6 +1395,31 @@ namespace eval ::ral::test {
             {Name Fred Age 20}}}
         relation extend $r1 t AgeInMonths int {[tuple extract $t foo] * 12}
     } -result {unknown attribute name, "foo"} -returnCodes error
+
+    # Test to confirm correcting problem when relation valued attribute values
+    # on an extend operation do not match the header for the extended
+    # attribute.
+    test relation-extend-3.0 {relation valued attribute} -body {
+        set r1 {{Name string Age int}
+            {{Name Andrew Age 20}
+            {Name George Age 20}
+            {Name Fred Age 20}}}
+        relation extend $r1 t AgeInMonths {Relation {A1 int A2 string}} {
+            {{A1 int} {{A1 3} {A1 4}}}
+        }
+    } -result {wrong number of attributes specified, "A1 int"}\
+    -returnCodes error
+
+    test relation-extend-3.1 {relation valued attribute} -body {
+        set r1 {{Name string Age int}
+            {{Name Andrew Age 20}
+            {Name George Age 20}
+            {Name Fred Age 20}}}
+        relation extend $r1 t AgeInMonths {Relation {A1 int A2 string}} {
+            [relation create {A1 int} {A1 3} {A1 4}]
+        }
+    } -result {headings not equal, "{A1 int} {{A1 3} {A1 4}}"}\
+    -returnCodes error
 
     # relation extract subcommand
     test relation-extract-1.0 {single attribute} -body {
@@ -3501,6 +3533,23 @@ in expression "_@_< 20"} -returnCodes error
             {STATUS 30 CITY Athens TOTAL 1}
         }
     } -match relation
+
+    test relation-summarizeby-5.0 {
+        relation valued attribute, bad heading
+    } -body {
+        relation summarizeby $OWNERSHIP Acquired r\
+            NumAcquired {Relation {Number int Year int}}\
+            {{{Number int} {{Number 100} {Number 200}}}}
+    } -result {wrong number of attributes specified, "Number int"}\
+    -returnCodes error
+
+    test relation-summarizeby-5.1 {
+        relation valued attribute, with tuple value
+    } -body {
+        relation summarizeby $OWNERSHIP Acquired r\
+            NumAcquired {Relation {Number int Year int}}\
+            {[tuple create {Number int Year int} {Number 100 Year 2000}]}
+    } -result {bad value type for value, "int"} -returnCodes error
 
     # relation tag subcommand
     test relation-tag-1.0 {relation scope -- ascending} -body {

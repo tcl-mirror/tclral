@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.c,v $
-$Revision: 1.26 $
-$Date: 2009/04/11 18:18:54 $
+$Revision: 1.27 $
+$Date: 2009/07/12 22:56:10 $
  *--
  */
 
@@ -659,9 +659,29 @@ Ral_AttributeConvertValueToType(
                 }
             }
 	}
+        /*
+         * Check that the heading of the value matches that of the
+         * attribute, i.e. make sure we are not trying to assign an
+         * attribute value that is of the wrong heading type.
+         */
+        if (result) {
+            Ral_Tuple tuple ;
+
+            assert(result->typePtr == &Ral_TupleObjType) ;
+            tuple = result->internalRep.otherValuePtr ;
+            if (!Ral_TupleHeadingEqual(attr->heading, tuple->heading)) {
+                Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_HEADING_NOT_EQUAL,
+                        objPtr) ;
+                Ral_InterpSetError(interp, errInfo) ;
+                result = NULL ;
+            }
+        }
 	break ;
 
     case Relation_Type:
+        /*
+         * It may be necessary to convert the object to relation type.
+         */
 	if (objPtr->typePtr != &Ral_RelationObjType) {
             if (Tcl_IsShared(objPtr)) {
                 result = Tcl_DuplicateObj(objPtr) ;
@@ -681,6 +701,23 @@ Ral_AttributeConvertValueToType(
                 }
             }
 	}
+        /*
+         * Check that the heading of the value matches that of the
+         * attribute, i.e. make sure we are not trying to assign an
+         * attribute value that is of the wrong heading type.
+         */
+        if (result) {
+            Ral_Relation relation ;
+
+            assert(result->typePtr == &Ral_RelationObjType) ;
+            relation = result->internalRep.otherValuePtr ;
+            if (!Ral_TupleHeadingEqual(attr->heading, relation->heading)) {
+                Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_HEADING_NOT_EQUAL,
+                        objPtr) ;
+                Ral_InterpSetError(interp, errInfo) ;
+                result = NULL ;
+            }
+        }
 	break ;
 
     default:

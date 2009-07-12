@@ -46,8 +46,8 @@ exec wish "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: ralview.tcl,v $
-# $Revision: 1.3 $
-# $Date: 2006/08/22 02:33:03 $
+# $Revision: 1.4 $
+# $Date: 2009/07/12 22:56:10 $
 #  *--
 
 lappend auto_path [file join .. src]
@@ -125,32 +125,32 @@ proc ::ralview::main {{filename {}}} {
 	-image [Bitmap::get new]\
 	-command ::ralview::openmenu\
 	-helptext "Create a new data set"\
-	{expand}$tb_opts
+	{*}$tb_opts
     $bbox add\
 	-image [Bitmap::get open]\
 	-command ::ralview::openmenu\
 	-helptext "Open an existing data set"\
-	{expand}$tb_opts
+	{*}$tb_opts
     $bbox add\
 	-image [Bitmap::get save]\
 	-command ::ralview::savemenu\
 	-helptext "Save file"\
-	{expand}$tb_opts
+	{*}$tb_opts
     $bbox add\
 	-image [Bitmap::get cut]\
 	-command ::ralview::cutmenu\
 	-helptext "Cut selection to clipboard"\
-	{expand}$tb_opts
+	{*}$tb_opts
     $bbox add\
 	-image [Bitmap::get copy]\
 	-command ::ralview::copymenu\
 	-helptext "Copy selection to clipboard"\
-	{expand}$tb_opts
+	{*}$tb_opts
     $bbox add\
 	-image [Bitmap::get paste]\
 	-command ::ralview::pastemenu\
 	-helptext "Paste clipboard to selection"\
-	{expand}$tb_opts
+	{*}$tb_opts
     pack $bbox -side left -anchor w
     pack $mainframe -fill both -expand yes
 
@@ -397,8 +397,8 @@ proc ::ralview::openfile {filename} {
 proc ::ralview::clearDataDisplay {} {
     variable mainframe
     set frame [$mainframe getframe]
-    destroy {expand}[winfo children $frame]
-    relvar unset {expand}[relvar names]
+    destroy {*}[winfo children $frame]
+    relvar unset {*}[relvar names]
     return
 }
 

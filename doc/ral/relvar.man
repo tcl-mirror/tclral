@@ -48,8 +48,8 @@
 #   This command is part of TclRAL. This file is in Tcl Markup Language
 #   format.
 # $RCSfile: relvar.man,v $
-# $Revision: 1.29 $
-# $Date: 2009/06/21 17:43:39 $
+# $Revision: 1.30 $
+# $Date: 2009/07/12 22:56:10 $
 #  *--
 }]
 [moddesc "Relvar Operators"]
@@ -1032,7 +1032,7 @@ the value held in [arg relvarName] and whose body contains tuples that were
 updated.
 This gives the caller access to any attributes that might have been modified
 by a relvar trace.
-This command is most useful when a subset of tuple from a relvar
+This command is most useful when a subset of tuples from a relvar
 are modified by a series of relational expressions and the results of those
 modification need to be updated back into the original relvar.
 
