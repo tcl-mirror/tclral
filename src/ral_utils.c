@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_utils.c,v $
-$Revision: 1.20 $
-$Date: 2009/04/11 18:18:54 $
+$Revision: 1.21 $
+$Date: 2009/07/25 23:11:37 $
  *--
  */
 
@@ -134,6 +134,7 @@ static char const * const optStrings[] = {
     "is",
     "isempty",
     "isnotempty",
+    "issametype",
     "join",
     "list",
     "minus",

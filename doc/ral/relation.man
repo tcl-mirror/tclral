@@ -46,8 +46,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.31 $
-# $Date: 2009/06/21 17:43:39 $
+# $Revision: 1.32 $
+# $Date: 2009/07/25 23:11:37 $
 #  *--
 }]
 [moddesc "Relation Operators"]
@@ -735,6 +735,16 @@ body of [arg relationValue] contains any tuples and "0" otherwise.
 The [cmd isnotempty] subcommand is a convenient short hand for the the command
 [cmd "expr \{\[::ral::relation cardinality [arg relationValue]] != 0\}"].
 
+[call [cmd "::ral::relation issametype"] [arg relationValue1]\
+        [arg relationValue2]]
+The [cmd issametype] subcommand returns the boolean value "1" if the
+headings of [arg relationValue1] is the same as that of [arg relationValue2]
+and "0" otherwise.
+Since the relation headings do not have any intrinsic ordering,
+using string comparison of relation headings to determine equality
+is not reliable and therefore the [cmd issametype] command should be used
+to determine type equality.
+
 [call [cmd "::ral::relation join"] [arg relationValue1] [arg relationValue2]\
     [opt "-using attrList"] [opt "relationValue3 ..."] [opt "-using attrList2"]]
 
@@ -881,7 +891,7 @@ and it is not an error to change the name of any given attribute multiple times.
 However, [arg oldname] must always be the name of an attribute at the
 time the rename takes place.
 The [cmd rename] subcommand is useful for manipulating the attribute names
-of a relation to suit the needs of particular operators ([emph e.g.]
+of a relation to prevent naming conflicts in certain operations ([emph e.g.]
 [cmd times] and [cmd join]).
 
 [example {

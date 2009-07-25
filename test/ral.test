@@ -51,8 +51,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.50 $
-# $Date: 2009/07/12 22:56:10 $
+# $Revision: 1.51 $
+# $Date: 2009/07/25 23:11:37 $
 #  *--
 
 package require tcltest 2.2
@@ -2413,6 +2413,23 @@ namespace eval ::ral::test {
     test relation-isnotempty-3.0 {multiple body tuples} -body {
         relation isnotempty $S
     } -result 1
+
+    # relation issametype subcommand
+    test relation-issametype-1.0 {
+        is same type
+    } -body {
+        set r1 {{Name string Age int Address string} {}}
+        set r2 {{Age int Name string Address string} {}}
+        relation issametype $r1 $r2
+    } -result {1}
+
+    test relation-issametype-1.0 {
+        not same type
+    } -body {
+        set r1 {{Age int Address string} {}}
+        set r2 {{Age int Name string Address string} {}}
+        relation issametype $r1 $r2
+    } -result {0}
 
     # relation join subcommand
     test relation-join-1.0 {one common attribute} -body {

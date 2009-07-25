@@ -46,8 +46,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: ralutil.man,v $
-# $Revision: 1.4 $
-# $Date: 2009/07/25 22:11:26 $
+# $Revision: 1.5 $
+# $Date: 2009/07/25 23:11:37 $
 #  *--
 }]
 [moddesc "Ralutil Package"]
@@ -172,19 +172,6 @@ in [arg relValue] that have the corresponding value of [arg crossAttr].
 +-------+----+----+----+----+-----+
 }]
 
-[call [cmd ::ralutil::sysIdsInit]]
-The [cmd sysIdsInit] command initializes a scheme whereby attributes of
-relvars can be given system generated identifiers.
-This procedure should be invoked before requesting system generated
-identifiers via [cmd sysIdGenSystemId].
-
-[call [cmd ::ralutil::sysIdsGenSystemId] [arg relvarName] [arg attrName]]
-The [cmd sysIdGenSystemId] command requests that the [arg attrName]
-attribute of the relvar, [arg relvarName], be assigned a system generated
-identifier.
-This procedure uses relvar tracing to assign a unique integer value to
-[arg attrName] when a tuple is inserted into [arg relvarName].
-
 [call [cmd "::ralutil::rvajoin"] [arg rel1] [arg rel2] [arg newAttr]\
         [arg [opt "attr1 attr2 ..."]]]
 
@@ -209,6 +196,19 @@ The type of [arg newAttr] is [emph Relation] with a heading that matches
 
 [example {
 }]
+
+[call [cmd ::ralutil::sysIdsInit]]
+The [cmd sysIdsInit] command initializes a scheme whereby attributes of
+relvars can be given system generated identifiers.
+This procedure should be invoked before requesting system generated
+identifiers via [cmd sysIdGenSystemId].
+
+[call [cmd ::ralutil::sysIdsGenSystemId] [arg relvarName] [arg attrName]]
+The [cmd sysIdGenSystemId] command requests that the [arg attrName]
+attribute of the relvar, [arg relvarName], be assigned a system generated
+identifier.
+This procedure uses relvar tracing to assign a unique integer value to
+[arg attrName] when a tuple is inserted into [arg relvarName].
 
 [list_end]
 

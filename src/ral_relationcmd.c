@@ -46,8 +46,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.41 $
-$Date: 2009/07/12 22:56:10 $
+$Revision: 1.42 $
+$Date: 2009/07/25 23:11:37 $
  *--
  */
 
@@ -117,6 +117,7 @@ static int RelationIntersectCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationIsCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationIsemptyCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationIsnotemptyCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
+static int RelationIssametypeCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationJoinCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationListCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationMinusCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
@@ -197,6 +198,7 @@ relationCmd(
 	{"is", RelationIsCmd},
 	{"isempty", RelationIsemptyCmd},
 	{"isnotempty", RelationIsnotemptyCmd},
+	{"issametype", RelationIssametypeCmd},
 	{"join", RelationJoinCmd},
 	{"list", RelationListCmd},
 	{"minus", RelationMinusCmd},
@@ -1494,6 +1496,40 @@ RelationIsnotemptyCmd(
 
     Tcl_SetObjResult(interp, Tcl_NewBooleanObj(
 	Ral_RelationCardinality(relation) != 0)) ;
+    return TCL_OK ;
+}
+
+static int
+RelationIssametypeCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_Obj *r1Obj ;
+    Ral_Relation r1 ;
+    Tcl_Obj *r2Obj ;
+    Ral_Relation r2 ;
+
+    /* relation issametype relation1 relation2 */
+    if (objc != 4) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relation1 relation2") ;
+	return TCL_ERROR ;
+    }
+
+    r1Obj = objv[2] ;
+    if (Tcl_ConvertToType(interp, r1Obj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    r1 = r1Obj->internalRep.otherValuePtr ;
+
+    r2Obj = objv[3] ;
+    if (Tcl_ConvertToType(interp, r2Obj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    r2 = r2Obj->internalRep.otherValuePtr ;
+
+    Tcl_SetObjResult(interp, Tcl_NewBooleanObj(
+	Ral_TupleHeadingEqual(r1->heading, r2->heading) != 0)) ;
     return TCL_OK ;
 }
 
