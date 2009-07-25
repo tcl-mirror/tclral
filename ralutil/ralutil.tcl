@@ -49,19 +49,20 @@
 # without cluttering the TclRAL package proper.
 # 
 # $RCSfile: ralutil.tcl,v $
-# $Revision: 1.2 $
-# $Date: 2009/04/11 18:18:54 $
+# $Revision: 1.3 $
+# $Date: 2009/07/25 22:11:26 $
 #  *--
 
-package provide ralutil 0.9.0
+package provide ralutil 0.9.1
 
-package require ral 0.9.0
+package require ral 0.9.1
 
 namespace eval ::ralutil {
     namespace export pipe
     namespace export sysIdsInit
     namespace export sysIdsGenSystemId
     namespace export crosstab
+    namespace export rvajoin
 
     namespace import ::ral::*
 
@@ -199,4 +200,61 @@ proc ::ralutil::crosstab {relValue crossAttr args} {
     # Finally we want the total for all the "crossAttr" matches.
     lappend sumCmd Total int {[relation cardinality $r]}
     return [eval $sumCmd]
+}
+
+# Perform the relational equivalent to an "outer join". The idea is to end up
+# with a relation that contains a relation valued attribute that contains the
+# tuples that match in the join and that is empty for those tuples in the
+# relation that do not match across the join attributes (the "natural
+# join" leaving such tuples out of the result altogether).
+# "r1" the first relation to join
+# "r2" the second relation to join
+# "newAttr" the name of the new relation valued attribute
+# The remaining optional arguments are the attributes across which the join is
+# to be made.  If the list is empty, then the commonly named attributes are
+# found.
+# The result has the same heading as "r1" plus an attribute "newAttr".
+# The type of "newAttr" is Relation with the heading of "r2" minus
+# the join attributes.
+
+proc ::ralutil::rvajoin {r1 r2 newAttr args} {
+    # If the join attributes are not given, then determine them by finding the
+    # intersection of the attributes in r1 and r2.
+    set joinAttrs $args
+    if {[llength $joinAttrs] == 0} {
+        set a1 [relation attributes $r1]
+        set a2 [relation attributes $r2]
+        foreach attr $a1 {
+            if {$attr in $a2} {
+                lappend joinAttrs $attr
+            }
+        }
+    }
+    # N.B. if there are no commonly named attributes, then we get the usual
+    # degenerate behavior of a join, namely, every tuple in the result relation
+    # will have its relation valued attribute set to "r2" in a sort of
+    # interesting take on the Cartesian product (I think if the result is
+    # "ungroup"ed it is the Cartesian product.)
+
+    # Compute the heading of the relation valued attribute by removing the
+    # join attributes from the heading of "r2".
+    set rvaHeading [relation heading $r2]
+    foreach attr $joinAttrs {
+        set attrIndex [lsearch -exact $rvaHeading $attr]
+        if {$attrIndex == -1} {
+            error "attribute, \"$attr\", does not appear in,\
+                    \"$[relation attributes $r2]\""
+        } else {
+            set rvaHeading [lreplace $rvaHeading $attrIndex $attrIndex+1]
+        }
+    }
+    # Finally, compute the result by extending "r1" with the relation valued
+    # attribute. The tuples of the relation valued attribute are those where
+    # the corresponding attributes in "r1" match those in "r2".
+    return [relation extend $r1 r1tup $newAttr [list Relation $rvaHeading] {
+        [relation project [relation restrict $r2 r2tup {
+            [tuple equal [tuple project $r2tup {*}$joinAttrs]\
+                    [tuple project $r1tup {*}$joinAttrs]]
+        }] {*}[dict keys $rvaHeading]]
+    }]
 }

@@ -46,8 +46,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: ralutil.man,v $
-# $Revision: 1.3 $
-# $Date: 2009/06/21 17:43:39 $
+# $Revision: 1.4 $
+# $Date: 2009/07/25 22:11:26 $
 #  *--
 }]
 [moddesc "Ralutil Package"]
@@ -184,6 +184,31 @@ attribute of the relvar, [arg relvarName], be assigned a system generated
 identifier.
 This procedure uses relvar tracing to assign a unique integer value to
 [arg attrName] when a tuple is inserted into [arg relvarName].
+
+[call [cmd "::ralutil::rvajoin"] [arg rel1] [arg rel2] [arg newAttr]\
+        [arg [opt "attr1 attr2 ..."]]]
+
+The [cmd rvajoin] command
+performs the relational equivalent to an [emph "outer join"].
+The idea is to end up
+with a relation that contains a relation valued attribute which in turn
+contains the
+tuples that match in the join and is empty for those tuples in the
+relation that do not match across the join attributes (the "natural
+join" leaving such tuples out of the result altogether).
+[arg rel1] the first relation to join
+[arg rel2] the second relation to join.
+[arg newAttr] the name of the new relation valued attribute.
+The remaining optional arguments are the attributes across which the join is
+to be made.
+If the no such arguments are given, then the join is performed across the
+attributes that have the same name.
+The result has the same heading as [arg rel1] plus an attribute [arg newAttr].
+The type of [arg newAttr] is [emph Relation] with a heading that matches
+[arg rel2] minus the join attributes.
+
+[example {
+}]
 
 [list_end]
 
