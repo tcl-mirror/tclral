@@ -46,8 +46,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: ralutil.man,v $
-# $Revision: 1.5 $
-# $Date: 2009/07/25 23:11:37 $
+# $Revision: 1.6 $
+# $Date: 2009/08/15 23:54:01 $
 #  *--
 }]
 [moddesc "Ralutil Package"]
@@ -193,8 +193,95 @@ attributes that have the same name.
 The result has the same heading as [arg rel1] plus an attribute [arg newAttr].
 The type of [arg newAttr] is [emph Relation] with a heading that matches
 [arg rel2] minus the join attributes.
+[emph N.B.] that [cmd rvajoin] is [emph not] commutative like the natural
+join.
+
+To show the difference between [cmd rvajoin] and natural join [emph i.e.]
+[cmd "relation join"] consider the join of [var Dog] to [var Ownership].
+In this data set, Jumper the Mutt is not owned by anyone.
+In the natural join, there is no tuple with Jumper.
+The RVA join has a tuple for Jumper and an empty relation valued attribute
+showing that Jumper is not owned.
+It is also instructive to consider the effect of the [cmd ungroup] operation
+on the RVA join which gives the same result as the natural join.
 
 [example {
+% relformat [relation join $::DOG $::OWNERSHIP] "Natural Join"
++-------+---------+---------+--------+
+|DogName|Breed    |OwnerName|Acquired|
+|string |string   |string   |string  |
++-------+---------+---------+--------+
+|Fido   |Poodle   |Sue      |2001    |
+|Fido   |Poodle   |George   |2001    |
+|Sam    |Collie   |Sue      |2000    |
+|Sam    |Collie   |George   |2000    |
+|Spot   |Terrier  |Alice    |2001    |
+|Rover  |Retriever|Mike     |2002    |
+|Fred   |Spaniel  |Jim      |2003    |
++-------+---------+---------+--------+
+Natural Join
+------------
+% set j [rvajoin $::DOG $::OWNERSHIP OwnedBy]
+% relformat $j "RVA Join"
++-------+---------+--------------------+
+|DogName|Breed    |OwnedBy             |
+|string |string   |Relation            |
++-------+---------+--------------------+
+|Fido   |Poodle   |+---------+--------+|
+|       |         ||OwnerName|Acquired||
+|       |         ||string   |string  ||
+|       |         |+---------+--------+|
+|       |         ||Sue      |2001    ||
+|       |         ||George   |2001    ||
+|       |         |+---------+--------+|
+|Sam    |Collie   |+---------+--------+|
+|       |         ||OwnerName|Acquired||
+|       |         ||string   |string  ||
+|       |         |+---------+--------+|
+|       |         ||Sue      |2000    ||
+|       |         ||George   |2000    ||
+|       |         |+---------+--------+|
+|Spot   |Terrier  |+---------+--------+|
+|       |         ||OwnerName|Acquired||
+|       |         ||string   |string  ||
+|       |         |+---------+--------+|
+|       |         ||Alice    |2001    ||
+|       |         |+---------+--------+|
+|Rover  |Retriever|+---------+--------+|
+|       |         ||OwnerName|Acquired||
+|       |         ||string   |string  ||
+|       |         |+---------+--------+|
+|       |         ||Mike     |2002    ||
+|       |         |+---------+--------+|
+|Fred   |Spaniel  |+---------+--------+|
+|       |         ||OwnerName|Acquired||
+|       |         ||string   |string  ||
+|       |         |+---------+--------+|
+|       |         ||Jim      |2003    ||
+|       |         |+---------+--------+|
+|Jumper |Mutt     |+---------+--------+|
+|       |         ||OwnerName|Acquired||
+|       |         ||string   |string  ||
+|       |         |+---------+--------+|
+|       |         |+---------+--------+|
++-------+---------+--------------------+
+RVA Join
+--------
+% relformat [relation ungroup $j OwnedBy] "Ungrouping the Owned By Attribute"
++-------+---------+---------+--------+
+|DogName|Breed    |OwnerName|Acquired|
+|string |string   |string   |string  |
++-------+---------+---------+--------+
+|Fido   |Poodle   |Sue      |2001    |
+|Fido   |Poodle   |George   |2001    |
+|Sam    |Collie   |Sue      |2000    |
+|Sam    |Collie   |George   |2000    |
+|Spot   |Terrier  |Alice    |2001    |
+|Rover  |Retriever|Mike     |2002    |
+|Fred   |Spaniel  |Jim      |2003    |
++-------+---------+---------+--------+
+Ungrouping the OwnedBy Attribute
+--------------------------------
 }]
 
 [call [cmd ::ralutil::sysIdsInit]]

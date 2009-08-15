@@ -48,8 +48,8 @@
 #   This command is part of TclRAL. This file is in Tcl Markup Language
 #   format.
 # $RCSfile: relvar.man,v $
-# $Revision: 1.30 $
-# $Date: 2009/07/12 22:56:10 $
+# $Revision: 1.31 $
+# $Date: 2009/08/15 23:54:01 $
 #  *--
 }]
 [moddesc "Relvar Operators"]
@@ -112,8 +112,8 @@ rather than [cmd "\[relvar set Dog]"]),
 creating a relvar also creates a corresponding Tcl variable by the same name.
 The Tcl variable created is traced to prevent accidental writing to it,
 since all modifications to a relvar should come via the [cmd relvar] commands.
-So, creating a relvar name [var Dog] at the global level creates a
-relvar named [var ::Dog] and a read-only Tcl variable named [var ::Dog].
+So, creating a relvar named [var Dog] at the global level creates a
+relvar named [var ::Dog] and a read-only Tcl variable also named [var ::Dog].
 
 [section CONSTRAINTS]
 
