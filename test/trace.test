@@ -48,8 +48,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: trace.test,v $
-# $Revision: 1.11 $
-# $Date: 2009/04/11 18:18:54 $
+# $Revision: 1.12 $
+# $Date: 2009/08/15 23:56:47 $
 #  *--
 
 package require tcltest 2.2
@@ -410,6 +410,35 @@ namespace eval ::ral::test {
 	}
 	set evalInfo
     } -result {{transaction begin 1} {transaction end 1}}
+
+    test relvar-trace-7.1 {
+        trace procedure modifies relvar being traced
+    } -setup {
+        relvar create M {
+            A1 int A2 string
+        } A1
+        relvar insert M {
+            A1 3 A2 foo
+        } {
+            A1 4 A2 bar
+        } {
+            A1 5 A2 target
+        }
+        proc modM {op relvar old new} {
+            relvar deleteone M A1 3
+        }
+    } -cleanup {
+        relvar unset M
+        rename modM {}
+    } -body {
+	relvar trace add variable M update [namespace code modM]
+        relvar eval {
+            relvar updateone M m {A1 5} {
+                tuple update $m A2 baz
+            }
+        }
+    } -result {trace command attempting to modify the traced relvar, "M"}\
+    -returnCodes error
 
     cleanupTests
 }

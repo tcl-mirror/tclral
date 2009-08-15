@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.34 $
-$Date: 2009/06/07 17:51:45 $
+$Revision: 1.35 $
+$Date: 2009/08/15 23:56:47 $
  *--
  */
 
@@ -409,6 +409,11 @@ RelvarDeleteCmd(
 	    RAL_ERR_ONGOING_CMD, objv[2]) ;
 	return TCL_ERROR ;
     }
+    if (relvar->traceFlags) {
+	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptDelete,
+	    RAL_ERR_ONGOING_TRACE, objv[2]) ;
+	return TCL_ERROR ;
+    }
 
     Tcl_IncrRefCount(tupleNameObj = objv[3]) ;
     Tcl_IncrRefCount(exprObj = objv[4]) ;
@@ -494,16 +499,20 @@ RelvarDeleteOneCmd(
     }
     relation = relvar->relObj->internalRep.otherValuePtr ;
 
-    objc -= 3 ;
-    objv += 3 ;
-
     Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelvar, Ral_OptDeleteone) ;
-
     if (!Ral_RelvarStartCommand(rInfo, relvar)) {
-	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptDeleteone,
-	    RAL_ERR_ONGOING_CMD, objv[2]) ;
+	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_CMD, objv[2]) ;
+	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
+    if (relvar->traceFlags) {
+	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_TRACE, objv[2]) ;
+	Ral_InterpSetError(interp, &errInfo) ;
+	return TCL_ERROR ;
+    }
+
+    objc -= 3 ;
+    objv += 3 ;
     /*
      * Make a tuple to use as a key from the arguments.
      */
@@ -703,13 +712,18 @@ RelvarInsertCmd(
 	return TCL_ERROR ;
     }
 
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelvar, Ral_OptInsert) ;
     if (!Ral_RelvarStartCommand(rInfo, relvar)) {
-	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptInsert,
-	    RAL_ERR_ONGOING_CMD, objv[2]) ;
+	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_CMD, objv[2]) ;
+	Ral_InterpSetError(interp, &errInfo) ;
+	return TCL_ERROR ;
+    }
+    if (relvar->traceFlags) {
+	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_TRACE, objv[2]) ;
+	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
 
-    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelvar, Ral_OptInsert) ;
     objc -= 3 ;
     objv += 3 ;
 
@@ -798,9 +812,13 @@ RelvarIntersectCmd(
     intersectRel = relvalue = relvar->relObj->internalRep.otherValuePtr ;
 
     Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelvar, Ral_OptIntersect) ;
-
     if (!Ral_RelvarStartCommand(rInfo, relvar)) {
 	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_CMD, objv[2]) ;
+	Ral_InterpSetError(interp, &errInfo) ;
+	return TCL_ERROR ;
+    }
+    if (relvar->traceFlags) {
+	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_TRACE, objv[2]) ;
 	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
@@ -897,9 +915,13 @@ RelvarMinusCmd(
     subvalue = subObj->internalRep.otherValuePtr ;
 
     Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelvar, Ral_OptMinus) ;
-
     if (!Ral_RelvarStartCommand(rInfo, relvar)) {
 	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_CMD, objv[2]) ;
+	Ral_InterpSetError(interp, &errInfo) ;
+	return TCL_ERROR ;
+    }
+    if (relvar->traceFlags) {
+	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_TRACE, objv[2]) ;
 	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
@@ -1159,6 +1181,11 @@ RelvarSetCmd(
 	    Ral_InterpSetError(interp, &errInfo) ;
 	    return TCL_ERROR ;
 	}
+        if (relvar->traceFlags) {
+	    Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_TRACE, objv[2]) ;
+	    Ral_InterpSetError(interp, &errInfo) ;
+	    return TCL_ERROR ;
+        }
 
 	resultObj = Ral_RelvarObjExecSetTraces(interp, relvar, valueObj,
 	    &errInfo) ;
@@ -1426,9 +1453,13 @@ RelvarUnionCmd(
     unionRel = relvalue = relvar->relObj->internalRep.otherValuePtr ;
 
     Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelvar, Ral_OptUnion) ;
-
     if (!Ral_RelvarStartCommand(rInfo, relvar)) {
 	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_CMD, objv[2]) ;
+	Ral_InterpSetError(interp, &errInfo) ;
+	return TCL_ERROR ;
+    }
+    if (relvar->traceFlags) {
+	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_TRACE, objv[2]) ;
 	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
@@ -1549,9 +1580,13 @@ RelvarUpdateCmd(
     relation = relvar->relObj->internalRep.otherValuePtr ;
 
     Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelvar, Ral_OptUpdate) ;
-
     if (!Ral_RelvarStartCommand(rInfo, relvar)) {
 	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_CMD, objv[2]) ;
+	Ral_InterpSetError(interp, &errInfo) ;
+	return TCL_ERROR ;
+    }
+    if (relvar->traceFlags) {
+	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_TRACE, objv[2]) ;
 	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
@@ -1679,6 +1714,11 @@ RelvarUpdateOneCmd(
     if (!Ral_RelvarStartCommand(rInfo, relvar)) {
         Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptUpdateone,
             RAL_ERR_ONGOING_CMD, objv[2]) ;
+        return TCL_ERROR ;
+    }
+    if (relvar->traceFlags) {
+        Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptUpdateone,
+            RAL_ERR_ONGOING_TRACE, objv[2]) ;
         return TCL_ERROR ;
     }
 
@@ -1906,14 +1946,20 @@ RelvarUpdatePerCmd(
             Ral_TupleHeadingSize(perRelation->heading)) ;
     Ral_IntVectorDelete(idAttrSet) ;
 
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelvar, Ral_OptUpdateper) ;
     if (!Ral_RelvarStartCommand(rInfo, relvar)) {
         Ral_IntVectorDelete(nonIdAttrSet) ;
-        Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptUpdateper,
-            RAL_ERR_ONGOING_CMD, objv[2]) ;
+	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_CMD, objv[2]) ;
+	Ral_InterpSetError(interp, &errInfo) ;
+        return TCL_ERROR ;
+    }
+    if (relvar->traceFlags) {
+        Ral_IntVectorDelete(nonIdAttrSet) ;
+	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_TRACE, objv[2]) ;
+	Ral_InterpSetError(interp, &errInfo) ;
         return TCL_ERROR ;
     }
     updatedTuples = Ral_RelationNew(relation->heading) ;
-    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelvar, Ral_OptUpdateper) ;
     /*
      * Iterate through the tuples of the "perRelation" and for each tuple find
      * the corresponding tuple in the relvar. Update the non-identifying

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_utils.c,v $
-$Revision: 1.21 $
-$Date: 2009/07/25 23:11:37 $
+$Revision: 1.22 $
+$Date: 2009/08/15 23:56:47 $
  *--
  */
 
@@ -219,6 +219,7 @@ static char const * const resultStrings[] = {
     "a super set relvar may not be named as one of its own sub sets",
     "correlation spec is not available for a \"-complete\" correlation",
     "recursively invoking a relvar command outside of a transaction",
+    "trace command attempting to modify the traced relvar",
 
     "serious internal error",
 } ;
@@ -271,6 +272,7 @@ static char const * const errorStrings[] = {
     "SUPER_NAME",
     "INCOMPLETE_SPEC",
     "ONGOING_CMD",
+    "ONGOING_TRACE",
 
     "INTERNAL_ERROR",
 } ;
