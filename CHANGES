@@ -1,3 +1,95 @@
+========= ral 0.9.1 =========
+2009/08/15 mangoa01
+
+	* src/ral_relvarcmd.c:
+	* src/ral_utils.c:
+	* src/ral_utils.h:
+	* test/trace.test:
+	  Corrected the problem where a trace command attempts to modify the
+	  same relvar that is currently being traced. Since the traced relvar
+	  is in the middle of a possible modification, the trace command cannot
+	  be allowed to come in an rip out the existing data structure.
+	  All havoc breaks loose when the trace command returns and we continue
+	  to iterate through data that has been changed. Prohibiting this
+	  seems to be the only realistic course.
+
+	* doc/ral/relvar.man:
+	* ralutil/doc/ralutil.man:
+	  Minor doc corrections. Added an example for "rvajoin".
+
+2009/07/25 mangoa01
+
+	* ralutil/doc/ralutil.man:
+	* ralutil/pkgIndex.tcl:
+	* ralutil/ralutil.tcl:
+	* src/ralutil.tcl:
+	  Added "rvajoin" procedure to ralutil.
+
+	* configure:
+	* configure.in:
+	* doc/ral/relation.man:
+	* ralutil/doc/ralutil.man:
+	* ralutil/teapot.txt:
+	* src/ral_relationcmd.c:
+	* src/ral_utils.c:
+	* src/ral_utils.h:
+	* test/ral.test:
+          Added new "relation issametype" command to provide an unambiguous
+          means of determining if two relations have the same heading.  Updated
+          "config.in" to reflect the reorganization of "ralutil" source.
+
+2009/07/12 mangoa01
+
+	* demos/ralview.tcl:
+	* doc/ral/relvar.man:
+	* src/ral_attribute.c:
+	* src/ral_relationcmd.c:
+	* test/ral.test:
+	  Corrected several problems that originated from a single cause.
+	  The problems occurred when commands line "extend" or "summarize"
+	  create relation or tuple valued attributes and then the expressions
+	  that return the value instead return a value with an incorrect heading
+	  or different type altogether.
+
+2009/06/21 mangoa01
+
+	* src/ral.tcl:
+	  Cleaned up for 0.9.1 release.
+	  Deal better with version compatibility checks.
+
+	* configure:
+	* configure.in:
+	* doc/ral/relation.man:
+	* doc/ral/relformat.man:
+	* doc/ral/relvar.man:
+	* doc/ral/serialize.man:
+	* doc/ral/tuple.man:
+	* ralutil/doc/ralutil.man:
+	* test/merge1.mk:
+	* test/merge2.mk:
+	* test/merge2.ral:
+	  Preparing for 0.9.1 release. Changing doc version numbers.
+
+2009/06/07 mangoa01
+
+	* src/ral_relation.c:
+	* src/ral_relvar.c:
+	* src/ral_relvarcmd.c:
+	  Corrections for compile errors for non-gcc compilers.
+
+	* doc/ral/relvar.man:
+	  Minor correction to trace documentation.
+
+	* test/ral.test:
+          Tests to check that "tuple update" fails on updates to Tuple or
+          Relation valued attributes if the headers don't match.
+
+2009/05/10 mangoa01
+
+	* doc/Makefile:
+	* doc/ral/relation.man:
+	  Correction to "tag" command manual page.
+
 ========= ral 0.9.0 =========
 2009/03/29 mangoa01
 

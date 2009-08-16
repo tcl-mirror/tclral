@@ -20,13 +20,13 @@ I build the Windows binary distributes using MSys.
 BINARY DISTRIBUTION
 ===================
 
-If you have selected to use one of the binary distributions, then it is
-only necessary to un-tar or un-zip the file into a directory that is along
-your Tcl library path. This could be in the "lib" directory of your
-Tcl installation (a common practice under Windows) or in any directory
-that is mentioned in the TCLLIBPATH environment variable. Binary distributions
-come with documentation and test cases located in directories below the
-package files.
+As of Revision 0.9.0, binary distributions are in the form or zip package
+suitable for installation using the "teacup" command.  It also works to unzip
+the package file in an appropriate place along your Tcl library path.  This
+could be in the "lib" directory of your Tcl installation (a common practice
+under Windows) or in any directory that is mentioned in the TCLLIBPATH
+environment variable. Binary distributions come with documentation and test
+cases located in directories below the package files.
 
 CONTACT
 =======
