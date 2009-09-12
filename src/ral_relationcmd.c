@@ -46,8 +46,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.42 $
-$Date: 2009/07/25 23:11:37 $
+$Revision: 1.43 $
+$Date: 2009/09/12 22:32:36 $
  *--
  */
 
@@ -110,6 +110,8 @@ static int RelationEmptyofCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationExtendCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationExtractCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationForeachCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
+static int RelationFromdictCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
+static int RelationFromlistCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationGroupCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationHeadingCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationInsertCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
@@ -191,6 +193,10 @@ relationCmd(
 	{"extend", RelationExtendCmd},
 	{"extract", RelationExtractCmd},
 	{"foreach", RelationForeachCmd},
+#	    if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
+	{"fromdict", RelationFromdictCmd},
+#	    endif
+	{"fromlist", RelationFromlistCmd},
 	{"group", RelationGroupCmd},
 	{"heading", RelationHeadingCmd},
 	{"insert", RelationInsertCmd},
@@ -1153,6 +1159,150 @@ RelationForeachCmd(
     Tcl_DecrRefCount(scriptObj) ;
 
     return result ;
+}
+
+#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
+static int RelationFromdictCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Ral_Attribute keyattr ;
+    Ral_Attribute valattr ;
+    Ral_ErrorInfo errInfo ;
+    Ral_TupleHeading heading ;
+    Ral_TupleHeadingIter iter ;
+    Ral_Relation relation ;
+    Tcl_DictSearch search ;
+    Tcl_Obj *keyObj ;
+    Tcl_Obj *valObj ;
+    int done ;
+
+    /* relation fromdict dictValue keyattr keytype valueattr valuetype */
+    if (objc != 7) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+                "dictValue keyattr keytype valueattr valuetype") ;
+	return TCL_ERROR ;
+    }
+
+    /*
+     * Build the binary heading.
+     */
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptFromdict) ;
+    keyattr = Ral_AttributeNewFromObjs(interp, objv[3], objv[4], &errInfo) ;
+    if (keyattr == NULL) {
+        Ral_InterpSetError(interp, &errInfo) ;
+	return TCL_ERROR ;
+    }
+    valattr = Ral_AttributeNewFromObjs(interp, objv[5], objv[6], &errInfo) ;
+    if (valattr == NULL) {
+        Ral_InterpSetError(interp, &errInfo) ;
+	return TCL_ERROR ;
+    }
+    heading = Ral_TupleHeadingNew(2) ;
+    iter = Ral_TupleHeadingPushBack(heading, keyattr) ;
+    assert(iter != Ral_TupleHeadingEnd(heading)) ;
+    iter = Ral_TupleHeadingPushBack(heading, valattr) ;
+    assert(iter != Ral_TupleHeadingEnd(heading)) ;
+    relation = Ral_RelationNew(heading) ;
+    /*
+     * Iterate through the dictionary, inserting the key / value pairs into
+     * the relation.
+     * N.B. that we should never get duplicates because the dictionaries
+     * are appropriately keyed.
+     */
+    if (Tcl_DictObjFirst(interp, objv[2], &search, &keyObj, &valObj, &done)
+            != TCL_OK) {
+        goto errout ;
+    }
+    while (!done) {
+        Ral_Tuple tuple ;
+        int status ;
+
+        tuple = Ral_TupleNew(relation->heading) ;
+	if (!(Ral_TupleUpdateAttrValue(tuple, keyattr->name, keyObj, &errInfo)
+                &&
+            Ral_TupleUpdateAttrValue(tuple, valattr->name, valObj, &errInfo))) {
+	    Ral_InterpSetError(interp, &errInfo) ;
+            Ral_TupleDelete(tuple) ;
+            Tcl_DictObjDone(&search) ;
+            goto errout ;
+	}
+        status = Ral_RelationPushBack(relation, tuple, NULL) ;
+        assert(status != 0) ;
+        Tcl_DictObjNext(&search, &keyObj, &valObj, &done) ;
+    }
+    Tcl_DictObjDone(&search) ;
+
+    Tcl_SetObjResult(interp, Ral_RelationObjNew(relation)) ;
+    return TCL_OK ;
+
+errout:
+    Ral_RelationDelete(relation) ;
+    return TCL_ERROR ;
+}
+#endif
+
+static int RelationFromlistCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    int elemc ;
+    Tcl_Obj **elemv ;
+    Ral_Attribute attr ;
+    Ral_ErrorInfo errInfo ;
+    Ral_TupleHeading heading ;
+    Ral_TupleHeadingIter iter ;
+    Ral_Relation relation ;
+
+    /* relation fromlist list attribute type */
+    if (objc != 5) {
+	Tcl_WrongNumArgs(interp, 2, objv, "list attribute type") ;
+	return TCL_ERROR ;
+    }
+
+    /*
+     * Make sure the list is reasonable first.
+     */
+    if (Tcl_ListObjGetElements(interp, objv[2], &elemc, &elemv) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+
+    /*
+     * Build the single attribute heading.
+     */
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptFromlist) ;
+    attr = Ral_AttributeNewFromObjs(interp, objv[3], objv[4], &errInfo) ;
+    if (attr == NULL) {
+        Ral_InterpSetError(interp, &errInfo) ;
+	return TCL_ERROR ;
+    }
+    heading = Ral_TupleHeadingNew(1) ;
+    iter = Ral_TupleHeadingPushBack(heading, attr) ;
+    assert(iter != Ral_TupleHeadingEnd(heading)) ;
+    relation = Ral_RelationNew(heading) ;
+    /*
+     * Iterate through the list, inserting the list elements into
+     * the relation.
+     * N.B. that we are ignoring duplicates, effectively converting the
+     * list into a set.
+     */
+    for ( ; elemc > 0 ; --elemc, ++elemv) {
+        Ral_Tuple tuple ;
+
+        tuple = Ral_TupleNew(relation->heading) ;
+	if (!Ral_TupleUpdateAttrValue(tuple, attr->name, *elemv, &errInfo)) {
+	    Ral_InterpSetError(interp, &errInfo) ;
+            Ral_TupleDelete(tuple) ;
+	    Ral_RelationDelete(relation) ;
+	    return TCL_ERROR ;
+	}
+        Ral_RelationPushBack(relation, tuple, NULL) ;
+    }
+
+    Tcl_SetObjResult(interp, Ral_RelationObjNew(relation)) ;
+    return TCL_OK ;
 }
 
 static int

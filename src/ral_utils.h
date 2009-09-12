@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_utils.h,v $
-$Revision: 1.19 $
-$Date: 2009/08/15 23:56:47 $
+$Revision: 1.20 $
+$Date: 2009/09/12 22:32:36 $
  *--
  */
 #ifndef _ral_utils_h_
@@ -105,6 +105,8 @@ typedef enum {
     Ral_OptExtend,
     Ral_OptExtract,
     Ral_OptForeach,
+    Ral_OptFromdict,
+    Ral_OptFromlist,
     Ral_OptGet,
     Ral_OptGroup,
     Ral_OptHeading,
@@ -196,7 +198,7 @@ typedef enum {
     RAL_ERR_SUPER_NAME,
     RAL_ERR_INCOMPLETE_SPEC,
     RAL_ERR_ONGOING_CMD,
-    RAL_ERR_ONGOING_TRACE,
+    RAL_ERR_ONGOING_MODIFICATION,
 
     RAL_ERR_INTERNAL_ERROR,
 

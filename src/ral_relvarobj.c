@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.42 $
-$Date: 2009/04/11 18:18:54 $
+$Revision: 1.43 $
+$Date: 2009/09/12 22:32:36 $
  *--
  */
 
@@ -79,6 +79,7 @@ MACRO DEFINITIONS
 #define	TRACEOP_UNSET_FLAG 0x08
 #define	TRACEOP_UPDATE_FLAG 0x10
 #define	TRACEOP_EVAL_FLAG 0x20
+#define	TRACEOP_SUSPEND_FLAG 0x40
 
 /*
 TYPE DEFINITIONS
@@ -332,12 +333,13 @@ Ral_RelvarObjDelete(
     Tcl_UntraceVar(interp, relvar->name, relvarTraceFlags, relvarTraceProc,
 	info) ;
     /*
-     * Remove the variable.
+     * Remove the variable. Ignore any errors just in case the variable
+     * was unset by some other mechanism.
      */
-    if (Tcl_UnsetVar(interp, relvar->name, TCL_LEAVE_ERR_MSG) != TCL_OK) {
-	return TCL_ERROR ;
-    }
-
+    Tcl_UnsetVar(interp, relvar->name, 0) ;
+    /*
+     * Finally, remove the relvar itself.
+     */
     Ral_RelvarDelete(info, relvar) ;
 
     Tcl_ResetResult(interp) ;
@@ -1961,6 +1963,34 @@ Ral_RelvarObjTraceVarInfo(
 }
 
 int
+Ral_RelvarObjTraceVarSuspend(
+    Tcl_Interp * interp,
+    Ral_Relvar relvar,
+    Tcl_Obj *const script)
+{
+    int result ;
+
+    relvar->traceFlags = TRACEOP_SUSPEND_FLAG ;
+    result = Tcl_EvalObjEx(interp, script, 0) ;
+    if (result == TCL_ERROR) {
+        static const char msgfmt[] =
+            "\n    (\"in ::ral::relvar trace suspend variable\" body line %d)" ;
+        char msg[sizeof(msgfmt) + TCL_INTEGER_SPACE + 50] ;
+
+        sprintf(msg, msgfmt,
+#                       if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 6
+            Tcl_GetErrorLine(interp)
+#                       else
+            interp->errorLine
+#                       endif
+        ) ;
+        Tcl_AddObjErrorInfo(interp, msg, -1) ;
+    }
+    relvar->traceFlags = 0 ;
+    return result ;
+}
+
+int
 Ral_RelvarObjTraceEvalAdd(
     Tcl_Interp *interp,
     Ral_RelvarInfo rInfo,
@@ -2213,7 +2243,7 @@ Ral_RelvarObjExecEvalTraces(
 		int cmdc ;
 		Tcl_Obj **cmdv ;
 		/*
-		 * Break out the list as a array of argments and evaluate it.
+		 * Break out the list as a array of arguments and evaluate it.
 		 */
 		if (Tcl_ListObjGetElements(interp, cmd, &cmdc, &cmdv)
                         == TCL_OK) {

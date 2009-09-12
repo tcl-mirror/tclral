@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.35 $
-$Date: 2009/08/15 23:56:47 $
+$Revision: 1.36 $
+$Date: 2009/09/12 22:32:36 $
  *--
  */
 
@@ -409,11 +409,12 @@ RelvarDeleteCmd(
 	    RAL_ERR_ONGOING_CMD, objv[2]) ;
 	return TCL_ERROR ;
     }
-    if (relvar->traceFlags) {
+    if (relvar->stateFlags) {
 	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptDelete,
-	    RAL_ERR_ONGOING_TRACE, objv[2]) ;
+	    RAL_ERR_ONGOING_MODIFICATION, objv[2]) ;
 	return TCL_ERROR ;
     }
+    relvar->stateFlags = 1 ;
 
     Tcl_IncrRefCount(tupleNameObj = objv[3]) ;
     Tcl_IncrRefCount(exprObj = objv[4]) ;
@@ -450,6 +451,7 @@ RelvarDeleteCmd(
         Tcl_DecrRefCount(tupleObj) ;
     }
 
+    relvar->stateFlags = 0 ;
     Tcl_UnsetVar(interp, Tcl_GetString(tupleNameObj), 0) ;
 
     Tcl_DecrRefCount(tupleNameObj) ;
@@ -505,11 +507,12 @@ RelvarDeleteOneCmd(
 	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
-    if (relvar->traceFlags) {
-	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_TRACE, objv[2]) ;
+    if (relvar->stateFlags) {
+	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_MODIFICATION, objv[2]) ;
 	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
+    relvar->stateFlags = 1 ;
 
     objc -= 3 ;
     objv += 3 ;
@@ -539,6 +542,7 @@ RelvarDeleteOneCmd(
         result = TCL_ERROR ;
     }
 
+    relvar->stateFlags = 0 ;
     result = Ral_RelvarObjEndCmd(interp, rInfo, result != TCL_OK) ;
     if (result == TCL_OK) {
 	Tcl_SetObjResult(interp, Tcl_NewBooleanObj(deleted)) ;
@@ -718,11 +722,12 @@ RelvarInsertCmd(
 	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
-    if (relvar->traceFlags) {
-	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_TRACE, objv[2]) ;
+    if (relvar->stateFlags) {
+	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_MODIFICATION, objv[2]) ;
 	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
+    relvar->stateFlags = 1 ;
 
     objc -= 3 ;
     objv += 3 ;
@@ -769,6 +774,7 @@ RelvarInsertCmd(
     }
 
     Ral_IntVectorDelete(orderMap) ;
+    relvar->stateFlags = 0 ;
     result = Ral_RelvarObjEndCmd(interp, rInfo, result != TCL_OK) ;
     if (result == TCL_OK) {
 	if (inserted) {
@@ -817,11 +823,12 @@ RelvarIntersectCmd(
 	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
-    if (relvar->traceFlags) {
-	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_TRACE, objv[2]) ;
+    if (relvar->stateFlags) {
+	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_MODIFICATION, objv[2]) ;
 	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
+    relvar->stateFlags = 1 ;
 
     /*
      * Index to the first relation value.
@@ -867,6 +874,7 @@ RelvarIntersectCmd(
         }
 	Tcl_DecrRefCount(intersectObj) ;
     }
+    relvar->stateFlags = 0 ;
     result = Ral_RelvarObjEndCmd(interp, rInfo, result != TCL_OK) ;
 
     if (result == TCL_OK) {
@@ -920,11 +928,12 @@ RelvarMinusCmd(
 	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
-    if (relvar->traceFlags) {
-	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_TRACE, objv[2]) ;
+    if (relvar->stateFlags) {
+	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_MODIFICATION, objv[2]) ;
 	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
+    relvar->stateFlags = 1 ;
 
     diffvalue = Ral_RelationMinus(relvalue, subvalue, &errInfo) ;
     if (diffvalue) {
@@ -949,6 +958,7 @@ RelvarMinusCmd(
 	Ral_InterpSetError(interp, &errInfo) ;
 	result = TCL_ERROR ;
     }
+    relvar->stateFlags = 0 ;
     result = Ral_RelvarObjEndCmd(interp, rInfo, result != TCL_OK) ;
 
     if (result == TCL_OK) {
@@ -1181,11 +1191,12 @@ RelvarSetCmd(
 	    Ral_InterpSetError(interp, &errInfo) ;
 	    return TCL_ERROR ;
 	}
-        if (relvar->traceFlags) {
-	    Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_TRACE, objv[2]) ;
+        if (relvar->stateFlags) {
+	    Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_MODIFICATION, objv[2]) ;
 	    Ral_InterpSetError(interp, &errInfo) ;
 	    return TCL_ERROR ;
         }
+        relvar->stateFlags = 1 ;
 
 	resultObj = Ral_RelvarObjExecSetTraces(interp, relvar, valueObj,
 	    &errInfo) ;
@@ -1198,6 +1209,7 @@ RelvarSetCmd(
             Tcl_DecrRefCount(resultObj) ;
         }
 
+        relvar->stateFlags = 0 ;
 	result = Ral_RelvarObjEndCmd(interp, rInfo, result != TCL_OK) ;
     } else {
         result = TCL_OK ;
@@ -1213,6 +1225,7 @@ RelvarSetCmd(
  * relvar trace add variable relvarName ops cmdPrefix
  * relvar trace remove variable relvarName ops cmdPrefix
  * relvar trace info variable relvarname
+ * relvar trace suspend variable relvarname script
  *
  * relvar trace add transaction cmdPrefix
  * relvar trace remove transaction cmdPrefix
@@ -1229,11 +1242,13 @@ RelvarTraceCmd(
 	TraceAdd,
 	TraceRemove,
 	TraceInfo,
+	TraceSuspend,
     } ;
     static char const *traceOptions[] = {
 	"add",
 	"remove",
 	"info",
+	"suspend",
 	NULL
     } ;
     enum TraceType {
@@ -1312,6 +1327,16 @@ RelvarTraceCmd(
 	    result = Ral_RelvarObjTraceVarInfo(interp, relvar) ;
 	    break ;
 
+        case TraceSuspend:
+	    /* relvar trace suspend variable relvarName script */
+	    if (objc != 6) {
+		Tcl_WrongNumArgs(interp, 2, objv,
+                        "suspend variable relvarName script") ;
+		return TCL_ERROR ;
+	    }
+	    result = Ral_RelvarObjTraceVarSuspend(interp, relvar, objv[5]) ;
+            break ;
+
 	default:
 	    Tcl_Panic("Unknown trace option, %d", option) ;
 	}
@@ -1348,6 +1373,13 @@ RelvarTraceCmd(
 	    }
 	    result = Ral_RelvarObjTraceEvalInfo(interp, rInfo) ;
 	    break ;
+
+        case TraceSuspend:
+            Tcl_SetObjResult(interp,
+                    Tcl_NewStringObj("suspending eval traces not implemented",
+                    -1)) ;
+	    result = TCL_ERROR ;
+            break ;
 
 	default:
 	    Tcl_Panic("Unknown trace option, %d", option) ;
@@ -1458,11 +1490,13 @@ RelvarUnionCmd(
 	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
-    if (relvar->traceFlags) {
-	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_TRACE, objv[2]) ;
+    if (relvar->stateFlags) {
+	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_MODIFICATION,
+                objv[2]) ;
 	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
+    relvar->stateFlags = 1 ;
 
     /*
      * Index to the first relation value.
@@ -1508,6 +1542,7 @@ RelvarUnionCmd(
         }
 	Tcl_DecrRefCount(unionObj) ;
     }
+    relvar->stateFlags = 0 ;
     result = Ral_RelvarObjEndCmd(interp, rInfo, result != TCL_OK) ;
 
     if (result == TCL_OK) {
@@ -1585,11 +1620,12 @@ RelvarUpdateCmd(
 	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
-    if (relvar->traceFlags) {
-	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_TRACE, objv[2]) ;
+    if (relvar->stateFlags) {
+	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_MODIFICATION, objv[2]) ;
 	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
     }
+    relvar->stateFlags = 1 ;
 
     Tcl_IncrRefCount(tupleVarNameObj = objv[3]) ;
     Tcl_IncrRefCount(exprObj = objv[4]) ;
@@ -1640,6 +1676,7 @@ RelvarUpdateCmd(
         Tcl_DecrRefCount(tupleObj) ;
     }
 
+    relvar->stateFlags = 0 ;
     result = Ral_RelvarObjEndCmd(interp, rInfo, result == TCL_ERROR) == TCL_OK ?
 	result : TCL_ERROR ;
 
@@ -1716,11 +1753,12 @@ RelvarUpdateOneCmd(
             RAL_ERR_ONGOING_CMD, objv[2]) ;
         return TCL_ERROR ;
     }
-    if (relvar->traceFlags) {
+    if (relvar->stateFlags) {
         Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptUpdateone,
-            RAL_ERR_ONGOING_TRACE, objv[2]) ;
+            RAL_ERR_ONGOING_MODIFICATION, objv[2]) ;
         return TCL_ERROR ;
     }
+    relvar->stateFlags = 1 ;
 
     updatedTuples = Ral_RelationNew(relation->heading) ;
     if (found != Ral_RelationEnd(relation)) {
@@ -1754,6 +1792,7 @@ RelvarUpdateOneCmd(
         Tcl_DecrRefCount(tupleObj) ;
     }
 
+    relvar->stateFlags = 0 ;
     result = Ral_RelvarObjEndCmd(interp, rInfo, result == TCL_ERROR) == TCL_OK ?
             result : TCL_ERROR ;
     if (result == TCL_ERROR) {
@@ -1953,9 +1992,9 @@ RelvarUpdatePerCmd(
 	Ral_InterpSetError(interp, &errInfo) ;
         return TCL_ERROR ;
     }
-    if (relvar->traceFlags) {
+    if (relvar->stateFlags) {
         Ral_IntVectorDelete(nonIdAttrSet) ;
-	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_TRACE, objv[2]) ;
+	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_MODIFICATION, objv[2]) ;
 	Ral_InterpSetError(interp, &errInfo) ;
         return TCL_ERROR ;
     }
@@ -2071,6 +2110,7 @@ RelvarUpdatePerCmd(
     }
     Ral_IntVectorDelete(nonIdAttrSet) ;
 
+    relvar->stateFlags = 0 ;
     result = Ral_RelvarObjEndCmd(interp, rInfo, result == TCL_ERROR) == TCL_OK ?
             result : TCL_ERROR ;
     if (result == TCL_ERROR) {

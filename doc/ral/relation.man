@@ -46,8 +46,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.32 $
-# $Date: 2009/07/25 23:11:37 $
+# $Revision: 1.33 $
+# $Date: 2009/09/12 22:32:36 $
 #  *--
 }]
 [moddesc "Relation Operators"]
@@ -582,6 +582,51 @@ Jumper
 Fred
 Fido
 }]
+
+[call [cmd "::ral::relation fromdict"] [arg dictValue]\
+    [arg keyattr] [arg keytype] [arg valattr] [arg valtype]]
+
+The [cmd fromdict] subcommand returns a relation value of degree two
+that contains all the keys and values from [arg dictValue].
+The heading of the returned relation will have two attributes
+names [arg keyattr] and [arg valattr] of the corresponding types,
+[arg keytype] and [arg valtype].
+All the key / value pairs from the dictionary are inserted as tuples in the
+returned relation value.
+This command provides a simpler means to move data from core Tcl types
+into relation values.
+Compare with [cmd "relation dict"] which extracts relation attribute values
+into Tcl dictionaries.
+
+[example {
+% set d [dict create Fido Poodle Sam Collie Spot Terrier]
+% relformat [relation fromdict $d DogName string Breed string]
++-------+-------+
+|DogName|Breed  |
+|string |string |
++-------+-------+
+|Fido   |Poodle |
+|Sam    |Collie |
+|Spot   |Terrier|
++-------+-------+
+}]
+
+[call [cmd "::ral::relation fromlist"] [arg listValue]\
+    [arg attrname] [arg attrtype]]
+
+The [cmd fromlist] subcommand returns a relation value of degree one
+that contains the values in the list given by [arg listValue].
+The heading of the returned relation contains a single attribute named,
+[arg attrname], whose type is given by, [arg attrtype].
+Since relations are sets and sets do not have duplicated values,
+any duplicated values in [arg listValue] are silently excluded from the
+returned relation value.
+Comparing the cardinality of the returned relation with the length of
+[arg listValue] can be used to determine of any elements of [arg listValue]
+were excluded.
+This command provides a simpler means to convert lists into a relation value.
+Compare with [cmd "relation list"] which extracts relation attribute values
+into Tcl lists.
 
 [call [cmd "::ral::relation group"] [arg relationValue] [arg newattribute]\
     [opt "attr1 attr2 ..."]]

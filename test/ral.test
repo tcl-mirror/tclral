@@ -51,8 +51,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.51 $
-# $Date: 2009/07/25 23:11:37 $
+# $Revision: 1.52 $
+# $Date: 2009/09/12 22:32:36 $
 #  *--
 
 package require tcltest 2.2
@@ -1544,6 +1544,115 @@ namespace eval ::ral::test {
             {S# S5 SNAME Adams STATUS 30 CITY Athens}
         }
     } -match relation
+
+    # relation fromdict subcommand
+    test relation-fromdict-1.0 {
+        empty dict
+    } -constraints {
+        tcl8.5
+    } -body {
+        relation fromdict {} A int B string
+    } -result {
+        {A int B string} {}
+    } -match relation
+
+    test relation-fromdict-2.0 {
+        single key / value pair
+    } -constraints {
+        tcl8.5
+    } -body {
+        relation fromdict {27 fred} A int B string
+    } -result {
+        {A int B string} {{A 27 B fred}}
+    } -match relation
+
+    test relation-fromdict-3.0 {
+        many element dictionary
+    } -constraints {
+        tcl8.5
+    } -body {
+        set d [dict create 27 fred 42 alice 38 george 15 sue]
+        relation fromdict $d A int B string
+    } -result {
+        {A int B string} {
+            {A 27 B fred}
+            {A 42 B alice}
+            {A 38 B george}
+            {A 15 B sue}
+        }
+    } -match relation
+
+    test relation-fromdict-4.0 {
+        duplicate dict key
+    } -constraints {
+        tcl8.5
+    } -body {
+        set d [dict create 27 fred 42 alice 38 george 27 sue]
+        relation fromdict $d A int B string
+    } -result {
+        {A int B string} {
+            {A 27 B sue}
+            {A 42 B alice}
+            {A 38 B george}
+        }
+    } -match relation
+
+    test relation-fromdict-5.0 {
+        bad element data type
+    } -constraints {
+        tcl8.5
+    } -body {
+        set d [dict create 27 fred 42 alice 38 george mary sue]
+        relation fromdict $d A int B string
+    } -result {bad value type for value, "mary"} -returnCodes error
+
+    test relation-fromdict-6.0 {
+        bad dictionary
+    } -constraints {
+        tcl8.5
+    } -body {
+        set d {27 fred 42 alice 38 george 13}
+        relation fromdict $d A int B string
+    } -result {missing value to go with key} -returnCodes error
+
+    # relation fromlist subcommand
+    test relation-fromlist-1.0 {
+        empty list
+    } -body {
+        relation fromlist {} A int
+    } -result {
+        {A int} {}
+    } -match relation
+
+    test relation-fromlist-2.0 {
+        singleton list
+    } -body {
+        relation fromlist {27} A int
+    } -result {
+        {A int} {{A 27}}
+    } -match relation
+
+    test relation-fromlist-3.0 {
+        many element list
+    } -body {
+        relation fromlist {27 42 38 15} A int
+    } -result {
+        {A int} {{A 27} {A 42} {A 38} {A 15}}
+    } -match relation
+
+    test relation-fromlist-4.0 {
+        duplicate list element
+    } -body {
+        relation fromlist {15 42 38 15} A int
+    } -result {
+        {A int} {{A 15} {A 42} {A 38}}
+    } -match relation
+
+    test relation-fromlist-5.0 {
+        bad element data type
+    } -body {
+        relation fromlist {15 42 fred} A int
+    } -result {bad value type for value, "fred"} -returnCodes error
 
     # relation group subcommand
     test relation-group-1.0 {group two attributes} -body {

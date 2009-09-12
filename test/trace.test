@@ -48,8 +48,8 @@ exec tclsh "$0" "$@"
 # ABSTRACT:
 # 
 # $RCSfile: trace.test,v $
-# $Revision: 1.12 $
-# $Date: 2009/08/15 23:56:47 $
+# $Revision: 1.13 $
+# $Date: 2009/09/12 22:32:36 $
 #  *--
 
 package require tcltest 2.2
@@ -437,7 +437,7 @@ namespace eval ::ral::test {
                 tuple update $m A2 baz
             }
         }
-    } -result {trace command attempting to modify the traced relvar, "M"}\
+    } -result {recursive attempt to modify a relvar already being changed, "M"}\
     -returnCodes error
 
     cleanupTests

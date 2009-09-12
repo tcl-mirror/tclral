@@ -48,8 +48,8 @@
 #   This command is part of TclRAL. This file is in Tcl Markup Language
 #   format.
 # $RCSfile: relvar.man,v $
-# $Revision: 1.31 $
-# $Date: 2009/08/15 23:54:01 $
+# $Revision: 1.32 $
+# $Date: 2009/09/12 22:32:36 $
 #  *--
 }]
 [moddesc "Relvar Operators"]
@@ -114,6 +114,10 @@ The Tcl variable created is traced to prevent accidental writing to it,
 since all modifications to a relvar should come via the [cmd relvar] commands.
 So, creating a relvar named [var Dog] at the global level creates a
 relvar named [var ::Dog] and a read-only Tcl variable also named [var ::Dog].
+However, it should be noted that the automatically created Tcl variable is
+not protected against [emph unset].
+It is allowed to unset the Tcl variable and still access the relation value
+stored in the relvar.
 
 [section CONSTRAINTS]
 
@@ -801,6 +805,8 @@ headings not equal, "{DogName string Breed string}"
 [def "[cmd {::ral::relvar trace remove variable}] [arg relvarName]\
     [arg traceops] [arg cmdPrefix]"]
 [def "[cmd {::ral::relvar trace info variable}] [arg relvarName]"]
+[def "[cmd {::ral::relvar trace suspend variable}] [arg relvarName]\
+        [arg script]"]
 [def "[cmd {::ral::relvar trace add eval}] [arg cmdPrefix]"]
 [def "[cmd {::ral::relvar trace remove eval}] [arg cmdPrefix]"]
 [def "[cmd {::ral::relvar trace info eval}]"]
@@ -829,6 +835,12 @@ the [arg traceops] and [arg command], of the relvar trace.
 
 It is an error to request any trace operation if [arg relvarName] does not
 exist.
+
+The [cmd "trace suspend variable"] subcommand suspends tracing on
+the relvar given by [arg relvarName] and executes [arg script] restoring
+tracing after [arg script] ends.
+This subcommand allows scripts to temporarily suspend tracing on a
+relvar.
 
 The [cmd "trace add eval"], [cmd "trace remove eval"] and
 [cmd "trace info eval"] variations perform the corresponding

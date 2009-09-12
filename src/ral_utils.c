@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_utils.c,v $
-$Revision: 1.22 $
-$Date: 2009/08/15 23:56:47 $
+$Revision: 1.23 $
+$Date: 2009/09/12 22:32:36 $
  *--
  */
 
@@ -125,6 +125,8 @@ static char const * const optStrings[] = {
     "extend",
     "extract",
     "foreach",
+    "fromdict",
+    "fromlist",
     "get",
     "group",
     "heading",
@@ -219,7 +221,7 @@ static char const * const resultStrings[] = {
     "a super set relvar may not be named as one of its own sub sets",
     "correlation spec is not available for a \"-complete\" correlation",
     "recursively invoking a relvar command outside of a transaction",
-    "trace command attempting to modify the traced relvar",
+    "recursive attempt to modify a relvar already being changed",
 
     "serious internal error",
 } ;
@@ -272,7 +274,7 @@ static char const * const errorStrings[] = {
     "SUPER_NAME",
     "INCOMPLETE_SPEC",
     "ONGOING_CMD",
-    "ONGOING_TRACE",
+    "ONGOING_MODIFICATION",
 
     "INTERNAL_ERROR",
 } ;

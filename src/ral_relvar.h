@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.h,v $
-$Revision: 1.13 $
-$Date: 2009/04/11 18:18:54 $
+$Revision: 1.14 $
+$Date: 2009/09/12 22:32:36 $
  *--
  */
 #ifndef _ral_relvar_h_
@@ -146,6 +146,7 @@ typedef struct Ral_Relvar {
     Ral_PtrVector transStack ;	/* a stack of Ral_Relation */
     Ral_PtrVector constraints ;	/* a list of Ral_Constraint  */
     Ral_TraceInfo traces ;	/* linked list of Ral_TraceInfo */
+    int stateFlags ;            /* internal state info */
     int traceFlags ;		/* state of tracing */
     unsigned idCount ;          /* Number of identifiers for the relvar.
                                  * This is the actual size of the array of

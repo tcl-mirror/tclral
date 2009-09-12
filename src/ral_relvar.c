@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.c,v $
-$Revision: 1.21 $
-$Date: 2009/06/07 17:51:45 $
+$Revision: 1.22 $
+$Date: 2009/09/12 22:32:36 $
  *--
  */
 
@@ -155,6 +155,7 @@ Ral_RelvarNew(
 	relvar->constraints = Ral_PtrVectorNew(0) ;
 	relvar->traces = NULL ;
 	relvar->traceFlags = 0 ;
+	relvar->stateFlags = 0 ;
         relvar->idCount = idCnt ;
         /*
          * Zero this out so we can use the the "idAttrs" as an indication
