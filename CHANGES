@@ -1,4 +1,23 @@
 ========= ral 0.9.1 =========
+2009/09/12 mangoa01
+
+	* doc/ral/relation.man:
+	* doc/ral/relvar.man:
+	* src/ral_relationcmd.c:
+	* src/ral_relvar.c:
+	* src/ral_relvar.h:
+	* src/ral_relvarcmd.c:
+	* src/ral_relvarobj.c:
+	* src/ral_relvarobj.h:
+	* src/ral_utils.c:
+	* src/ral_utils.h:
+	* test/ral.test:
+	* test/trace.test:
+	  Added "relation fromlist" and "relation fromdict" commands.
+	  Corrected problem with recursive call attempting to modify
+	  a relvar already in the process of being modified.
+	  Added trace suspend so that tracing could be temporarily suspended.
+
 2009/08/15 mangoa01
 
 	* src/ral_relvarcmd.c:
