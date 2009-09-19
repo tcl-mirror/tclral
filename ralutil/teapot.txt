@@ -5,5 +5,5 @@ Meta entrysource ralutil.tcl
 Meta included    ralutil.tcl
 Meta platform    tcl
 Meta require     {ral 0.9.1}
+Meta require     {Tcl 8.4}
 Meta summary     TclRAL utilities
-

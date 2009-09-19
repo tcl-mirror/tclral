@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.c,v $
-$Revision: 1.22 $
-$Date: 2009/09/12 22:32:36 $
+$Revision: 1.23 $
+$Date: 2009/09/19 18:55:03 $
  *--
  */
 
@@ -143,19 +143,19 @@ Ral_RelvarNew(
 
     entry = Tcl_CreateHashEntry(&info->relvars, name, &newPtr) ;
     if (newPtr) {
-	    /* +1 for NUL terminator */
+            /* +1 for NUL terminator */
         assert(idCnt >= 1) ;
-	relvar = (Ral_Relvar)ckalloc(sizeof(*relvar) +
+        relvar = (Ral_Relvar)ckalloc(sizeof(*relvar) +
                 (idCnt - 1) * sizeof(struct relvarId)) ;
-	relvar->name = ckalloc(strlen(name) + 1) ;
+        relvar->name = ckalloc(strlen(name) + 1) ;
         strcpy(relvar->name, name) ;
-	Tcl_IncrRefCount(
-	    relvar->relObj = Ral_RelationObjNew(Ral_RelationNew(heading))) ;
-	relvar->transStack = Ral_PtrVectorNew(1) ;
-	relvar->constraints = Ral_PtrVectorNew(0) ;
-	relvar->traces = NULL ;
-	relvar->traceFlags = 0 ;
-	relvar->stateFlags = 0 ;
+        Tcl_IncrRefCount(
+            relvar->relObj = Ral_RelationObjNew(Ral_RelationNew(heading))) ;
+        relvar->transStack = Ral_PtrVectorNew(1) ;
+        relvar->constraints = Ral_PtrVectorNew(0) ;
+        relvar->traces = NULL ;
+        relvar->traceFlags = 0 ;
+        relvar->stateFlags = 0 ;
         relvar->idCount = idCnt ;
         /*
          * Zero this out so we can use the the "idAttrs" as an indication
@@ -164,7 +164,7 @@ Ral_RelvarNew(
          * relvars.
          */
         memset(relvar->identifiers, 0, idCnt * sizeof(struct relvarId)) ;
-	Tcl_SetHashValue(entry, relvar) ;
+        Tcl_SetHashValue(entry, relvar) ;
     }
 
     return relvar ;
@@ -199,7 +199,7 @@ Ral_RelvarFind(
 
     entry = Tcl_FindHashEntry(&info->relvars, name) ;
     if (entry) {
-	relvar = Tcl_GetHashValue(entry) ;
+        relvar = Tcl_GetHashValue(entry) ;
     }
 
     return relvar ;
@@ -249,8 +249,8 @@ Ral_RelvarDeleteInfo(
     }
 
     for (entry = Tcl_FirstHashEntry(&info->relvars, &search) ;
-	entry ; entry = Tcl_NextHashEntry(&search)) {
-	relvarCleanup(Tcl_GetHashValue(entry)) ;
+        entry ; entry = Tcl_NextHashEntry(&search)) {
+        relvarCleanup(Tcl_GetHashValue(entry)) ;
     }
     Tcl_DeleteHashTable(&info->relvars) ;
     /*
@@ -258,19 +258,19 @@ Ral_RelvarDeleteInfo(
      * Now do the same for constraints.
      */
     for (entry = Tcl_FirstHashEntry(&info->constraints, &search) ;
-	entry ; entry = Tcl_NextHashEntry(&search)) {
-	 relvarConstraintCleanup(Tcl_GetHashValue(entry)) ;
+        entry ; entry = Tcl_NextHashEntry(&search)) {
+         relvarConstraintCleanup(Tcl_GetHashValue(entry)) ;
     }
     Tcl_DeleteHashTable(&info->constraints) ;
     /*
      * Clean up the transaction trace list.
      */
     for (trace = info->traces ; trace ; ) {
-	Ral_TraceInfo temp = trace->next ; /* make sure not to access the trace
-					    * memory after it has been freed */
-	Tcl_DecrRefCount(trace->command) ;
-	ckfree((char *)trace) ;
-	trace = temp ;
+        Ral_TraceInfo temp = trace->next ; /* make sure not to access the trace
+                                            * memory after it has been freed */
+        Tcl_DecrRefCount(trace->command) ;
+        ckfree((char *)trace) ;
+        trace = temp ;
     }
     /*
      * Finally free the top level memory.
@@ -299,52 +299,52 @@ Ral_RelvarEndTransaction(
     Ral_PtrVectorIter pEnd ;
 
     if (!failed) {
-	Ral_PtrVector constraints = Ral_PtrVectorNew(0) ;
-	Ral_PtrVectorIter cEnd ;
-	Ral_PtrVectorIter cIter ;
-	/*
-	 * Iterate across the transaction evaluating the constraints.
-	 * Build a set of constraints that the modified relvars
-	 * participate in and then evaluate all the constraints in that set.
-	 * "trans->modified" is the set of relvars that were modified
-	 * during the transaction.
-	 */
-	pEnd = Ral_PtrVectorEnd(trans->modifiedRelvars) ;
-	for (pIter = Ral_PtrVectorBegin(trans->modifiedRelvars) ;
-	    pIter != pEnd ; ++pIter) {
-	    Ral_Relvar modRelvar = *pIter ;
-	    Ral_PtrVectorIter rcEnd = Ral_PtrVectorEnd(modRelvar->constraints) ;
-	    Ral_PtrVectorIter rcIter ;
-	    for (rcIter = Ral_PtrVectorBegin(modRelvar->constraints) ;
-		rcIter != rcEnd ; ++rcIter) {
-		Ral_PtrVectorSetAdd(constraints, *rcIter) ;
-	    }
-	}
-	cEnd = Ral_PtrVectorEnd(constraints) ;
-	for (cIter = Ral_PtrVectorBegin(constraints) ; cIter != cEnd ;
-	    ++cIter) {
-	    failed += !Ral_RelvarConstraintEval(*cIter, errMsg) ;
-	}
-	Ral_PtrVectorDelete(constraints) ;
+        Ral_PtrVector constraints = Ral_PtrVectorNew(0) ;
+        Ral_PtrVectorIter cEnd ;
+        Ral_PtrVectorIter cIter ;
+        /*
+         * Iterate across the transaction evaluating the constraints.
+         * Build a set of constraints that the modified relvars
+         * participate in and then evaluate all the constraints in that set.
+         * "trans->modified" is the set of relvars that were modified
+         * during the transaction.
+         */
+        pEnd = Ral_PtrVectorEnd(trans->modifiedRelvars) ;
+        for (pIter = Ral_PtrVectorBegin(trans->modifiedRelvars) ;
+            pIter != pEnd ; ++pIter) {
+            Ral_Relvar modRelvar = *pIter ;
+            Ral_PtrVectorIter rcEnd = Ral_PtrVectorEnd(modRelvar->constraints) ;
+            Ral_PtrVectorIter rcIter ;
+            for (rcIter = Ral_PtrVectorBegin(modRelvar->constraints) ;
+                rcIter != rcEnd ; ++rcIter) {
+                Ral_PtrVectorSetAdd(constraints, *rcIter) ;
+            }
+        }
+        cEnd = Ral_PtrVectorEnd(constraints) ;
+        for (cIter = Ral_PtrVectorBegin(constraints) ; cIter != cEnd ;
+            ++cIter) {
+            failed += !Ral_RelvarConstraintEval(*cIter, errMsg) ;
+        }
+        Ral_PtrVectorDelete(constraints) ;
     }
     pEnd = Ral_PtrVectorEnd(trans->modifiedRelvars) ;
     if (failed) {
-	/*
-	 * If any constaint fails, pop and restore the saved values of
-	 * the relvars.
-	 */
-	for (pIter = Ral_PtrVectorBegin(trans->modifiedRelvars) ;
-	    pIter != pEnd ; ++pIter) {
-	    Ral_RelvarRestorePrev(*pIter) ;
-	}
+        /*
+         * If any constaint fails, pop and restore the saved values of
+         * the relvars.
+         */
+        for (pIter = Ral_PtrVectorBegin(trans->modifiedRelvars) ;
+            pIter != pEnd ; ++pIter) {
+            Ral_RelvarRestorePrev(*pIter) ;
+        }
     } else {
-	/*
-	 * Pop and discard the saved values.
-	 */
-	for (pIter = Ral_PtrVectorBegin(trans->modifiedRelvars) ;
-	    pIter != pEnd ; ++pIter) {
-	    Ral_RelvarDiscardPrev(*pIter) ;
-	}
+        /*
+         * Pop and discard the saved values.
+         */
+        for (pIter = Ral_PtrVectorBegin(trans->modifiedRelvars) ;
+            pIter != pEnd ; ++pIter) {
+            Ral_RelvarDiscardPrev(*pIter) ;
+        }
     }
     /*
      * Delete the transaction.
@@ -379,19 +379,19 @@ Ral_RelvarStartCommand(
      * transaction.
      */
     if (Ral_PtrVectorSize(info->transactions) == 0) {
-	Ral_RelvarStartTransaction(info, 1) ;
-	currTrans = Ral_PtrVectorBack(info->transactions) ;
+        Ral_RelvarStartTransaction(info, 1) ;
+        currTrans = Ral_PtrVectorBack(info->transactions) ;
     } else {
-	/*
-	 * Otherwise, check if the current transaction is a single command.
-	 * If so, then then we are recursively trying to run relvar commands
-	 * outside of a "relvar eval". This can happen if a "relvar update"
-	 * script runs another relvar command, for example.
-	 */
-	currTrans = Ral_PtrVectorBack(info->transactions) ;
-	if (currTrans->isSingleCmd) {
-	    return 0 ;
-	}
+        /*
+         * Otherwise, check if the current transaction is a single command.
+         * If so, then then we are recursively trying to run relvar commands
+         * outside of a "relvar eval". This can happen if a "relvar update"
+         * script runs another relvar command, for example.
+         */
+        currTrans = Ral_PtrVectorBack(info->transactions) ;
+        if (currTrans->isSingleCmd) {
+            return 0 ;
+        }
     }
     /*
      * If we are starting a command on a relvar that is not already part of the
@@ -399,9 +399,9 @@ Ral_RelvarStartCommand(
      * the end of the transaction if necessary.
      */
     if (Ral_RelvarTransModifiedRelvar(info, relvar)) {
-	Ral_Relation rel = relvar->relObj->internalRep.otherValuePtr ;
-	Ral_PtrVectorPushBack(relvar->transStack,
-	    Ral_RelationShallowCopy(rel)) ;
+        Ral_Relation rel = relvar->relObj->internalRep.otherValuePtr ;
+        Ral_PtrVectorPushBack(relvar->transStack,
+            Ral_RelationShallowCopy(rel)) ;
     }
     return 1 ;
 }
@@ -418,11 +418,11 @@ Ral_RelvarEndCommand(
     assert(Ral_PtrVectorSize(info->transactions) > 0) ;
     trans = Ral_PtrVectorBack(info->transactions) ;
     if (trans->isSingleCmd) {
-	assert(Ral_PtrVectorSize(info->transactions) == 1) ;
-	/*
-	 * End the single command transaction. 
-	 */
-	success = Ral_RelvarEndTransaction(info, failed, errMsg) ;
+        assert(Ral_PtrVectorSize(info->transactions) == 1) ;
+        /*
+         * End the single command transaction. 
+         */
+        success = Ral_RelvarEndTransaction(info, failed, errMsg) ;
     }
 
     return success ;
@@ -446,9 +446,9 @@ Ral_RelvarNewTransaction(void)
     Ral_RelvarTransaction trans ;
 
     trans = (Ral_RelvarTransaction)ckalloc(sizeof(*trans)) ;
-	/*
-	 * 1, so that we don't reallocate immediately
-	 */
+        /*
+         * 1, so that we don't reallocate immediately
+         */
     trans->modifiedRelvars = Ral_PtrVectorNew(1) ;
     return trans ;
 }
@@ -472,8 +472,8 @@ Ral_ConstraintAssocCreate(
 
     entry = Tcl_CreateHashEntry(&info->constraints, name, &newPtr) ;
     if (newPtr) {
-	constraint = Ral_ConstraintNewAssociation(name) ;
-	Tcl_SetHashValue(entry, constraint) ;
+        constraint = Ral_ConstraintNewAssociation(name) ;
+        Tcl_SetHashValue(entry, constraint) ;
     }
 
     return constraint ;
@@ -490,8 +490,8 @@ Ral_ConstraintPartitionCreate(
 
     entry = Tcl_CreateHashEntry(&info->constraints, name, &newPtr) ;
     if (newPtr) {
-	constraint = Ral_ConstraintNewPartition(name) ;
-	Tcl_SetHashValue(entry, constraint) ;
+        constraint = Ral_ConstraintNewPartition(name) ;
+        Tcl_SetHashValue(entry, constraint) ;
     }
 
     return constraint ;
@@ -508,8 +508,8 @@ Ral_ConstraintCorrelationCreate(
 
     entry = Tcl_CreateHashEntry(&info->constraints, name, &newPtr) ;
     if (newPtr) {
-	constraint = Ral_ConstraintNewCorrelation(name) ;
-	Tcl_SetHashValue(entry, constraint) ;
+        constraint = Ral_ConstraintNewCorrelation(name) ;
+        Tcl_SetHashValue(entry, constraint) ;
     }
 
     return constraint ;
@@ -525,10 +525,10 @@ Ral_ConstraintDeleteByName(
 
     entry = Tcl_FindHashEntry(&info->constraints, name) ;
     if (entry) {
-	Ral_Constraint constraint = (Ral_Constraint)Tcl_GetHashValue(entry) ;
-	Ral_ConstraintDelete(constraint) ;
-	Tcl_DeleteHashEntry(entry) ;
-	deleted = 1 ;
+        Ral_Constraint constraint = (Ral_Constraint)Tcl_GetHashValue(entry) ;
+        Ral_ConstraintDelete(constraint) ;
+        Tcl_DeleteHashEntry(entry) ;
+        deleted = 1 ;
     }
     return deleted ;
 }
@@ -543,7 +543,7 @@ Ral_ConstraintFindByName(
 
     entry = Tcl_FindHashEntry(&info->constraints, name) ;
     if (entry) {
-	constraint = (Ral_Constraint)Tcl_GetHashValue(entry) ;
+        constraint = (Ral_Constraint)Tcl_GetHashValue(entry) ;
     }
 
     return constraint ;
@@ -556,7 +556,7 @@ Ral_ConstraintNew(
     Ral_Constraint constraint ;
 
     constraint = (Ral_Constraint)ckalloc(sizeof(*constraint) + strlen(name)
-	+ 1) ; /* +1 for NUL terminator */
+        + 1) ; /* +1 for NUL terminator */
     constraint->name = (char *)(constraint + 1) ;
     strcpy(constraint->name, name) ;
 
@@ -571,9 +571,9 @@ Ral_ConstraintNewAssociation(
 
     constraint->type = ConstraintAssociation ;
     constraint->constraint.association = (Ral_AssociationConstraint)ckalloc(
-	sizeof(*constraint->constraint.association)) ;
+        sizeof(*constraint->constraint.association)) ;
     memset(constraint->constraint.association, 0,
-	    sizeof(*constraint->constraint.association)) ;
+            sizeof(*constraint->constraint.association)) ;
 
     return constraint ;
 }
@@ -586,7 +586,7 @@ Ral_ConstraintNewPartition(
 
     constraint->type = ConstraintPartition ;
     constraint->constraint.partition = (Ral_PartitionConstraint)ckalloc(
-	sizeof(*constraint->constraint.partition)) ;
+        sizeof(*constraint->constraint.partition)) ;
     constraint->constraint.partition->subsetReferences = Ral_PtrVectorNew(2) ;
 
     return constraint ;
@@ -600,9 +600,9 @@ Ral_ConstraintNewCorrelation(
 
     constraint->type = ConstraintCorrelation ;
     constraint->constraint.correlation = (Ral_CorrelationConstraint)ckalloc(
-	sizeof(*constraint->constraint.correlation)) ;
+        sizeof(*constraint->constraint.correlation)) ;
     memset(constraint->constraint.correlation, 0,
-	    sizeof(*constraint->constraint.correlation)) ;
+            sizeof(*constraint->constraint.correlation)) ;
 
     return constraint ;
 }
@@ -614,115 +614,115 @@ Ral_ConstraintDelete(
     switch (constraint->type) {
     case ConstraintAssociation:
     {
-	Ral_AssociationConstraint assoc = constraint->constraint.association ;
-	Ral_Relvar referring = assoc->referringRelvar ;
-	Ral_Relvar referred = assoc->referredToRelvar ;
-	Ral_PtrVectorIter found ;
+        Ral_AssociationConstraint assoc = constraint->constraint.association ;
+        Ral_Relvar referring = assoc->referringRelvar ;
+        Ral_Relvar referred = assoc->referredToRelvar ;
+        Ral_PtrVectorIter found ;
 
-	/*
-	 * Find the constraint in the list of constraints associated
-	 * with each relvar that participates in the association.
-	 * We have to remove these references before deleting the
-	 * constraint data structure.
-	 */
-	found = Ral_PtrVectorFind(referring->constraints, constraint) ;
-	/*
-	 * We allow the constraint to not be found in case this
-	 * is called as a clean up when the constraint is only
-	 * partially formed.
-	 */
-	if (found != Ral_PtrVectorEnd(referring->constraints)) {
-	    Ral_PtrVectorErase(referring->constraints, found, found + 1) ;
-	}
+        /*
+         * Find the constraint in the list of constraints associated
+         * with each relvar that participates in the association.
+         * We have to remove these references before deleting the
+         * constraint data structure.
+         */
+        found = Ral_PtrVectorFind(referring->constraints, constraint) ;
+        /*
+         * We allow the constraint to not be found in case this
+         * is called as a clean up when the constraint is only
+         * partially formed.
+         */
+        if (found != Ral_PtrVectorEnd(referring->constraints)) {
+            Ral_PtrVectorErase(referring->constraints, found, found + 1) ;
+        }
 
-	found = Ral_PtrVectorFind(referred->constraints, constraint) ;
-	if (found != Ral_PtrVectorEnd(referred->constraints)) {
-	    Ral_PtrVectorErase(referred->constraints, found, found + 1) ;
-	}
+        found = Ral_PtrVectorFind(referred->constraints, constraint) ;
+        if (found != Ral_PtrVectorEnd(referred->constraints)) {
+            Ral_PtrVectorErase(referred->constraints, found, found + 1) ;
+        }
     }
-	break ;
+        break ;
 
     case ConstraintPartition:
     {
-	Ral_PartitionConstraint partition = constraint->constraint.partition ;
-	Ral_Relvar super = partition->referredToRelvar ;
-	Ral_PtrVectorIter found ;
-	Ral_PtrVectorIter sEnd ;
-	Ral_PtrVectorIter sIter ;
+        Ral_PartitionConstraint partition = constraint->constraint.partition ;
+        Ral_Relvar super = partition->referredToRelvar ;
+        Ral_PtrVectorIter found ;
+        Ral_PtrVectorIter sEnd ;
+        Ral_PtrVectorIter sIter ;
 
-	/*
-	 * Find the pointer to the constraint in the super type and remove it.
-	 */
-	found = Ral_PtrVectorFind(super->constraints, constraint) ;
-	if (found != Ral_PtrVectorEnd(super->constraints)) {
-	    Ral_PtrVectorErase(super->constraints, found, found + 1) ;
-	}
-	/*
-	 * Now iterate through the subtypes and remove the constraint
-	 * references found there.
-	 */
-	sEnd = Ral_PtrVectorEnd(partition->subsetReferences) ;
-	for (sIter = Ral_PtrVectorBegin(partition->subsetReferences) ;
-	    sIter != sEnd ; ++sIter) {
-	    Ral_SubsetReference subRef = *sIter ;
-	    Ral_Relvar sub = subRef->relvar ;
+        /*
+         * Find the pointer to the constraint in the super type and remove it.
+         */
+        found = Ral_PtrVectorFind(super->constraints, constraint) ;
+        if (found != Ral_PtrVectorEnd(super->constraints)) {
+            Ral_PtrVectorErase(super->constraints, found, found + 1) ;
+        }
+        /*
+         * Now iterate through the subtypes and remove the constraint
+         * references found there.
+         */
+        sEnd = Ral_PtrVectorEnd(partition->subsetReferences) ;
+        for (sIter = Ral_PtrVectorBegin(partition->subsetReferences) ;
+            sIter != sEnd ; ++sIter) {
+            Ral_SubsetReference subRef = *sIter ;
+            Ral_Relvar sub = subRef->relvar ;
 
-	    found = Ral_PtrVectorFind(sub->constraints, constraint) ;
-	    if (found != Ral_PtrVectorEnd(sub->constraints)) {
-		Ral_PtrVectorErase(sub->constraints, found, found + 1) ;
-	    }
-	}
-	/*
-	 * Iterate through the subset references and free the join maps.
-	 */
-	sEnd = Ral_PtrVectorEnd(partition->subsetReferences) ;
-	for (sIter = Ral_PtrVectorBegin(partition->subsetReferences) ;
-	    sIter != sEnd ; ++sIter) {
-	    Ral_SubsetReference subRef = *sIter ;
-	    if (subRef->subsetMap) {
-		Ral_JoinMapDelete(subRef->subsetMap) ;
-	    }
-	}
+            found = Ral_PtrVectorFind(sub->constraints, constraint) ;
+            if (found != Ral_PtrVectorEnd(sub->constraints)) {
+                Ral_PtrVectorErase(sub->constraints, found, found + 1) ;
+            }
+        }
+        /*
+         * Iterate through the subset references and free the join maps.
+         */
+        sEnd = Ral_PtrVectorEnd(partition->subsetReferences) ;
+        for (sIter = Ral_PtrVectorBegin(partition->subsetReferences) ;
+            sIter != sEnd ; ++sIter) {
+            Ral_SubsetReference subRef = *sIter ;
+            if (subRef->subsetMap) {
+                Ral_JoinMapDelete(subRef->subsetMap) ;
+            }
+        }
     }
-	break ;
+        break ;
 
     case ConstraintCorrelation:
     {
-	Ral_CorrelationConstraint correl = constraint->constraint.correlation ;
-	Ral_Relvar referring = correl->referringRelvar ;
-	Ral_Relvar aRef = correl->aRefToRelvar ;
-	Ral_Relvar bRef = correl->bRefToRelvar ;
-	Ral_PtrVectorIter found ;
+        Ral_CorrelationConstraint correl = constraint->constraint.correlation ;
+        Ral_Relvar referring = correl->referringRelvar ;
+        Ral_Relvar aRef = correl->aRefToRelvar ;
+        Ral_Relvar bRef = correl->bRefToRelvar ;
+        Ral_PtrVectorIter found ;
 
-	/*
-	 * Like the association case, delete this constraint from
-	 * those associated with the participating relvars.
-	 * In this case there are three different relvars to examine.
-	 */
-	found = Ral_PtrVectorFind(referring->constraints, constraint) ;
-	/*
-	 * We allow the constraint to not be found in case this
-	 * is called as a clean up when the constraint is only
-	 * partially formed.
-	 */
-	if (found != Ral_PtrVectorEnd(referring->constraints)) {
-	    Ral_PtrVectorErase(referring->constraints, found, found + 1) ;
-	}
+        /*
+         * Like the association case, delete this constraint from
+         * those associated with the participating relvars.
+         * In this case there are three different relvars to examine.
+         */
+        found = Ral_PtrVectorFind(referring->constraints, constraint) ;
+        /*
+         * We allow the constraint to not be found in case this
+         * is called as a clean up when the constraint is only
+         * partially formed.
+         */
+        if (found != Ral_PtrVectorEnd(referring->constraints)) {
+            Ral_PtrVectorErase(referring->constraints, found, found + 1) ;
+        }
 
-	found = Ral_PtrVectorFind(aRef->constraints, constraint) ;
-	if (found != Ral_PtrVectorEnd(aRef->constraints)) {
-	    Ral_PtrVectorErase(aRef->constraints, found, found + 1) ;
-	}
-	found = Ral_PtrVectorFind(bRef->constraints, constraint) ;
-	if (found != Ral_PtrVectorEnd(bRef->constraints)) {
-	    Ral_PtrVectorErase(bRef->constraints, found, found + 1) ;
-	}
+        found = Ral_PtrVectorFind(aRef->constraints, constraint) ;
+        if (found != Ral_PtrVectorEnd(aRef->constraints)) {
+            Ral_PtrVectorErase(aRef->constraints, found, found + 1) ;
+        }
+        found = Ral_PtrVectorFind(bRef->constraints, constraint) ;
+        if (found != Ral_PtrVectorEnd(bRef->constraints)) {
+            Ral_PtrVectorErase(bRef->constraints, found, found + 1) ;
+        }
     }
-	break ;
+        break ;
 
     default:
-	Tcl_Panic("Ral_ConstraintDelete: unknown constraint type, %d",
-	    constraint->type) ;
+        Tcl_Panic("Ral_ConstraintDelete: unknown constraint type, %d",
+            constraint->type) ;
     }
 
     relvarConstraintCleanup(constraint) ;
@@ -735,23 +735,23 @@ Ral_RelvarConstraintEval(
 {
     switch (constraint->type) {
     case ConstraintAssociation:
-	return relvarAssocConstraintEval(constraint->name,
-	    constraint->constraint.association, errMsg) ;
-	break ;
+        return relvarAssocConstraintEval(constraint->name,
+            constraint->constraint.association, errMsg) ;
+        break ;
 
     case ConstraintPartition:
-	return relvarPartitionConstraintEval(constraint->name,
-	    constraint->constraint.partition, errMsg) ;
-	break ;
+        return relvarPartitionConstraintEval(constraint->name,
+            constraint->constraint.partition, errMsg) ;
+        break ;
 
     case ConstraintCorrelation:
-	return relvarCorrelationConstraintEval(constraint->name,
-	    constraint->constraint.correlation, errMsg) ;
-	break ;
+        return relvarCorrelationConstraintEval(constraint->name,
+            constraint->constraint.correlation, errMsg) ;
+        break ;
 
     default:
-	Tcl_Panic("unknown constraint type, %d", constraint->type) ;
-	return 0 ;
+        Tcl_Panic("unknown constraint type, %d", constraint->type) ;
+        return 0 ;
     }
     /* NOT REACHED */
 }
@@ -783,14 +783,14 @@ Ral_RelvarSetRelation(
     if (orderMap) {
         int copied ;
 
-	copyRel = Ral_RelationNew(oldRel->heading) ;
-	Ral_RelationReserve(copyRel, Ral_RelationCardinality(newRel)) ;
-	copied = Ral_RelationCopy(newRel, Ral_RelationBegin(newRel),
-	    Ral_RelationEnd(newRel), copyRel, orderMap) ;
-	assert(copied == 1) ;
-	Ral_IntVectorDelete(orderMap) ;
+        copyRel = Ral_RelationNew(oldRel->heading) ;
+        Ral_RelationReserve(copyRel, Ral_RelationCardinality(newRel)) ;
+        copied = Ral_RelationCopy(newRel, Ral_RelationBegin(newRel),
+            Ral_RelationEnd(newRel), copyRel, orderMap) ;
+        assert(copied == 1) ;
+        Ral_IntVectorDelete(orderMap) ;
     } else {
-	copyRel = Ral_RelationShallowCopy(newRel) ;
+        copyRel = Ral_RelationShallowCopy(newRel) ;
     }
     /*
      * Free up the old relation and install the copy.
@@ -1083,38 +1083,38 @@ Ral_RelvarTraceRemove(
      * pointer to use during relinking.
      */
     while (trace) {
-	if (trace->flags == flags &&
-	    strcmp(Tcl_GetString(trace->command), cmdString) == 0) {
-	    /*
-	     * Found a match. Remember the one to delete.
-	     */
-	    Ral_TraceInfo del = trace ;
-	    if (prev) {
-		/*
-		 * Unlinking in the middle of the list.
-		 */
-		prev->next = trace->next ;
-	    } else {
-		/*
-		 * Unlinking the first one in the list.
-		 */
-		relvar->traces = trace->next ;
-	    }
-	    /*
-	     * Point to the next list item. Do this before freeing
-	     * the item itself since after the cleanup the "trace"
-	     * pointer is invalid.
-	     */
-	    trace = trace->next ;
-	    relvarTraceCleanup(del) ;
-	    ++nRemoved ;
-	} else {
-	    /*
-	     * No match, advance the pointers along the list.
-	     */
-	    prev = trace ;
-	    trace = trace->next ;
-	}
+        if (trace->flags == flags &&
+            strcmp(Tcl_GetString(trace->command), cmdString) == 0) {
+            /*
+             * Found a match. Remember the one to delete.
+             */
+            Ral_TraceInfo del = trace ;
+            if (prev) {
+                /*
+                 * Unlinking in the middle of the list.
+                 */
+                prev->next = trace->next ;
+            } else {
+                /*
+                 * Unlinking the first one in the list.
+                 */
+                relvar->traces = trace->next ;
+            }
+            /*
+             * Point to the next list item. Do this before freeing
+             * the item itself since after the cleanup the "trace"
+             * pointer is invalid.
+             */
+            trace = trace->next ;
+            relvarTraceCleanup(del) ;
+            ++nRemoved ;
+        } else {
+            /*
+             * No match, advance the pointers along the list.
+             */
+            prev = trace ;
+            trace = trace->next ;
+        }
     }
     return nRemoved ;
 }
@@ -1132,13 +1132,13 @@ relvarCleanup(
     int idCnt ;
 
     if (relvar->relObj) {
-	assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
-	Tcl_DecrRefCount(relvar->relObj) ;
+        assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
+        Tcl_DecrRefCount(relvar->relObj) ;
     }
 
     for ( ; Ral_PtrVectorSize(relvar->transStack) != 0 ;
-	Ral_PtrVectorPopBack(relvar->transStack)) {
-	Ral_RelationDelete(Ral_PtrVectorBack(relvar->transStack)) ;
+        Ral_PtrVectorPopBack(relvar->transStack)) {
+        Ral_RelationDelete(Ral_PtrVectorBack(relvar->transStack)) ;
     }
     Ral_PtrVectorDelete(relvar->transStack) ;
     Ral_PtrVectorDelete(relvar->constraints) ;
@@ -1147,9 +1147,9 @@ relvarCleanup(
      * Free the trace information.
      */
     for (t = relvar->traces ; t ; ) {
-	Ral_TraceInfo del = t ;
-	t = t->next ;
-	relvarTraceCleanup(del) ;
+        Ral_TraceInfo del = t ;
+        t = t->next ;
+        relvarTraceCleanup(del) ;
     }
 
     /*
@@ -1183,38 +1183,38 @@ relvarConstraintCleanup(
     switch (constraint->type) {
     case ConstraintAssociation:
     {
-	Ral_AssociationConstraint assoc = constraint->constraint.association ;
-	if (assoc->referenceMap) {
-	    Ral_JoinMapDelete(assoc->referenceMap) ;
-	}
-	ckfree((char *)assoc) ;
+        Ral_AssociationConstraint assoc = constraint->constraint.association ;
+        if (assoc->referenceMap) {
+            Ral_JoinMapDelete(assoc->referenceMap) ;
+        }
+        ckfree((char *)assoc) ;
     }
-	break ;
+        break ;
 
     case ConstraintPartition:
     {
-	Ral_PartitionConstraint partition = constraint->constraint.partition ;
-	Ral_PtrVectorDelete(partition->subsetReferences) ;
-	ckfree((char *)partition) ;
+        Ral_PartitionConstraint partition = constraint->constraint.partition ;
+        Ral_PtrVectorDelete(partition->subsetReferences) ;
+        ckfree((char *)partition) ;
     }
-	break ;
+        break ;
 
     case ConstraintCorrelation:
     {
-	Ral_CorrelationConstraint correl = constraint->constraint.correlation ;
-	if (correl->aReferenceMap) {
-	    Ral_JoinMapDelete(correl->aReferenceMap) ;
-	}
-	if (correl->bReferenceMap) {
-	    Ral_JoinMapDelete(correl->bReferenceMap) ;
-	}
-	ckfree((char *)correl) ;
+        Ral_CorrelationConstraint correl = constraint->constraint.correlation ;
+        if (correl->aReferenceMap) {
+            Ral_JoinMapDelete(correl->aReferenceMap) ;
+        }
+        if (correl->bReferenceMap) {
+            Ral_JoinMapDelete(correl->bReferenceMap) ;
+        }
+        ckfree((char *)correl) ;
     }
-	break ;
+        break ;
 
     default:
-	Tcl_Panic("relvarConstraintCleanup: unknown constraint type, %d",
-	    constraint->type) ;
+        Tcl_Panic("relvarConstraintCleanup: unknown constraint type, %d",
+            constraint->type) ;
     }
 
     ckfree((char *)constraint) ;
@@ -1324,9 +1324,9 @@ relvarIndexIds(
  */
 static int
 relvarAssocConstraintEval(
-    char const *name,			    /* name of constraint */
+    char const *name,                       /* name of constraint */
     Ral_AssociationConstraint association,  /* association constraint */
-    Tcl_DString *errMsg)		    /* error message left here */
+    Tcl_DString *errMsg)                    /* error message left here */
 {
     Ral_Relvar referringRelvar = association->referringRelvar ;
     Ral_Relvar referredToRelvar = association->referredToRelvar ;
@@ -1361,18 +1361,18 @@ relvarAssocConstraintEval(
     multViolations = Ral_IntVectorNewEmpty(0) ;
     condViolations = Ral_IntVectorNewEmpty(0) ;
     ref_result = relvarEvalAssocTupleCounts(cnts, association->referringMult,
-	association->referringCond, multViolations, condViolations) ;
+        association->referringCond, multViolations, condViolations) ;
     Ral_IntVectorDelete(cnts) ;
     /*
      * Leave error messages.
      */
     if (!ref_result) {
-	relvarAssocConstraintErrorMsg(errMsg, name, association,
-	    referredToRelvar, multViolations,
-	    "is referenced by multiple tuples") ;
-	relvarAssocConstraintErrorMsg(errMsg, name, association,
-	    referredToRelvar, condViolations,
-	    "is not referenced by any tuple") ;
+        relvarAssocConstraintErrorMsg(errMsg, name, association,
+            referredToRelvar, multViolations,
+            "is referenced by multiple tuples") ;
+        relvarAssocConstraintErrorMsg(errMsg, name, association,
+            referredToRelvar, condViolations,
+            "is not referenced by any tuple") ;
     }
     Ral_IntVectorDelete(multViolations) ;
     Ral_IntVectorDelete(condViolations) ;
@@ -1385,13 +1385,13 @@ relvarAssocConstraintEval(
     multViolations = Ral_IntVectorNewEmpty(0) ;
     condViolations = Ral_IntVectorNewEmpty(0) ;
     refTo_result = relvarEvalAssocTupleCounts(cnts, association->referredToMult,
-	association->referredToCond, multViolations, condViolations) ;
+        association->referredToCond, multViolations, condViolations) ;
     Ral_IntVectorDelete(cnts) ;
     if (!refTo_result) {
-	relvarAssocConstraintErrorMsg(errMsg, name, association,
-	    referringRelvar, multViolations, "references multiple tuples") ;
-	relvarAssocConstraintErrorMsg(errMsg, name, association,
-	    referringRelvar, condViolations, "references no tuple") ;
+        relvarAssocConstraintErrorMsg(errMsg, name, association,
+            referringRelvar, multViolations, "references multiple tuples") ;
+        relvarAssocConstraintErrorMsg(errMsg, name, association,
+            referringRelvar, condViolations, "references no tuple") ;
     }
     Ral_IntVectorDelete(multViolations) ;
     Ral_IntVectorDelete(condViolations) ;
@@ -1435,54 +1435,54 @@ relvarPartitionConstraintEval(
 
     for (subIter = Ral_PtrVectorBegin(partition->subsetReferences) ;
             subIter != subEnd ; ++subIter) {
-	Ral_SubsetReference subRef = *subIter ;
-	Ral_Relvar sub = subRef->relvar ;
-	Ral_Relation subRel ;
-	Ral_JoinMap subMap = subRef->subsetMap ;
-	int subMatches ;
+        Ral_SubsetReference subRef = *subIter ;
+        Ral_Relvar sub = subRef->relvar ;
+        Ral_Relation subRel ;
+        Ral_JoinMap subMap = subRef->subsetMap ;
+        int subMatches ;
 
-	assert(sub->relObj->typePtr == &Ral_RelationObjType) ;
-	subRel = sub->relObj->internalRep.otherValuePtr ;
-	/*
-	 * Find the join from the subtype to the supertype.
-	 */
+        assert(sub->relObj->typePtr == &Ral_RelationObjType) ;
+        subRel = sub->relObj->internalRep.otherValuePtr ;
+        /*
+         * Find the join from the subtype to the supertype.
+         */
         relvarFindJoinTuples(sub, super, partition->referredToIdentifier,
                 subMap) ;
-	/*
-	 * The number of matching tuple entries must be the same as
-	 * the cardinality of the subtype.
-	 */
-	subMatches = Ral_JoinMapTupleCounts(subMap, 1, superMatches) ;
-	if (subMatches != Ral_RelationCardinality(subRel)) {
-	    Ral_IntVector violations = Ral_IntVectorNewEmpty(1) ;
-	    Ral_IntVector matchMap = Ral_JoinMapTupleMap(subMap, 0,
-		Ral_RelationCardinality(subRel)) ;
-	    Ral_IntVectorIter mIter ;
+        /*
+         * The number of matching tuple entries must be the same as
+         * the cardinality of the subtype.
+         */
+        subMatches = Ral_JoinMapTupleCounts(subMap, 1, superMatches) ;
+        if (subMatches != Ral_RelationCardinality(subRel)) {
+            Ral_IntVector violations = Ral_IntVectorNewEmpty(1) ;
+            Ral_IntVector matchMap = Ral_JoinMapTupleMap(subMap, 0,
+                Ral_RelationCardinality(subRel)) ;
+            Ral_IntVectorIter mIter ;
 
-	    /*
-	     * We must find the tuple that did not match anything in
-	     * the supertype. We can do this by getting the map
-	     * and examining it.
-	     */
-	    for (mIter = Ral_IntVectorBegin(matchMap) ;
+            /*
+             * We must find the tuple that did not match anything in
+             * the supertype. We can do this by getting the map
+             * and examining it.
+             */
+            for (mIter = Ral_IntVectorBegin(matchMap) ;
                     mIter != Ral_IntVectorEnd(matchMap) ; ++mIter) {
-		if (*mIter) {
-		    Ral_IntVectorPushBack(violations,
-			Ral_IntVectorOffsetOf(matchMap, mIter)) ;
-		}
-	    }
-	    Ral_IntVectorDelete(matchMap) ;
+                if (*mIter) {
+                    Ral_IntVectorPushBack(violations,
+                        Ral_IntVectorOffsetOf(matchMap, mIter)) ;
+                }
+            }
+            Ral_IntVectorDelete(matchMap) ;
 
-	    relvarPartitionConstraintErrorMsg(errMsg, name, partition,
-		sub, violations, "references no tuple") ;
-	    Ral_IntVectorDelete(violations) ;
+            relvarPartitionConstraintErrorMsg(errMsg, name, partition,
+                sub, violations, "references no tuple") ;
+            Ral_IntVectorDelete(violations) ;
 
-	    result = 0 ;
-	}
-	/*
-	 * Clear out the matches for the next time the constraint is evaluated.
-	 */
-	Ral_JoinMapTupleEmpty(subMap) ;
+            result = 0 ;
+        }
+        /*
+         * Clear out the matches for the next time the constraint is evaluated.
+         */
+        Ral_JoinMapTupleEmpty(subMap) ;
     }
 
     /*
@@ -1495,23 +1495,23 @@ relvarPartitionConstraintEval(
     condViolations = Ral_IntVectorNewEmpty(0) ;
     for (mIter = Ral_IntVectorBegin(superMatches) ;
             mIter != Ral_IntVectorEnd(superMatches) ; ++mIter) {
-	int matchCount = *mIter ;
+        int matchCount = *mIter ;
 
-	if (matchCount != 1) {
-	    if (matchCount > 1) {
-		Ral_IntVectorPushBack(multViolations,
-		    Ral_IntVectorOffsetOf(superMatches, mIter)) ;
-	    } else /* matchCount == 0 */ {
-		Ral_IntVectorPushBack(condViolations,
-		    Ral_IntVectorOffsetOf(superMatches, mIter)) ;
-	    }
-	    result = 0 ;
-	}
+        if (matchCount != 1) {
+            if (matchCount > 1) {
+                Ral_IntVectorPushBack(multViolations,
+                    Ral_IntVectorOffsetOf(superMatches, mIter)) ;
+            } else /* matchCount == 0 */ {
+                Ral_IntVectorPushBack(condViolations,
+                    Ral_IntVectorOffsetOf(superMatches, mIter)) ;
+            }
+            result = 0 ;
+        }
     }
     relvarPartitionConstraintErrorMsg(errMsg, name, partition, super,
-	multViolations, "is referred to by multiple tuples") ;
+        multViolations, "is referred to by multiple tuples") ;
     relvarPartitionConstraintErrorMsg(errMsg, name, partition, super,
-	condViolations, "is not referred to by any tuple") ;
+        condViolations, "is not referred to by any tuple") ;
 
     Ral_IntVectorDelete(multViolations) ;
     Ral_IntVectorDelete(condViolations) ;
@@ -1571,18 +1571,18 @@ relvarCorrelationConstraintEval(
     multViolations = Ral_IntVectorNewEmpty(0) ;
     condViolations = Ral_IntVectorNewEmpty(0) ;
     aRef_result = relvarEvalAssocTupleCounts(cnts, correlation->aMult,
-	correlation->aCond, multViolations, condViolations) ;
+        correlation->aCond, multViolations, condViolations) ;
     Ral_IntVectorDelete(cnts) ;
     /*
      * Leave error messages.
      */
     if (!aRef_result) {
-	relvarCorrelationConstraintErrorMsg(errMsg, name, correlation,
-	    aRefToRelvar, multViolations,
-	    "is referenced by multiple tuples") ;
-	relvarCorrelationConstraintErrorMsg(errMsg, name, correlation,
-	    aRefToRelvar, condViolations,
-	    "is not referenced by any tuple") ;
+        relvarCorrelationConstraintErrorMsg(errMsg, name, correlation,
+            aRefToRelvar, multViolations,
+            "is referenced by multiple tuples") ;
+        relvarCorrelationConstraintErrorMsg(errMsg, name, correlation,
+            aRefToRelvar, condViolations,
+            "is not referenced by any tuple") ;
     }
     Ral_IntVectorDelete(multViolations) ;
     Ral_IntVectorDelete(condViolations) ;
@@ -1598,13 +1598,13 @@ relvarCorrelationConstraintEval(
      * The referred to direction is always unconditionally singular.
      */
     aRefTo_result = relvarEvalAssocTupleCounts(cnts, 0, 0,
-	multViolations, condViolations) ;
+        multViolations, condViolations) ;
     Ral_IntVectorDelete(cnts) ;
     if (!aRefTo_result) {
-	relvarCorrelationConstraintErrorMsg(errMsg, name, correlation,
-	    referringRelvar, multViolations, "references multiple tuples") ;
-	relvarCorrelationConstraintErrorMsg(errMsg, name, correlation,
-	    referringRelvar, condViolations, "references no tuple") ;
+        relvarCorrelationConstraintErrorMsg(errMsg, name, correlation,
+            referringRelvar, multViolations, "references multiple tuples") ;
+        relvarCorrelationConstraintErrorMsg(errMsg, name, correlation,
+            referringRelvar, condViolations, "references no tuple") ;
     }
     Ral_IntVectorDelete(multViolations) ;
     Ral_IntVectorDelete(condViolations) ;
@@ -1633,18 +1633,18 @@ relvarCorrelationConstraintEval(
     multViolations = Ral_IntVectorNewEmpty(0) ;
     condViolations = Ral_IntVectorNewEmpty(0) ;
     bRef_result = relvarEvalAssocTupleCounts(cnts, correlation->bMult,
-	correlation->bCond, multViolations, condViolations) ;
+        correlation->bCond, multViolations, condViolations) ;
     Ral_IntVectorDelete(cnts) ;
     /*
      * Leave error messages.
      */
     if (!bRef_result) {
-	relvarCorrelationConstraintErrorMsg(errMsg, name, correlation,
-	    bRefToRelvar, multViolations,
-	    "is referenced by multiple tuples") ;
-	relvarCorrelationConstraintErrorMsg(errMsg, name, correlation,
-	    bRefToRelvar, condViolations,
-	    "is not referenced by any tuple") ;
+        relvarCorrelationConstraintErrorMsg(errMsg, name, correlation,
+            bRefToRelvar, multViolations,
+            "is referenced by multiple tuples") ;
+        relvarCorrelationConstraintErrorMsg(errMsg, name, correlation,
+            bRefToRelvar, condViolations,
+            "is not referenced by any tuple") ;
     }
     Ral_IntVectorDelete(multViolations) ;
     Ral_IntVectorDelete(condViolations) ;
@@ -1660,13 +1660,13 @@ relvarCorrelationConstraintEval(
      * The referred to direction is always unconditionally singular.
      */
     bRefTo_result = relvarEvalAssocTupleCounts(cnts, 0, 0,
-	multViolations, condViolations) ;
+        multViolations, condViolations) ;
     Ral_IntVectorDelete(cnts) ;
     if (!bRefTo_result) {
-	relvarCorrelationConstraintErrorMsg(errMsg, name, correlation,
-	    referringRelvar, multViolations, "references multiple tuples") ;
-	relvarCorrelationConstraintErrorMsg(errMsg, name, correlation,
-	    referringRelvar, condViolations, "references no tuple") ;
+        relvarCorrelationConstraintErrorMsg(errMsg, name, correlation,
+            referringRelvar, multViolations, "references multiple tuples") ;
+        relvarCorrelationConstraintErrorMsg(errMsg, name, correlation,
+            referringRelvar, condViolations, "references no tuple") ;
     }
     Ral_IntVectorDelete(multViolations) ;
     Ral_IntVectorDelete(condViolations) ;
@@ -1680,20 +1680,20 @@ relvarCorrelationConstraintEval(
      */
     comp_result = 1 ;
     if (correlation->complete && (Ral_RelationCardinality(referringRel) !=
-	    Ral_RelationCardinality(aRefToRel) *
-	    Ral_RelationCardinality(bRefToRel))) {
-	{
-	    comp_result = 0 ;
-	    Tcl_DStringAppend(errMsg, "correlation ", -1) ;
-	    relvarCorrelationConstraintToString(name, correlation, errMsg) ;
-	    Tcl_DStringAppend(errMsg, " does not form a complete correlation",
-		-1) ;
-	}
+            Ral_RelationCardinality(aRefToRel) *
+            Ral_RelationCardinality(bRefToRel))) {
+        {
+            comp_result = 0 ;
+            Tcl_DStringAppend(errMsg, "correlation ", -1) ;
+            relvarCorrelationConstraintToString(name, correlation, errMsg) ;
+            Tcl_DStringAppend(errMsg, " does not form a complete correlation",
+                -1) ;
+        }
     }
 
     return aRef_result && aRefTo_result
-	    && bRef_result && bRefTo_result
-	    && comp_result ;
+            && bRef_result && bRefTo_result
+            && comp_result ;
 }
 
 /*
@@ -1764,24 +1764,24 @@ relvarEvalAssocTupleCounts(
 
     cEnd = Ral_IntVectorEnd(counts) ;
     for (cIter = Ral_IntVectorBegin(counts) ; cIter != cEnd ; ++cIter) {
-	Ral_IntVectorValueType count = *cIter ;
-	if (count != 1) {
-	    if (count > 1 && multiplicity == 0) {
-		/*
-		 * multiplicity violation
-		 */
-		result = 0 ;
-		Ral_IntVectorSetAdd(multViolate,
-		    Ral_IntVectorOffsetOf(counts, cIter)) ;
-	    } else if (count == 0 && conditionality == 0) {
-		/*
-		 * conditionality violation.
-		 */
-		result = 0 ;
-		Ral_IntVectorSetAdd(condViolate,
-		    Ral_IntVectorOffsetOf(counts, cIter)) ;
-	    }
-	}
+        Ral_IntVectorValueType count = *cIter ;
+        if (count != 1) {
+            if (count > 1 && multiplicity == 0) {
+                /*
+                 * multiplicity violation
+                 */
+                result = 0 ;
+                Ral_IntVectorSetAdd(multViolate,
+                    Ral_IntVectorOffsetOf(counts, cIter)) ;
+            } else if (count == 0 && conditionality == 0) {
+                /*
+                 * conditionality violation.
+                 */
+                result = 0 ;
+                Ral_IntVectorSetAdd(condViolate,
+                    Ral_IntVectorOffsetOf(counts, cIter)) ;
+            }
+        }
     }
 
     return result ;
@@ -1789,17 +1789,17 @@ relvarEvalAssocTupleCounts(
 
 static void
 relvarAssocConstraintErrorMsg(
-    Tcl_DString *msg,		    /* error text appended here */
-    char const *name,		    /* constraint name */
+    Tcl_DString *msg,               /* error text appended here */
+    char const *name,               /* constraint name */
     Ral_AssociationConstraint assoc,/* association contraint in error */
-    Ral_Relvar relvar,		    /* the relvar in error */
-    Ral_IntVector violations,	    /* a list of tuple indices in error */
-    char const *detail)		    /* text detail for the error */
+    Ral_Relvar relvar,              /* the relvar in error */
+    Ral_IntVector violations,       /* a list of tuple indices in error */
+    char const *detail)             /* text detail for the error */
 {
     Ral_Relation rel ;
 
     if (msg == NULL || Ral_IntVectorSize(violations) == 0) {
-	return ;
+        return ;
     }
 
     assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
@@ -1812,17 +1812,17 @@ relvarAssocConstraintErrorMsg(
 
 static void
 relvarPartitionConstraintErrorMsg(
-    Tcl_DString *msg,		    /* error text appended here */
-    char const *name,		    /* constraint name */
+    Tcl_DString *msg,               /* error text appended here */
+    char const *name,               /* constraint name */
     Ral_PartitionConstraint partition,/* partition contraint in error */
-    Ral_Relvar relvar,		    /* the relvar in error */
-    Ral_IntVector violations,	    /* a list of tuple indices in error */
-    char const *detail)		    /* text detail for the error */
+    Ral_Relvar relvar,              /* the relvar in error */
+    Ral_IntVector violations,       /* a list of tuple indices in error */
+    char const *detail)             /* text detail for the error */
 {
     Ral_Relation rel ;
 
     if (msg == NULL || Ral_IntVectorSize(violations) == 0) {
-	return ;
+        return ;
     }
 
     assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
@@ -1835,17 +1835,17 @@ relvarPartitionConstraintErrorMsg(
 
 static void
 relvarCorrelationConstraintErrorMsg(
-    Tcl_DString *msg,		    /* error text appended here */
-    char const *name,		    /* constraint name */
+    Tcl_DString *msg,               /* error text appended here */
+    char const *name,               /* constraint name */
     Ral_CorrelationConstraint correlation,/* correlation contraint in error */
-    Ral_Relvar relvar,		    /* the relvar in error */
-    Ral_IntVector violations,	    /* a list of tuple indices in error */
-    char const *detail)		    /* text detail for the error */
+    Ral_Relvar relvar,              /* the relvar in error */
+    Ral_IntVector violations,       /* a list of tuple indices in error */
+    char const *detail)             /* text detail for the error */
 {
     Ral_Relation rel ;
 
     if (msg == NULL || Ral_IntVectorSize(violations) == 0) {
-	return ;
+        return ;
     }
 
     assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
@@ -1872,18 +1872,19 @@ relvarConstraintErrorMsg(
     Tcl_DStringAppend(msg, "\n", -1) ;
 
     for (vIter = Ral_IntVectorBegin(violations) ; vIter != vEnd ; ++vIter) {
-	Ral_Tuple errTuple ;
+        Ral_Tuple errTuple ;
+        char *tupleString ;
 
         assert(*vIter < Ral_RelationCardinality(rel)) ;
-	errTuple = *(Ral_RelationBegin(rel) + *vIter) ;
-	char *tupleString = Ral_TupleValueStringOf(errTuple) ;
+        errTuple = *(Ral_RelationBegin(rel) + *vIter) ;
+        tupleString = Ral_TupleValueStringOf(errTuple) ;
 
-	Tcl_DStringAppend(msg, "tuple ", -1) ;
-	Tcl_DStringAppend(msg, tupleString, -1) ;
-	ckfree(tupleString) ;
-	Tcl_DStringAppend(msg, " ", -1) ;
-	Tcl_DStringAppend(msg, detail, -1) ;
-	Tcl_DStringAppend(msg, "\n", -1) ;
+        Tcl_DStringAppend(msg, "tuple ", -1) ;
+        Tcl_DStringAppend(msg, tupleString, -1) ;
+        ckfree(tupleString) ;
+        Tcl_DStringAppend(msg, " ", -1) ;
+        Tcl_DStringAppend(msg, detail, -1) ;
+        Tcl_DStringAppend(msg, "\n", -1) ;
     }
 }
 
@@ -1901,10 +1902,10 @@ relvarAssocConstraintToString(
     Tcl_DStringAppend(result, referringRelvar->name, -1) ;
     Tcl_DStringAppend(result, " [", -1) ;
     Tcl_DStringAppend(result,
-	condMultStrings[assoc->referringCond][assoc->referringMult], -1) ;
+        condMultStrings[assoc->referringCond][assoc->referringMult], -1) ;
     Tcl_DStringAppend(result, "] ==> [", -1) ;
     Tcl_DStringAppend(result,
-	condMultStrings[assoc->referredToCond][assoc->referredToMult], -1) ;
+        condMultStrings[assoc->referredToCond][assoc->referredToMult], -1) ;
     Tcl_DStringAppend(result, "] ", -1) ;
     Tcl_DStringAppend(result, referredToRelvar->name, -1) ;
     Tcl_DStringAppend(result, ")", -1) ;
@@ -1927,10 +1928,10 @@ relvarPartitionConstraintToString(
     Tcl_DStringAppend(result, " is partitioned [", -1) ;
 
     for (rIter = Ral_PtrVectorBegin(subRefs) ; rIter != rEnd ; ++rIter) {
-	Ral_SubsetReference subRef = *rIter ;
-	Ral_Relvar sub = subRef->relvar ;
-	Tcl_DStringAppend(result, sub->name, -1) ;
-	Tcl_DStringAppend(result, " | ", -1) ;
+        Ral_SubsetReference subRef = *rIter ;
+        Ral_Relvar sub = subRef->relvar ;
+        Tcl_DStringAppend(result, sub->name, -1) ;
+        Tcl_DStringAppend(result, " | ", -1) ;
     }
     /*
      * Remove the trailing space, vertical bar and space.
@@ -1955,15 +1956,15 @@ relvarCorrelationConstraintToString(
     Tcl_DStringAppend(result, aReferredToRelvar->name, -1) ;
     Tcl_DStringAppend(result, " <== [", -1) ;
     Tcl_DStringAppend(result,
-	condMultStrings[correlation->aCond][correlation->aMult], -1) ;
+        condMultStrings[correlation->aCond][correlation->aMult], -1) ;
     Tcl_DStringAppend(result, "] ", -1) ;
     Tcl_DStringAppend(result, referringRelvar->name, -1) ;
     if (correlation->complete) {
-	Tcl_DStringAppend(result, " (Complete)", -1) ;
+        Tcl_DStringAppend(result, " (Complete)", -1) ;
     }
     Tcl_DStringAppend(result, " [", -1) ;
     Tcl_DStringAppend(result,
-	condMultStrings[correlation->bCond][correlation->bMult], -1) ;
+        condMultStrings[correlation->bCond][correlation->bMult], -1) ;
     Tcl_DStringAppend(result, "] ==> ", -1) ;
     Tcl_DStringAppend(result, bReferredToRelvar->name, -1) ;
     Tcl_DStringAppend(result, ")", -1) ;
