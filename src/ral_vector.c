@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_vector.c,v $
-$Revision: 1.14 $
-$Date: 2009/04/11 18:18:54 $
+$Revision: 1.15 $
+$Date: 2009/09/19 18:50:44 $
  *--
  */
 
@@ -65,6 +65,12 @@ INCLUDE FILES
 /*
 MACRO DEFINITIONS
 */
+/*
+ * Holding my nose so tightly that I can hardly breathe.
+ */
+#ifdef _MSC_VER
+#define snprintf    _snprintf
+#endif /* _MSC_VER */
 
 /*
 TYPE DEFINITIONS
