@@ -12,7 +12,7 @@
 # See the file "license.terms" for information on usage and redistribution
 # of this file, and for a DISCLAIMER OF ALL WARRANTIES.
 #
-# RCS: @(#) $Id: Makefile.in,v 1.7 2008/01/31 02:15:30 mangoa01 Exp $
+# RCS: @(#) $Id: Makefile.in,v 1.8 2009/09/19 18:58:02 mangoa01 Exp $
 
 #========================================================================
 # Add additional lines to handle any additional AC_SUBST cases that
@@ -251,7 +251,6 @@ install-doc: doc
 
 test: binaries libraries
 	-ln -s $(srcdir)/src/ral.tcl .
-	-ln -s $(srcdir)/src/ralutil.tcl .
 	$(TCLSH) `@CYGPATH@ $(srcdir)/test/all` $(TESTFLAGS)
 
 shell: binaries libraries
