@@ -46,8 +46,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.33 $
-# $Date: 2009/09/12 22:32:36 $
+# $Revision: 1.34 $
+# $Date: 2010/10/20 00:11:13 $
 #  *--
 }]
 [moddesc "Relation Operators"]
@@ -837,24 +837,34 @@ of the [arg relationValueN] does not affect the result.
 +---------+-------+--------+---------+
 }]
 
-[call [cmd "::ral::relation list"] [arg relationValue] [opt [arg attrName]]]
+[call [cmd "::ral::relation list"] [arg relationValue] [opt [arg attrName]]\
+    [opt "[opt -ascending|-descending] sortAttrList"]]
 
 The [cmd list] subcommand returns the values of a single attribute
 from all the tuples of [arg relationValue] as a proper Tcl list.
 If [arg attrName] is not given, then
 [arg RelationValue] must be of degree one or an error is returned.
-Note that the list returned from a singular relation is necessarily a set
+Otherwise the attribute values of [arg attrName] are returned.
+Since lists are ordered and tuples in a relation values are not,
+an optional [arg sortAttrList] may be specified.
+In this case,
+the returned list is in the same order as the corresponding values
+of the attributes given in [arg sortAttrList].
+By default the sorting is [arg -ascending] unless otherwise specified.
+If no sorting arguments are given, the returned order is arbitrary
+and unspecified.
+Note that the list returned from a relation of degree one is necessarily a set
 and may be used with the [package struct::set] package.
-If [arg attrName] is present, then the returned list will consist of the
-value of the given attribute taken from all the tuples in the relation
-in an arbitrary order.
 In this case if the values of the [arg attrName] attribute are not
-unique then, in general, the returned list is not a set and includes
-the duplicated values.
+unique then, in general, the returned list is not a set and may include
+duplicated values.
 
 [example {
 % relation list [relation project $OWNERSHIP Acquired]]
 2001 2000 2002 2003
+
+% relation list $OWNERSHIP Acquired -ascending {OwnerName DogName}
+2001 2001 2000 2003 2002 2001 2000
 }]
 
 [call [cmd "::ral::relation minus"] [arg relationValue1] [arg relationValue2]]
