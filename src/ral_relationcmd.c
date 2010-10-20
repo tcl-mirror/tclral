@@ -46,8 +46,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.43 $
-$Date: 2009/09/12 22:32:36 $
+$Revision: 1.44 $
+$Date: 2010/10/20 00:09:31 $
  *--
  */
 
@@ -1767,16 +1767,21 @@ RelationListCmd(
     int objc,
     Tcl_Obj *const*objv)
 {
-    /* relation list relationValue ?attrName? */
+    /* relation list relationValue ?attrName
+            ??-ascending | -descending? sortAttr?? */
     Tcl_Obj *relObj ;
     Ral_Relation relation ;
     Tcl_Obj *listObj ;
-    int attrIndex = 0 ;
-    Ral_RelationIter iter ;
-    Ral_RelationIter end ;
+    int attrIndex ;
+    Ral_IntVector sortMap ;
+    Ral_IntVectorIter mapIter ;
+    Tcl_Obj *sortAttrList ;
+    Ral_IntVector sortAttrs  ;
+    int sortDir ;
 
-    if (objc < 3 || objc > 4) {
-	Tcl_WrongNumArgs(interp, 2, objv, "relationValue ?attrName?") ;
+    if (objc < 3 || objc > 6) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relationValue ?attrName "
+                "? ?-ascending | -descending? sortAttrList\? ?") ;
 	return TCL_ERROR ;
     }
 
@@ -1786,23 +1791,23 @@ RelationListCmd(
     }
     relation = relObj->internalRep.otherValuePtr ;
 
-    /*
-     * If no attribute name is mentioned, then we insist that the 
-     * relation be of degree 1. The resulting list will necessarily be
-     * a set.
-     */
     if (objc == 3) {
+        /*
+         * If no attribute name is mentioned, then we insist that the 
+         * relation be of degree 1. The resulting list will necessarily be
+         * a set.
+         */
 	if (Ral_RelationDegree(relation) != 1) {
 	    Ral_InterpErrorInfoObj(interp, Ral_CmdRelation, Ral_OptList,
 		RAL_ERR_DEGREE_ONE, relObj) ;
 	    return TCL_ERROR ;
 	}
-    } else {
+        attrIndex = 0 ;
+    }  else /* objc > 3 */ {
 	/*
 	 * Otherwise we need to find which attribute is referenced and
 	 * will return the values of that attribute in all tuples of
-	 * the relation. If the attribute does not constitute an identifier
-	 * then, in general, the list will not be a set.
+	 * the relation.
 	 */
 	const char *attrName = Tcl_GetString(objv[3]) ;
 	attrIndex = Ral_TupleHeadingIndexOf(relation->heading, attrName) ;
@@ -1811,21 +1816,57 @@ RelationListCmd(
 		RAL_ERR_UNKNOWN_ATTR, attrName) ;
 	    return TCL_ERROR ;
 	}
+    } 
+    if (objc < 5) {
+        /*
+         * No sorting specified.
+         */
+        sortMap = Ral_IntVectorNew(Ral_RelationCardinality(relation), 0) ;
+        Ral_IntVectorFillConsecutive(sortMap, 0) ;
+    } else /* objc >= 5 */ {
+        if (objc == 5) {
+            /*
+             * Attribute list specified, ascending order assumed.
+             */
+            sortDir = 0 ;
+            sortAttrList = objv[4] ;
+        } else /* objc > 5 */ {
+            /*
+             * Both ordering keyword and attribute list given.
+             */
+            int index ;
+
+            if (Tcl_GetIndexFromObjStruct(interp, objv[4], orderOptions,
+                sizeof(orderOptions[0]), "ordering", 0, &index) != TCL_OK) {
+                return TCL_ERROR ;
+            }
+            sortDir = orderOptions[index].type == SORT_DESCENDING ;
+            sortAttrList = objv[5] ;
+        }
+        sortAttrs = Ral_TupleHeadingAttrsFromObj(relation->heading, interp,
+                sortAttrList) ;
+        if (sortAttrs == NULL) {
+            return TCL_ERROR ;
+        }
+        sortMap = Ral_RelationSort(relation, sortAttrs, sortDir) ;
+        Ral_IntVectorDelete(sortAttrs) ;
     }
 
     listObj = Tcl_NewListObj(0, NULL) ;
-    end = Ral_RelationEnd(relation) ;
-    for (iter = Ral_RelationBegin(relation) ; iter != end ; ++iter) {
-	Ral_Tuple tuple = *iter ;
+    for (mapIter = Ral_IntVectorBegin(sortMap) ;
+            mapIter != Ral_IntVectorEnd(sortMap) ; ++mapIter) {
+	Ral_Tuple tuple = *(Ral_RelationBegin(relation) + *mapIter) ;
 
 	if (Tcl_ListObjAppendElement(interp, listObj, tuple->values[attrIndex])
 	    != TCL_OK) {
 	    Tcl_DecrRefCount(listObj) ;
+            Ral_IntVectorDelete(sortMap) ;
 	    return TCL_ERROR ;
 	}
     }
 
     Tcl_SetObjResult(interp, listObj) ;
+    Ral_IntVectorDelete(sortMap) ;
     return TCL_OK ;
 }
 
