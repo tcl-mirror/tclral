@@ -51,8 +51,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.52 $
-# $Date: 2009/09/12 22:32:36 $
+# $Revision: 1.53 $
+# $Date: 2010/10/20 00:17:22 $
 #  *--
 
 package require tcltest 2.2
@@ -2813,6 +2813,24 @@ namespace eval ::ral::test {
     test relation-list-3.0 {list of named attribute} -body {
         lsort [relation list $S CITY]
     } -result {Athens London London Paris Paris}
+
+    test relation-list-4.0 {
+        sorting on one attribute
+    } -body {
+        relation list $P CITY P#
+    } -result {London Paris Oslo London Paris London}
+
+    test relation-list-4.1 {
+        sorting on one attribute, descending
+    } -body {
+        relation list $P CITY -descending P#
+    } -result {London Paris London Oslo Paris London}
+
+    test relation-list-4.2 {
+        sorting on multiple attributes
+    } -body {
+        relation list $P CITY -ascending {PNAME COLOR}
+    } -result {Paris Paris London London Oslo London}
 
     # relation minus subcommand
     test relation-minus-1.0 {dum relation} -body {
@@ -5892,6 +5910,26 @@ tuple {C1 c C2 42} references no tuple
             relvar insert Y {Y_ID y2 Y2 two}
             relvar insert A {A1 1 X_ID x1 Y_ID y2}
             relvar insert A {A1 2 X_ID x2 Y_ID y1}
+        }
+        return
+    } -result {}
+
+    test relvar-correlation-1.1 {many to many conditional} -setup {
+        relvar create A {A1 int X_ID string Y_ID string} {X_ID Y_ID}
+        relvar create X {X_ID string X2 string} X_ID
+        relvar create Y {Y_ID string Y2 string} Y_ID
+        relvar correlation R1 A X_ID * X X_ID Y_ID + Y Y_ID
+    } -cleanup {
+        relvar constraint delete R1
+        relvar unset A X Y
+    } -body {
+        relvar eval {
+            relvar insert X {X_ID x1 X2 one}
+            relvar insert X {X_ID x2 X2 two}
+            relvar insert Y {Y_ID y1 Y2 one}
+            relvar insert Y {Y_ID y2 Y2 two}
+            relvar insert A {A1 1 X_ID x1 Y_ID y1}
+            relvar insert A {A1 1 X_ID x1 Y_ID y2}
         }
         return
     } -result {}
