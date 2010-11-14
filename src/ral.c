@@ -49,8 +49,8 @@ ABSTRACT:
     Algebra.
 
 $RCSfile: ral.c,v $
-$Revision: 1.42 $
-$Date: 2009/04/11 18:18:54 $
+$Revision: 1.43 $
+$Date: 2010/11/14 18:15:57 $
  *--
  */
 
@@ -97,7 +97,7 @@ STATIC DATA ALLOCATION
 static char const ral_pkgname[] = PACKAGE_NAME ;
 static char const ral_version[] = PACKAGE_VERSION ;
 static char const ral_rcsid[] =
-    "$Id: ral.c,v 1.42 2009/04/11 18:18:54 mangoa01 Exp $" ;
+    "$Id: ral.c,v 1.43 2010/11/14 18:15:57 mangoa01 Exp $" ;
 static char const ral_copyright[] =
     "This software is copyrighted 2004, 2005, 2006, 2007, 2008, 2009 by G. Andrew Mangogna."
     " Terms and conditions for use are distributed with the source code." ;
@@ -122,6 +122,7 @@ FUNCTION DEFINITIONS
  * ======================================================================
  */
 
+DLLEXPORT
 int
 Ral_Init(
     Tcl_Interp *interp)
@@ -226,6 +227,7 @@ Ral_SafeInit(
  * have.  Nothing really to do here. All the data will be cleaned up when the
  * interpreter is deleted.
  */
+DLLEXPORT
 int
 Ral_Unload(
     Tcl_Interp *interp)
@@ -233,6 +235,7 @@ Ral_Unload(
     return TCL_OK ;
 }
 
+DLLEXPORT
 int
 Ral_SafeUnload(
     Tcl_Interp *interp)
