@@ -46,8 +46,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.44 $
-$Date: 2010/10/20 00:09:31 $
+$Revision: 1.45 $
+$Date: 2010/11/14 18:17:33 $
  *--
  */
 
@@ -137,6 +137,7 @@ static int RelationTagCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationTcloseCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationTimesCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationTupleCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
+static int RelationUinsertCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationUngroupCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationUnionCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationUpdateCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
@@ -222,6 +223,7 @@ relationCmd(
 	{"tclose", RelationTcloseCmd},
 	{"times", RelationTimesCmd},
 	{"tuple", RelationTupleCmd},
+	{"uinsert", RelationUinsertCmd},
 	{"ungroup", RelationUngroupCmd},
 	{"union", RelationUnionCmd},
 	{"unwrap", RelationUnwrapCmd},
@@ -3143,6 +3145,47 @@ RelationTupleCmd(
 
     Tcl_SetObjResult(interp, Ral_TupleObjNew(
 	Ral_TupleDup(*Ral_RelationBegin(relation)))) ;
+    return TCL_OK ;
+}
+
+static int
+RelationUinsertCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_Obj *relObj ;
+    Ral_Relation relation ;
+    Ral_Relation newRel ;
+    Ral_ErrorInfo errInfo ;
+
+    /* relation sinsert relationValue ?name-value-list ...? */
+    if (objc < 3) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+	    "relationValue ?name-value-list ...?") ;
+	return TCL_ERROR ;
+    }
+
+    relObj = objv[2] ;
+    if (Tcl_ConvertToType(interp, relObj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    relation = relObj->internalRep.otherValuePtr ;
+
+    objc -= 3 ;
+    objv += 3 ;
+
+    newRel = Ral_RelationShallowCopy(relation) ;
+    Ral_RelationReserve(newRel, objc) ;
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptInsert) ;
+    while (objc-- > 0) {
+	/*
+	 * sinsert silently ignores duplicates and has "union" like semantics.
+	 */
+	Ral_RelationInsertTupleValue(newRel, interp, *objv++, &errInfo) ;
+    }
+
+    Tcl_SetObjResult(interp, Ral_RelationObjNew(newRel)) ;
     return TCL_OK ;
 }
 
