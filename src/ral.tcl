@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.43 $
-# $Date: 2010/12/05 00:49:00 $
+# $Revision: 1.44 $
+# $Date: 2010/12/05 21:58:52 $
 #  *--
 
 namespace eval ::ral {
@@ -145,7 +145,8 @@ namespace eval ::ral {
     }
 
     # This is the SQL schema required to store the ral meta-data into SQL so
-    # that we will have all the require information to reconstruct the relvars.
+    # that we will have all the required information to reconstruct the relvars
+    # when we load it back in.
     variable ralSQLSchema {
 -- SQL Tables to hold RAL specific meta-data
 create table __ral_version (
@@ -618,9 +619,7 @@ proc ::ral::storeToMk {fileName {pattern *}} {
     package require Mk4tcl
 
     # Back up an existing file
-    if {[file exists $fileName]} {
-        file rename -force $fileName $fileName~
-    }
+    catch {file rename -force -- $fileName $fileName~}
 
     ::mk::file open db $fileName
     catch {
@@ -798,142 +797,146 @@ proc ::ral::mergeFromMk {fileName {ns ::}} {
 proc ::ral::storeToSQLite {filename {pattern *}} {
     package require sqlite3
 
-    catch {file rename -force -- $filename $filename.bak}
+    catch {file rename -force -- $filename $filename~}
     sqlite3 [namespace current]::sqlitedb $filename
 
-    # First we insert the meta-data schema and populate it.
-    variable ralSQLSchema
-    sqlitedb eval "pragma foreign_keys=ON"
-    sqlitedb eval $ralSQLSchema
-    sqlitedb transaction exclusive {
-        set version [getVersion]
-        sqlitedb eval {insert into __ral_version (Vnum, Date)\
-            values ($version, CURRENT_TIMESTAMP) ;}
-        foreach relvar [relvar names $pattern] {
-            # First the relvars and their attributes and identifiers
-            set basename [namespace tail $relvar]
-            sqlitedb eval {insert into __ral_relvar (Vname)\
-                    values ($basename) ;}
-            foreach {attrName type} [relation heading [relvar set $relvar]] {
-                sqlitedb eval {insert into __ral_attribute (Vname, Aname, Type)\
-                    values ($basename, $attrName, $type) ;}
-            }
-            set idCounter 0
-            foreach identifier [relvar identifiers $relvar] {
-                sqlitedb eval {insert into\
-                    __ral_identifier (IdNum, Vname, Attrs)\
-                    values ($idCounter, $basename, $identifier) ;}
-                incr idCounter
-            }
-            # Next the constraints
-            foreach constraint [relvar constraint member $relvar] {
-                set cinfo [relvar constraint info $constraint]
-                set cinfo [lassign $cinfo ctype]
-                switch -exact -- $ctype {
-                association {
-                    lassign $cinfo cname rfering a1 c1 refto a2 c2
-                    set cname [namespace tail $cname]
-                    set rfering [namespace tail $rfering]
-                    set refto [namespace tail $refto]
-                    sqlitedb eval {insert or ignore into __ral_association\
-                        (Cname, Referring, ReferringAttrs, RefToSpec,\
-                        RefTo, RefToAttrs, ReferringSpec) values\
-                        ($cname, $rfering, $a1, $c1, $refto, $a2, $c2) ;}
+    catch {
+        # First we insert the meta-data schema and populate it.
+        variable ralSQLSchema
+        sqlitedb eval "pragma foreign_keys=ON"
+        sqlitedb eval $ralSQLSchema
+        sqlitedb transaction exclusive {
+            set version [getVersion]
+            sqlitedb eval {insert into __ral_version (Vnum, Date)\
+                values ($version, CURRENT_TIMESTAMP) ;}
+            foreach relvar [relvar names $pattern] {
+                # First the relvars and their attributes and identifiers
+                set basename [namespace tail $relvar]
+                sqlitedb eval {insert into __ral_relvar (Vname)\
+                        values ($basename) ;}
+                foreach {attrName type} [relation heading\
+                        [relvar set $relvar]] {
+                    sqlitedb eval {insert into __ral_attribute (Vname, Aname,\
+                            Type) values ($basename, $attrName, $type) ;}
                 }
-                partition {
-                    set subs [lassign $cinfo cname super sattrs]
-                    set cname [namespace tail $cname]
-                    set super [namespace tail $super]
-                    sqlitedb eval {insert or ignore into __ral_partition\
-                        (Cname, SuperType, SuperAttrs) values\
-                        ($cname, $super, $sattrs) ;}
-                    foreach {subtype subattrs} $subs {
-                        set subtype [namespace tail $subtype]
-                        sqlitedb eval {insert or ignore into __ral_subtype\
-                            (Cname, SubType, SubAttrs) values\
-                            ($cname, $subtype, $subattrs) ;}
+                set idCounter 0
+                foreach identifier [relvar identifiers $relvar] {
+                    sqlitedb eval {insert into\
+                        __ral_identifier (IdNum, Vname, Attrs)\
+                        values ($idCounter, $basename, $identifier) ;}
+                    incr idCounter
+                }
+                # Next the constraints
+                foreach constraint [relvar constraint member $relvar] {
+                    set cinfo [relvar constraint info $constraint]
+                    set cinfo [lassign $cinfo ctype]
+                    switch -exact -- $ctype {
+                    association {
+                        lassign $cinfo cname rfering a1 c1 refto a2 c2
+                        set cname [namespace tail $cname]
+                        set rfering [namespace tail $rfering]
+                        set refto [namespace tail $refto]
+                        sqlitedb eval {insert or ignore into __ral_association\
+                            (Cname, Referring, ReferringAttrs, RefToSpec,\
+                            RefTo, RefToAttrs, ReferringSpec) values\
+                            ($cname, $rfering, $a1, $c1, $refto, $a2, $c2) ;}
                     }
-                }
-                correlation {
-                    if {[lindex $cinfo 0] eq "-complete"} {
-                        set comp 1
-                        set cinfo [lrange $cinfo 1 end]
-                    } else {
-                        set comp 0
+                    partition {
+                        set subs [lassign $cinfo cname super sattrs]
+                        set cname [namespace tail $cname]
+                        set super [namespace tail $super]
+                        sqlitedb eval {insert or ignore into __ral_partition\
+                            (Cname, SuperType, SuperAttrs) values\
+                            ($cname, $super, $sattrs) ;}
+                        foreach {subtype subattrs} $subs {
+                            set subtype [namespace tail $subtype]
+                            sqlitedb eval {insert or ignore into __ral_subtype\
+                                (Cname, SubType, SubAttrs) values\
+                                ($cname, $subtype, $subattrs) ;}
+                        }
                     }
-                    lassign $cinfo cname correl ref1Attr c1 rel1 rel1Attr\
-                        ref2Attr c2 rel2 rel2Attr
-                    set cname [namespace tail $cname]
-                    set correl [namespace tail $correl]
-                    set rel1 [namespace tail $rel1]
-                    set rel2 [namespace tail $rel2]
-                    sqlitedb eval {insert or ignore into __ral_correlation\
-                        (Cname, IsComplete, AssocRelvar, OneRefAttrs,\
-                        OneRefSpec, OneRelvar, OneAttrs, OtherRefAttrs,\
-                        OtherRefSpec, OtherRelvar, OtherAttrs) values\
-                        ($cname, $comp, $correl, $ref1Attr, $c1, $rel1,\
-                        $rel1Attr, $ref2Attr, $c2, $rel2, $rel2Attr) ;}
-                }
-                default {
-                    error "unknown constraint type, \"$ctype\""
-                }
+                    correlation {
+                        if {[lindex $cinfo 0] eq "-complete"} {
+                            set comp 1
+                            set cinfo [lrange $cinfo 1 end]
+                        } else {
+                            set comp 0
+                        }
+                        lassign $cinfo cname correl ref1Attr c1 rel1 rel1Attr\
+                            ref2Attr c2 rel2 rel2Attr
+                        set cname [namespace tail $cname]
+                        set correl [namespace tail $correl]
+                        set rel1 [namespace tail $rel1]
+                        set rel2 [namespace tail $rel2]
+                        sqlitedb eval {insert or ignore into __ral_correlation\
+                            (Cname, IsComplete, AssocRelvar, OneRefAttrs,\
+                            OneRefSpec, OneRelvar, OneAttrs, OtherRefAttrs,\
+                            OtherRefSpec, OtherRelvar, OtherAttrs) values\
+                            ($cname, $comp, $correl, $ref1Attr, $c1, $rel1,\
+                            $rel1Attr, $ref2Attr, $c2, $rel2, $rel2Attr) ;}
+                    }
+                    default {
+                        error "unknown constraint type, \"$ctype\""
+                    }
+                    }
                 }
             }
         }
-    }
-    # Next we insert the schema that corresponds to the "pattern" as an SQL
-    # schema. This gives us the ability to manipulate the relvar data as SQL
-    # tables.
-    sqlitedb transaction exclusive {
-        sqlitedb eval [sqlSchema $pattern]
-    }
-    # Finally we insert the values of the relvars.  There is a tricky part
-    # here. Since ral attributes can be any Tcl string and since SQL is
-    # particular about names, we have to account for that.  Also, we have to
-    # deal with the "run time" nature of what we are doing.  We construct the
-    # "insert" statement in order to fill in the attributes in the required
-    # order. We also want to use the ability of the SQLite Tcl bindings to
-    # fetch the values of Tcl variables. Unfortunately, (as determined by
-    # experiment) SQLite cannot deal with Tcl variable syntax of the form
-    # "${name}". Consequently, any character in an attribute name that would
-    # terminate scanning a variable reference of the form "$name" creates a
-    # problem. The solution is to use the ability of "relvar assign" to assign
-    # attributes to explicitly named variables.  We choose as the alternate
-    # variable names the names given to the SQLite columns.
-    sqlitedb transaction exclusive {
-        foreach relvar [relvar names $pattern] {
-            set relValue [relvar set $relvar]
-            set sqlTableName [mapNamesToSQL [namespace tail $relvar]]
-            set attrNames [relation attributes $relValue]
-            # Map the attribute names to a set of SQLite column names.
-            set sqlCols [mapNamesToSQL $attrNames]
-            set statement "insert into $sqlTableName ([join $sqlCols {, }])\
-                values ("
-            # Create two lists here, one is used to get "relvar assign" to
-            # assign attributes to variable names that SQLite can later
-            # resolve. The other is just a list of those resolvable names so
-            # that we can finish out the "insert" statement.
-            set assignVars [list]
-            set sqlVars [list]
-            foreach attr $attrNames sqlCol $sqlCols {
-                lappend assignVars [list $attr $sqlCol]
-                lappend sqlVars \$$sqlCol
-            }
-            # This completes the composition of the "insert" statement.  We
-            # just managed to add a list of variable references (i.e. variable
-            # names each of which is preceded by a "$").
-            append statement [join $sqlVars {, }] ") ;"
-            # Finally after all of that, the actual populating of the SQLite
-            # tables is trivial.
-            relation foreach row $relValue {
-                relation assign $row {*}$assignVars
-                sqlitedb eval $statement
+        # Next we insert the schema that corresponds to the "pattern" as an SQL
+        # schema. This gives us the ability to manipulate the relvar data as
+        # SQL tables.
+        sqlitedb transaction exclusive {
+            sqlitedb eval [sqlSchema $pattern]
+        }
+        # Finally we insert the values of the relvars.  There is a tricky part
+        # here. Since ral attributes can be any Tcl string and since SQL is
+        # particular about names, we have to account for that.  Also, we have
+        # to deal with the "run time" nature of what we are doing.  We
+        # construct the "insert" statement in order to fill in the attributes
+        # in the required order. We also want to use the ability of the SQLite
+        # Tcl bindings to fetch the values of Tcl variables. Unfortunately, (as
+        # determined by experiment) SQLite cannot deal with Tcl variable syntax
+        # of the form "${name}". Consequently, any character in an attribute
+        # name that would terminate scanning a variable reference of the form
+        # "$name" creates a problem. The solution is to use the ability of
+        # "relvar assign" to assign attributes to explicitly named variables.
+        # We choose as the alternate variable names the names given to the
+        # SQLite columns.
+        sqlitedb transaction exclusive {
+            foreach relvar [relvar names $pattern] {
+                set relValue [relvar set $relvar]
+                set sqlTableName [mapNamesToSQL [namespace tail $relvar]]
+                set attrNames [relation attributes $relValue]
+                # Map the attribute names to a set of SQLite column names.
+                set sqlCols [mapNamesToSQL $attrNames]
+                set statement "insert into $sqlTableName ([join $sqlCols {, }])\
+                    values ("
+                # Create two lists here, one is used to get "relvar assign" to
+                # assign attributes to variable names that SQLite can later
+                # resolve. The other is just a list of those resolvable names so
+                # that we can finish out the "insert" statement.
+                set assignVars [list]
+                set sqlVars [list]
+                foreach attr $attrNames sqlCol $sqlCols {
+                    lappend assignVars [list $attr $sqlCol]
+                    lappend sqlVars \$$sqlCol
+                }
+                # This completes the composition of the "insert" statement.  We
+                # just managed to add a list of variable references (i.e.
+                # variable names each of which is preceded by a "$").
+                append statement [join $sqlVars {, }] ") ;"
+                # Finally after all of that, the actual populating of the
+                # SQLite tables is trivial.
+                relation foreach row $relValue {
+                    relation assign $row {*}$assignVars
+                    sqlitedb eval $statement
+                }
             }
         }
-    }
+    } result opts
 
     sqlitedb close
-    return
+    return -options $opts
 }
 
 proc ::ral::loadFromSQLite {filename {ns ::}} {
@@ -944,58 +947,86 @@ proc ::ral::loadFromSQLite {filename {ns ::}} {
     namespace eval $ns {}
     package require sqlite3
     sqlite3 [namespace current]::sqlitedb $filename
-    # First we query the meta data and rebuild the relvars and constraints.
-    set version [sqlitedb onecolumn {select Vnum from __ral_version ;}]
-    if {![package vsatisfies $version [getCompatVersion]]} {
-        error "incompatible version number, \"$version\",\
-            current library version is, \"[getVersion]\""
-    }
-    sqlitedb transaction {
-        foreach vname [sqlitedb eval {select Vname from __ral_relvar}] {
-            set heading [list]
-            foreach {aname type} [sqlitedb eval {select Aname, Type from\
-                    __ral_attribute where Vname = $vname}] {
-                lappend heading $aname $type
+    catch {
+        # First we query the meta data and rebuild the relvars and constraints.
+        set version [sqlitedb onecolumn {select Vnum from __ral_version ;}]
+        if {![package vsatisfies $version [getCompatVersion]]} {
+            error "incompatible version number, \"$version\",\
+                current library version is, \"[getVersion]\""
+        }
+        set relvarNames [sqlitedb eval {select Vname from __ral_relvar}]
+        sqlitedb transaction {
+            # The relvars
+            foreach vname $relvarNames {
+                set heading [list]
+                foreach {aname type} [sqlitedb eval {select Aname, Type from\
+                        __ral_attribute where Vname = $vname}] {
+                    lappend heading $aname $type
+                }
+                set idlist [list]
+                foreach attrs [sqlitedb eval {select Attrs from\
+                        __ral_identifier where Vname = $vname order by IdNum}] {
+                    lappend idlist $attrs
+                }
+                ::ral::relvar create $ns$vname $heading {*}$idlist
             }
-            set idlist [list]
-            foreach attrs [sqlitedb eval {select Attrs from __ral_identifier\
-                    where Vname = $vname order by IdNum}] {
-                lappend idlist $attrs
+            # The association constraints
+            foreach {cname referring referringAttrs refToSpec refTo refToAttrs\
+                    referringSpec} [sqlitedb eval {select Cname, Referring,\
+                    ReferringAttrs, RefToSpec, RefTo, RefToAttrs, ReferringSpec\
+                    from __ral_association}] {
+                ::ral::relvar association $ns$cname $ns$referring\
+                        $referringAttrs $refToSpec $ns$refTo $refToAttrs\
+                        $referringSpec
             }
-            ::ral::relvar create $ns$vname $heading {*}$idlist
-        }
-        foreach {cname referring referringAttrs refToSpec refTo refToAttrs\
-                referringSpec} [sqlitedb eval {select Cname, Referring,\
-                ReferringAttrs, RefToSpec, RefTo, RefToAttrs, ReferringSpec\
-                from __ral_association}] {
-            ::ral::relvar association $ns$cname $ns$referring $referringAttrs\
-                    $refToSpec $ns$refTo $refToAttrs $referringSpec
-        }
-        foreach {cname superType superAttrs} [sqlitedb eval {select Cname,\
-                SuperType, SuperAttrs from __ral_partition}] {
-            set cmd [list ::ral::relvar partition $ns$cname $ns$superType\
-                    $superAttrs]
-            foreach {subtype subattr} [sqlitedb eval {select Subtype, SubAttrs\
-                    from __ral_subtype where Cname = $cname}] {
-                lappend cmd $ns$subtype $subattr
+            # The partition constraints
+            foreach {cname superType superAttrs} [sqlitedb eval {select Cname,\
+                    SuperType, SuperAttrs from __ral_partition}] {
+                set cmd [list ::ral::relvar partition $ns$cname $ns$superType\
+                        $superAttrs]
+                foreach {subtype subattr} [sqlitedb eval {select Subtype,\
+                        SubAttrs from __ral_subtype where Cname = $cname}] {
+                    lappend cmd $ns$subtype $subattr
+                }
+                eval $cmd
             }
-            eval $cmd
+            # The correlation contraints
+            foreach {cname isComplete assocRelvar oneRefAttrs oneRefSpec\
+                    oneRelvar oneAttrs otherRefAttrs otherRefSpec otherRelvar\
+                    otherAttrs}\
+                    [sqlitedb eval {select Cname, IsComplete, AssocRelvar,\
+                    OneRefAttrs, OneRefSpec, OneRelvar, OneAttrs,\
+                    OtherRefAttrs, OtherRefSpec, OtherRelvar, OtherAttrs\
+                    from __ral_correlation}] {
+                ::ral::relvar correlation $ns$cname\
+                        [expr {$isComplete ? "-complete" : {}}]\
+                        $ns$assocRelvar $oneRefAttrs $oneRefSpec $nsOneRelvar\
+                        $oneAttrs $otherRefAttrs $otherRefSpec $ns$otherRelvar\
+                        $otherAttrs
+            }
         }
-        foreach {cname isComplete assocRelvar oneRefAttrs oneRefSpec oneRelvar\
-                oneAttrs otherRefAttrs otherRefSpec otherRelvar otherAttrs}\
-                [sqlitedb eval {select Cname, IsComplete, AssocRelvar,\
-                OneRefAttrs, OneRefSpec, OneRelvar, OneAttrs, OtherRefAttrs,\
-                OtherRefSpec, OtherRelvar, OtherAttrs from __ral_correlation}] {
-            ::ral::relvar correlation $ns$cname\
-                    [expr {$isComplete ? "-complete" : {}}]\
-                    $ns$assocRelvar $oneRefAttrs $oneRefSpec $nsOneRelvar\
-                    $oneAttrs $otherRefAttrs $otherRefSpec $ns$otherRelvar\
-                    $otherAttrs
+        # Now insert the data from the tables.
+        # We are careful here not to depend upon SQL column ordering.
+        relvar eval {
+            foreach vname $relvarNames {
+                set sqlTableName [mapNamesToSQL $vname]
+                set attrNames [relation attributes [relvar set $ns$vname]]
+                set sqlColNames [mapNamesToSQL $attrNames]
+                sqlitedb eval "select [join $sqlColNames {, }]\
+                        from $sqlTableName" valArray {
+                    # Build up the insert tuple
+                    set insert [list]
+                    foreach attr $attrNames sqlCol $sqlColNames {
+                        lappend insert $attr $valArray($sqlCol)
+                    }
+                    ::ral::relvar insert $ns$vname $insert
+                }
+            }
         }
-    }
-    # HERE -- now insert the data from the tables.
+    } result opts
 
-    return
+    sqlitedb close
+    return -options $opts
 }
 
 proc ::ral::dump {{pattern *}} {
