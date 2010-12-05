@@ -46,8 +46,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.45 $
-$Date: 2010/11/14 18:17:33 $
+$Revision: 1.46 $
+$Date: 2010/12/05 00:49:00 $
  *--
  */
 
@@ -3180,7 +3180,7 @@ RelationUinsertCmd(
     Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptInsert) ;
     while (objc-- > 0) {
 	/*
-	 * sinsert silently ignores duplicates and has "union" like semantics.
+	 * uinsert silently ignores duplicates and has "union" like semantics.
 	 */
 	Ral_RelationInsertTupleValue(newRel, interp, *objv++, &errInfo) ;
     }

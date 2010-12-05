@@ -1,4 +1,4 @@
-# This software is copyrighted 2004, 2005, 2006 by G. Andrew Mangogna.
+# This software is copyrighted 2004 - 2010 by G. Andrew Mangogna.
 # The following terms apply to all files associated with the software unless
 # explicitly disclaimed in individual files.
 # 
@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.42 $
-# $Date: 2009/06/21 17:42:10 $
+# $Revision: 1.43 $
+# $Date: 2010/12/05 00:49:00 $
 #  *--
 
 namespace eval ::ral {
@@ -65,6 +65,8 @@ namespace eval ::ral {
     namespace export storeToMk
     namespace export loadFromMk
     namespace export mergeFromMk
+    namespace export storeToSQLite
+    namespace export loadFromSQLite
     namespace export dump
     namespace export dumpToFile
     namespace export csv
@@ -133,7 +135,111 @@ namespace eval ::ral {
     }
     proc getCompatVersion {} {
         lassign [split [getVersion] .] maj min rev
-        return $maj.$min-
+        incr maj
+        return 0.9-$maj.$min
+    }
+
+    variable sqlTypeMap ; array set sqlTypeMap {
+        int         integer
+        double      real
+    }
+
+    # This is the SQL schema required to store the ral meta-data into SQL so
+    # that we will have all the require information to reconstruct the relvars.
+    variable ralSQLSchema {
+-- SQL Tables to hold RAL specific meta-data
+create table __ral_version (
+    Vnum test not null,
+    Date timestamp not null,
+    constraint __ral_version_id unique (Vnum)) ;
+create table __ral_relvar (
+    Vname text not null,
+    constraint __ral_relvar_id unique (Vname)) ;
+create unique index __ral_relvar_id_index on __ral_relvar (Vname) ;
+create table __ral_attribute (
+    Vname text not null,
+    Aname text not null,
+    Type text not null,
+    constraint __ral_attribute_id unique (Vname, Aname),
+    constraint __ral_attribute_ref foreign key (Vname) references
+        __ral_relvar (Vname) on delete cascade on update cascade
+        deferrable initially deferred) ;
+create unique index __ral_attribute_id_index on __ral_attribute (Vname, Aname) ;
+create index __ral_attribute_ref on __ral_attribute (Vname) ;
+create table __ral_identifier (
+    IdNum integer not null,
+    Vname text not null,
+    Attrs text not null,
+    constraint __ral_identifier_id unique (IdNum, Vname),
+    constraint __ral_identifier_ref foreign key (Vname) references
+        __ral_attribute (Vname) on delete cascade on update cascade
+        deferrable initially deferred) ;
+create unique index __ral_identifier_id on __ral_identifier (IdNum, Vname) ;
+create index __ral_identifier_ref on __ral_identifier (Vname) ;
+create table __ral_association (
+    Cname text not null,
+    Referring text not null,
+    ReferringAttrs text not null,
+    RefToSpec text not null,
+    RefTo text not null,
+    RefToAttrs text not null,
+    ReferringSpec text not null,
+    constraint __ral_association_id unique (Cname),
+    constraint __ral_association_one foreign key (Referring)
+        references __ral_relvar (Vname) on delete cascade on update cascade
+        deferrable initially deferred,
+    constraint __ral_association_other foreign key (RefTo)
+        references __ral_relvar (Vname) on delete cascade on update cascade
+        deferrable initially deferred) ;
+create unique index __ral_association_id on __ral_association (Cname) ;
+create index __ral_association_oneindex on __ral_association (Referring) ;
+create index __ral_association_otherindex on __ral_association (RefTo) ;
+create table __ral_partition (
+    Cname text not null,
+    SuperType text not null,
+    SuperAttrs text not null,
+    constraint __ral_partition_id unique (Cname),
+    constraint __ral_partition_ref foreign key (SuperType)
+        references __ral_relvar (Vname) on delete cascade on update cascade
+        deferrable initially deferred) ;
+create unique index __ral_partition_id on __ral_partition (Cname) ;
+create index __ral_partition_ref on __ral_partition (SuperType) ;
+create table __ral_subtype (
+    Cname text not null,
+    SubType text not null,
+    SubAttrs text not null,
+    constraint __ral_subtype_id unique (Cname, SubType),
+    constraint __ral_subtype_ref foreign key (SubType)
+        references __ral_relvar (Vname) on delete cascade on update cascade
+        deferrable initially deferred) ;
+create unique index __ral_subtype_id on __ral_subtype (Cname, SubType) ;
+create index __ral_subtype_refindex on __ral_subtype (SubType) ;
+create table __ral_correlation (
+    Cname text not null,
+    IsComplete integer not null,
+    AssocRelvar text not null,
+    OneRefAttrs text not null,
+    OneRefSpec text not null,
+    OneRelvar text not null,
+    OneAttrs text not null,
+    OtherRefAttrs text not null,
+    OtherRefSpec text not null,
+    OtherRelvar text not null,
+    OtherAttrs text not null,
+    constraint __ral_correlation_id unique (Cname),
+    constraint __ral_correlation_assoc foreign key (AssocRelvar)
+        references __ral_relvar (Vname) on delete cascade on update cascade
+        deferrable initially deferred,
+    constraint __ral_correlation_oneref foreign key (OneRelvar)
+        references __ral_relvar (Vname) on delete cascade on update cascade
+        deferrable initially deferred,
+    constraint __ral_correlation_otherref foreign key (OtherRelvar)
+        references __ral_relvar (Vname) on delete cascade on update cascade
+        deferrable initially deferred) ;
+create unique index __ral_correlation_id on __ral_correlation (Cname) ;
+create index __ral_correlation_assocref on __ral_correlation (AssocRelvar) ;
+create index __ral_correlation_oneref on __ral_correlation (OneRelvar) ;
+create index __ral_correlation_otherref on __ral_correlation (OtherRelvar) ;
     }
 }
 
@@ -251,7 +357,7 @@ proc ::ral::serialize {{pattern *}} {
     set names [lsort [relvar names $pattern]]
     set relNameList [list]
     foreach name $names {
-        lappend relNameList $name\
+        lappend relNameList [namespace tail $name]\
             [relation heading [relvar set $name]] [relvar identifiers $name]
     }
     lappend result Relvars $relNameList
@@ -260,13 +366,13 @@ proc ::ral::serialize {{pattern *}} {
     # and must be converted to be relative to the global namespace.
     set constraints [list]
     foreach cname [lsort [relvar constraint names $pattern]] {
-        lappend constraints [relvar constraint info $cname]
+        lappend constraints [getRelativeConstraintInfo $cname]
     }
     lappend result Constraints $constraints
 
     set bodies [list]
     foreach name $names {
-        lappend bodies [list $name [relvar set $name]]
+        lappend bodies [list [namespace tail $name] [relvar set $name]]
     }
 
     lappend result Values $bodies
@@ -285,13 +391,13 @@ proc ::ral::serializeToFile {fileName {pattern *}} {
 }
 
 # Restore the relvar values from a string.
-proc ::ral::deserialize {value {ns {}}} {
+proc ::ral::deserialize {value {ns ::}} {
     if {[llength $value] == 4} {
         # Assume it is 0.8.X style serialization.
         deserialize-0.8.X $value [expr {$ns eq {} ? "::" : $ns}]
         return
     }
-    set ns [string trimright $ns :]
+    set ns [string trimright $ns :]::
     if {[llength $value] != 8} {
         error "bad value format, expected list of 8 items,\
                 got [llength $value] items"
@@ -317,7 +423,7 @@ proc ::ral::deserialize {value {ns {}}} {
         error "expected keyword \"Relvars\", got \"$revarKeyWord\""
     }
     foreach {rvName rvHead rvIds} $relvarDefs {
-        set fullName $ns$rvName
+        set fullName $ns[string trimleft $rvName :]
         set quals [namespace qualifiers $fullName]
         if {!($quals eq {} || [namespace exists $quals])} {
             namespace eval $quals {}
@@ -338,7 +444,7 @@ proc ::ral::deserialize {value {ns {}}} {
     relvar eval {
         foreach body $bodyDefs {
             foreach {relvarName relvarBody} $body {
-                ::ral::relvar set $ns$relvarName $relvarBody
+                ::ral::relvar set $ns[string trimleft $relvarName :] $relvarBody
             }
         }
     }
@@ -346,7 +452,7 @@ proc ::ral::deserialize {value {ns {}}} {
     return
 }
 
-proc ::ral::deserializeFromFile {fileName {ns {}}} {
+proc ::ral::deserializeFromFile {fileName {ns ::}} {
     set chan [::open $fileName r]
     catch {deserialize [read $chan] $ns} result opts
     ::close $chan
@@ -431,8 +537,8 @@ proc ::ral::deserializeFromFile-0.8.X {fileName {ns ::}} {
     return -options $opts $result
 }
 
-proc ::ral::merge {value {ns {}}} {
-    set ns [string trimright $ns :]
+proc ::ral::merge {value {ns ::}} {
+    set ns [string trimright $ns :]::
     if {[llength $value] != 8} {
         error "bad value format, expected list of 8 items,\
                 got [llength $value] items"
@@ -458,9 +564,13 @@ proc ::ral::merge {value {ns {}}} {
         error "expected keyword \"Relvars\", got \"$revarKeyWord\""
     }
     foreach {rvName rvHead rvIds} $relvarDefs {
-        set rvName $ns$rvName
-        if {![relvar exists $rvName]} {
-            eval [list ::ral::relvar create $rvName $rvHead] $rvIds
+        set fullName $ns[string trimleft $rvName :]
+        set quals [namespace qualifiers $fullName]
+        if {!($quals eq {} || [namespace exists $quals])} {
+            namespace eval $quals {}
+        }
+        if {![relvar exists $fullName]} {
+            eval [list ::ral::relvar create $fullName $rvHead] $rvIds
         }
     }
 
@@ -472,7 +582,7 @@ proc ::ral::merge {value {ns {}}} {
         if {$cname eq "-complete"} {
             set cname [lindex $constraint 2]
         }
-        set cname $ns$cname
+        set cname $ns[string trimleft $cname :]
         if {![relvar constraint exists $cname]} {
             eval ::ral::relvar [setRelativeConstraintInfo $ns $constraint]
         }
@@ -486,8 +596,8 @@ proc ::ral::merge {value {ns {}}} {
     relvar eval {
         foreach body $bodyDefs {
             foreach {relvarName relvarBody} $body {
-                if {[catch {\
-                        ::ral::relvar union ${ns}$relvarName $relvarBody}]} {
+                set relvarName $ns[string trimleft $relvarName :]
+                if {[catch {::ral::relvar union $relvarName $relvarBody}]} {
                     lappend failedMerge $relvarName $::errorCode
                 }
             }
@@ -497,7 +607,7 @@ proc ::ral::merge {value {ns {}}} {
     return $failedMerge
 }
 
-proc ::ral::mergeFromFile {fileName {ns {}}} {
+proc ::ral::mergeFromFile {fileName {ns ::}} {
     set chan [::open $fileName r]
     catch {merge [read $chan] $ns} result opts
     ::close $chan
@@ -575,10 +685,10 @@ proc ::ral::storeToMk {fileName {pattern *}} {
     return -options $opts $result
 }
 
-proc ::ral::loadFromMk {fileName {ns {}}} {
+proc ::ral::loadFromMk {fileName {ns ::}} {
     package require Mk4tcl
 
-    set ns [string trimright $ns :]
+    set ns [string trimright $ns :]::
 
     ::mk::file open db $fileName -readonly
     catch {
@@ -588,7 +698,7 @@ proc ::ral::loadFromMk {fileName {ns {}}} {
         # determine the relvar names and types by reading the catalog
         ::mk::loop rvCursor db.__ral_relvar {
             array set relvarInfo [::mk::get $rvCursor]
-            set relvarName ${ns}$relvarInfo(Name_ral)
+            set relvarName $ns[string trimleft $relvarInfo(Name_ral) :]
             # check that the parent namespace exists
             set parent [namespace qualifiers $relvarName]
             if {!($parent eq {} || [namespace exists $parent])} {
@@ -609,7 +719,7 @@ proc ::ral::loadFromMk {fileName {ns {}}} {
                 array set relvarInfo [::mk::get $rvCursor]
                 ::mk::loop vCursor db.$relvarInfo(View_ral) {
                     eval [list ::ral::relvar insert\
-                        ${ns}$relvarInfo(Name_ral)\
+                        $ns[string trimleft $relvarInfo(Name_ral) :]\
                         [mkLoadTuple $vCursor $relvarInfo(Heading_ral)]]
                 }
             }
@@ -624,10 +734,10 @@ proc ::ral::loadFromMk {fileName {ns {}}} {
 # All relvars that are in the file but not currently defined are created.
 # All relvars whose names and headings match currently defined relvars
 # will have their relation values unioned with those in the file.
-proc ::ral::mergeFromMk {fileName {ns {}}} {
+proc ::ral::mergeFromMk {fileName {ns ::}} {
     package require Mk4tcl
 
-    set ns [string trimright $ns :]
+    set ns [string trimright $ns :]::
 
     ::mk::file open db $fileName -readonly
     catch {
@@ -635,7 +745,7 @@ proc ::ral::mergeFromMk {fileName {ns {}}} {
         # determine the relvar names and types by reading the catalog
         ::mk::loop rvCursor db.__ral_relvar {
             array set relvarInfo [::mk::get $rvCursor]
-            set relvarName $ns$relvarInfo(Name_ral)
+            set relvarName $ns[string trimleft $relvarInfo(Name_ral) :]
             # Check if the relvar already exists
             if {![relvar exists $relvarName]} {
                 # New relvar
@@ -668,8 +778,9 @@ proc ::ral::mergeFromMk {fileName {ns {}}} {
                 set value [eval\
                     [list relation create $relvarInfo(Heading_ral)] $body]
                 if {[catch {::ral::relvar union\
-                        $ns$relvarInfo(Name_ral) $value}]} {
-                    lappend failedMerge $ns$relvarInfo(Name_ral)\
+                        $ns[string trimleft $relvarInfo(Name_ral) :] $value}]} {
+                    lappend failedMerge\
+                        $ns[string trimleft $relvarInfo(Name_ral) :]\
                         $::errorCode
                 }
             }
@@ -682,6 +793,211 @@ proc ::ral::mergeFromMk {fileName {ns {}}} {
     return -options $opts $result
 }
 
+# Save all the relvars that match "pattern" in to a SQLite database named
+# "filename".
+proc ::ral::storeToSQLite {filename {pattern *}} {
+    package require sqlite3
+
+    catch {file rename -force -- $filename $filename.bak}
+    sqlite3 [namespace current]::sqlitedb $filename
+
+    # First we insert the meta-data schema and populate it.
+    variable ralSQLSchema
+    sqlitedb eval "pragma foreign_keys=ON"
+    sqlitedb eval $ralSQLSchema
+    sqlitedb transaction exclusive {
+        set version [getVersion]
+        sqlitedb eval {insert into __ral_version (Vnum, Date)\
+            values ($version, CURRENT_TIMESTAMP) ;}
+        foreach relvar [relvar names $pattern] {
+            # First the relvars and their attributes and identifiers
+            set basename [namespace tail $relvar]
+            sqlitedb eval {insert into __ral_relvar (Vname)\
+                    values ($basename) ;}
+            foreach {attrName type} [relation heading [relvar set $relvar]] {
+                sqlitedb eval {insert into __ral_attribute (Vname, Aname, Type)\
+                    values ($basename, $attrName, $type) ;}
+            }
+            set idCounter 0
+            foreach identifier [relvar identifiers $relvar] {
+                sqlitedb eval {insert into\
+                    __ral_identifier (IdNum, Vname, Attrs)\
+                    values ($idCounter, $basename, $identifier) ;}
+                incr idCounter
+            }
+            # Next the constraints
+            foreach constraint [relvar constraint member $relvar] {
+                set cinfo [relvar constraint info $constraint]
+                set cinfo [lassign $cinfo ctype]
+                switch -exact -- $ctype {
+                association {
+                    lassign $cinfo cname rfering a1 c1 refto a2 c2
+                    set cname [namespace tail $cname]
+                    set rfering [namespace tail $rfering]
+                    set refto [namespace tail $refto]
+                    sqlitedb eval {insert or ignore into __ral_association\
+                        (Cname, Referring, ReferringAttrs, RefToSpec,\
+                        RefTo, RefToAttrs, ReferringSpec) values\
+                        ($cname, $rfering, $a1, $c1, $refto, $a2, $c2) ;}
+                }
+                partition {
+                    set subs [lassign $cinfo cname super sattrs]
+                    set cname [namespace tail $cname]
+                    set super [namespace tail $super]
+                    sqlitedb eval {insert or ignore into __ral_partition\
+                        (Cname, SuperType, SuperAttrs) values\
+                        ($cname, $super, $sattrs) ;}
+                    foreach {subtype subattrs} $subs {
+                        set subtype [namespace tail $subtype]
+                        sqlitedb eval {insert or ignore into __ral_subtype\
+                            (Cname, SubType, SubAttrs) values\
+                            ($cname, $subtype, $subattrs) ;}
+                    }
+                }
+                correlation {
+                    if {[lindex $cinfo 0] eq "-complete"} {
+                        set comp 1
+                        set cinfo [lrange $cinfo 1 end]
+                    } else {
+                        set comp 0
+                    }
+                    lassign $cinfo cname correl ref1Attr c1 rel1 rel1Attr\
+                        ref2Attr c2 rel2 rel2Attr
+                    set cname [namespace tail $cname]
+                    set correl [namespace tail $correl]
+                    set rel1 [namespace tail $rel1]
+                    set rel2 [namespace tail $rel2]
+                    sqlitedb eval {insert or ignore into __ral_correlation\
+                        (Cname, IsComplete, AssocRelvar, OneRefAttrs,\
+                        OneRefSpec, OneRelvar, OneAttrs, OtherRefAttrs,\
+                        OtherRefSpec, OtherRelvar, OtherAttrs) values\
+                        ($cname, $comp, $correl, $ref1Attr, $c1, $rel1,\
+                        $rel1Attr, $ref2Attr, $c2, $rel2, $rel2Attr) ;}
+                }
+                default {
+                    error "unknown constraint type, \"$ctype\""
+                }
+                }
+            }
+        }
+    }
+    # Next we insert the schema that corresponds to the "pattern" as an SQL
+    # schema. This gives us the ability to manipulate the relvar data as SQL
+    # tables.
+    sqlitedb transaction exclusive {
+        sqlitedb eval [sqlSchema $pattern]
+    }
+    # Finally we insert the values of the relvars.  There is a tricky part
+    # here. Since ral attributes can be any Tcl string and since SQL is
+    # particular about names, we have to account for that.  Also, we have to
+    # deal with the "run time" nature of what we are doing.  We construct the
+    # "insert" statement in order to fill in the attributes in the required
+    # order. We also want to use the ability of the SQLite Tcl bindings to
+    # fetch the values of Tcl variables. Unfortunately, (as determined by
+    # experiment) SQLite cannot deal with Tcl variable syntax of the form
+    # "${name}". Consequently, any character in an attribute name that would
+    # terminate scanning a variable reference of the form "$name" creates a
+    # problem. The solution is to use the ability of "relvar assign" to assign
+    # attributes to explicitly named variables.  We choose as the alternate
+    # variable names the names given to the SQLite columns.
+    sqlitedb transaction exclusive {
+        foreach relvar [relvar names $pattern] {
+            set relValue [relvar set $relvar]
+            set sqlTableName [mapNamesToSQL [namespace tail $relvar]]
+            set attrNames [relation attributes $relValue]
+            # Map the attribute names to a set of SQLite column names.
+            set sqlCols [mapNamesToSQL $attrNames]
+            set statement "insert into $sqlTableName ([join $sqlCols {, }])\
+                values ("
+            # Create two lists here, one is used to get "relvar assign" to
+            # assign attributes to variable names that SQLite can later
+            # resolve. The other is just a list of those resolvable names so
+            # that we can finish out the "insert" statement.
+            set assignVars [list]
+            set sqlVars [list]
+            foreach attr $attrNames sqlCol $sqlCols {
+                lappend assignVars [list $attr $sqlCol]
+                lappend sqlVars \$$sqlCol
+            }
+            # This completes the composition of the "insert" statement.  We
+            # just managed to add a list of variable references (i.e. variable
+            # names each of which is preceded by a "$").
+            append statement [join $sqlVars {, }] ") ;"
+            # Finally after all of that, the actual populating of the SQLite
+            # tables is trivial.
+            relation foreach row $relValue {
+                relation assign $row {*}$assignVars
+                sqlitedb eval $statement
+            }
+        }
+    }
+
+    sqlitedb close
+    return
+}
+
+proc ::ral::loadFromSQLite {filename {ns ::}} {
+    if {![file exists $filename]} {
+        error "no such file, \"$filename\""
+    }
+    set ns [string trimright $ns :]::
+    namespace eval $ns {}
+    package require sqlite3
+    sqlite3 [namespace current]::sqlitedb $filename
+    # First we query the meta data and rebuild the relvars and constraints.
+    set version [sqlitedb onecolumn {select Vnum from __ral_version ;}]
+    if {![package vsatisfies $version [getCompatVersion]]} {
+        error "incompatible version number, \"$version\",\
+            current library version is, \"[getVersion]\""
+    }
+    sqlitedb transaction {
+        foreach vname [sqlitedb eval {select Vname from __ral_relvar}] {
+            set heading [list]
+            foreach {aname type} [sqlitedb eval {select Aname, Type from\
+                    __ral_attribute where Vname = $vname}] {
+                lappend heading $aname $type
+            }
+            set idlist [list]
+            foreach attrs [sqlitedb eval {select Attrs from __ral_identifier\
+                    where Vname = $vname order by IdNum}] {
+                lappend idlist $attrs
+            }
+            ::ral::relvar create $ns$vname $heading {*}$idlist
+        }
+        foreach {cname referring referringAttrs refToSpec refTo refToAttrs\
+                referringSpec} [sqlitedb eval {select Cname, Referring,\
+                ReferringAttrs, RefToSpec, RefTo, RefToAttrs, ReferringSpec\
+                from __ral_association}] {
+            ::ral::relvar association $ns$cname $ns$referring $referringAttrs\
+                    $refToSpec $ns$refTo $refToAttrs $referringSpec
+        }
+        foreach {cname superType superAttrs} [sqlitedb eval {select Cname,\
+                SuperType, SuperAttrs from __ral_partition}] {
+            set cmd [list ::ral::relvar partition $ns$cname $ns$superType\
+                    $superAttrs]
+            foreach {subtype subattr} [sqlitedb eval {select Subtype, SubAttrs\
+                    from __ral_subtype where Cname = $cname}] {
+                lappend cmd $ns$subtype $subattr
+            }
+            eval $cmd
+        }
+        foreach {cname isComplete assocRelvar oneRefAttrs oneRefSpec oneRelvar\
+                oneAttrs otherRefAttrs otherRefSpec otherRelvar otherAttrs}\
+                [sqlitedb eval {select Cname, IsComplete, AssocRelvar,\
+                OneRefAttrs, OneRefSpec, OneRelvar, OneAttrs, OtherRefAttrs,\
+                OtherRefSpec, OtherRelvar, OtherAttrs from __ral_correlation}] {
+            ::ral::relvar correlation $ns$cname\
+                    [expr {$isComplete ? "-complete" : {}}]\
+                    $ns$assocRelvar $oneRefAttrs $oneRefSpec $nsOneRelvar\
+                    $oneAttrs $otherRefAttrs $otherRefSpec $ns$otherRelvar\
+                    $otherAttrs
+        }
+    }
+    # HERE -- now insert the data from the tables.
+
+    return
+}
+
 proc ::ral::dump {{pattern *}} {
     set result {}
     set names [lsort [relvar names $pattern]]
@@ -689,18 +1005,12 @@ proc ::ral::dump {{pattern *}} {
     append result "# Generated via ::ral::dump\n"
     append result "package require ral [getVersion]\n"
 
-    array set qualMap {}
     # Convert the names to be relative
     # Strip any leading "::" from names so that if the script is
     # sourced in, names are created relative to the namespace of the
     # source.
     foreach name $names {
-        set rName [string trimleft $name ":"]
-        set quals [namespace qualifiers $rName]
-        if {![info exists qualMap($quals)]} {
-            append result "namespace eval $quals {}\n"
-            set qualMap($quals) 1
-        }
+        set rName [namespace tail $name]
         append result "::ral::relvar create $rName\
             [list [relation heading [relvar set $name]]]\
             [relvar identifiers $name]" \n
@@ -714,8 +1024,7 @@ proc ::ral::dump {{pattern *}} {
     append result "::ral::relvar eval \{\n"
     foreach name $names {
         append result\
-            "    ::ral::relvar set [string trimleft $name :]\
-            [list [relvar set $name]]" \n
+            "    ::ral::relvar set [namespace tail  $name] [list [relvar set $name]]" \n
     }
     append result "\}"
 
@@ -753,6 +1062,156 @@ proc ::ral::csvToFile {relValue fileName {sortAttr {}} {noheading 0}} {
         error $result
     }
     return
+}
+
+# Returns a string that can be fed to SQLite that will create the necessary
+# tables and contraints for the relvars that match "pattern".
+proc ::ral::sqlSchema {{pattern *}} {
+    set names [lsort [relvar names $pattern]]
+
+    append result "-- Generated via ::ral::sqlSchema\n"
+    append result "pragma foreign_keys=ON;\n"
+
+    # Convert the names to be relative.  Strip any leading namespace qualifiers
+    # from names so that if the script is sourced in, names are created
+    # relative to the namespace of the source.
+    foreach name $names {
+        set indices {}
+        set value [relvar set $name]
+        set baseName [namespace tail $name]
+        set sqlBaseName [mapNamesToSQL $baseName]
+
+        append result "create table $sqlBaseName (\n"
+        # Find the attributes of the relationship that participate in
+        # a conditional association. This is the one and only case
+        # where we will allow the attribute to be NULL.
+        set condAttrs [list]
+        foreach constraint [relvar constraint member $name] {
+            set info [relvar constraint info $constraint]
+            set info [lassign $info ctype]
+            if {$ctype eq "association"} {
+                lassign $info cname rfering a1 c1 refto a2 c2
+                if {$c2 eq "?"} {
+                    lappend condAttrs {*}$a1
+                }
+            }
+        }
+        # Define table attributes.
+        foreach {attr type} [relation heading $value] {
+            # N.B. need to map type from Tcl type to SQL type
+            # Need to figure out what to do with Tuple and Relation type
+            # attributes.
+            append result "    [mapNamesToSQL $attr] [mapTypeToSQL $type]"
+            if {$attr ni $condAttrs} {
+                append result " not null"
+            }
+            append result ",\n"
+        }
+        # Define identification constraints.
+        set idNum 0
+        foreach id [relvar identifiers $name] {
+            set id [join [mapNamesToSQL $id] {, }]
+            append result "    constraint ${sqlBaseName}_ID$idNum\
+                    unique ($id),\n"
+            append indices "create unique index ${sqlBaseName}_INDEX$idNum\
+                    on $sqlBaseName ($id) ;\n"
+            incr idNum
+        }
+        # Define the referential constraints.
+        foreach constraint [relvar constraint member $name] {
+            set info [relvar constraint info $constraint]
+            set info [lassign $info ctype]
+            switch -exact -- $ctype {
+                association {
+                    lassign $info cname rfering a1 c1 refto a2 c2
+                    set cname [mapNamesToSQL [namespace tail $cname]]
+                    set rfering [namespace tail $rfering]
+                    set refto [namespace tail $refto]
+                    if {$rfering eq $baseName} {
+                        set a1 [join [mapNamesToSQL $a1] {, }]
+                        append result "    constraint ${sqlBaseName}_$cname\
+                            foreign key ($a1)\
+                            references $refto\
+                                ([join [mapNamesToSQL $a2] {, }])\n"\
+                            "        on delete [expr {$c2 eq "?" ?\
+                                "set null" : "cascade"}]\
+                            on update cascade\
+                            deferrable initially deferred,\n"
+                        append indices "create index\
+                            ${sqlBaseName}_${cname}INDEX\
+                            on $sqlBaseName ($a1) ;\n"
+                    }
+                }
+                partition {
+                    # The best we can do for a partition is to make it one to
+                    # one conditional subtypes referring to the supertype. This
+                    # will not enforce disjointedness, but it's SQL after all.
+                    set subs [lassign $info cname super sattrs]
+                    foreach {subrel subattrs} $subs {
+                        set rfering [namespace tail $subrel]
+                        if {$baseName eq $rfering} {
+                            set cname [mapNamesToSQL [namespace tail $cname]]
+                            set refto [namespace tail $super]
+                            set subattrs [join [mapNamesToSQL $subattrs] {, }]
+                            append result "    constraint ${sqlBaseName}_$cname\
+                                foreign key ($subattrs)\
+                                references $refto\
+                                    ([join [mapNamesToSQL $sattrs] {, }])\n"\
+                                "        on delete cascade on update cascade\
+                                deferrable initially deferred,\n"
+                            append indices "create index\
+                                ${sqlBaseName}_${cname}INDEX on\
+                                $sqlBaseName ($subattrs) ;\n"
+                            break
+                        }
+                    }
+                }
+                correlation {
+                    # The correlation constraint shows up as two foreign
+                    # key references on the correlation table.
+                    lassign $info cname correl ref1Attr c1 rel1 rel1Attr\
+                        ref2Attr c2 rel2 rel2Attr
+                    set correl [mapNamesToSQL [namespace tail $correl]]
+                    if {$baseName eq $correl} {
+                        set cname [mapNamesToSQL [namespace tail $cname]]
+                        set rel1 [namespace tail $rel1]
+                        set ref1Attr [join [mapNamesToSQL $ref1Attr] {, }]
+                        append result "    constraint\
+                                ${sqlBaseName}_${cname}_${rel1}\
+                            foreign key ($ref1Attr)\
+                            references $rel1\
+                                ([join [mapNamesToSQL $rel1Attr] {, }])\n"\
+                            "        on delete cascade on update cascade\
+                            deferrable initially deferred,\n"
+                        append indices "create index\
+                            ${sqlBaseName}_${cname}INDEX0 on $sqlBaseName\
+                            ($ref1Attr) ;\n"
+
+                        set rel2 [namespace tail $rel2]
+                        set ref2Attr [join [mapNamesToSQL $ref2Attr] {, }]
+                        append result "    constraint\
+                                ${sqlBaseName}_${cname}_${rel2}\
+                            foreign key ($ref2Attr)\
+                            references $rel2\
+                                ([join [mapNamesToSQL $rel2Attr] {, }])\n"\
+                            "        on delete cascade on update cascade\
+                            deferrable initially deferred,\n"
+                        append indices "create index\
+                            ${sqlBaseName}_${cname}INDEX1 on $sqlBaseName\
+                            ($ref2Attr) ;\n"
+                    }
+                }
+                default {
+                    error "unknown constraint type, \"[lindex $info 0\""
+                }
+            }
+        }
+        set result [string trimright $result ,\n]
+        append result ") ;\n"
+        append result $indices
+    }
+
+    return $result
 }
 
 # If we have Tcl 8.5, then we can supply some "aggregate scalar functions" that
@@ -1027,14 +1486,14 @@ proc ::ral::getRelativeConstraintInfo {cname} {
         association {
             variable assocIndices
             foreach index $assocIndices {
-                lset cinfo $index [string trimleft [lindex $cinfo $index] ":"]
+                lset cinfo $index [namespace tail [lindex $cinfo $index]]
             }
         }
         partition {
-            lset cinfo 1 [string trimleft [lindex $cinfo 1] ":"]
-            lset cinfo 2 [string trimleft [lindex $cinfo 2] ":"]
+            lset cinfo 1 [namespace tail [lindex $cinfo 1]]
+            lset cinfo 2 [namespace tail [lindex $cinfo 2]]
             for {set index 4} {$index < [llength $cinfo]} {incr index 2} {
-                lset cinfo $index [string trimleft [lindex $cinfo $index] ":"]
+                lset cinfo $index [namespace tail [lindex $cinfo $index]]
             }
         }
         correlation {
@@ -1043,7 +1502,7 @@ proc ::ral::getRelativeConstraintInfo {cname} {
             set cIndices [expr {[lindex $cinfo 1] eq "-complete" ?\
                 $compCorrelIndices : $correlIndices}]
             foreach index $cIndices {
-                lset cinfo $index [string trimleft [lindex $cinfo $index] ":"]
+                lset cinfo $index [namespace tail [lindex $cinfo $index]]
             }
         }
         default {
@@ -1054,18 +1513,18 @@ proc ::ral::getRelativeConstraintInfo {cname} {
 }
 
 proc ::ral::setRelativeConstraintInfo {ns cinfo} {
-    switch -exact [lindex $cinfo 0] {
+    switch -exact -- [lindex $cinfo 0] {
         association {
             variable assocIndices
             foreach index $assocIndices {
-                lset cinfo $index ${ns}[lindex $cinfo $index]
+                lset cinfo $index ${ns}[string trimleft [lindex $cinfo $index] :]
             }
         }
         partition {
-            lset cinfo 1 ${ns}[lindex $cinfo 1]
-            lset cinfo 2 ${ns}[lindex $cinfo 2]
+            lset cinfo 1 ${ns}[string trimleft [lindex $cinfo 1] :]
+            lset cinfo 2 ${ns}[string trimleft [lindex $cinfo 2] :]
             for {set index 4} {$index < [llength $cinfo]} {incr index 2} {
-                lset cinfo $index ${ns}[lindex $cinfo $index]
+                lset cinfo $index ${ns}[string trimleft [lindex $cinfo $index] :]
             }
         }
         correlation {
@@ -1074,7 +1533,7 @@ proc ::ral::setRelativeConstraintInfo {ns cinfo} {
             set cIndices [expr {[lindex $cinfo 1] eq "-complete" ?\
                 $compCorrelIndices : $correlIndices}]
             foreach index $cIndices {
-                lset cinfo $index ${ns}[lindex $cinfo $index]
+                lset cinfo $index ${ns}[string trimleft [lindex $cinfo $index] :]
             }
         }
         default {
@@ -1085,4 +1544,18 @@ proc ::ral::setRelativeConstraintInfo {ns cinfo} {
     return $cinfo
 }
 
-package provide ral 0.9.1
+proc ::ral::mapNamesToSQL {names} {
+    set newNames [list]
+    foreach name $names {
+        lappend newNames [regsub -all -- {[^[:alnum:]_]} $name _]
+    }
+    return $newNames
+}
+
+proc ::ral::mapTypeToSQL {type} {
+    variable sqlTypeMap
+    return [expr {[info exists sqlTypeMap($type)] ?\
+            $sqlTypeMap($type) : "text"}]
+}
+
+package provide ral 0.10.0
