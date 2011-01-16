@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_utils.c,v $
-$Revision: 1.23 $
-$Date: 2009/09/12 22:32:36 $
+$Revision: 1.24 $
+$Date: 2011/01/16 23:18:42 $
  *--
  */
 
@@ -118,6 +118,7 @@ static char const * const optStrings[] = {
     "destroy",
     "dict",
     "divide",
+    "dunion",
     "eliminate",
     "emptyof",
     "equal",
@@ -160,6 +161,7 @@ static char const * const optStrings[] = {
     "times",
     "trace",
     "tuple",
+    "uinsert",
     "ungroup",
     "union",
     "unset",

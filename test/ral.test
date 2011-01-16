@@ -51,8 +51,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.53 $
-# $Date: 2010/10/20 00:17:22 $
+# $Revision: 1.54 $
+# $Date: 2011/01/16 23:18:42 $
 #  *--
 
 package require tcltest 2.2
@@ -4256,7 +4256,7 @@ in expression "_@_< 20"} -returnCodes error
         set r2 {{Name string City string}
             {{Name George City {San Jose}}}}
         relation union $r1 $r2
-    } -result {headings not equal, "Name string City string"}\
+    } -result {headings not equal, "Name string Age int City string != Name string City string"}\
     -returnCodes error
 
     test relation-union-8.0 {equal headings of different order} -body {
@@ -4941,7 +4941,7 @@ in expression "_@_< 20"} -returnCodes error
     } -body {
         set x [relation create {Name string} {Name George}]
         relvar union X $x
-    } -result {headings not equal, "Name string"}\
+    } -result {headings not equal, "Name string Status int != Name string"}\
     -returnCodes error
 
     test relvar-union-2.1 {

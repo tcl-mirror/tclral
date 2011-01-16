@@ -1,6 +1,6 @@
-[manpage_begin relation n 0.9.1]
+[manpage_begin relation n 0.10.0]
 [comment {
-# This software is copyrighted 2004 - 2009
+# This software is copyrighted 2004 - 2010
 # by G. Andrew Mangogna.
 # The following terms apply to all files associated with the software unless
 # explicitly disclaimed in individual files.
@@ -46,14 +46,14 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.34 $
-# $Date: 2010/10/20 00:11:13 $
+# $Revision: 1.35 $
+# $Date: 2011/01/16 23:18:42 $
 #  *--
 }]
 [moddesc "Relation Operators"]
 [titledesc "Operators for Relation Values"]
-[copyright "2004 - 2009 by G. Andrew Mangogna"]
-[require ral [opt 0.9.1]]
+[copyright "2004 - 2010 by G. Andrew Mangogna"]
+[require ral [opt 0.10.0]]
 [description]
 This manpage describes the [cmd relation] command.
 The [cmd relation]
@@ -480,6 +480,20 @@ Mediator:
 All dogs owned by both Sue and George
 -------------------------------------
 }]
+
+[call [cmd "::ral::relation dunion"] [arg relationValue1]\
+    [arg relationValue2] [opt "relationValue3 ..."]]
+
+The [cmd dunion] subcommand returns the set union of two or more relations.
+However, unlike the [cmd "relation union"] command, the [cmd dunion]
+command insists that all the relation values be disjoint.
+All relations must be of the same type.
+The result relation has a heading that is the same as any of the arguments
+and has a body consisting of all tuples present in any of the
+[arg relationValue] arguments.
+However, if any duplicated tuples are found, then an error results.
+Since the dunion operation is both associative and commutative,
+the order of the [arg relationValue] arguments has no effect the result.
 
 
 [call [cmd "::ral::relation eliminate"] [arg relationValue]\
@@ -1372,6 +1386,9 @@ the order of the [arg relationValue] arguments has no effect on the result.
 
 The [cmd tuple] subcommand returns the body of [arg relationValue] as a tuple.
 The cardinality of [arg relationValue] must be one or an error is returned.
+
+[call [cmd "::ral::relation uinsert"] [arg relationValue]\
+        [opt [arg "name-value-list1 name-value-list2 ..."]]]
 
 [call [cmd "::ral::relation ungroup"] [arg relationValue] [arg attribute]]
 

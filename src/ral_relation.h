@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.h,v $
-$Revision: 1.21 $
-$Date: 2009/04/11 18:18:54 $
+$Revision: 1.22 $
+$Date: 2011/01/16 23:18:42 $
  *--
  */
 #ifndef _ral_relation_h_
@@ -179,7 +179,7 @@ extern int Ral_RelationProperSupersetOf(Ral_Relation, Ral_Relation) ;
 extern int Ral_RelationRenameAttribute(Ral_Relation, char const *, char const *,
         Ral_ErrorInfo *) ;
 
-extern Ral_Relation Ral_RelationUnion(Ral_Relation, Ral_Relation,
+extern Ral_Relation Ral_RelationUnion(Ral_Relation, Ral_Relation, int,
         Ral_ErrorInfo *) ;
 extern Ral_Relation Ral_RelationIntersect(Ral_Relation, Ral_Relation,
         Ral_ErrorInfo *) ;
@@ -210,7 +210,9 @@ extern Ral_Relation Ral_RelationUnwrap(Ral_Relation, char const *,
 extern Ral_Relation Ral_RelationTclose(Ral_Relation) ;
 
 extern Ral_IntVector Ral_RelationSort(Ral_Relation, Ral_IntVector, int) ;
-extern int Ral_RelationCopy(Ral_Relation, Ral_RelationIter,
+extern Ral_RelationIter Ral_RelationDisjointCopy(Ral_RelationIter,
+        Ral_RelationIter, Ral_Relation, Ral_IntVector) ;
+extern void Ral_RelationUnionCopy(Ral_RelationIter,
         Ral_RelationIter, Ral_Relation, Ral_IntVector) ;
 extern void Ral_RelationFindJoinTuples(Ral_Relation, Ral_Relation,
         Ral_JoinMap) ;

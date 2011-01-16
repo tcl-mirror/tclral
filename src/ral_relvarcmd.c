@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.36 $
-$Date: 2009/09/12 22:32:36 $
+$Revision: 1.37 $
+$Date: 2011/01/16 23:18:42 $
  *--
  */
 
@@ -91,9 +91,11 @@ static int RelvarCreateCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarDeleteCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarDeleteOneCmd(Tcl_Interp *, int, Tcl_Obj *const*,
         Ral_RelvarInfo) ;
+static int RelvarDunionCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarEvalCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarExistsCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
-static int RelvarIdentifiersCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
+static int RelvarIdentifiersCmd(Tcl_Interp *, int, Tcl_Obj *const*,
+        Ral_RelvarInfo) ;
 static int RelvarInsertCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarIntersectCmd(Tcl_Interp *, int, Tcl_Obj *const*,
         Ral_RelvarInfo) ;
@@ -106,6 +108,8 @@ static int RelvarRestrictOneCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarIn
 static int RelvarSetCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarTraceCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarTransactionCmd(Tcl_Interp *, int, Tcl_Obj *const*,
+        Ral_RelvarInfo) ;
+static int RelvarUinsertCmd(Tcl_Interp *, int, Tcl_Obj *const*,
         Ral_RelvarInfo) ;
 static int RelvarUnionCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarUnsetCmd(Tcl_Interp *, int, Tcl_Obj *const*,
@@ -149,6 +153,7 @@ relvarCmd(
 	{"create", RelvarCreateCmd},
 	{"delete", RelvarDeleteCmd},
 	{"deleteone", RelvarDeleteOneCmd},
+        {"dunion", RelvarDunionCmd},
 	{"eval", RelvarEvalCmd},
 	{"exists", RelvarExistsCmd},
 	{"identifiers", RelvarIdentifiersCmd},
@@ -162,6 +167,7 @@ relvarCmd(
 	{"set", RelvarSetCmd},
 	{"trace", RelvarTraceCmd},
 	{"transaction", RelvarTransactionCmd},
+        {"uinsert", RelvarUinsertCmd},
 	{"union", RelvarUnionCmd},
 	{"unset", RelvarUnsetCmd},
 	{"update", RelvarUpdateCmd},
@@ -551,6 +557,103 @@ RelvarDeleteOneCmd(
 }
 
 static int
+RelvarDunionCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv,
+    Ral_RelvarInfo rInfo)
+{
+    Ral_Relvar relvar ;
+    Ral_Relation relvalue ;
+    Ral_Relation unionRel ;
+    int result = TCL_OK ;
+    Ral_ErrorInfo errInfo ;
+
+    /* relvar union relvarName ?relationValue ... ? */
+    if (objc < 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relvarName ?relationValue ...?") ;
+	return TCL_ERROR ;
+    }
+
+    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2])) ;
+    if (relvar == NULL) {
+	return TCL_ERROR ;
+    }
+    if (Tcl_ConvertToType(interp, relvar->relObj, &Ral_RelationObjType)
+		!= TCL_OK ||
+	    Ral_RelvarObjCopyOnShared(interp, rInfo, relvar) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    unionRel = relvalue = relvar->relObj->internalRep.otherValuePtr ;
+
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelvar, Ral_OptUnion) ;
+    if (!Ral_RelvarStartCommand(rInfo, relvar)) {
+	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_CMD, objv[2]) ;
+	Ral_InterpSetError(interp, &errInfo) ;
+	return TCL_ERROR ;
+    }
+    if (relvar->stateFlags) {
+	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_MODIFICATION,
+                objv[2]) ;
+	Ral_InterpSetError(interp, &errInfo) ;
+	return TCL_ERROR ;
+    }
+    relvar->stateFlags = 1 ;
+
+    /*
+     * Index to the first relation value.
+     */
+    objc -= 3 ;
+    objv += 3 ;
+    while (objc-- > 0) {
+	Tcl_Obj *relObj ;
+	Ral_Relation r1 ;
+	Ral_Relation r2 ;
+
+	r1 = unionRel ;
+
+	relObj = *objv++ ;
+	if (Tcl_ConvertToType(interp, relObj, &Ral_RelationObjType)
+	    != TCL_OK) {
+	    result = TCL_ERROR ;
+	    break ;
+	}
+	r2 = relObj->internalRep.otherValuePtr ;
+
+	unionRel = Ral_RelationUnion(r1, r2, 1, &errInfo) ;
+	if (r1 != relvalue) {
+	    Ral_RelationDelete(r1) ;
+	}
+	if (unionRel == NULL) {
+	    Ral_InterpSetError(interp, &errInfo) ;
+	    result = TCL_ERROR ;
+	    break ;
+	}
+    }
+    if (result == TCL_OK) {
+	Tcl_Obj *unionObj = Ral_RelationObjNew(unionRel) ;
+	Tcl_Obj *resultObj ;
+
+	Tcl_IncrRefCount(unionObj) ;
+	resultObj = Ral_RelvarObjExecSetTraces(interp, relvar, unionObj,
+	    &errInfo) ;
+        if (!(resultObj && Ral_RelvarSetRelation(relvar, resultObj,
+                &errInfo))) {
+            Ral_InterpSetError(interp, &errInfo) ;
+            result = TCL_ERROR ;
+        }
+	Tcl_DecrRefCount(unionObj) ;
+    }
+    relvar->stateFlags = 0 ;
+    result = Ral_RelvarObjEndCmd(interp, rInfo, result != TCL_OK) ;
+
+    if (result == TCL_OK) {
+	Tcl_SetObjResult(interp, relvar->relObj) ;
+    }
+    return result ;
+}
+
+static int
 RelvarEvalCmd(
     Tcl_Interp *interp,
     int objc,
@@ -761,7 +864,7 @@ RelvarInsertCmd(
             /*
              * The inserted tuple object had a reference count of at least
              * one from the insertion processing. We now need to discard
-             * the Tcl_Obj, even though the underlying tuple has have
+             * the Tcl_Obj, even though the underlying tuple had
              * its reference count incremented by being inserted into
              * both the relvar and the result relation value.
              */
@@ -1455,6 +1558,104 @@ RelvarTransactionCmd(
 }
 
 static int
+RelvarUinsertCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv,
+    Ral_RelvarInfo rInfo)
+{
+    Ral_Relvar relvar ;
+    int inserted = 0 ;
+    int result = TCL_OK ;
+    Ral_ErrorInfo errInfo ;
+    Ral_Relation relation ;
+    Ral_Relation resultRel ;
+    Ral_IntVector orderMap = NULL ;
+
+    /* relvar uinsert relvarName ?name-value-list ...? */
+    if (objc < 3) {
+	Tcl_WrongNumArgs(interp, 2, objv, "relvarName ?name-value-list ...?") ;
+	return TCL_ERROR ;
+    }
+
+    relvar = Ral_RelvarObjFindRelvar(interp, rInfo, Tcl_GetString(objv[2])) ;
+    if (relvar == NULL) {
+	return TCL_ERROR ;
+    }
+    if (Tcl_ConvertToType(interp, relvar->relObj, &Ral_RelationObjType)
+		!= TCL_OK ||
+	    Ral_RelvarObjCopyOnShared(interp, rInfo, relvar) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelvar, Ral_OptUinsert) ;
+    if (!Ral_RelvarStartCommand(rInfo, relvar)) {
+	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_CMD, objv[2]) ;
+	Ral_InterpSetError(interp, &errInfo) ;
+	return TCL_ERROR ;
+    }
+    if (relvar->stateFlags) {
+	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_MODIFICATION,
+                objv[2]) ;
+	Ral_InterpSetError(interp, &errInfo) ;
+	return TCL_ERROR ;
+    }
+    relvar->stateFlags = 1 ;
+
+    objc -= 3 ;
+    objv += 3 ;
+
+    /*
+     * The result of relvar uinsert is a relation value that contains the
+     * tuples that were inserted into the relvar. This allows access to
+     * modifications that the relvar traces might have performed.
+     */
+    relation = relvar->relObj->internalRep.otherValuePtr ;
+    resultRel = Ral_RelationNew(relation->heading) ;
+
+    while (objc-- > 0) {
+        Tcl_Obj *insertedTuple ;
+
+        Ral_IntVectorDelete(orderMap) ;
+        insertedTuple = Ral_RelvarObjInsertTuple(interp, relvar, *objv++,
+                &orderMap, &errInfo) ;
+        if (insertedTuple) {
+            Ral_Tuple tuple ;
+
+            assert(insertedTuple->typePtr == &Ral_TupleObjType) ;
+            tuple = insertedTuple->internalRep.otherValuePtr ;
+            Ral_RelationPushBack(resultRel, tuple, orderMap) ;
+            /*
+             * The inserted tuple object had a reference count of at least
+             * one from the insertion processing. We now need to discard
+             * the Tcl_Obj, even though the underlying tuple had
+             * its reference count incremented by being inserted into
+             * both the relvar and the result relation value.
+             */
+            Tcl_DecrRefCount(insertedTuple) ;
+            ++inserted ;
+	}
+        /*
+         * N.B. we ignore any attempt the insert a tuple that fails
+         * the identification constraints.
+         */
+    }
+
+    Ral_IntVectorDelete(orderMap) ;
+    relvar->stateFlags = 0 ;
+    result = Ral_RelvarObjEndCmd(interp, rInfo, result != TCL_OK) ;
+    if (result == TCL_OK) {
+	if (inserted) {
+	    Tcl_InvalidateStringRep(relvar->relObj) ;
+	}
+	Tcl_SetObjResult(interp, Ral_RelationObjNew(resultRel)) ;
+    } else {
+        Ral_RelationDelete(resultRel) ;
+    }
+    return result ;
+}
+
+static int
 RelvarUnionCmd(
     Tcl_Interp *interp,
     int objc,
@@ -1484,7 +1685,7 @@ RelvarUnionCmd(
     }
     unionRel = relvalue = relvar->relObj->internalRep.otherValuePtr ;
 
-    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelvar, Ral_OptUnion) ;
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelvar, Ral_OptDunion) ;
     if (!Ral_RelvarStartCommand(rInfo, relvar)) {
 	Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_ONGOING_CMD, objv[2]) ;
 	Ral_InterpSetError(interp, &errInfo) ;
@@ -1518,7 +1719,7 @@ RelvarUnionCmd(
 	}
 	r2 = relObj->internalRep.otherValuePtr ;
 
-	unionRel = Ral_RelationUnion(r1, r2, &errInfo) ;
+	unionRel = Ral_RelationUnion(r1, r2, 0, &errInfo) ;
 	if (r1 != relvalue) {
 	    Ral_RelationDelete(r1) ;
 	}

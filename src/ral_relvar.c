@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.c,v $
-$Revision: 1.23 $
-$Date: 2009/09/19 18:55:03 $
+$Revision: 1.24 $
+$Date: 2011/01/16 23:18:42 $
  *--
  */
 
@@ -781,13 +781,10 @@ Ral_RelvarSetRelation(
      */
     orderMap = Ral_TupleHeadingNewOrderMap(oldRel->heading, newRel->heading) ;
     if (orderMap) {
-        int copied ;
-
         copyRel = Ral_RelationNew(oldRel->heading) ;
-        Ral_RelationReserve(copyRel, Ral_RelationCardinality(newRel)) ;
-        copied = Ral_RelationCopy(newRel, Ral_RelationBegin(newRel),
+        assert(Ral_TupleHeadingEqual(newRel->heading, copyRel->heading)) ;
+        Ral_RelationUnionCopy(Ral_RelationBegin(newRel),
             Ral_RelationEnd(newRel), copyRel, orderMap) ;
-        assert(copied == 1) ;
         Ral_IntVectorDelete(orderMap) ;
     } else {
         copyRel = Ral_RelationShallowCopy(newRel) ;

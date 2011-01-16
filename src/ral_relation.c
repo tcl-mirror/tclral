@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.38 $
-$Date: 2009/06/07 17:51:45 $
+$Revision: 1.39 $
+$Date: 2011/01/16 23:18:42 $
  *--
  */
 
@@ -408,10 +408,10 @@ Ral_Relation
 Ral_RelationUnion(
     Ral_Relation r1,
     Ral_Relation r2,
+    int isDisjoint,         // true if the union must be disjoint
     Ral_ErrorInfo *errInfo)
 {
     Ral_Relation unionRel ;
-    int copyStatus ;
     Ral_IntVector orderMap ;
     /*
      * Headings must be equal to perform a union.
@@ -424,9 +424,8 @@ Ral_RelationUnion(
      * Everything in the first relation is in the union, so just copy it in.
      * No reordering necessary.
      */
-    copyStatus = Ral_RelationCopy(r1, Ral_RelationBegin(r1),
-	Ral_RelationEnd(r1), unionRel, NULL) ;
-    assert(copyStatus == 1) ;
+    Ral_RelationUnionCopy(Ral_RelationBegin(r1), Ral_RelationEnd(r1),
+            unionRel, NULL) ;
     /*
      * Reordering may be necessary.
      */
@@ -435,8 +434,27 @@ Ral_RelationUnion(
      * Copy in the tuples from the second relation.  Ignore any return status.
      * If there is already a matching tuple it will not be inserted.
      */
-    Ral_RelationCopy(r2, Ral_RelationBegin(r2), Ral_RelationEnd(r2), unionRel,
-	orderMap) ;
+    if (isDisjoint) {
+        Ral_RelationIter copyFinish ;
+
+        copyFinish = Ral_RelationDisjointCopy(Ral_RelationBegin(r2),
+                Ral_RelationEnd(r2), unionRel, orderMap) ;
+        if (copyFinish != Ral_RelationEnd(r2)) {
+            /*
+             * The tuple pointed to by "copyFinish" didn't copy. This
+             * is an error for a disjoint union.
+             */
+            char *dupTupString = Ral_TupleStringOf(*copyFinish) ;
+            Ral_ErrorInfoSetError(errInfo, RAL_ERR_DUPLICATE_TUPLE,
+                dupTupString) ;
+            ckfree(dupTupString) ;
+            Ral_RelationDelete(unionRel) ;
+            unionRel = NULL ;
+        }
+    } else {
+        Ral_RelationUnionCopy(Ral_RelationBegin(r2),
+                Ral_RelationEnd(r2), unionRel, orderMap) ;
+    }
 
     Ral_IntVectorDelete(orderMap) ;
 
@@ -1546,24 +1564,40 @@ Ral_RelationUnwrap(
     return resultRel ;
 }
 
-int
-Ral_RelationCopy(
-    Ral_Relation src,
+/*
+ * Copy, stopping at the first duplicate found.
+ */
+Ral_RelationIter
+Ral_RelationDisjointCopy(
     Ral_RelationIter start,
     Ral_RelationIter finish,
     Ral_Relation dst,
     Ral_IntVector orderMap)
 {
-    int allCopied = 1 ;
-
-    assert(Ral_TupleHeadingEqual(src->heading, dst->heading)) ;
-
     Ral_RelationReserve(dst, finish - start) ;
-    while (start != finish) {
-	allCopied = Ral_RelationPushBack(dst, *start++, orderMap) && allCopied ;
+    for ( ; start != finish ; ++start) {
+	if (!Ral_RelationPushBack(dst, *start, orderMap)) {
+            break ;
+        }
     }
 
-    return allCopied ;
+    return start ;
+}
+
+/*
+ * Copy, ignoring duplicates.
+ */
+void
+Ral_RelationUnionCopy(
+    Ral_RelationIter start,
+    Ral_RelationIter finish,
+    Ral_Relation dst,
+    Ral_IntVector orderMap)
+{
+    Ral_RelationReserve(dst, finish - start) ;
+    for ( ; start != finish ; ++start) {
+	Ral_RelationPushBack(dst, *start, orderMap) ;
+    }
 }
 
 /*
@@ -2419,8 +2453,14 @@ Ral_HeadingMatch(
 {
     int status = Ral_TupleHeadingEqual(h1, h2) ;
     if (status == 0) {
+	char *h1str = Ral_TupleHeadingStringOf(h1) ;
 	char *h2str = Ral_TupleHeadingStringOf(h2) ;
-	Ral_ErrorInfoSetError(errInfo, RAL_ERR_HEADING_NOT_EQUAL, h2str) ;
+
+	Ral_ErrorInfoSetError(errInfo, RAL_ERR_HEADING_NOT_EQUAL, h1str) ;
+	Tcl_DStringAppend(&errInfo->param, " != ", -1) ;
+	Tcl_DStringAppend(&errInfo->param, h2str, -1) ;
+
+        ckfree(h1str) ;
         ckfree(h2str) ;
     }
     return status ;

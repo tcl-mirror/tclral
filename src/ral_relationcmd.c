@@ -46,8 +46,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.46 $
-$Date: 2010/12/05 00:49:00 $
+$Revision: 1.47 $
+$Date: 2011/01/16 23:18:42 $
  *--
  */
 
@@ -105,6 +105,7 @@ static int RelationDegreeCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationDictCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 #endif
 static int RelationDivideCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
+static int RelationDunionCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationEliminateCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationEmptyofCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationExtendCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
@@ -189,6 +190,7 @@ relationCmd(
 	{"dict", RelationDictCmd},
 #	    endif
 	{"divide", RelationDivideCmd},
+        {"dunion", RelationDunionCmd},
 	{"eliminate", RelationEliminateCmd},
 	{"emptyof", RelationEmptyofCmd},
 	{"extend", RelationExtendCmd},
@@ -730,6 +732,73 @@ RelationDivideCmd(
     }
 
     Tcl_SetObjResult(interp, Ral_RelationObjNew(quot)) ;
+    return TCL_OK ;
+}
+
+static int
+RelationDunionCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Tcl_Obj *r1Obj ;
+    Tcl_Obj *r2Obj ;
+    Ral_Relation r1 ;
+    Ral_Relation r2 ;
+    Ral_Relation unionRel ;
+    Ral_ErrorInfo errInfo ;
+
+    /* relation dunion relation1 relation2 ? ... ? */
+    if (objc < 4) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+	    "relation1 relation2 ?relation3 ...?") ;
+	return TCL_ERROR ;
+    }
+
+    r1Obj = objv[2] ;
+    if (Tcl_ConvertToType(interp, r1Obj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    r1 = r1Obj->internalRep.otherValuePtr ;
+
+    r2Obj = objv[3] ;
+    if (Tcl_ConvertToType(interp, r2Obj, &Ral_RelationObjType) != TCL_OK) {
+	return TCL_ERROR ;
+    }
+    r2 = r2Obj->internalRep.otherValuePtr ;
+
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptDunion) ;
+    unionRel = Ral_RelationUnion(r1, r2, 1, &errInfo) ;
+    if (unionRel == NULL) {
+	Ral_InterpSetError(interp, &errInfo) ;
+	return TCL_ERROR ;
+    }
+
+    /*
+     * Increment past the first two relations and perform the union
+     * on the remaining values.
+     */
+    objc -= 4 ;
+    objv += 4 ;
+    while (objc-- > 0) {
+	r1 = unionRel ;
+
+	r2Obj = *objv++ ;
+	if (Tcl_ConvertToType(interp, r2Obj, &Ral_RelationObjType) != TCL_OK) {
+	    Ral_RelationDelete(r1) ;
+	    return TCL_ERROR ;
+	}
+	r2 = r2Obj->internalRep.otherValuePtr ;
+
+	unionRel = Ral_RelationUnion(r1, r2, 1, &errInfo) ;
+	Ral_RelationDelete(r1) ;
+	if (unionRel == NULL) {
+	    Ral_InterpSetError(interp, &errInfo) ;
+	    return TCL_ERROR ;
+	}
+    }
+
+    Tcl_SetObjResult(interp, Ral_RelationObjNew(unionRel)) ;
     return TCL_OK ;
 }
 
@@ -3177,7 +3246,7 @@ RelationUinsertCmd(
 
     newRel = Ral_RelationShallowCopy(relation) ;
     Ral_RelationReserve(newRel, objc) ;
-    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptInsert) ;
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptUinsert) ;
     while (objc-- > 0) {
 	/*
 	 * uinsert silently ignores duplicates and has "union" like semantics.
@@ -3259,7 +3328,7 @@ RelationUnionCmd(
     r2 = r2Obj->internalRep.otherValuePtr ;
 
     Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdRelation, Ral_OptUnion) ;
-    unionRel = Ral_RelationUnion(r1, r2, &errInfo) ;
+    unionRel = Ral_RelationUnion(r1, r2, 0, &errInfo) ;
     if (unionRel == NULL) {
 	Ral_InterpSetError(interp, &errInfo) ;
 	return TCL_ERROR ;
@@ -3281,7 +3350,7 @@ RelationUnionCmd(
 	}
 	r2 = r2Obj->internalRep.otherValuePtr ;
 
-	unionRel = Ral_RelationUnion(r1, r2, &errInfo) ;
+	unionRel = Ral_RelationUnion(r1, r2, 0, &errInfo) ;
 	Ral_RelationDelete(r1) ;
 	if (unionRel == NULL) {
 	    Ral_InterpSetError(interp, &errInfo) ;
