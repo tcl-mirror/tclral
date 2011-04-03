@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.c,v $
-$Revision: 1.24 $
-$Date: 2011/01/16 23:18:42 $
+$Revision: 1.25 $
+$Date: 2011/04/03 22:02:52 $
  *--
  */
 
@@ -92,6 +92,8 @@ static int relvarPartitionConstraintEval(char const *,
     Ral_PartitionConstraint, Tcl_DString *) ;
 static int relvarCorrelationConstraintEval(char const *,
     Ral_CorrelationConstraint, Tcl_DString *) ;
+static int relvarProceduralConstraintEval(char const *,
+    Ral_ProceduralConstraint, Tcl_DString *) ;
 static void relvarFindJoinTuples(Ral_Relvar, Ral_Relvar, int, Ral_JoinMap) ;
 static int relvarEvalAssocTupleCounts(Ral_IntVector, int, int, Ral_IntVector,
     Ral_IntVector) ;
@@ -515,6 +517,24 @@ Ral_ConstraintCorrelationCreate(
     return constraint ;
 }
 
+Ral_Constraint
+Ral_ConstraintProceduralCreate(
+    char const *name,
+    Ral_RelvarInfo info)
+{
+    int newPtr ;
+    Tcl_HashEntry *entry ;
+    Ral_Constraint constraint = NULL ;
+
+    entry = Tcl_CreateHashEntry(&info->constraints, name, &newPtr) ;
+    if (newPtr) {
+        constraint = Ral_ConstraintNewProcedural(name) ;
+        Tcl_SetHashValue(entry, constraint) ;
+    }
+
+    return constraint ;
+}
+
 int
 Ral_ConstraintDeleteByName(
     char const *name,
@@ -603,6 +623,21 @@ Ral_ConstraintNewCorrelation(
         sizeof(*constraint->constraint.correlation)) ;
     memset(constraint->constraint.correlation, 0,
             sizeof(*constraint->constraint.correlation)) ;
+
+    return constraint ;
+}
+
+Ral_Constraint
+Ral_ConstraintNewProcedural(
+    char const *name)
+{
+    Ral_Constraint constraint = Ral_ConstraintNew(name) ;
+
+    constraint->type = ConstraintProcedural ;
+    constraint->constraint.procedural = (Ral_ProceduralConstraint)ckalloc(
+        sizeof(*constraint->constraint.procedural)) ;
+    constraint->constraint.procedural->relvarList = Ral_PtrVectorNew(2) ;
+    constraint->constraint.procedural->script = NULL ;
 
     return constraint ;
 }
@@ -720,6 +755,33 @@ Ral_ConstraintDelete(
     }
         break ;
 
+    case ConstraintProcedural:
+    {
+        Ral_ProceduralConstraint proc = constraint->constraint.procedural ;
+        Ral_PtrVectorIter iter ;
+
+        /*
+         * Iterate through the list of relvar to which this procedural
+         * constraint applies.  We have to remove these references before
+         * deleting the constraint data structure.
+         */
+        for (iter = Ral_PtrVectorBegin(proc->relvarList) ;
+                iter != Ral_PtrVectorEnd(proc->relvarList) ; ++iter) {
+            Ral_Relvar partic = (Ral_Relvar)*iter ;
+            Ral_PtrVectorIter found =
+                    Ral_PtrVectorFind(partic->constraints, constraint) ;
+            /*
+             * We allow the constraint to not be found in case this
+             * is called as a clean up when the constraint is only
+             * partially formed.
+             */
+            if (found != Ral_PtrVectorEnd(partic->constraints)) {
+                Ral_PtrVectorErase(partic->constraints, found, found + 1) ;
+            }
+        }
+    }
+        break ;
+
     default:
         Tcl_Panic("Ral_ConstraintDelete: unknown constraint type, %d",
             constraint->type) ;
@@ -747,6 +809,11 @@ Ral_RelvarConstraintEval(
     case ConstraintCorrelation:
         return relvarCorrelationConstraintEval(constraint->name,
             constraint->constraint.correlation, errMsg) ;
+        break ;
+
+    case ConstraintProcedural:
+        return relvarProceduralConstraintEval(constraint->name,
+            constraint->constraint.procedural, errMsg) ;
         break ;
 
     default:
@@ -1206,6 +1273,17 @@ relvarConstraintCleanup(
             Ral_JoinMapDelete(correl->bReferenceMap) ;
         }
         ckfree((char *)correl) ;
+    }
+        break ;
+
+    case ConstraintProcedural:
+    {
+        Ral_ProceduralConstraint proc = constraint->constraint.procedural ;
+        Ral_PtrVectorDelete(proc->relvarList) ;
+        if (proc->script) {
+            Tcl_DecrRefCount(proc->script) ;
+        }
+        ckfree((char *)proc) ;
     }
         break ;
 
@@ -1691,6 +1769,56 @@ relvarCorrelationConstraintEval(
     return aRef_result && aRefTo_result
             && bRef_result && bRefTo_result
             && comp_result ;
+}
+
+/*
+ * Evaluate a procedural type constraint.
+ * Return 1 if the constraint is satisfied,  0 otherwise.
+ * On error, "errMsg" if it is non-NULL, contains text to identify the error.
+ * Assumes that, "errMsg" is properly initialized on entry.
+ *
+ * HERE -- ick! need and interpreter to evaluate a script!
+ */
+static int
+relvarProceduralConstraintEval(
+    char const *name,
+    Ral_ProceduralConstraint procedural,
+    Tcl_DString *errMsg)
+{
+#if 0
+    int result ;
+    Tcl_Obj *resultObj ;
+    /*
+     * Evaluate the script.
+     */
+    Tcl_IncrRefCount(procedural->script) ;
+    result = Tcl_EvalObjEx(interp, procedural->script, 0) ;
+    Tcl_DecrRefCount(procedural->script) ;
+    if (result == TCL_ERROR) {
+	static const char msgfmt[] =
+	    "\n    (\"in ::ral::%s %s\" body line %d)" ;
+	char msg[sizeof(msgfmt) + TCL_INTEGER_SPACE + 50] ;
+
+#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 6
+	sprintf(msg, msgfmt, Ral_ErrorInfoGetCommand(errInfo),
+	    Ral_ErrorInfoGetOption(errInfo), Tcl_GetErrorLine(interp)) ;
+#else
+	sprintf(msg, msgfmt, Ral_ErrorInfoGetCommand(errInfo),
+	    Ral_ErrorInfoGetOption(errInfo), interp->errorLine) ;
+#endif
+	Tcl_AddObjErrorInfo(interp, msg, -1) ;
+	return TCL_ERROR ;
+    } else if (!(result == TCL_OK || result == TCL_RETURN
+            || result == TCL_CONTINUE)) {
+	return result ;
+    }
+    /*
+     * Fetch the return value of the script.  Once we get the new tuple value,
+     * we can use it to update the relvar.
+     */
+    resultObj = Tcl_GetObjResult(interp) ;
+#endif
+    return 1 ;
 }
 
 /*

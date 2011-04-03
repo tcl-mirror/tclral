@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.44 $
-# $Date: 2010/12/05 21:58:52 $
+# $Revision: 1.45 $
+# $Date: 2011/04/03 22:02:52 $
 #  *--
 
 namespace eval ::ral {
@@ -241,6 +241,21 @@ create unique index __ral_correlation_id on __ral_correlation (Cname) ;
 create index __ral_correlation_assocref on __ral_correlation (AssocRelvar) ;
 create index __ral_correlation_oneref on __ral_correlation (OneRelvar) ;
 create index __ral_correlation_otherref on __ral_correlation (OtherRelvar) ;
+create table __ral_procedural (
+    Cname text not null,
+    Script text not null,
+    constraint __ral_procedural_id unique(Cname)) ;
+create unique index __ral_procedural_id on __ral_procedural (Cname) ;
+create table __ral_proc_participant (
+    Cname text not null,
+    ParticipantRelvar text not null,
+    constraint __ral_proc_participant_id unique (Cname, ParticipantRelvar),
+    constraint __ral_proc_participant_proc foreign key (Cname)
+        references __ral_procedural (Cname) on delete cascade on update cascade
+        deferrable initially deferred,
+    constraint __ral_proc_participant_relvar foreign key (ParticipantRelvar)
+        references __ral_relvar(Vname) on delete cascade on update cascade
+        deferrable initially deferred) ;
     }
 }
 
@@ -333,7 +348,7 @@ proc ::ral::tupleformat {tupleValue {title {}} {noheading 0}} {
 #       {<relvar name> <relation heading> <list of relvar identfiers}
 #
 #   <list of constaints> :
-#       {association | partition | correlation <constraint detail>}
+#       {association | partition | correlation | procedural <constraint detail>}
 #   <association constaint detail> :
 #       <association name> <relvar name> {<attr list>} <mult/cond>\
 #           <relvar name> {<attr list>} <mult/cond>
@@ -343,6 +358,8 @@ proc ::ral::tupleformat {tupleValue {title {}} {noheading 0}} {
 #       <?-complete?> <correlation name> <correl relvar>
 #           {<attr list>} <mult/cond> <relvarA> {<attr list>}
 #           {<attr list>} <mult/cond> <relvarB> {<attr list>}
+#   <procedural constraint detail> :
+#       <procedural name> {<relvar name list>} {<script>}
 #
 #   <list of relvar names/relation values> :
 #       {<relvar name> <relation value>}
@@ -364,7 +381,7 @@ proc ::ral::serialize {{pattern *}} {
     lappend result Relvars $relNameList
 
     # Constraint information contains fully qualified relvar names
-    # and must be converted to be relative to the global namespace.
+    # and must be flattened to a single level.
     set constraints [list]
     foreach cname [lsort [relvar constraint names $pattern]] {
         lappend constraints [getRelativeConstraintInfo $cname]
@@ -828,8 +845,8 @@ proc ::ral::storeToSQLite {filename {pattern *}} {
                 }
                 # Next the constraints
                 foreach constraint [relvar constraint member $relvar] {
-                    set cinfo [relvar constraint info $constraint]
-                    set cinfo [lassign $cinfo ctype]
+                    set cinfo [lassign [relvar constraint info $constraint]\
+                        ctype]
                     switch -exact -- $ctype {
                     association {
                         lassign $cinfo cname rfering a1 c1 refto a2 c2
@@ -874,6 +891,18 @@ proc ::ral::storeToSQLite {filename {pattern *}} {
                             OtherRefSpec, OtherRelvar, OtherAttrs) values\
                             ($cname, $comp, $correl, $ref1Attr, $c1, $rel1,\
                             $rel1Attr, $ref2Attr, $c2, $rel2, $rel2Attr) ;}
+                    }
+                    procedural {
+                        set cname [lindex $cinfo 0]
+                        set script [lindex $cinfo end]
+                        sqlitedb eval {insert or ignore into __ral_procedural\
+                            (Cname, Script) values ($cname $script) ;}
+                        foreach participant [lrange $cinfo 1 end-1] {
+                            sqlitedb eval {insert or ignore into\
+                                __ral_proc_participant\
+                                (Cname, ParticipantRelvar) values\
+                                ($cname, $participant) ;}
+                        }
                     }
                     default {
                         error "unknown constraint type, \"$ctype\""
@@ -1004,6 +1033,8 @@ proc ::ral::loadFromSQLite {filename {ns ::}} {
                         $oneAttrs $otherRefAttrs $otherRefSpec $ns$otherRelvar\
                         $otherAttrs
             }
+            # The procedural contraints
+            # HERE add the SQLite procedural constraint extraction.
         }
         # Now insert the data from the tables.
         # We are careful here not to depend upon SQL column ordering.
@@ -1536,6 +1567,12 @@ proc ::ral::getRelativeConstraintInfo {cname} {
                 lset cinfo $index [namespace tail [lindex $cinfo $index]]
             }
         }
+        procedural {
+            set endIndex [expr {[llength $cinfo] - 1}]
+            for {set index 1} {$index < $endEnd} {incr index} {
+                lset cinfo $index [namespace tail [lindex $cinfo $index]]
+            }
+        }
         default {
             error "unknown constraint type, \"[lindex $cinfo 0]\""
         }
@@ -1548,14 +1585,16 @@ proc ::ral::setRelativeConstraintInfo {ns cinfo} {
         association {
             variable assocIndices
             foreach index $assocIndices {
-                lset cinfo $index ${ns}[string trimleft [lindex $cinfo $index] :]
+                lset cinfo $index\
+                        ${ns}[string trimleft [lindex $cinfo $index] :]
             }
         }
         partition {
             lset cinfo 1 ${ns}[string trimleft [lindex $cinfo 1] :]
             lset cinfo 2 ${ns}[string trimleft [lindex $cinfo 2] :]
             for {set index 4} {$index < [llength $cinfo]} {incr index 2} {
-                lset cinfo $index ${ns}[string trimleft [lindex $cinfo $index] :]
+                lset cinfo $index\
+                        ${ns}[string trimleft [lindex $cinfo $index] :]
             }
         }
         correlation {
@@ -1564,7 +1603,15 @@ proc ::ral::setRelativeConstraintInfo {ns cinfo} {
             set cIndices [expr {[lindex $cinfo 1] eq "-complete" ?\
                 $compCorrelIndices : $correlIndices}]
             foreach index $cIndices {
-                lset cinfo $index ${ns}[string trimleft [lindex $cinfo $index] :]
+                lset cinfo $index\
+                        ${ns}[string trimleft [lindex $cinfo $index] :]
+            }
+        }
+        procedural {
+            set endIndex [expr {[llength $cinfo] - 1}]
+            for {set index 1} {$index < $endEnd} {incr index} {
+                lset cinfo $index\
+                        ${ns}[string trimleft [lindex $cinfo $index] :]
             }
         }
         default {

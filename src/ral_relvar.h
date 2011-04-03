@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.h,v $
-$Revision: 1.14 $
-$Date: 2009/09/12 22:32:36 $
+$Revision: 1.15 $
+$Date: 2011/04/03 22:02:52 $
  *--
  */
 #ifndef _ral_relvar_h_
@@ -81,6 +81,7 @@ typedef enum {
     ConstraintAssociation,
     ConstraintPartition,
     ConstraintCorrelation,
+    ConstraintProcedural,
 } Ral_ConstraintType ;
 
 typedef struct Ral_AssociationConstraint {
@@ -120,6 +121,12 @@ typedef struct Ral_CorrelationConstraint {
     int complete ;
 } *Ral_CorrelationConstraint ;
 
+typedef struct Ral_ProceduralConstraint {
+    Ral_PtrVector relvarList ;  /* set of "struct Ral_Relvar *"
+                                 * entities to which the constraint applies */
+    Tcl_Obj *script ;           /* script to evaluate for constraint */
+} *Ral_ProceduralConstraint ;
+
 typedef struct Ral_Constraint {
     Ral_ConstraintType type ;
     char *name ;
@@ -127,6 +134,7 @@ typedef struct Ral_Constraint {
 	Ral_AssociationConstraint association ;
 	Ral_PartitionConstraint partition ;
 	Ral_CorrelationConstraint correlation ;
+        Ral_ProceduralConstraint procedural ;
     } constraint ;
 } *Ral_Constraint ;
 
@@ -210,12 +218,15 @@ extern Ral_Constraint Ral_ConstraintPartitionCreate(char const *,
     Ral_RelvarInfo) ;
 extern Ral_Constraint Ral_ConstraintCorrelationCreate(char const *,
     Ral_RelvarInfo) ;
+extern Ral_Constraint Ral_ConstraintProceduralCreate(char const *,
+    Ral_RelvarInfo) ;
 
 extern int Ral_ConstraintDeleteByName(char const *, Ral_RelvarInfo) ;
 extern Ral_Constraint Ral_ConstraintFindByName(char const *, Ral_RelvarInfo) ;
 extern Ral_Constraint Ral_ConstraintNewAssociation(char const *) ;
 extern Ral_Constraint Ral_ConstraintNewPartition(char const *) ;
 extern Ral_Constraint Ral_ConstraintNewCorrelation(char const *) ;
+extern Ral_Constraint Ral_ConstraintNewProcedural(char const *) ;
 extern void Ral_ConstraintDelete(Ral_Constraint) ;
 extern int Ral_RelvarConstraintEval(Ral_Constraint, Tcl_DString *) ;
 

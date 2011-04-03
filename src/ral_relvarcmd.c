@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.37 $
-$Date: 2011/01/16 23:18:42 $
+$Revision: 1.38 $
+$Date: 2011/04/03 22:02:52 $
  *--
  */
 
@@ -104,6 +104,8 @@ static int RelvarNamesCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarPartitionCmd(Tcl_Interp *, int, Tcl_Obj *const*,
         Ral_RelvarInfo) ;
 static int RelvarPathCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
+static int RelvarProceduralCmd(Tcl_Interp *, int, Tcl_Obj *const*,
+        Ral_RelvarInfo) ;
 static int RelvarRestrictOneCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarSetCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
 static int RelvarTraceCmd(Tcl_Interp *, int, Tcl_Obj *const*, Ral_RelvarInfo) ;
@@ -163,6 +165,7 @@ relvarCmd(
 	{"names", RelvarNamesCmd},
 	{"partition", RelvarPartitionCmd},
 	{"path", RelvarPathCmd},
+	{"procedural", RelvarProceduralCmd},
 	{"restrictone", RelvarRestrictOneCmd},
 	{"set", RelvarSetCmd},
 	{"trace", RelvarTraceCmd},
@@ -1155,11 +1158,24 @@ RelvarPathCmd(
 	return TCL_ERROR ;
     }
     Tcl_SetObjResult(interp, Tcl_NewStringObj(relvar->name, -1)) ;
-    /*
-     * Creating a partition is an implicit transaction as each
-     * relvar participating in the association is treated as modified.
-     */
     return TCL_OK ;
+}
+
+static int
+RelvarProceduralCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv,
+    Ral_RelvarInfo rInfo)
+{
+    /* relvar procedural name relvarName1 ... script */
+    if (objc < 5) {
+	Tcl_WrongNumArgs(interp, 2, objv,
+                "name relvarName1 ?relvarName2 ...? script") ;
+	return TCL_ERROR ;
+    }
+    return Ral_RelvarObjCreateProcedural(interp, objc - 2, objv + 2,
+            *(objv + objc - 1), rInfo) ;
 }
 
 static int

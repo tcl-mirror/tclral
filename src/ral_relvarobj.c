@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.43 $
-$Date: 2009/09/12 22:32:36 $
+$Revision: 1.44 $
+$Date: 2011/04/03 22:02:52 $
  *--
  */
 
@@ -1442,6 +1442,100 @@ errorOut:
 }
 
 int
+Ral_RelvarObjCreateProcedural(
+    Tcl_Interp *interp,
+    int cnt,
+    Tcl_Obj *const*objv,
+    Tcl_Obj *script,
+    Ral_RelvarInfo info)
+{
+    char const *procName ;
+    Tcl_DString resolve ;
+    Ral_Constraint constraint ;
+    Ral_ProceduralConstraint procedural ;
+    Tcl_DString errMsg ;
+    int result = TCL_OK ;
+
+    /*
+     * Creating a procedural constraint is not allowed during an "eval" script.
+     */
+    if (Ral_RelvarIsTransOnGoing(info)) {
+	Ral_InterpErrorInfo(interp, Ral_CmdRelvar, Ral_OptProcedural,
+	    RAL_ERR_BAD_TRANS_OP, "procedural") ;
+	return TCL_ERROR ;
+    }
+    /*
+     * Create the procedural constraint.
+     */
+    procName = relvarResolveName(interp, Tcl_GetString(objv[0]), &resolve) ;
+    constraint = Ral_ConstraintProceduralCreate(procName, info) ;
+    if (constraint == NULL) {
+	Ral_InterpErrorInfoObj(interp, Ral_CmdRelvar, Ral_OptProcedural,
+	    RAL_ERR_DUP_CONSTRAINT, objv[0]) ;
+	Tcl_DStringFree(&resolve) ;
+	return TCL_ERROR ;
+    }
+    procedural = constraint->constraint.procedural ;
+    /*
+     * Add the pointer to the script object to the constraint. Bump the
+     * reference count because we intend to hold on to it.
+     */
+    Tcl_IncrRefCount(procedural->script = script) ;
+    /*
+     * Loop through the set of relvar names, making sure each name
+     * is indeed a relvar.
+     */
+    ++objv ; --cnt ; /* skip constraint name */
+    assert(cnt >= 1) ;
+    Ral_PtrVectorReserve(procedural->relvarList, cnt) ;
+    while (cnt-- != 0) {
+        char const *relvarName ;
+        Ral_Relvar relvar ;
+        Ral_Relation relvarValue ;
+        /*
+         * Look up the relvar names and make sure that we find it and that a
+         * relation is stored there.
+         */
+        relvarName = Tcl_GetString(objv[1]) ;
+        relvar = Ral_RelvarObjFindRelvar(interp, info, relvarName) ;
+        if (relvar == NULL) {
+            goto errorOut ;
+        }
+        if (Tcl_ConvertToType(interp, relvar->relObj, &Ral_RelationObjType)
+                != TCL_OK) {
+            goto errorOut ;
+        }
+        relvarValue = relvar->relObj->internalRep.otherValuePtr ;
+        /*
+         * Add the relvar pointer to the procedural constraint and the
+         * constraint pointer to the relvar.
+         */
+        Ral_PtrVectorPushBack(procedural->relvarList, relvar) ;
+        Ral_PtrVectorPushBack(relvar->constraints, constraint) ;
+    }
+
+    Tcl_DStringInit(&errMsg) ;
+    if (!Ral_RelvarConstraintEval(constraint, &errMsg)) {
+	int status ;
+
+	Tcl_DStringResult(interp, &errMsg) ;
+	status = Ral_ConstraintDeleteByName(procName, info) ;
+	assert(status != 0) ;
+
+	result = TCL_ERROR ;
+    }
+
+    Tcl_DStringFree(&errMsg) ;
+    Tcl_DStringFree(&resolve) ;
+    return TCL_OK ;
+
+errorOut:
+    Ral_ConstraintDeleteByName(procName, info) ;
+    Tcl_DStringFree(&resolve) ;
+    return TCL_ERROR ;
+}
+
+int
 Ral_RelvarObjConstraintDelete(
     Tcl_Interp *interp,
     char const *name,
@@ -1691,6 +1785,44 @@ Ral_RelvarObjConstraintInfo(
 	}
     }
 	break ;
+
+    case ConstraintProcedural:
+    {
+	/* procedural name relvar1 ?relvar2 ...? script
+	 */
+	Ral_ProceduralConstraint procedural =
+                constraint->constraint.procedural ;
+	Ral_PtrVectorIter relvarIter ;
+
+	if (Tcl_ListObjAppendElement(interp, resultObj,
+	    Tcl_NewStringObj("procedural", -1)) != TCL_OK) {
+	    goto errorOut ;
+	}
+	if (Tcl_ListObjAppendElement(interp, resultObj,
+	    Tcl_NewStringObj(constraint->name, -1)) != TCL_OK) {
+	    goto errorOut ;
+	}
+        /*
+         * Loop through the relvar list and add the names to the list.
+         */
+	for (relvarIter = Ral_PtrVectorBegin(procedural->relvarList) ;
+                relvarIter != Ral_PtrVectorEnd(procedural->relvarList) ;
+                ++relvarIter) {
+            Ral_Relvar relvar = (Ral_Relvar)*relvarIter ;
+	    if (Tcl_ListObjAppendElement(interp, resultObj,
+		Tcl_NewStringObj(relvar->name, -1)) != TCL_OK) {
+		goto errorOut ;
+	    }
+	}
+        /*
+         * Add the script.
+         */
+        if (Tcl_ListObjAppendElement(interp, resultObj, procedural->script) !=
+                TCL_OK) {
+            goto errorOut ;
+        }
+    }
+        break ;
 
     default:
 	Tcl_Panic("Ral_RelvarObjConstraintInfo: unknown constraint type, %d",

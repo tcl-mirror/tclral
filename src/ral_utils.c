@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_utils.c,v $
-$Revision: 1.24 $
-$Date: 2011/01/16 23:18:42 $
+$Revision: 1.25 $
+$Date: 2011/04/03 22:02:52 $
  *--
  */
 
@@ -143,6 +143,7 @@ static char const * const optStrings[] = {
     "minus",
     "names",
     "partition",
+    "procedural",
     "project",
     "rank",
     "relation",
