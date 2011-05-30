@@ -51,8 +51,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.54 $
-# $Date: 2011/01/16 23:18:42 $
+# $Revision: 1.55 $
+# $Date: 2011/05/30 18:44:42 $
 #  *--
 
 package require tcltest 2.2
@@ -4035,6 +4035,61 @@ in expression "_@_< 20"} -returnCodes error
         set r {{Name string Age int} {{Name Andrew Age 20} {Name George Age 20}}}
         relation tuple $r
     } -result {relation must have cardinality of one, "{Name string Age int} {{Name Andrew Age 20} {Name George Age 20}}"} -returnCodes error
+
+    # relation uinsert command
+    test relation-uinsert-1.0 {
+        single tuple
+    } -body {
+        relation uinsert [relation emptyof $S]\
+            {S# S1 SNAME Jones STATUS 20 CITY Madrid}
+    } -result {
+        {S# string SNAME string STATUS int CITY string}
+        {
+            {S# S1 SNAME Jones STATUS 20 CITY Madrid}
+        }
+    } -match relation
+
+    test relation-uinsert-2.0 {
+        single tuple inserted twice
+    } -body {
+        relation uinsert [relation emptyof $S]\
+            {S# S1 SNAME Jones STATUS 20 CITY Madrid}\
+            {S# S1 SNAME Jones STATUS 20 CITY Madrid}
+    } -result {
+        {S# string SNAME string STATUS int CITY string}
+        {
+            {S# S1 SNAME Jones STATUS 20 CITY Madrid}
+        }
+    } -match relation
+
+    test relation-uinsert-3.0 {
+        two distinct tuples
+    } -body {
+        relation uinsert [relation emptyof $S]\
+            {S# S1 SNAME Jones STATUS 20 CITY Madrid}\
+            {S# S2 SNAME Smith STATUS 20 CITY Paris}
+    } -result {
+        {S# string SNAME string STATUS int CITY string}
+        {
+            {S# S1 SNAME Jones STATUS 20 CITY Madrid}
+            {S# S2 SNAME Smith STATUS 20 CITY Paris}
+        }
+    } -match relation
+
+    test relation-uinsert-3.0 {
+        two distinct tuples, one duplicate insertion
+    } -body {
+        relation uinsert [relation emptyof $S]\
+            {S# S1 SNAME Jones STATUS 20 CITY Madrid}\
+            {S# S2 SNAME Smith STATUS 20 CITY Paris}\
+            {S# S1 SNAME Jones STATUS 20 CITY Madrid}
+    } -result {
+        {S# string SNAME string STATUS int CITY string}
+        {
+            {S# S1 SNAME Jones STATUS 20 CITY Madrid}
+            {S# S2 SNAME Smith STATUS 20 CITY Paris}
+        }
+    } -match relation
 
     # relation ungroup subcommand
     test relation-ungroup-1.0 {two attribute relation} -body {

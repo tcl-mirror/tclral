@@ -46,8 +46,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.35 $
-# $Date: 2011/01/16 23:18:42 $
+# $Revision: 1.36 $
+# $Date: 2011/05/30 18:44:43 $
 #  *--
 }]
 [moddesc "Relation Operators"]
@@ -494,7 +494,6 @@ and has a body consisting of all tuples present in any of the
 However, if any duplicated tuples are found, then an error results.
 Since the dunion operation is both associative and commutative,
 the order of the [arg relationValue] arguments has no effect the result.
-
 
 [call [cmd "::ral::relation eliminate"] [arg relationValue]\
     [opt "attribute ..."]]
@@ -1389,6 +1388,11 @@ The cardinality of [arg relationValue] must be one or an error is returned.
 
 [call [cmd "::ral::relation uinsert"] [arg relationValue]\
         [opt [arg "name-value-list1 name-value-list2 ..."]]]
+
+The [cmd uinsert] subcommand operates in the same fashion as the
+[cmd insert] subcommand, except that attempts to insert duplicate
+tuples are silently ignored.
+Thus the [cmd uinsert] subcommand has union type semantics.
 
 [call [cmd "::ral::relation ungroup"] [arg relationValue] [arg attribute]]
 
