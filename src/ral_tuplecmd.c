@@ -1,5 +1,5 @@
 /*
-This software is copyrighted 2005 by G. Andrew Mangogna.  The following
+This software is copyrighted 2005 - 2011 by G. Andrew Mangogna.  The following
 terms apply to all files associated with the software unless explicitly
 disclaimed in individual files.
 
@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuplecmd.c,v $
-$Revision: 1.21 $
-$Date: 2009/04/11 18:18:54 $
+$Revision: 1.22 $
+$Date: 2011/06/05 18:01:10 $
  *--
  */
 

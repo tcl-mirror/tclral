@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.45 $
-# $Date: 2011/04/03 22:02:52 $
+# $Revision: 1.46 $
+# $Date: 2011/06/05 18:01:10 $
 #  *--
 
 namespace eval ::ral {
@@ -150,9 +150,10 @@ namespace eval ::ral {
     variable ralSQLSchema {
 -- SQL Tables to hold RAL specific meta-data
 create table __ral_version (
-    Vnum test not null,
+    Vnum text not null,
     Date timestamp not null,
     constraint __ral_version_id unique (Vnum)) ;
+create unique index __ral_version_id_index on __ral_version (Vnum) ;
 create table __ral_relvar (
     Vname text not null,
     constraint __ral_relvar_id unique (Vname)) ;
@@ -166,7 +167,7 @@ create table __ral_attribute (
         __ral_relvar (Vname) on delete cascade on update cascade
         deferrable initially deferred) ;
 create unique index __ral_attribute_id_index on __ral_attribute (Vname, Aname) ;
-create index __ral_attribute_ref on __ral_attribute (Vname) ;
+create index __ral_attribute_ref_index on __ral_attribute (Vname) ;
 create table __ral_identifier (
     IdNum integer not null,
     Vname text not null,
@@ -816,13 +817,13 @@ proc ::ral::storeToSQLite {filename {pattern *}} {
 
     catch {file rename -force -- $filename $filename~}
     sqlite3 [namespace current]::sqlitedb $filename
+    sqlitedb eval "pragma foreign_keys=ON;"
 
     catch {
         # First we insert the meta-data schema and populate it.
         variable ralSQLSchema
-        sqlitedb eval "pragma foreign_keys=ON"
         sqlitedb eval $ralSQLSchema
-        sqlitedb transaction exclusive {
+        sqlitedb transaction {
             set version [getVersion]
             sqlitedb eval {insert into __ral_version (Vnum, Date)\
                 values ($version, CURRENT_TIMESTAMP) ;}

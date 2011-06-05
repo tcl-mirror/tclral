@@ -1,5 +1,5 @@
 /*
-This software is copyrighted 2006 by G. Andrew Mangogna.  The following
+This software is copyrighted 2006 - 2011 by G. Andrew Mangogna.  The following
 terms apply to all files associated with the software unless explicitly
 disclaimed in individual files.
 
@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.38 $
-$Date: 2011/04/03 22:02:52 $
+$Revision: 1.39 $
+$Date: 2011/06/05 18:01:10 $
  *--
  */
 
@@ -1174,7 +1174,11 @@ RelvarProceduralCmd(
                 "name relvarName1 ?relvarName2 ...? script") ;
 	return TCL_ERROR ;
     }
-    return Ral_RelvarObjCreateProcedural(interp, objc - 2, objv + 2,
+    /*
+     * -3 to skip the "relvar", "procedural" and "script" arguments.
+     * +2 to point to the contraint name
+     */
+    return Ral_RelvarObjCreateProcedural(interp, objc - 3, objv + 2,
             *(objv + objc - 1), rInfo) ;
 }
 

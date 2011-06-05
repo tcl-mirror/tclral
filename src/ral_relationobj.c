@@ -1,5 +1,5 @@
 /*
-This software is copyrighted 2005 by G. Andrew Mangogna.  The following
+This software is copyrighted 2005 - 2011 by G. Andrew Mangogna.  The following
 terms apply to all files associated with the software unless explicitly
 disclaimed in individual files.
 
@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationobj.c,v $
-$Revision: 1.25 $
-$Date: 2009/04/11 18:18:54 $
+$Revision: 1.26 $
+$Date: 2011/06/05 18:01:10 $
  *--
  */
 
@@ -345,6 +345,7 @@ Ral_RelationFindJoinAttrs(
     }
     Ral_JoinMapAttrReserve(joinMap, objc / 2) ;
     for ( ; objc > 0 ; objc -= 2, objv += 2) {
+        int status ;
 	int r1Index = Ral_TupleHeadingIndexOf(r1TupleHeading,
 	    Tcl_GetString(*objv)) ;
 	int r2Index = Ral_TupleHeadingIndexOf(r2TupleHeading,
@@ -358,7 +359,15 @@ Ral_RelationFindJoinAttrs(
 		*(objv + 1)) ;
 	    goto errorOut ;
 	}
-	Ral_JoinMapAddAttrMapping(joinMap, r1Index, r2Index) ;
+	status = Ral_JoinMapAddAttrMapping(joinMap, r1Index, r2Index) ;
+        if (status == 1) {
+	    Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_DUPLICATE_ATTR, *objv) ;
+            goto errorOut ;
+        } else if (status == 2) {
+	    Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_DUPLICATE_ATTR,
+		*(objv + 1)) ;
+            goto errorOut ;
+        }
     }
 
     return TCL_OK ;

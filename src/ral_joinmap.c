@@ -1,5 +1,5 @@
 /*
-This software is copyrighted 2006 by G. Andrew Mangogna.  The following
+This software is copyrighted 2006 - 2011 by G. Andrew Mangogna.  The following
 terms apply to all files associated with the software unless explicitly
 disclaimed in individual files.
 
@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_joinmap.c,v $
-$Revision: 1.7 $
-$Date: 2009/04/11 18:18:54 $
+$Revision: 1.8 $
+$Date: 2011/06/05 18:01:10 $
  *--
  */
 
@@ -153,12 +153,19 @@ Ral_JoinMapTupleReserve(
     }
 }
 
-void
+/*
+ * Add attribute indices to the join map. Checks that there are not duplicates.
+ * Return 0 upon success, 1 if attribute #1 is a duplicate, 2 if attribute #2
+ * is a duplicate.
+ */
+int
 Ral_JoinMapAddAttrMapping(
     Ral_JoinMap map,
-    int attr1Index,
-    int attr2Index)
+    Ral_JoinMapComponentType attr1Index,
+    Ral_JoinMapComponentType attr2Index)
 {
+    Ral_JoinMapIter iter ;
+
     if (map->attrFinish >= map->attrEndStorage) {
 	int oldCapacity = Ral_JoinMapAttrCapacity(map) ;
 	/*
@@ -168,9 +175,25 @@ Ral_JoinMapAddAttrMapping(
 	 */
 	Ral_JoinMapAttrReserve(map, oldCapacity + oldCapacity / 2 + 1) ;
     }
-    map->attrFinish->m[0] = attr1Index ;
-    map->attrFinish->m[1] = attr2Index ;
+    /*
+     * We need to make sure that the indices do not already occur in the join
+     * map, i.e. the attribute indices on each side of the join should be sets.
+     * So we iterate through the map comparing indices. If we get to the end
+     * and don't find a match, then we can just insert out new indices.
+     */
+    for (iter = Ral_JoinMapAttrBegin(map) ; iter != Ral_JoinMapAttrEnd(map) ;
+            ++iter) {
+        if (iter->m[0] == attr1Index) {
+            return 1 ;
+        } else if (iter->m[1] == attr2Index) {
+            return 2 ;
+        }
+    }
+    assert(iter == Ral_JoinMapAttrEnd(map)) ;
+    iter->m[0] = attr1Index ;
+    iter->m[1] = attr2Index ;
     ++map->attrFinish ;
+    return 0 ;
 }
 
 void

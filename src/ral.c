@@ -1,5 +1,5 @@
 /*
-This software is copyrighted 2004, 2005, 2006 by G. Andrew Mangogna.
+This software is copyrighted 2004 - 2011 by G. Andrew Mangogna.
 The following terms apply to all files associated with the software unless
 explicitly disclaimed in individual files.
 
@@ -49,8 +49,8 @@ ABSTRACT:
     Algebra.
 
 $RCSfile: ral.c,v $
-$Revision: 1.43 $
-$Date: 2010/11/14 18:15:57 $
+$Revision: 1.44 $
+$Date: 2011/06/05 18:01:10 $
  *--
  */
 
@@ -97,7 +97,7 @@ STATIC DATA ALLOCATION
 static char const ral_pkgname[] = PACKAGE_NAME ;
 static char const ral_version[] = PACKAGE_VERSION ;
 static char const ral_rcsid[] =
-    "$Id: ral.c,v 1.43 2010/11/14 18:15:57 mangoa01 Exp $" ;
+    "$Id: ral.c,v 1.44 2011/06/05 18:01:10 mangoa01 Exp $" ;
 static char const ral_copyright[] =
     "This software is copyrighted 2004, 2005, 2006, 2007, 2008, 2009 by G. Andrew Mangogna."
     " Terms and conditions for use are distributed with the source code." ;

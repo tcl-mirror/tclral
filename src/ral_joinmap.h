@@ -1,5 +1,5 @@
 /*
-This software is copyrighted 2006 by G. Andrew Mangogna.  The following
+This software is copyrighted 2006 - 2011 by G. Andrew Mangogna.  The following
 terms apply to all files associated with the software unless explicitly
 disclaimed in individual files.
 
@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_joinmap.h,v $
-$Revision: 1.7 $
-$Date: 2009/04/11 18:18:54 $
+$Revision: 1.8 $
+$Date: 2011/06/05 18:01:10 $
  *--
  */
 #ifndef _ral_joinmap_h_
@@ -129,7 +129,7 @@ extern Ral_JoinMap Ral_JoinMapNew(int, int) ;
 extern void Ral_JoinMapDelete(Ral_JoinMap) ;
 extern void Ral_JoinMapAttrReserve(Ral_JoinMap, int) ;
 extern void Ral_JoinMapTupleReserve(Ral_JoinMap, int) ;
-extern void Ral_JoinMapAddAttrMapping(Ral_JoinMap,
+extern int Ral_JoinMapAddAttrMapping(Ral_JoinMap,
     Ral_JoinMapComponentType, Ral_JoinMapComponentType) ;
 extern void Ral_JoinMapAddTupleMapping(Ral_JoinMap,
     Ral_JoinMapComponentType, Ral_JoinMapComponentType) ;

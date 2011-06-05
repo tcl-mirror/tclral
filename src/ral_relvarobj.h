@@ -1,5 +1,5 @@
 /*
-This software is copyrighted 2006 by G. Andrew Mangogna.  The following
+This software is copyrighted 2006 - 2011 by G. Andrew Mangogna.  The following
 terms apply to all files associated with the software unless explicitly
 disclaimed in individual files.
 
@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.h,v $
-$Revision: 1.20 $
-$Date: 2011/04/03 22:02:52 $
+$Revision: 1.21 $
+$Date: 2011/06/05 18:01:10 $
  *--
  */
 #ifndef _ral_relvarobj_h_

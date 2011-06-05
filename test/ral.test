@@ -51,8 +51,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.55 $
-# $Date: 2011/05/30 18:44:42 $
+# $Revision: 1.56 $
+# $Date: 2011/06/05 18:01:10 $
 #  *--
 
 package require tcltest 2.2
@@ -2791,6 +2791,27 @@ namespace eval ::ral::test {
             {ID2 21 ID1 0}
         }
     } -match relation
+
+    # This was a latent bug. Specifying a duplicated join attribute
+    # in a -using argument caused a panic.
+    test relation-join-11.0 {
+        duplicated attributes in a "-using" argument
+    } -setup {
+        relvar create A {
+            A1 string
+            A2 string
+            A3 int
+        } {A1 A2}
+        relvar create B {
+            B1 string
+            B2 string
+            B3 string
+        } {B1 B2}
+    } -cleanup {
+        relvar unset A B
+    } -body {
+        relation join $A $B -using {A1 B1 A1 B2}
+    } -result {duplicate attribute name, "A1"} -returnCodes error
 
     # relation list subcommand
     test relation-list-1.0 {multiple tuples} -body {
@@ -6127,6 +6148,58 @@ tuple {A1 c} is not referred to by any tuple
         return
     } -result {}
 
+    test relvar-procedural-1.0 {
+        evaluate a procedural constraint
+    } -setup {
+        relvar create A {
+            A1 string
+            A2 string
+            A3 int
+        } {A1 A2}
+        relvar create B {
+            B1 string
+            B2 string
+            B3 string
+        } {B1 B2}
+        relvar create C {
+            C1 string
+            C2 string
+            C3 string
+        } {C1 C2}
+    } -cleanup {
+        # clean up is below
+    } -body {
+        relvar procedural R1 A B C {
+            set way1 [relation semijoin $A $B -using {A1 B1 A2 B2} $C\
+                    -using {B1 C1 B2 C2} $A -using {C1 A1 C2 A2}]
+            #puts [relformat $way1 way1]
+            #puts [relformat $A A]
+            return [relation is $A == $way1]
+        }
+        relvar eval {
+            relvar insert A {A1 a A2 b A3 1}
+            relvar insert B {B1 a B2 b B3 foo}
+            relvar insert C {C1 a C2 b C3 bar}
+        }
+        return
+    } -result {}
+
+    test relvar-procedural-2.0 {
+        evaluate a procedural constraint -- fails
+    } -setup {
+        # setup is above
+    } -cleanup {
+        relvar constraint delete R1
+        relvar unset A B C
+    } -body {
+        relvar eval {
+            relvar insert A {A1 aa A2 b A3 1}
+        }
+        puts [relformat $A A]
+        return
+    } -result {procedural contraint, "::ral::test::R1", failed}\
+    -returnCodes error
+
     # examples from the Date book
     test date-example-1.0 {Get suppliers who supply all parts} -body {
         set pnums [relation project $P P#]
@@ -6137,8 +6210,7 @@ tuple {A1 c} is not referred to by any tuple
                     {[tuple extract $spx S#] eq [tuple extract $sx S#]}] P#]\
             equal $pnums]}
     } -result {
-        {S# string SNAME string STATUS int CITY string}
-        {
+        {S# string SNAME string STATUS int CITY string} {
             {S# S1 SNAME Smith STATUS 20 CITY London}
         }
     } -match relation

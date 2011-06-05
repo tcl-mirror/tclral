@@ -1,5 +1,5 @@
 /*
-This software is copyrighted 2006 by G. Andrew Mangogna.  The following
+This software is copyrighted 2004 - 2011 by G. Andrew Mangogna.  The following
 terms apply to all files associated with the software unless explicitly
 disclaimed in individual files.
 
@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.h,v $
-$Revision: 1.15 $
-$Date: 2011/04/03 22:02:52 $
+$Revision: 1.16 $
+$Date: 2011/06/05 18:01:10 $
  *--
  */
 #ifndef _ral_relvar_h_
@@ -203,12 +203,10 @@ extern Ral_Relvar Ral_RelvarLookupRelvar(Tcl_Interp *, Ral_RelvarInfo,
     Tcl_Obj *) ;
 
 extern void Ral_RelvarStartTransaction(Ral_RelvarInfo, int) ;
-extern int Ral_RelvarEndTransaction(Ral_RelvarInfo, int, Tcl_DString *) ;
 extern int Ral_RelvarIsTransOnGoing(Ral_RelvarInfo) ;
 extern int Ral_RelvarTransModifiedRelvar(Ral_RelvarInfo, Ral_Relvar) ;
 
 extern int Ral_RelvarStartCommand(Ral_RelvarInfo, Ral_Relvar) ;
-extern int Ral_RelvarEndCommand(Ral_RelvarInfo, int, Tcl_DString *) ;
 
 extern Ral_RelvarTransaction Ral_RelvarNewTransaction(void) ;
 extern void Ral_RelvarDeleteTransaction(Ral_RelvarTransaction) ;
@@ -228,7 +226,7 @@ extern Ral_Constraint Ral_ConstraintNewPartition(char const *) ;
 extern Ral_Constraint Ral_ConstraintNewCorrelation(char const *) ;
 extern Ral_Constraint Ral_ConstraintNewProcedural(char const *) ;
 extern void Ral_ConstraintDelete(Ral_Constraint) ;
-extern int Ral_RelvarConstraintEval(Ral_Constraint, Tcl_DString *) ;
+extern int Ral_RelvarDeclConstraintEval(Ral_Constraint, Tcl_DString *) ;
 
 extern int Ral_RelvarSetRelation(Ral_Relvar, Tcl_Obj *, Ral_ErrorInfo *) ;
 extern int Ral_RelvarInsertTuple(Ral_Relvar, Ral_Tuple, Ral_IntVector,

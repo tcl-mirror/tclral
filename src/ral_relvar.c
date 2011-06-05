@@ -1,5 +1,5 @@
 /*
-This software is copyrighted 2004, 2005, 2006 by G. Andrew Mangogna.
+This software is copyrighted 2004 - 2011 by G. Andrew Mangogna.
 The following terms apply to all files associated with the software unless
 explicitly disclaimed in individual files.
 
@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.c,v $
-$Revision: 1.25 $
-$Date: 2011/04/03 22:02:52 $
+$Revision: 1.26 $
+$Date: 2011/06/05 18:01:10 $
  *--
  */
 
@@ -92,8 +92,6 @@ static int relvarPartitionConstraintEval(char const *,
     Ral_PartitionConstraint, Tcl_DString *) ;
 static int relvarCorrelationConstraintEval(char const *,
     Ral_CorrelationConstraint, Tcl_DString *) ;
-static int relvarProceduralConstraintEval(char const *,
-    Ral_ProceduralConstraint, Tcl_DString *) ;
 static void relvarFindJoinTuples(Ral_Relvar, Ral_Relvar, int, Ral_JoinMap) ;
 static int relvarEvalAssocTupleCounts(Ral_IntVector, int, int, Ral_IntVector,
     Ral_IntVector) ;
@@ -291,73 +289,6 @@ Ral_RelvarStartTransaction(
 }
 
 int
-Ral_RelvarEndTransaction(
-    Ral_RelvarInfo info,
-    int failed,
-    Tcl_DString *errMsg)
-{
-    Ral_RelvarTransaction trans = Ral_PtrVectorBack(info->transactions) ;
-    Ral_PtrVectorIter pIter ;
-    Ral_PtrVectorIter pEnd ;
-
-    if (!failed) {
-        Ral_PtrVector constraints = Ral_PtrVectorNew(0) ;
-        Ral_PtrVectorIter cEnd ;
-        Ral_PtrVectorIter cIter ;
-        /*
-         * Iterate across the transaction evaluating the constraints.
-         * Build a set of constraints that the modified relvars
-         * participate in and then evaluate all the constraints in that set.
-         * "trans->modified" is the set of relvars that were modified
-         * during the transaction.
-         */
-        pEnd = Ral_PtrVectorEnd(trans->modifiedRelvars) ;
-        for (pIter = Ral_PtrVectorBegin(trans->modifiedRelvars) ;
-            pIter != pEnd ; ++pIter) {
-            Ral_Relvar modRelvar = *pIter ;
-            Ral_PtrVectorIter rcEnd = Ral_PtrVectorEnd(modRelvar->constraints) ;
-            Ral_PtrVectorIter rcIter ;
-            for (rcIter = Ral_PtrVectorBegin(modRelvar->constraints) ;
-                rcIter != rcEnd ; ++rcIter) {
-                Ral_PtrVectorSetAdd(constraints, *rcIter) ;
-            }
-        }
-        cEnd = Ral_PtrVectorEnd(constraints) ;
-        for (cIter = Ral_PtrVectorBegin(constraints) ; cIter != cEnd ;
-            ++cIter) {
-            failed += !Ral_RelvarConstraintEval(*cIter, errMsg) ;
-        }
-        Ral_PtrVectorDelete(constraints) ;
-    }
-    pEnd = Ral_PtrVectorEnd(trans->modifiedRelvars) ;
-    if (failed) {
-        /*
-         * If any constaint fails, pop and restore the saved values of
-         * the relvars.
-         */
-        for (pIter = Ral_PtrVectorBegin(trans->modifiedRelvars) ;
-            pIter != pEnd ; ++pIter) {
-            Ral_RelvarRestorePrev(*pIter) ;
-        }
-    } else {
-        /*
-         * Pop and discard the saved values.
-         */
-        for (pIter = Ral_PtrVectorBegin(trans->modifiedRelvars) ;
-            pIter != pEnd ; ++pIter) {
-            Ral_RelvarDiscardPrev(*pIter) ;
-        }
-    }
-    /*
-     * Delete the transaction.
-     */
-    Ral_RelvarDeleteTransaction(trans) ;
-    Ral_PtrVectorPopBack(info->transactions) ;
-
-    return !failed ;
-}
-
-int
 Ral_RelvarIsTransOnGoing(
     Ral_RelvarInfo info)
 {
@@ -406,28 +337,6 @@ Ral_RelvarStartCommand(
             Ral_RelationShallowCopy(rel)) ;
     }
     return 1 ;
-}
-
-int
-Ral_RelvarEndCommand(
-    Ral_RelvarInfo info,
-    int failed,
-    Tcl_DString *errMsg)
-{
-    Ral_RelvarTransaction trans ;
-    int success = !failed ;
-
-    assert(Ral_PtrVectorSize(info->transactions) > 0) ;
-    trans = Ral_PtrVectorBack(info->transactions) ;
-    if (trans->isSingleCmd) {
-        assert(Ral_PtrVectorSize(info->transactions) == 1) ;
-        /*
-         * End the single command transaction. 
-         */
-        success = Ral_RelvarEndTransaction(info, failed, errMsg) ;
-    }
-
-    return success ;
 }
 
 int
@@ -790,8 +699,12 @@ Ral_ConstraintDelete(
     relvarConstraintCleanup(constraint) ;
 }
 
+/*
+ * Evaluate declarative constraints.
+ * Procedural constraints are done elsewhere.
+ */
 int
-Ral_RelvarConstraintEval(
+Ral_RelvarDeclConstraintEval(
     Ral_Constraint constraint,
     Tcl_DString *errMsg)
 {
@@ -809,11 +722,6 @@ Ral_RelvarConstraintEval(
     case ConstraintCorrelation:
         return relvarCorrelationConstraintEval(constraint->name,
             constraint->constraint.correlation, errMsg) ;
-        break ;
-
-    case ConstraintProcedural:
-        return relvarProceduralConstraintEval(constraint->name,
-            constraint->constraint.procedural, errMsg) ;
         break ;
 
     default:
@@ -1769,56 +1677,6 @@ relvarCorrelationConstraintEval(
     return aRef_result && aRefTo_result
             && bRef_result && bRefTo_result
             && comp_result ;
-}
-
-/*
- * Evaluate a procedural type constraint.
- * Return 1 if the constraint is satisfied,  0 otherwise.
- * On error, "errMsg" if it is non-NULL, contains text to identify the error.
- * Assumes that, "errMsg" is properly initialized on entry.
- *
- * HERE -- ick! need and interpreter to evaluate a script!
- */
-static int
-relvarProceduralConstraintEval(
-    char const *name,
-    Ral_ProceduralConstraint procedural,
-    Tcl_DString *errMsg)
-{
-#if 0
-    int result ;
-    Tcl_Obj *resultObj ;
-    /*
-     * Evaluate the script.
-     */
-    Tcl_IncrRefCount(procedural->script) ;
-    result = Tcl_EvalObjEx(interp, procedural->script, 0) ;
-    Tcl_DecrRefCount(procedural->script) ;
-    if (result == TCL_ERROR) {
-	static const char msgfmt[] =
-	    "\n    (\"in ::ral::%s %s\" body line %d)" ;
-	char msg[sizeof(msgfmt) + TCL_INTEGER_SPACE + 50] ;
-
-#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 6
-	sprintf(msg, msgfmt, Ral_ErrorInfoGetCommand(errInfo),
-	    Ral_ErrorInfoGetOption(errInfo), Tcl_GetErrorLine(interp)) ;
-#else
-	sprintf(msg, msgfmt, Ral_ErrorInfoGetCommand(errInfo),
-	    Ral_ErrorInfoGetOption(errInfo), interp->errorLine) ;
-#endif
-	Tcl_AddObjErrorInfo(interp, msg, -1) ;
-	return TCL_ERROR ;
-    } else if (!(result == TCL_OK || result == TCL_RETURN
-            || result == TCL_CONTINUE)) {
-	return result ;
-    }
-    /*
-     * Fetch the return value of the script.  Once we get the new tuple value,
-     * we can use it to update the relvar.
-     */
-    resultObj = Tcl_GetObjResult(interp) ;
-#endif
-    return 1 ;
 }
 
 /*

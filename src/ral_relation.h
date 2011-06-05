@@ -1,5 +1,5 @@
 /*
-This software is copyrighted 2005, 2006, 2007, 2008, 2009 by G. Andrew Mangogna.
+This software is copyrighted 2005 - 2011 by G. Andrew Mangogna.
 The following terms apply to all files associated with the software unless
 explicitly disclaimed in individual files.
 
@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.h,v $
-$Revision: 1.22 $
-$Date: 2011/01/16 23:18:42 $
+$Revision: 1.23 $
+$Date: 2011/06/05 18:01:10 $
  *--
  */
 #ifndef _ral_relation_h_

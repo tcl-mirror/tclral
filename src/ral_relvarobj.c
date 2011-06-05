@@ -1,5 +1,5 @@
 /*
-This software is copyrighted 2006 by G. Andrew Mangogna.  The following
+This software is copyrighted 2006 -2011 by G. Andrew Mangogna.  The following
 terms apply to all files associated with the software unless explicitly
 disclaimed in individual files.
 
@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.44 $
-$Date: 2011/04/03 22:02:52 $
+$Revision: 1.45 $
+$Date: 2011/06/05 18:01:10 $
  *--
  */
 
@@ -105,6 +105,10 @@ static int Ral_RelvarObjDecodeTraceOps(Tcl_Interp *, Tcl_Obj *, int *) ;
 static int Ral_RelvarObjEncodeTraceFlag(Tcl_Interp *, int, Tcl_Obj **) ;
 static Tcl_Obj *Ral_RelvarObjExecTraces(Tcl_Interp *, Ral_Relvar, Tcl_ObjType *,
     Tcl_Obj *, Tcl_Obj *) ;
+static int relvarEndTransaction(Tcl_Interp *, Ral_RelvarInfo, int) ;
+static int relvarObjConstraintEval(Tcl_Interp *, Ral_Constraint) ;
+static int relvarProceduralConstraintEval(Tcl_Interp *, char const *,
+    Ral_ProceduralConstraint) ;
 
 /*
 EXTERNAL DATA REFERENCES
@@ -765,7 +769,6 @@ Ral_RelvarObjCreateAssoc(
     Ral_Constraint constraint ;
     Ral_AssociationConstraint assoc ;
     int result = TCL_OK ;
-    Tcl_DString errMsg ;
 
     /*
      * Creating an association is not allowed during an "eval" script.
@@ -920,11 +923,9 @@ Ral_RelvarObjCreateAssoc(
      * If not, we delete the constraint because the state of the
      * relvar values is not correct.
      */
-    Tcl_DStringInit(&errMsg) ;
-    if (!Ral_RelvarConstraintEval(constraint, &errMsg)) {
+    if (!relvarObjConstraintEval(interp, constraint)) {
 	int status ;
 
-	Tcl_DStringResult(interp, &errMsg) ;
 	status = Ral_ConstraintDeleteByName(name, info) ;
 	assert(status != 0) ;
 
@@ -932,7 +933,6 @@ Ral_RelvarObjCreateAssoc(
     }
 
     Tcl_DStringFree(&resolve) ;
-    Tcl_DStringFree(&errMsg) ;
     return result ;
 }
 
@@ -958,7 +958,6 @@ Ral_RelvarObjCreatePartition(
     Ral_TupleHeading supth ;
     char const *partName ;
     Tcl_DString resolve ;
-    Tcl_DString errMsg ;
     Ral_Constraint constraint ;
     Ral_PartitionConstraint partition ;
     Ral_PtrVector subList ;	/* set of sub type names */
@@ -1125,11 +1124,9 @@ Ral_RelvarObjCreatePartition(
 	Ral_PtrVectorPushBack(sub->constraints, constraint) ;
     }
 
-    Tcl_DStringInit(&errMsg) ;
-    if (!Ral_RelvarConstraintEval(constraint, &errMsg)) {
+    if (!relvarObjConstraintEval(interp, constraint)) {
 	int status ;
 
-	Tcl_DStringResult(interp, &errMsg) ;
 	status = Ral_ConstraintDeleteByName(partName, info) ;
 	assert(status != 0) ;
 
@@ -1138,7 +1135,6 @@ Ral_RelvarObjCreatePartition(
 
     Ral_IntVectorDelete(superAttrs) ;
     Ral_PtrVectorDelete(subList) ;
-    Tcl_DStringFree(&errMsg) ;
     Tcl_DStringFree(&resolve) ;
     return result ;
 
@@ -1191,7 +1187,6 @@ Ral_RelvarObjCreateCorrelation(
     Ral_Constraint constraint ;
     Ral_CorrelationConstraint correl ;
     int result = TCL_OK ;
-    Tcl_DString errMsg ;
 
     /*
      * Creating a correlation is not allowed during an "eval" script.
@@ -1420,11 +1415,9 @@ Ral_RelvarObjCreateCorrelation(
      * If not, we delete the constraint because the state of the
      * relvar values is not correct.
      */
-    Tcl_DStringInit(&errMsg) ;
-    if (!Ral_RelvarConstraintEval(constraint, &errMsg)) {
+    if (!relvarObjConstraintEval(interp, constraint)) {
 	int status ;
 
-	Tcl_DStringResult(interp, &errMsg) ;
 	status = Ral_ConstraintDeleteByName(name, info) ;
 	assert(status != 0) ;
 
@@ -1432,7 +1425,6 @@ Ral_RelvarObjCreateCorrelation(
     }
 
     Tcl_DStringFree(&resolve) ;
-    Tcl_DStringFree(&errMsg) ;
     return result ;
 
 errorOut:
@@ -1453,8 +1445,6 @@ Ral_RelvarObjCreateProcedural(
     Tcl_DString resolve ;
     Ral_Constraint constraint ;
     Ral_ProceduralConstraint procedural ;
-    Tcl_DString errMsg ;
-    int result = TCL_OK ;
 
     /*
      * Creating a procedural constraint is not allowed during an "eval" script.
@@ -1496,7 +1486,7 @@ Ral_RelvarObjCreateProcedural(
          * Look up the relvar names and make sure that we find it and that a
          * relation is stored there.
          */
-        relvarName = Tcl_GetString(objv[1]) ;
+        relvarName = Tcl_GetString(*objv++) ;
         relvar = Ral_RelvarObjFindRelvar(interp, info, relvarName) ;
         if (relvar == NULL) {
             goto errorOut ;
@@ -1514,18 +1504,10 @@ Ral_RelvarObjCreateProcedural(
         Ral_PtrVectorPushBack(relvar->constraints, constraint) ;
     }
 
-    Tcl_DStringInit(&errMsg) ;
-    if (!Ral_RelvarConstraintEval(constraint, &errMsg)) {
-	int status ;
-
-	Tcl_DStringResult(interp, &errMsg) ;
-	status = Ral_ConstraintDeleteByName(procName, info) ;
-	assert(status != 0) ;
-
-	result = TCL_ERROR ;
+    if (!relvarObjConstraintEval(interp, constraint)) {
+        goto errorOut ;
     }
 
-    Tcl_DStringFree(&errMsg) ;
     Tcl_DStringFree(&resolve) ;
     return TCL_OK ;
 
@@ -1984,25 +1966,18 @@ Ral_RelvarObjEndTrans(
     Ral_RelvarInfo info,
     int failed)
 {
-    Tcl_DString errMsg ;
     int success ;
-
-    Tcl_DStringInit(&errMsg) ;
     /*
-     * Guard against calling "transaction end" when there was not
+     * Guard against calling "transaction end" when there was no
      * "transaction begin".
      */
     if (Ral_PtrVectorSize(info->transactions) > 0) {
-        success = Ral_RelvarEndTransaction(info, failed, &errMsg) ;
-        if (!(failed || success)) {
-            Tcl_DStringResult(interp, &errMsg) ;
-        }
+        success = relvarEndTransaction(interp, info, failed) ;
     } else {
-	Tcl_DStringAppend(&errMsg, "end transaction with no beginning", -1) ;
-        Tcl_DStringResult(interp, &errMsg) ;
+        Tcl_SetObjResult(interp,
+                Tcl_NewStringObj("end transaction with no beginning", -1)) ;
         success = 0 ;
     }
-    Tcl_DStringFree(&errMsg) ;
 
     return success ? TCL_OK : TCL_ERROR ;
 }
@@ -2013,17 +1988,21 @@ Ral_RelvarObjEndCmd(
     Ral_RelvarInfo info,
     int failed)
 {
-    Tcl_DString errMsg ;
-    int success ;
+    Ral_RelvarTransaction trans ;
+    int result ;
 
-    Tcl_DStringInit(&errMsg) ;
-    success = Ral_RelvarEndCommand(info, failed, &errMsg) ;
-    if (!(failed || success)) {
-	Tcl_DStringResult(interp, &errMsg) ;
+    trans = Ral_PtrVectorBack(info->transactions) ;
+    if (trans->isSingleCmd) {
+        assert(Ral_PtrVectorSize(info->transactions) == 1) ;
+        /*
+         * End the single command transaction. 
+         */
+        result = Ral_RelvarObjEndTrans(interp, info, failed) ;
+    } else {
+        result = !failed ? TCL_OK : TCL_ERROR ;
     }
-    Tcl_DStringFree(&errMsg) ;
 
-    return success ? TCL_OK : TCL_ERROR ;
+    return result ;
 }
 
 int
@@ -2737,4 +2716,144 @@ cmdError:
     Tcl_DecrRefCount(flagObj) ;
     Tcl_DecrRefCount(nameObj) ;
     return NULL ;
+}
+
+static int
+relvarEndTransaction(
+    Tcl_Interp *interp,
+    Ral_RelvarInfo info,
+    int failed)
+{
+    Ral_RelvarTransaction trans = Ral_PtrVectorBack(info->transactions) ;
+    Ral_PtrVectorIter pIter ;
+    Ral_PtrVectorIter pEnd ;
+
+    if (!failed) {
+        Ral_PtrVector constraints = Ral_PtrVectorNew(0) ;
+        Ral_PtrVectorIter cEnd ;
+        Ral_PtrVectorIter cIter ;
+        /*
+         * Iterate across the transaction evaluating the constraints.
+         * Build a set of constraints that the modified relvars
+         * participate in and then evaluate all the constraints in that set.
+         * "trans->modified" is the set of relvars that were modified
+         * during the transaction.
+         */
+        pEnd = Ral_PtrVectorEnd(trans->modifiedRelvars) ;
+        for (pIter = Ral_PtrVectorBegin(trans->modifiedRelvars) ;
+                pIter != pEnd ; ++pIter) {
+            Ral_Relvar modRelvar = *pIter ;
+            Ral_PtrVectorIter rcEnd = Ral_PtrVectorEnd(modRelvar->constraints) ;
+            Ral_PtrVectorIter rcIter ;
+            for (rcIter = Ral_PtrVectorBegin(modRelvar->constraints) ;
+                    rcIter != rcEnd ; ++rcIter) {
+                Ral_PtrVectorSetAdd(constraints, *rcIter) ;
+            }
+        }
+        cEnd = Ral_PtrVectorEnd(constraints) ;
+        for (cIter = Ral_PtrVectorBegin(constraints) ; cIter != cEnd ;
+                ++cIter) {
+            failed = !relvarObjConstraintEval(interp, *cIter) ;
+            if (failed) {
+                break ;
+            }
+        }
+        Ral_PtrVectorDelete(constraints) ;
+    }
+    pEnd = Ral_PtrVectorEnd(trans->modifiedRelvars) ;
+    if (failed) {
+        /*
+         * If any constaint fails, pop and restore the saved values of
+         * the relvars.
+         */
+        for (pIter = Ral_PtrVectorBegin(trans->modifiedRelvars) ;
+            pIter != pEnd ; ++pIter) {
+            Ral_RelvarRestorePrev(*pIter) ;
+        }
+    } else {
+        /*
+         * Pop and discard the saved values.
+         */
+        for (pIter = Ral_PtrVectorBegin(trans->modifiedRelvars) ;
+            pIter != pEnd ; ++pIter) {
+            Ral_RelvarDiscardPrev(*pIter) ;
+        }
+    }
+    /*
+     * Delete the transaction.
+     */
+    Ral_RelvarDeleteTransaction(trans) ;
+    Ral_PtrVectorPopBack(info->transactions) ;
+
+    return !failed ;
+}
+
+static int
+relvarObjConstraintEval(
+    Tcl_Interp *interp,
+    Ral_Constraint constraint)
+{
+    int result ;
+
+    if (constraint->type == ConstraintProcedural) {
+        result = relvarProceduralConstraintEval(interp, constraint->name,
+                constraint->constraint.procedural) ;
+    } else {
+        Tcl_DString errMsg ;
+
+        Tcl_DStringInit(&errMsg) ;
+        result = Ral_RelvarDeclConstraintEval(constraint, &errMsg) ;
+        if (!result) {
+            Tcl_DStringResult(interp, &errMsg) ;
+        }
+        Tcl_DStringFree(&errMsg) ;
+    }
+
+    return result ;
+}
+
+/*
+ * Evaluate a procedural type constraint.
+ * Return 1 if the constraint is satisfied,  0 otherwise.
+ * On error, "errMsg" contains text to identify the error.
+ * Assumes that, "errMsg" is properly initialized on entry.
+ */
+static int
+relvarProceduralConstraintEval(
+    Tcl_Interp *interp,
+    char const *name,
+    Ral_ProceduralConstraint procedural)
+{
+    int scriptResult ;
+    int result = 0 ;
+    /*
+     * Evaluate the script.
+     */
+    Tcl_IncrRefCount(procedural->script) ;
+    scriptResult = Tcl_EvalObjEx(interp, procedural->script, 0) ;
+    Tcl_DecrRefCount(procedural->script) ;
+    if (scriptResult == TCL_OK || scriptResult == TCL_RETURN) {
+        Tcl_Obj *resultObj ;
+        /*
+         * Fetch the return value of the script and try to get a boolean value
+         * out of the result. Either that will succeed and the boolean will be
+         * put into "result" or it will fail and "result" is left unmodified
+         * (and therefore 0 to indicate failure).
+         */
+        resultObj = Tcl_GetObjResult(interp) ;
+        Tcl_GetBooleanFromObj(interp, resultObj, &result) ;
+        if (!result) {
+            Tcl_SetObjResult(interp,
+                Tcl_ObjPrintf("procedural contraint, \"%s\", failed", name)) ;
+        }
+    } else if (scriptResult == TCL_CONTINUE) {
+        Tcl_SetObjResult(interp,
+            Tcl_ObjPrintf("returned \"continue\" from procedural "
+                "contraint script for constraint, \"%s\"")) ;
+    } else if (scriptResult == TCL_BREAK) {
+        Tcl_SetObjResult(interp,
+            Tcl_ObjPrintf("returned \"break\" from procedural "
+                "contraint script for constraint, \"%s\"")) ;
+    }
+    return result ;
 }
