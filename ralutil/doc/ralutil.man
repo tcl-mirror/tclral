@@ -1,6 +1,6 @@
 [manpage_begin ralutil n 0.10.0]
 [comment {
-# This software is copyrighted 2004 - 2010
+# This software is copyrighted 2004 - 2011
 # by G. Andrew Mangogna.
 # The following terms apply to all files associated with the software unless
 # explicitly disclaimed in individual files.
@@ -46,8 +46,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: ralutil.man,v $
-# $Revision: 1.7 $
-# $Date: 2011/01/16 23:18:42 $
+# $Revision: 1.8 $
+# $Date: 2011/06/06 01:00:30 $
 #  *--
 }]
 [moddesc "Ralutil Package"]
@@ -55,12 +55,12 @@
 [copyright "2004 - 2010 by G. Andrew Mangogna"]
 [require ral [opt 0.10.0]]
 [description]
-This manpage describes the [package ralutil] package
-The [package ralutil]
-package is part of the Tcl Relational Algebra Library (ral) package.
+This manpage describes the [package ralutil] package.
+The [package ralutil] package is a supplementary package to the
+Tcl Relational Algebra Library (ral) package.
 
 [section VARIABLES]
-The [package ralutil] defines two variables, [var DUM] and [var DEE].
+The [package ralutil] package defines two variables, [var DUM] and [var DEE].
 These two relation values play a special role as identity and
 annihilator relations.
 
@@ -77,7 +77,7 @@ empty tuple.
 [section COMMANDS]
 [list_begin definitions]
 [call [cmd "::ralutil::pipe"] [arg script] [arg [opt varName]] [arg [opt sep]]]
-The [cmd pipe] command provides syntactic sugar to execute a sequence
+The [cmd pipe] command provides a control structure to execute a sequence
 of commands feeding the output of one command as the input to the next
 one in the sequence.
 The [arg script] argument is a sequence of commands separated by a
@@ -183,8 +183,8 @@ contains the
 tuples that match in the join and is empty for those tuples in the
 relation that do not match across the join attributes (the "natural
 join" leaving such tuples out of the result altogether).
-[arg rel1] the first relation to join
-[arg rel2] the second relation to join.
+[arg rel1] is the first relation to join and
+[arg rel2] is the second relation to join.
 [arg newAttr] the name of the new relation valued attribute.
 The remaining optional arguments are the attributes across which the join is
 to be made.
@@ -197,7 +197,8 @@ The type of [arg newAttr] is [emph Relation] with a heading that matches
 join.
 
 To show the difference between [cmd rvajoin] and natural join [emph i.e.]
-[cmd "relation join"] consider the join of [var Dog] to [var Ownership].
+[cmd "relation join"],
+consider the join of [var Dog] to [var Ownership].
 In this data set, Jumper the Mutt is not owned by anyone.
 In the natural join, there is no tuple with Jumper.
 The RVA join has a tuple for Jumper and an empty relation valued attribute

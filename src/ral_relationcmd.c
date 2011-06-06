@@ -46,8 +46,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.48 $
-$Date: 2011/06/05 18:01:10 $
+$Revision: 1.49 $
+$Date: 2011/06/06 01:00:30 $
  *--
  */
 
@@ -1839,7 +1839,7 @@ RelationListCmd(
     Tcl_Obj *const*objv)
 {
     /* relation list relationValue ?attrName
-            ??-ascending | -descending? sortAttr?? */
+            ??-ascending | -descending? sortAttrList?? */
     Tcl_Obj *relObj ;
     Ral_Relation relation ;
     Tcl_Obj *listObj ;

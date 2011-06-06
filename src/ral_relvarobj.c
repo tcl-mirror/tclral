@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.45 $
-$Date: 2011/06/05 18:01:10 $
+$Revision: 1.46 $
+$Date: 2011/06/06 01:00:30 $
  *--
  */
 
@@ -2833,18 +2833,25 @@ relvarProceduralConstraintEval(
     scriptResult = Tcl_EvalObjEx(interp, procedural->script, 0) ;
     Tcl_DecrRefCount(procedural->script) ;
     if (scriptResult == TCL_OK || scriptResult == TCL_RETURN) {
-        Tcl_Obj *resultObj ;
         /*
          * Fetch the return value of the script and try to get a boolean value
          * out of the result. Either that will succeed and the boolean will be
          * put into "result" or it will fail and "result" is left unmodified
          * (and therefore 0 to indicate failure).
          */
-        resultObj = Tcl_GetObjResult(interp) ;
-        Tcl_GetBooleanFromObj(interp, resultObj, &result) ;
-        if (!result) {
-            Tcl_SetObjResult(interp,
-                Tcl_ObjPrintf("procedural contraint, \"%s\", failed", name)) ;
+        if (Tcl_GetBooleanFromObj(interp, Tcl_GetObjResult(interp), &result)
+            == TCL_OK) {
+            if (result) {
+                /*
+                 * Clear out the interpreter result since we used to get the
+                 * boolean value.
+                 */
+                Tcl_ResetResult(interp) ;
+            } else {
+                Tcl_SetObjResult(interp,
+                        Tcl_ObjPrintf("procedural contraint, \"%s\", failed",
+                        name)) ;
+            }
         }
     } else if (scriptResult == TCL_CONTINUE) {
         Tcl_SetObjResult(interp,

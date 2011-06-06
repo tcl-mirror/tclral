@@ -1,7 +1,6 @@
 [manpage_begin relation n 0.10.0]
 [comment {
-# This software is copyrighted 2004 - 2010
-# by G. Andrew Mangogna.
+# This software is copyrighted 2004 - 2011 by G. Andrew Mangogna.
 # The following terms apply to all files associated with the software unless
 # explicitly disclaimed in individual files.
 # 
@@ -46,8 +45,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: relation.man,v $
-# $Revision: 1.36 $
-# $Date: 2011/05/30 18:44:43 $
+# $Revision: 1.37 $
+# $Date: 2011/06/06 01:00:30 $
 #  *--
 }]
 [moddesc "Relation Operators"]

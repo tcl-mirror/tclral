@@ -165,6 +165,29 @@ displayExample {
     relvar insert FloorLamp {SerialNo NF101 Height 72 Sockets 3}
 }
 
+#relvar procedural
+displayExample {
+relvar create Ingredient {Name string   Percentage int} Name
+relvar insert Ingredient {Name flour Percentage 100}
+
+relvar procedural P2 Ingredient {
+    set tot [relation summarizeby [relvar set Ingredient] {} ig\
+        TotalPercent int {rsum($ig, "Percentage")}]
+    return [expr {[relation extract $tot TotalPercent] == 100}]
+}
+
+relvar eval {
+    relvar insert Ingredient {Name butter Percentage 25}
+    relvar updateone Ingredient ig {Name flour} {
+        tuple update $ig Percentage 75}
+}
+relformat $::Ingredient Ingredient
+
+relvar insert Ingredient {Name salt Percentage 1}
+
+relformat $::Ingredient Ingredient
+}
+
 #relvar constraint info
 displayExample {
     relvar constraint info A1

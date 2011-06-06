@@ -1,7 +1,6 @@
 [manpage_begin relvar n 0.10.0]
 [comment {
-# This software is copyrighted 2004 - 2010
-# by G. Andrew Mangogna.
+# This software is copyrighted 2004 - 2011 by G. Andrew Mangogna.
 # The following terms apply to all files associated with the software unless
 # explicitly disclaimed in individual files.
 # 
@@ -48,8 +47,8 @@
 #   This command is part of TclRAL. This file is in Tcl Markup Language
 #   format.
 # $RCSfile: relvar.man,v $
-# $Revision: 1.33 $
-# $Date: 2011/01/16 23:18:42 $
+# $Revision: 1.34 $
+# $Date: 2011/06/06 01:00:30 $
 #  *--
 }]
 [moddesc "Relvar Operators"]
@@ -124,8 +123,8 @@ stored in the relvar.
 TclRAL supports the notion of [emph constraints] as a means of
 insuring integrity among a set of relvars.
 There are many types of constraints that might be used to insure integrity,
-but TclRAL supports two distinct types of constraints:
-identification constraints and referential constraints.
+but TclRAL supports three distinct types of constraints:
+identification constraints, referential constraints and procedural constraints.
 [list_begin definitions]
 
 [def Identification]
@@ -140,6 +139,10 @@ for a given relvar are allowed to be a subset of one another.
 [def Referential]
 Referential constraints define how tuples of one relvar refer to tuples
 in another relvar.
+
+[def Procedural]
+Procedural constraints define a Tcl script that is evaluated to determine
+if the constraint is satisfied.
 
 [list_end]
 
@@ -179,13 +182,16 @@ It is similar in some ways to two Association Constraints.
 
 [list_end]
 
+Procedural constraints are enforced by evaluating a Tcl script when
+a given set of relvars are modified.
+
 At the end of each [cmd ::ral::eval] command or after a
 [cmd "::ral::transaction end"] command(see below) or,
 if outside of an [cmd eval] command,
 at the end of any command that modifies a relvar
 that participates in a referential constraint,
-all of the referential constraints defined for the modified relvars
-are evaluated.
+all of the referential and procedural constraints defined for the
+modified relvars are evaluated.
 If any of the constraints fail, the relvar modifications are discarded
 and the relvar values are returned to the values they had before
 the modifications.
@@ -538,6 +544,26 @@ After deleting Mike
 +---------+---+-------------+
 }]
 
+[call [cmd "::ral::relvar dunion"] [arg relvarName]\
+    [arg [opt "relationValue1 ..."]]]
+The [cmd dunion] subcommand performs the relation disjoint union of the
+relation value contained in [arg relvarName] with the given
+[arg relationValueN] arguments and assigns the result back into
+[arg relvarName].
+This command is shorthand for:
+[para]
+relvar set <relvarName> [lb]relation dunion [lb]relvar set <relvarName>[rb]
+<relationValue1> ...[rb]
+[para]
+The headings of each [arg relationValueN] must match that of the value
+contained in [arg relvarName].
+Any duplicated tuples will cause an error to be thrown and thus
+this command has insert type semantics.
+Since the disjoint union operation is commutative, the order of the
+[arg relationValueN] arguments does not affect the result.
+The return value of the command is the new relation value stored in
+[arg relvarName].
+
 [call [cmd "::ral::relvar eval"] [arg arg] [opt "arg ..."]]
 
 The [cmd eval] subcommand concatenates it arguments together and evaluates
@@ -761,6 +787,66 @@ tuple {SerialNo NF101 Height 72 Sockets 3} references no tuple
 The [cmd path] subcommand returns the fully qualified relvar
 name of [arg relvarName].
 
+[call [cmd "::ral::relvar procedural"] [arg constraintName]\
+    [arg relvarName] [arg [opt "relvarName2 ..."]] [arg script]]
+The [cmd procedural] subcommand defines a procedural constraint.
+The name of the constraint is given by the [arg constraintName] argument.
+At the end of any transaction (or any command that modifies a relvar
+if there is no ongoing transaction),
+[arg script] is evaluated if any of the [arg relvarNameN] relvars is
+modified.
+The [arg script] must return a value that can be intepreted as a boolean.
+If [arg script] returns [emph true] then the constraint passes.
+If [arg script] returns [emph false] then the constraint is deemed to
+have failed an the transaction is rolled back.
+Procedural constraints are only evaluated at the end of a transaction
+and only if the relvars given in the [cmd procedural] command are
+modified during the transaction.
+Compare this to the behavior of [cmd "relvar trace"] procedures which
+are invoked on a tuple-by-tuple basis as the relvar value is being modified.
+[para]
+The following example shows a constraint that insures that the
+Percentage attribute always totals to 100.
+[example {
+% relvar create Ingredient {Name string   Percentage int} Name
+{Name string Percentage int} {}
+% relvar insert Ingredient {Name flour Percentage 100}
+{Name string Percentage int} {{Name flour Percentage 100}}
+% relvar procedural P2 Ingredient {
+> set tot [relation summarizeby [relvar set Ingredient] {}\\
+> ig TotalPercent int {rsum($ig, "Percentage")}]
+> return [expr {[relation extract $tot TotalPercent] == 100}]
+> }
+% relvar eval {
+> relvar insert Ingredient {Name butter Percentage 25}
+> relvar updateone Ingredient ig {Name flour} {
+> tuple update $ig Percentage 75}
+> }
+% relformat $::Ingredient Ingredient
++------+----------+
+|Name  |Percentage|
+|string|int       |
++------+----------+
+|flour |75        |
+|butter|25        |
++------+----------+
+Ingredient
+----------
+% relvar insert Ingredient {Name salt Percentage 1}
+procedural contraint, "::P2", failed
+% relformat $::Ingredient Ingredient
++------+----------+
+|Name  |Percentage|
+|string|int       |
++------+----------+
+|flour |75        |
+|butter|25        |
++------+----------+
+Ingredient
+----------
+}]
+    
+
 [call [cmd "::ral::relvar restrictone"] [arg relvarName]\
     [arg attr1] [arg value1] [opt [arg "attr2 value2 ..."]]]
 The [cmd restrictone] subcommand returns a relation value containing
@@ -876,6 +962,27 @@ The command returns the empty string.
 If relvar modifications are such that the constraints are violated,
 then [cmd "relvar transaction end"] will throw an error.
 
+[call [cmd "::ral::relvar uinsert"] [arg relvarName]\
+    [opt "name-value-list ..."]]
+
+The [cmd uinsert] subcommand inserts the tuples given by [arg name-value-list]
+arguments into the value of the relation stored in [arg relvarName].
+The value of [arg relvarName] is modified in place.
+The return value is a relation value with the same heading as the
+value held in [arg relvarName] and whose body contains the tuples as they
+were actually inserted.
+This gives the caller access to any attributes that might have been added
+or modified by a relvar trace.
+The [cmd uinsert] command has union-like semantics and so any
+attempt to insert a duplicate tuple is silently ignored.
+It is an error to attempt to insert a tuple whose
+heading does not match the heading of the value held in [arg relvarName].
+The values of all attributes of the inserted tuples must be specified
+either in the command invocation or as supplied by any relvar insert traces
+with a valid value representation of the type associated with the attribute.
+However, because of relvar tracing, the tuple values given in
+[arg name-value-list] may not be the ones actually inserted into the relvar
+and relvar traces may extend the given [arg name-value-list] argument.
 
 [call [cmd "::ral::relvar union"] [arg relvarName]\
     [opt "relationValue1 relationValue2 ..."]]
