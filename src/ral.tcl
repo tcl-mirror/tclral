@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.46 $
-# $Date: 2011/06/05 18:01:10 $
+# $Revision: 1.47 $
+# $Date: 2011/06/08 01:17:29 $
 #  *--
 
 namespace eval ::ral {
@@ -171,13 +171,18 @@ create index __ral_attribute_ref_index on __ral_attribute (Vname) ;
 create table __ral_identifier (
     IdNum integer not null,
     Vname text not null,
-    Attrs text not null,
-    constraint __ral_identifier_id unique (IdNum, Vname),
+    Attr text not null,
+    constraint __ral_identifier_id unique (IdNum, Vname, Attr),
     constraint __ral_identifier_ref foreign key (Vname) references
-        __ral_attribute (Vname) on delete cascade on update cascade
+        __ral_relvar (Vname) on delete cascade on update cascade
+        deferrable initially deferred,
+    constraint __ral_identifier_ref2 foreign key (Vname, Attr) references
+        __ral_attribute(Vname, Aname) on delete cascade on update cascade
         deferrable initially deferred) ;
-create unique index __ral_identifier_id on __ral_identifier (IdNum, Vname) ;
-create index __ral_identifier_ref on __ral_identifier (Vname) ;
+create unique index __ral_identifier_id on
+    __ral_identifier (IdNum, Vname, Attr) ;
+create index __ral_identifier_ref_index on __ral_identifier (Vname) ;
+create index __ral_identifier_ref2_index on __ral_identifier (Vname, Attr) ;
 create table __ral_association (
     Cname text not null,
     Referring text not null,
@@ -839,9 +844,11 @@ proc ::ral::storeToSQLite {filename {pattern *}} {
                 }
                 set idCounter 0
                 foreach identifier [relvar identifiers $relvar] {
-                    sqlitedb eval {insert into\
-                        __ral_identifier (IdNum, Vname, Attrs)\
-                        values ($idCounter, $basename, $identifier) ;}
+                    foreach idattr $identifier {
+                        sqlitedb eval {insert into\
+                            __ral_identifier (IdNum, Vname, Attr)\
+                            values ($idCounter, $basename, $idattr) ;}
+                    }
                     incr idCounter
                 }
                 # Next the constraints
@@ -993,12 +1000,12 @@ proc ::ral::loadFromSQLite {filename {ns ::}} {
                         __ral_attribute where Vname = $vname}] {
                     lappend heading $aname $type
                 }
-                set idlist [list]
-                foreach attrs [sqlitedb eval {select Attrs from\
-                        __ral_identifier where Vname = $vname order by IdNum}] {
-                    lappend idlist $attrs
+                set idents [dict create]
+                foreach {idnum attrName} [sqlitedb eval {select IdNum, Attr\
+                        from __ral_identifier where Vname = $vname}] {
+                    dict lappend idents $idnum $attrName
                 }
-                ::ral::relvar create $ns$vname $heading {*}$idlist
+                ::ral::relvar create $ns$vname $heading {*}[dict values $idents]
             }
             # The association constraints
             foreach {cname referring referringAttrs refToSpec refTo refToAttrs\
