@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.40 $
-$Date: 2011/06/05 18:01:10 $
+$Revision: 1.41 $
+$Date: 2011/08/09 15:11:35 $
  *--
  */
 
@@ -408,7 +408,7 @@ Ral_Relation
 Ral_RelationUnion(
     Ral_Relation r1,
     Ral_Relation r2,
-    int isDisjoint,         // true if the union must be disjoint
+    int isDisjoint,         /* true if the union must be disjoint */
     Ral_ErrorInfo *errInfo)
 {
     Ral_Relation unionRel ;
@@ -431,8 +431,9 @@ Ral_RelationUnion(
      */
     orderMap = Ral_TupleHeadingNewOrderMap(r1->heading, r2->heading) ;
     /*
-     * Copy in the tuples from the second relation.  Ignore any return status.
-     * If there is already a matching tuple it will not be inserted.
+     * Copy in the tuples from the second relation.  If there is already a
+     * matching tuple it will not be inserted.  Ignore any return status on a
+     * normal union, but a disjoint union will complaint.
      */
     if (isDisjoint) {
         Ral_RelationIter copyFinish ;
