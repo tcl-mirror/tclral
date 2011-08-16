@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.46 $
-$Date: 2011/06/06 01:00:30 $
+$Revision: 1.47 $
+$Date: 2011/08/16 14:20:56 $
  *--
  */
 
@@ -2815,8 +2815,7 @@ relvarObjConstraintEval(
 /*
  * Evaluate a procedural type constraint.
  * Return 1 if the constraint is satisfied,  0 otherwise.
- * On error, "errMsg" contains text to identify the error.
- * Assumes that, "errMsg" is properly initialized on entry.
+ * On error, "interp" contains text to identify the error.
  */
 static int
 relvarProceduralConstraintEval(
@@ -2856,11 +2855,11 @@ relvarProceduralConstraintEval(
     } else if (scriptResult == TCL_CONTINUE) {
         Tcl_SetObjResult(interp,
             Tcl_ObjPrintf("returned \"continue\" from procedural "
-                "contraint script for constraint, \"%s\"")) ;
+                "contraint script for constraint, \"%s\"", name)) ;
     } else if (scriptResult == TCL_BREAK) {
         Tcl_SetObjResult(interp,
             Tcl_ObjPrintf("returned \"break\" from procedural "
-                "contraint script for constraint, \"%s\"")) ;
+                "contraint script for constraint, \"%s\"", name)) ;
     }
     return result ;
 }
