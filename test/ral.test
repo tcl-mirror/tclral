@@ -51,17 +51,19 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.56 $
-# $Date: 2011/06/05 18:01:10 $
+# $Revision: 1.57 $
+# $Date: 2011/09/26 00:57:22 $
 #  *--
 
 package require tcltest 2.2
 package require ral
-package require struct::set
 
 eval tcltest::configure $argv
 
-if {[package vsatisfies [package require Tcl] 8.5]} {
+if {[package vsatisfies [package require Tcl] 8.6]} {
+    ::tcltest::testConstraint tcl8.6 1
+    ::tcltest::testConstraint haveDict 1
+} elseif {[package vsatisfies [package require Tcl] 8.5]} {
     ::tcltest::testConstraint tcl8.5 1
     ::tcltest::testConstraint haveDict 1
 } elseif {[package vsatisfies [package require Tcl] 8.4]} {
@@ -70,7 +72,7 @@ if {[package vsatisfies [package require Tcl] 8.5]} {
         ::tcltest::testConstraint haveDict 1
     }
 } else {
-    error "TclRAL has only been tested against Tcl 8.4 and 8.5"
+    error "TclRAL has only been tested against Tcl 8.4, 8.5 and 8.6"
 }
 
 namespace eval ::ral::test {
@@ -86,11 +88,6 @@ namespace eval ::ral::test {
         return [::ral::relation is $expected == $actual]
     }
     customMatch relation [namespace current]::relationMatch
-
-    proc setMatch {expected actual} {
-        return [::struct::set equal $expected $actual]
-    }
-    customMatch set [namespace current]::setMatch
 
     if {[testConstraint haveDict]} {
         proc dictMatch {expected actual} {

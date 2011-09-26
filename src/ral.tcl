@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.48 $
-# $Date: 2011/08/16 14:22:59 $
+# $Revision: 1.49 $
+# $Date: 2011/09/26 00:57:22 $
 #  *--
 
 namespace eval ::ral {
@@ -71,7 +71,7 @@ namespace eval ::ral {
     namespace export dumpToFile
     namespace export csv
     namespace export csvToFile
-    if {![package vsatisfies [package require Tcl] 8.5-]} {
+    if {![package vsatisfies [package require Tcl] 8.5]} {
         namespace export rcount
         namespace export rcountd
         namespace export rsum
@@ -1288,7 +1288,7 @@ proc ::ral::sqlSchema {{pattern *}} {
 # are useful and have "expr" syntax. If we don't have Tcl 8.5 then we
 # will define these in the "::ral" namespace and they will require
 # "proc" type syntax.
-set sfuncNS [expr {[package vsatisfies [package require Tcl] 8.5-] ?\
+set sfuncNS [expr {[package vsatisfies [package require Tcl] 8.5] ?\
     "::tcl::mathfunc" : "::ral"}]
 # Count the number of tuples in a relation
 proc ${sfuncNS}::rcount {relation} {
@@ -1316,7 +1316,7 @@ proc ${sfuncNS}::rsumd {relation attr} {
     }
     return $result
 }
-if {[package vsatisfies [package require Tcl] 8.5-]} {
+if {[package vsatisfies [package require Tcl] 8.5]} {
     # Compute the average of the values of an attribute
     proc ${sfuncNS}::ravg {relation attr} {
         return [expr {rsum($relation, $attr) / rcount($relation)}]

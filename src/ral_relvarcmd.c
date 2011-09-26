@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.39 $
-$Date: 2011/06/05 18:01:10 $
+$Revision: 1.40 $
+$Date: 2011/09/26 00:57:22 $
  *--
  */
 
@@ -231,7 +231,7 @@ RelvarConstraintCmd(
 	ConstraintInfo,
 	ConstraintNames,
 	ConstraintMember,
-	ConstraintPath,
+	ConstraintPath
     } ;
     static char const *constraintCmds[] = {
 	"delete",
@@ -1365,7 +1365,7 @@ RelvarTraceCmd(
 	TraceAdd,
 	TraceRemove,
 	TraceInfo,
-	TraceSuspend,
+	TraceSuspend
     } ;
     static char const *traceOptions[] = {
 	"add",
@@ -1376,7 +1376,7 @@ RelvarTraceCmd(
     } ;
     enum TraceType {
 	TraceVariable,
-	TraceEval,
+	TraceEval
     } ;
     static char const *traceTypes[] = {
 	"variable",
@@ -1524,7 +1524,7 @@ RelvarTransactionCmd(
     enum TransactionOption {
 	TransactionBegin,
 	TransactionEnd,
-	TransactionRollback,
+	TransactionRollback
     } ;
     static char const *transactionOptions[] = {
 	"begin",

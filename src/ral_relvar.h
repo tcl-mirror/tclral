@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.h,v $
-$Revision: 1.16 $
-$Date: 2011/06/05 18:01:10 $
+$Revision: 1.17 $
+$Date: 2011/09/26 00:57:22 $
  *--
  */
 #ifndef _ral_relvar_h_
@@ -81,7 +81,7 @@ typedef enum {
     ConstraintAssociation,
     ConstraintPartition,
     ConstraintCorrelation,
-    ConstraintProcedural,
+    ConstraintProcedural
 } Ral_ConstraintType ;
 
 typedef struct Ral_AssociationConstraint {

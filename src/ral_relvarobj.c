@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.47 $
-$Date: 2011/08/16 14:20:56 $
+$Revision: 1.48 $
+$Date: 2011/09/26 00:57:22 $
  *--
  */
 
@@ -2840,26 +2840,27 @@ relvarProceduralConstraintEval(
          */
         if (Tcl_GetBooleanFromObj(interp, Tcl_GetObjResult(interp), &result)
             == TCL_OK) {
-            if (result) {
-                /*
-                 * Clear out the interpreter result since we used to get the
-                 * boolean value.
-                 */
-                Tcl_ResetResult(interp) ;
-            } else {
-                Tcl_SetObjResult(interp,
-                        Tcl_ObjPrintf("procedural contraint, \"%s\", failed",
-                        name)) ;
+            /*
+             * Clear out the interpreter result since we used to get the
+             * boolean value.
+             */
+            Tcl_ResetResult(interp) ;
+            if (!result) {
+                Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
+                        "procedural contraint, \"", name, "\", failed",
+                        NULL) ;
             }
         }
     } else if (scriptResult == TCL_CONTINUE) {
-        Tcl_SetObjResult(interp,
-            Tcl_ObjPrintf("returned \"continue\" from procedural "
-                "contraint script for constraint, \"%s\"", name)) ;
+        Tcl_ResetResult(interp) ;
+        Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
+            "returned \"continue\" from procedural "
+                "contraint script for constraint, \"", name, "\"", NULL) ;
     } else if (scriptResult == TCL_BREAK) {
-        Tcl_SetObjResult(interp,
-            Tcl_ObjPrintf("returned \"break\" from procedural "
-                "contraint script for constraint, \"%s\"", name)) ;
+        Tcl_ResetResult(interp) ;
+        Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
+            "returned \"break\" from procedural "
+                "contraint script for constraint, \"", name, "\"", NULL) ;
     }
     return result ;
 }

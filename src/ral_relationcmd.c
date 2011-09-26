@@ -46,8 +46,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.49 $
-$Date: 2011/06/06 01:00:30 $
+$Revision: 1.50 $
+$Date: 2011/09/26 00:57:22 $
  *--
  */
 
@@ -111,7 +111,9 @@ static int RelationEmptyofCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationExtendCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationExtractCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationForeachCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
+#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
 static int RelationFromdictCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
+#endif
 static int RelationFromlistCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationGroupCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationHeadingCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
@@ -2983,13 +2985,13 @@ RelationTagCmd(
 	    enum {
 		TAG_ASCENDING,
 		TAG_DESCENDING,
-		TAG_WITHIN,
+		TAG_WITHIN
 	    } opt ;
 	} optTable[] = {
 	    {"-ascending", TAG_ASCENDING},
 	    {"-descending", TAG_DESCENDING},
 	    {"-within", TAG_WITHIN},
-	    {NULL, 0},
+	    {NULL, 0}
 	} ;
 	Ral_IntVector sortAttrs ;
 	int index ;
