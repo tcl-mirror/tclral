@@ -1,4 +1,4 @@
-[manpage_begin serialize n 0.10.0]
+[manpage_begin serialize n 0.10.1]
 [comment {
 # This software is copyrighted 2004 - 2011 by G. Andrew Mangogna.
 # The following terms apply to all files associated with the software unless
@@ -45,14 +45,14 @@
 # ABSTRACT:
 # 
 # $RCSfile: serialize.man,v $
-# $Revision: 1.17 $
-# $Date: 2011/06/06 01:00:30 $
+# $Revision: 1.18 $
+# $Date: 2011/10/08 17:40:02 $
 #  *--
 }]
 [moddesc "Relation persistence"]
 [titledesc "Persistent storage for relations"]
 [copyright "2004 - 2010 by G. Andrew Mangogna"]
-[require ral [arg [opt 0.10.0]]]
+[require ral [arg [opt 0.10.1]]]
 [description]
 This manpage describes a set of commands that are used for
 saving the values of relvars on external storage.
