@@ -1,4 +1,4 @@
-Package ralutil 0.10.0
+Package ralutil 0.10.1
 Meta description The {"ralutil"} package contains a set of procedures
 Meta description useful with TclRAL.
 Meta entrysource ralutil.tcl
@@ -7,3 +7,4 @@ Meta platform    tcl
 Meta require     {ral 0.10.0}
 Meta require     {Tcl 8.5}
 Meta summary     TclRAL utilities
+

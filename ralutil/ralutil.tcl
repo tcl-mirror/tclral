@@ -49,13 +49,13 @@
 # without cluttering the TclRAL package proper.
 # 
 # $RCSfile: ralutil.tcl,v $
-# $Revision: 1.4 $
-# $Date: 2011/01/16 23:18:42 $
+# $Revision: 1.5 $
+# $Date: 2011/10/08 18:59:13 $
 #  *--
 
 package provide ralutil 0.10.0
 
-package require ral 0.10.0
+package require ral 0.10.1
 
 namespace eval ::ralutil {
     namespace export pipe
@@ -125,7 +125,7 @@ proc ::ralutil::sysIdsInit {} {
 # a relvar in order to have the system assign a unique value
 # to that attribute.
 proc ::ralutil::sysIdsGenSystemId {relvarName attrName} {
-    relvar trace add variable $relvarName insert\
+    relvar trace add variable [uplevel 1 relvar path $relvarName] insert\
 	[list ::ralutil::sysIdsCreateIdFor $attrName]
 }
 
@@ -149,7 +149,17 @@ proc ::ralutil::sysIdsCreateIdFor {attrName op relvarName tup} {
 		IdAttr $attrName IdNum [incr idValue]]
 	}
     }
-    return [tuple update $tup $attrName $idValue]
+    # It is possible that no value was given for the attribute that is to be
+    # generated. In that case we need to add it in using the type we find in
+    # the relation heading.
+    if {$attrName in [tuple attributes $tup]} {
+        set newTup [tuple update $tup $attrName $idValue]
+    } else {
+        set heading [relation heading [relvar set $relvarName]]
+        set attrType [dict get $heading $attrName]
+        set newTup [tuple extend $tup $attrName $attrType $idValue]
+    }
+    return $newTup
 }
 
 # A helper procedure in finding the value for a system identifiers
