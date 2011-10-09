@@ -1,3 +1,219 @@
+========= ral 0.10.1 =========
+2011/10/08 mangoa01
+
+	* doc/ral/relation.man:
+	* doc/ral/relformat.man:
+	* doc/ral/relvar.man:
+	* doc/ral/serialize.man:
+	* doc/ral/tuple.man:
+	* ralutil/doc/ralutil.man:
+	  Update documentation version numbers in preparation for new release.
+
+	* ralutil/pkgIndex.tcl:
+	* ralutil/ralutil.tcl:
+	* ralutil/teapot.txt:
+	  Update to ralutil package revision numbers.
+          Improved system generated ID's procedures. Now the path name to a
+          relvar will be automatically resolved and if the attribute that is
+          the system generated ID is missing in the trace callback, it is added
+          automatically.
+
+2011/10/03 mangoa01
+
+	* src/ral_relation.c:
+          Put in a workaround for Tcl 8.4. The hash table code in 8.4 clears
+          the ClientData field whenever any new entry is created -- even if a
+          custom hash type supplied an allocation function. Later versions of
+          the code in Tcl 8.5 do not clear ClientData if the allocation
+          function was supplied (i.e. it depends upon that allocation function
+          to set a value into ClientData). This difference causes the NULL
+          pointer to dereferenced when TclRAL is compiled against Tcl 8.4. Here
+          we put in a workaround.
+
+2011/09/26 mangoa01
+
+	* src/ral.tcl:
+	* src/ral_relationcmd.c:
+	* src/ral_relvar.h:
+	* src/ral_relvarcmd.c:
+	* src/ral_relvarobj.c:
+	* src/ral_utils.h:
+	* test/ral.test:
+	  Corrected several issues when trying to compile for Tcl 8.4 and for
+	  compilers that are strict about C89 syntax.
+
+2011/08/16 mangoa01
+
+	* configure:
+	* configure.in:
+	* src/ral_relvarobj.c:
+	  Corrected a problem with a format statement that contained too few
+	  arguments.
+	  Incremented version number in preparation for a new release.
+
+	* src/ral.tcl:
+	  Increment revision number in Tcl script portion of the package.
+
+2011/08/09 mangoa01
+
+	* src/ral_relation.c:
+	  Remove C99 style comment for the benefit of older compilers.
+
+========= ral 0.10.0 =========
+2011/06/08 mangoa01
+
+	* ralutil/teapot.txt:
+	* src/ral.tcl:
+	  Corrected a problem with foreign key constraints when serializing
+	  relvars to a SQLite database.
+
+2011/06/06 mangoa01
+
+	* doc/ral/relation.man:
+	* doc/ral/relformat.man:
+	* doc/ral/relvar-examples.tcl:
+	* doc/ral/relvar.man:
+	* doc/ral/serialize.man:
+	* doc/ral/tuple.man:
+	* ralutil/doc/ralutil.man:
+	* src/ral_relationcmd.c:
+	* src/ral_relvarobj.c:
+	  Clean up of documenation, adding the remaining relvar commands that
+	  are going into the 0.10.0 release.
+
+2011/06/05 mangoa01
+
+	* Makefile.in:
+	* configure:
+	* configure.in:
+	* src/ral.c:
+	* src/ral.tcl:
+	* src/ral_attribute.c:
+	* src/ral_attribute.h:
+	* src/ral_joinmap.c:
+	* src/ral_joinmap.h:
+	* src/ral_relation.c:
+	* src/ral_relation.h:
+	* src/ral_relationcmd.c:
+	* src/ral_relationcmd.h:
+	* src/ral_relationobj.c:
+	* src/ral_relationobj.h:
+	* src/ral_relvar.c:
+	* src/ral_relvar.h:
+	* src/ral_relvarcmd.c:
+	* src/ral_relvarcmd.h:
+	* src/ral_relvarobj.c:
+	* src/ral_relvarobj.h:
+	* src/ral_tuple.c:
+	* src/ral_tuple.h:
+	* src/ral_tuplecmd.c:
+	* src/ral_tuplecmd.h:
+	* src/ral_tupleheading.c:
+	* src/ral_tupleheading.h:
+	* src/ral_tupleobj.c:
+	* src/ral_tupleobj.h:
+	* src/ral_utils.c:
+	* src/ral_utils.h:
+	* src/ral_vector.c:
+	* src/ral_vector.h:
+	* tclconfig/install-sh:
+	* tclconfig/tcl.m4:
+	* test/ral.test:
+	  Completed procedural constrain command.
+	  Updated to latest TEA files (3.9).
+          Corrected long latent bug where duplicated attribute names in a
+          relation join "-using" argument caused a panic and aborted the
+          program.
+
+2011/05/30 mangoa01
+
+	* doc/ral/relation.man:
+	* test/ral.test:
+	  Updates for "uinsert" command.
+
+2011/04/03 mangoa01
+
+	* src/ral.tcl:
+	* src/ral_relvar.c:
+	* src/ral_relvar.h:
+	* src/ral_relvarcmd.c:
+	* src/ral_relvarobj.c:
+	* src/ral_relvarobj.h:
+	* src/ral_utils.c:
+	* src/ral_utils.h:
+	  Checkpoint. Saving the current state of the procedural constraint
+	  code. It's not done yet, but I wanted it in the repository.
+
+2011/01/16 mangoa01
+
+	* configure:
+	* configure.in:
+	* doc/ral/relation.man:
+	* doc/ral/relformat.man:
+	* doc/ral/relvar.man:
+	* doc/ral/serialize.man:
+	* doc/ral/tuple.man:
+	* ralutil/doc/ralutil.man:
+	* ralutil/pkgIndex.tcl:
+	* ralutil/ralutil.tcl:
+	* src/ral_relation.c:
+	* src/ral_relation.h:
+	* src/ral_relationcmd.c:
+	* src/ral_relvar.c:
+	* src/ral_relvarcmd.c:
+	* src/ral_utils.c:
+	* src/ral_utils.h:
+	* test/ral.test:
+	* test/serialize.test:
+	  Added commands to do disjoin union of both relation values and
+	  of values stored in relvars.
+
+2010/12/05 mangoa01
+
+	* src/ral.tcl:
+	  Completed SQLite load / store procedures.
+
+	* src/ral.tcl:
+	* src/ral_relationcmd.c:
+	  First cut at proc to store and load sets of relvars to/from SQLite.
+
+2010/11/14 mangoa01
+
+	* src/ral_relationcmd.c:
+          Added "relation uinsert" command to perform an insert without
+          throwing an error on duplicates.
+
+	* src/ral.c:
+	  Improvements for Windoze builds.
+
+2010/10/20 mangoa01
+
+	* src/ral_relationcmd.c:
+	  Changed operation of relation list command to include a sorting option.
+
+	* doc/ral/relation.man:
+	  Doc changes for new flavor of relation list command.
+
+	* test/ral.test:
+          Test cases for new version of relation list command and other new
+          test cases.
+
+2009/09/19 mangoa01
+
+	* ralutil/teapot.txt:
+	* src/ral_relvar.c:
+          Fixes Bug # 2860118. Extends meta data for "ralutil" package and
+          eliminates the variable declaration after executable statements.
+
+	* src/ral_vector.c:
+	  Fixes Bug # 2860772, by putting an a hack for Windows builds.
+
+	* Makefile.in:
+	* configure:
+	* configure.in:
+	  Removed "ralutil.tcl" from the build for "ral". Ralutil is now treated
+	  as a separate package.
+
 ========= ral 0.9.1 =========
 2009/09/12 mangoa01
 
