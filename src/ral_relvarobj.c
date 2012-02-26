@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarobj.c,v $
-$Revision: 1.48 $
-$Date: 2011/09/26 00:57:22 $
+$Revision: 1.49 $
+$Date: 2012/02/26 19:09:04 $
  *--
  */
 
@@ -281,6 +281,7 @@ Ral_RelvarObjNew(
     status = Tcl_TraceVar(interp, relvar->name, relvarTraceFlags,
 	relvarTraceProc, info) ;
     assert(status == TCL_OK) ;
+    (void)status ;
 
     Tcl_SetObjResult(interp, relvar->relObj) ;
     return TCL_OK ;
@@ -400,6 +401,7 @@ Ral_RelvarObjCopyOnShared(
 	status = Tcl_TraceVar(interp, relvar->name, relvarTraceFlags,
 	    relvarTraceProc, info) ;
 	assert(status == TCL_OK) ;
+        (void)status ;
     }
     assert(relvar->relObj->refCount == 2) ;
 
@@ -617,12 +619,10 @@ Ral_RelvarObjUpdateTuple(
     Ral_Relation updated,
     Ral_ErrorInfo *errInfo)
 {
-    Ral_Relation relation ;
     int result ;
     Tcl_Obj *newTupleObj ;
 
     assert(relvar->relObj->typePtr == &Ral_RelationObjType) ;
-    relation = relvar->relObj->internalRep.otherValuePtr ;
     /*
      * Evaluate the script.
      */
@@ -928,6 +928,7 @@ Ral_RelvarObjCreateAssoc(
 
 	status = Ral_ConstraintDeleteByName(name, info) ;
 	assert(status != 0) ;
+        (void)status ;
 
 	result = TCL_ERROR ;
     }
@@ -1129,6 +1130,7 @@ Ral_RelvarObjCreatePartition(
 
 	status = Ral_ConstraintDeleteByName(partName, info) ;
 	assert(status != 0) ;
+        (void)status ;
 
 	result = TCL_ERROR ;
     }
@@ -1420,6 +1422,7 @@ Ral_RelvarObjCreateCorrelation(
 
 	status = Ral_ConstraintDeleteByName(name, info) ;
 	assert(status != 0) ;
+        (void)status ;
 
 	result = TCL_ERROR ;
     }
@@ -1481,7 +1484,6 @@ Ral_RelvarObjCreateProcedural(
     while (cnt-- != 0) {
         char const *relvarName ;
         Ral_Relvar relvar ;
-        Ral_Relation relvarValue ;
         /*
          * Look up the relvar names and make sure that we find it and that a
          * relation is stored there.
@@ -1495,7 +1497,6 @@ Ral_RelvarObjCreateProcedural(
                 != TCL_OK) {
             goto errorOut ;
         }
-        relvarValue = relvar->relObj->internalRep.otherValuePtr ;
         /*
          * Add the relvar pointer to the procedural constraint and the
          * constraint pointer to the relvar.
@@ -1534,6 +1535,8 @@ Ral_RelvarObjConstraintDelete(
     }
     status = Ral_ConstraintDeleteByName(constraint->name, info) ;
     assert(status != 0) ;
+    (void)status ;
+
     return TCL_OK ;
 }
 
@@ -2406,6 +2409,7 @@ relvarTraceProc(
 	 * Should not be modified because tracing is suspended while tracing.
 	 */
 	assert(newValue == relvar->relObj) ;
+        (void)newValue ;
 	result = "relvar may only be modified using \"::ral::relvar\" command" ;
     } else {
 	Tcl_Panic("relvarTraceProc: trace on non-write, flags = %#x\n", flags) ;

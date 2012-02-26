@@ -49,8 +49,8 @@ ABSTRACT:
     Algebra.
 
 $RCSfile: ral.c,v $
-$Revision: 1.44 $
-$Date: 2011/06/05 18:01:10 $
+$Revision: 1.45 $
+$Date: 2012/02/26 19:09:04 $
  *--
  */
 
@@ -64,6 +64,9 @@ INCLUDE FILES
 #include <stdio.h>
 #include <string.h>
 #include "tcl.h"
+#ifdef Tcl_GetBignumFromObj_TCL_DECLARED
+#   include "tclTomMath.h"
+#endif
 #include "ral_tuplecmd.h"
 #include "ral_relationcmd.h"
 #include "ral_relationobj.h"
@@ -97,9 +100,9 @@ STATIC DATA ALLOCATION
 static char const ral_pkgname[] = PACKAGE_NAME ;
 static char const ral_version[] = PACKAGE_VERSION ;
 static char const ral_rcsid[] =
-    "$Id: ral.c,v 1.44 2011/06/05 18:01:10 mangoa01 Exp $" ;
+    "$Id: ral.c,v 1.45 2012/02/26 19:09:04 mangoa01 Exp $" ;
 static char const ral_copyright[] =
-    "This software is copyrighted 2004, 2005, 2006, 2007, 2008, 2009 by G. Andrew Mangogna."
+    "This software is copyrighted 2004 - 2012 by G. Andrew Mangogna."
     " Terms and conditions for use are distributed with the source code." ;
 
 #ifdef Tcl_RegisterConfig_TCL_DECLARED
@@ -136,7 +139,14 @@ Ral_Init(
     Ral_RelvarInfo rInfo ;
     int baseLen;
 
-    Tcl_InitStubs(interp, TCL_VERSION, 0) ;
+    if (Tcl_InitStubs(interp, TCL_VERSION, 0) == NULL) {
+        return TCL_ERROR ;
+    }
+#   ifdef Tcl_GetBignumFromObj_TCL_DECLARED
+    if (Tcl_TomMath_InitStubs(interp, TCL_VERSION) == NULL) {
+        return TCL_ERROR ;
+    }
+#   endif
 
     /*
      * Create the namespace in which the package command reside.

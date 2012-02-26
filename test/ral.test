@@ -51,8 +51,8 @@ exec tclsh "$0" "$@"
 #   Algebra library.
 # 
 # $RCSfile: ral.test,v $
-# $Revision: 1.57 $
-# $Date: 2011/09/26 00:57:22 $
+# $Revision: 1.58 $
+# $Date: 2012/02/26 19:09:04 $
 #  *--
 
 package require tcltest 2.2
@@ -5260,6 +5260,37 @@ in expression "_@_< 20"} -returnCodes error
     } -result {
         {Name string Age int City string} {
             {Name Andrew Age 33 City Sunnyvale}
+        }
+    } -match relation
+
+    test relvar-insert-6.0 {
+        relvar with a bignum attribute
+    } -setup {
+        relvar create BN {Name string Age bignum Status int} Name
+    } -cleanup {
+        relvar unset BN
+    } -body {
+        relvar insert BN {Name Andrew Age 1700000000000000000000 Status 10}
+    } -result {
+        {Name string Age bignum Status int} {
+            {Name Andrew Age 1700000000000000000000 Status 10}
+        }
+    } -match relation
+
+    test relvar-insert-6.1 {
+        relvar with a bignum identifier
+    } -setup {
+        relvar create BN {Name string Age bignum Status int} Age
+    } -cleanup {
+        relvar unset BN
+    } -body {
+        relvar insert BN\
+            {Name Andrew Age 1700000000000000000000 Status 10}\
+            {Name Andrew Age 1900000000000000000000 Status 10}
+    } -result {
+        {Name string Age bignum Status int} {
+            {Name Andrew Age 1700000000000000000000 Status 10}
+            {Name Andrew Age 1900000000000000000000 Status 10}
         }
     } -match relation
 

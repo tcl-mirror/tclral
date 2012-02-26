@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tuplecmd.c,v $
-$Revision: 1.22 $
-$Date: 2011/06/05 18:01:10 $
+$Revision: 1.23 $
+$Date: 2012/02/26 19:09:04 $
  *--
  */
 
@@ -790,7 +790,6 @@ TupleUnwrapCmd(
     Tcl_Obj *tupleObj ;
     Ral_Tuple tuple ;
     Ral_TupleHeading heading ;
-    Tcl_Obj **values ;
     const char *tupleAttrName ;
     Ral_TupleHeadingIter tupleAttrIter ;
     Ral_Attribute tupleAttr ;
@@ -814,7 +813,6 @@ TupleUnwrapCmd(
     }
     tuple = tupleObj->internalRep.otherValuePtr ;
     heading = tuple->heading ;
-    values = tuple->values ;
 
     /*
      * Obtain the name of the attribute that is to be unwrapped.

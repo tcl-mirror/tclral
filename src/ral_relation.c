@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relation.c,v $
-$Revision: 1.42 $
-$Date: 2011/10/03 14:45:56 $
+$Revision: 1.43 $
+$Date: 2012/02/26 19:09:04 $
  *--
  */
 
@@ -230,6 +230,7 @@ Ral_RelationDup(
                 Ral_TupleBegin(dupTuple)) ;
 	appended = Ral_RelationPushBack(dupRelation, dupTuple, NULL) ;
 	assert(appended != 0) ;
+        (void)appended ;
     }
 
     return dupRelation ;
@@ -256,6 +257,7 @@ Ral_RelationShallowCopy(
 
 	appended = Ral_RelationPushBack(dupRelation, *srcIter, NULL) ;
 	assert(appended != 0) ;
+        (void)appended ;
     }
 
     return dupRelation ;
@@ -589,6 +591,7 @@ Ral_RelationTimes(
 
             status = Ral_RelationPushBack(product, prodTuple, NULL) ;
             assert(status != 0) ;
+            (void)status ;
 	}
     }
 
@@ -676,6 +679,7 @@ Ral_RelationGroup(
          * we should not have any duplicated attribute names.
          */
         assert(status != 0) ;
+        (void)status ;
     }
     /*
      * Add the new relation valued attribute to the heading.
@@ -683,6 +687,7 @@ Ral_RelationGroup(
     grpAttrIter = Ral_TupleHeadingPushBack(grpHeading,
 	Ral_AttributeNewRelationType(newAttrName, attrHeading)) ;
     assert(grpAttrIter != Ral_TupleHeadingEnd(grpHeading)) ;
+    (void)grpAttrIter ;
     /*
      * Now that the heading is complete, we construct the new relation from
      * that heading.
@@ -1191,6 +1196,7 @@ Ral_RelationSemiMinus(
 	     */
 	    status = Ral_RelationPushBack(semiMinusRel, *r2Iter, NULL) ;
 	    assert(status != 0) ;
+            (void)status ;
 	}
     }
 
@@ -1307,6 +1313,7 @@ Ral_RelationDivide(
 	    int status ;
 	    status = Ral_RelationPushBack(quot, dendTuple, NULL) ;
 	    assert(status != 0) ;
+            (void)status ;
 	}
     }
 
@@ -1362,6 +1369,7 @@ Ral_RelationTag(
          */
         status = Ral_RelationPushBack(tagRelation, tagTuple, NULL) ;
         assert(status != 0) ;
+        (void)status ;
     }
 
     return tagRelation ;
@@ -1443,6 +1451,7 @@ Ral_RelationTagWithin(
          */
         status = Ral_RelationPushBack(tagRelation, tagTuple, NULL) ;
         assert(status != 0) ;
+        (void)status ;
     }
 
     Tcl_DeleteHashTable(&index) ;
@@ -1942,6 +1951,7 @@ Ral_RelationExtract(
 	status = Ral_RelationPushBack(subRel,
                 *(Ral_RelationBegin(relation) + *iter), NULL) ;
 	assert(status != 0) ;
+        (void)status ;
     }
 
     return subRel ;
@@ -1990,6 +2000,7 @@ Ral_RelationErase(
 
 	status = Ral_RelationUpdateTupleIndex(relation, *iter, iter) ;
 	assert(status != 0) ;
+        (void)status ;
     }
     return first ;
 }

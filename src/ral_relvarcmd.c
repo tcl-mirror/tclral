@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvarcmd.c,v $
-$Revision: 1.40 $
-$Date: 2011/09/26 00:57:22 $
+$Revision: 1.41 $
+$Date: 2012/02/26 19:09:04 $
  *--
  */
 
@@ -1248,6 +1248,7 @@ RelvarRestrictOneCmd(
          * Should always be able to insert into an empty relation.
          */
         assert(inserted != 0) ;
+        (void)inserted ;
     }
     /*
      * Either we we return a new relation value. This will necessarily

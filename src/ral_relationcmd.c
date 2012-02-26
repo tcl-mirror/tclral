@@ -46,8 +46,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relationcmd.c,v $
-$Revision: 1.50 $
-$Date: 2011/09/26 00:57:22 $
+$Revision: 1.51 $
+$Date: 2012/02/26 19:09:04 $
  *--
  */
 
@@ -998,6 +998,7 @@ RelationExtendCmd(
 	 */
 	status = Ral_RelationPushBack(extRelation, extTuple, NULL) ;
 	assert(status != 0) ;
+        (void)status ;
     }
 
     Tcl_UnsetVar(interp, Tcl_GetString(varNameObj), 0) ;
@@ -1180,6 +1181,7 @@ RelationForeachCmd(
 	appended = Ral_RelationPushBack(iterRel, *(relBegin + *mapIter),
 	    NULL) ;
 	assert(appended != 0) ;
+        (void)appended ;
 
 	iterObj = Ral_RelationObjNew(iterRel) ;
 
@@ -1277,6 +1279,7 @@ static int RelationFromdictCmd(
     assert(iter != Ral_TupleHeadingEnd(heading)) ;
     iter = Ral_TupleHeadingPushBack(heading, valattr) ;
     assert(iter != Ral_TupleHeadingEnd(heading)) ;
+    (void)iter ;
     relation = Ral_RelationNew(heading) ;
     /*
      * Iterate through the dictionary, inserting the key / value pairs into
@@ -1303,6 +1306,8 @@ static int RelationFromdictCmd(
 	}
         status = Ral_RelationPushBack(relation, tuple, NULL) ;
         assert(status != 0) ;
+        (void)status ;
+
         Tcl_DictObjNext(&search, &keyObj, &valObj, &done) ;
     }
     Tcl_DictObjDone(&search) ;
@@ -1354,6 +1359,8 @@ static int RelationFromlistCmd(
     heading = Ral_TupleHeadingNew(1) ;
     iter = Ral_TupleHeadingPushBack(heading, attr) ;
     assert(iter != Ral_TupleHeadingEnd(heading)) ;
+    (void)iter ;
+
     relation = Ral_RelationNew(heading) ;
     /*
      * Iterate through the list, inserting the list elements into
@@ -2141,6 +2148,7 @@ RelationRankCmd(
 	 */
 	status = Ral_RelationPushBack(newRelation, newTuple, NULL) ;
 	assert(status != 0) ;
+        (void)status ;
     }
 
     Tcl_SetObjResult(interp, Ral_RelationObjNew(newRelation)) ;
@@ -2247,6 +2255,7 @@ RelationRestrictCmd(
 	    int inserted ;
 	    inserted = Ral_RelationPushBack(newRelation, tuple, NULL) ;
 	    assert(inserted != 0) ;
+            (void)inserted ;
 	}
     }
 
@@ -2327,6 +2336,7 @@ RelationRestrictWithCmd(
 	    int inserted ;
 	    inserted = Ral_RelationPushBack(newRelation, tuple, NULL) ;
 	    assert(inserted != 0) ;
+            (void)inserted ;
 	}
     }
 
@@ -2658,6 +2668,7 @@ RelationSummarizeCmd(
 	}
 	status = Ral_RelationPushBack(sumRelation, sumTuple, NULL) ;
 	assert(status != 0) ;
+        (void)status ;
     }
 
     Tcl_UnsetVar(interp, Tcl_GetString(varNameObj), 0) ;
@@ -2847,6 +2858,7 @@ RelationSummarizebyCmd(
 	}
 	status = Ral_RelationPushBack(sumRelation, sumTuple, NULL) ;
 	assert(status != 0) ;
+        (void)status ;
     }
 
     Tcl_UnsetVar(interp, Tcl_GetString(varNameObj), 0) ;
@@ -3516,6 +3528,8 @@ RelationUpdateCmd(
                 newTuple->heading) ;
         status = Ral_RelationPushBack(updatedRel, newTuple, orderMap) ;
         assert(status != 0) ;
+        (void)status ;
+
         Ral_IntVectorDelete(orderMap) ;
         Tcl_DecrRefCount(oldTupleObj) ;
     }
@@ -3631,6 +3645,7 @@ RelationWrapCmd(
         status = Ral_TupleHeadingAppend(heading, attrIter, attrIter + 1,
                 resultHeading) ;
         assert(status != 0) ;
+        (void)status ;
     }
     /*
      * Add the tuple valued attribute to the result relation heading.

@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_tupleheading.c,v $
-$Revision: 1.17 $
-$Date: 2011/06/05 18:01:10 $
+$Revision: 1.18 $
+$Date: 2012/02/26 19:09:04 $
  *--
  */
 
@@ -133,6 +133,7 @@ Ral_TupleHeadingSubset(
 
 	hIter = Ral_TupleHeadingPushBack(newHeading, newAttr) ;
 	assert(hIter != Ral_TupleHeadingEnd(newHeading)) ;
+        (void)hIter ;
     }
 
     return newHeading ;
@@ -150,6 +151,7 @@ Ral_TupleHeadingDup(
 	Ral_TupleHeadingBegin(srcHeading),
 	Ral_TupleHeadingEnd(srcHeading), dupHeading) ;
     assert(appended != 0) ;
+    (void)appended ;
 
     return dupHeading ;
 }
@@ -167,6 +169,7 @@ Ral_TupleHeadingExtend(
     appended = Ral_TupleHeadingAppend(heading, Ral_TupleHeadingBegin(heading),
 	Ral_TupleHeadingEnd(heading), extendHeading) ;
     assert(appended != 0) ;
+    (void)appended ;
 
     return extendHeading ;
 }

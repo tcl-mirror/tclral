@@ -1,4 +1,4 @@
-[manpage_begin relformat n 0.10.1]
+[manpage_begin relformat n 0.10.2]
 [comment {
 # This software is copyrighted 2004 - 2011 by G. Andrew Mangogna.
 # The following terms apply to all files associated with the software unless
@@ -47,14 +47,14 @@
 #   Relformat is part of the TCLRAL package.
 # 
 # $RCSfile: relformat.man,v $
-# $Revision: 1.21 $
-# $Date: 2011/10/08 17:40:02 $
+# $Revision: 1.22 $
+# $Date: 2012/02/26 19:09:04 $
 #  *--
 }]
 [moddesc "Relation formatting"]
 [titledesc "Text formatting for relations"]
-[copyright "2004 - 2010 by G. Andrew Mangogna"]
-[require ral [opt 0.10.1]]
+[copyright "2004 - 2012 by G. Andrew Mangogna"]
+[require ral [opt 0.10.2]]
 [description]
 This manpage describes a set of commands that are used for
 generating text output of relation and tuple values.

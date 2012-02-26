@@ -45,8 +45,8 @@
 # This file contains the Tcl script portions of the TclRAL package.
 # 
 # $RCSfile: ral.tcl,v $
-# $Revision: 1.49 $
-# $Date: 2011/09/26 00:57:22 $
+# $Revision: 1.50 $
+# $Date: 2012/02/26 19:09:04 $
 #  *--
 
 namespace eval ::ral {
@@ -1644,4 +1644,4 @@ proc ::ral::mapTypeToSQL {type} {
             $sqlTypeMap($type) : "text"}]
 }
 
-package provide ral 0.10.1
+package provide ral 0.10.2

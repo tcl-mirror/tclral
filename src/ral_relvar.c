@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_relvar.c,v $
-$Revision: 1.26 $
-$Date: 2011/06/05 18:01:10 $
+$Revision: 1.27 $
+$Date: 2012/02/26 19:09:04 $
  *--
  */
 
@@ -849,6 +849,7 @@ Ral_RelvarDeleteTuple(
          * deletion.
          */
         assert(status != 0) ;
+        (void)status ;
     }
 
     return newiter ;
@@ -1005,6 +1006,7 @@ Ral_RelvarRestorePrev(
     Ral_PtrVectorPopBack(relvar->transStack) ;
     status = relvarSetIntRep(relvar, oldRel, NULL) ;
     assert(status != 0) ;
+    (void)status ;
 }
 
 void
@@ -1247,6 +1249,8 @@ relvarSetIntRep(
         status = relvarIndexIds(relvar,
                 relvar->relObj->internalRep.otherValuePtr, NULL) ;
         assert(status != 0) ;
+        (void)status ;
+
         result = 0 ;
     }
 

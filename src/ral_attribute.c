@@ -45,8 +45,8 @@ MODULE:
 ABSTRACT:
 
 $RCSfile: ral_attribute.c,v $
-$Revision: 1.28 $
-$Date: 2011/06/05 18:01:10 $
+$Revision: 1.29 $
+$Date: 2012/02/26 19:09:04 $
  *--
  */
 
@@ -1132,9 +1132,12 @@ isABignum(
     Tcl_Interp *interp,
     Tcl_Obj *bnObj)
 {
+    int result ;
     mp_int bn ;
-    int result = Tcl_GetBignumFromObj(interp, bnObj, &bn) ;
-    mp_clear(&bn) ;
+    result = Tcl_GetBignumFromObj(interp, bnObj, &bn) ;
+    if (result == TCL_OK) {
+        mp_clear(&bn) ;
+    }
 
     return result ;
 }
@@ -1188,8 +1191,10 @@ bignumHash(
     unsigned hash = 0 ;
 
     result = Tcl_GetBignumFromObj(NULL, bignumObj, &bn) ;
-    hash = hashBytes(bn.dp, bn.used) ;
-    mp_clear(&bn) ;
+    if (result == TCL_OK) {
+        hash = hashBytes(bn.dp, bn.used) ;
+        mp_clear(&bn) ;
+    }
 
     return hash ;
 }
