@@ -1,3 +1,32 @@
+========= ral 0.10.2 =========
+2012/02/26 mangoa01
+
+	* configure:
+	* configure.in:
+	* doc/ral/relation.man:
+	* doc/ral/relformat.man:
+	* doc/ral/relvar.man:
+	* doc/ral/serialize.man:
+	* doc/ral/tuple.man:
+	* ralutil/doc/ralutil.man:
+	* ralutil/pkgIndex.tcl:
+	* ralutil/ralutil.tcl:
+	* ralutil/teapot.txt:
+	* src/ral.c:
+	* src/ral.tcl:
+	* src/ral_attribute.c:
+	* src/ral_relation.c:
+	* src/ral_relationcmd.c:
+	* src/ral_relvar.c:
+	* src/ral_relvarcmd.c:
+	* src/ral_relvarobj.c:
+	* src/ral_tuplecmd.c:
+	* src/ral_tupleheading.c:
+	* test/ral.test:
+	  Fixed the bignum problem by properly initializing the Tom Math stubs.
+	  Cleaned up a number of compiler warning for unused variables when
+	  compiled with NDEBUG to remove assertions.
+
 ========= ral 0.10.1 =========
 2011/10/08 mangoa01
 
