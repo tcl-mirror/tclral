@@ -45,8 +45,8 @@
 # ABSTRACT:
 # 
 # $RCSfile: ralutil.test,v $
-# $Revision: 1.1 $
-# $Date: 2011/10/09 17:17:47 $
+# $Revision: 1.2 $
+# $Date: 2012/06/24 23:40:23 $
 #  *--
 
 package require tcltest
@@ -75,6 +75,7 @@ namespace eval ::ralutil::test {
         sysIdsInit
         sysIdsGenSystemId A Attr1
     } -cleanup {
+        relvar unset A
     } -body {
         relvar insert A {Attr2 foo}
     } -result {
@@ -82,6 +83,116 @@ namespace eval ::ralutil::test {
             {Attr1 1 Attr2 foo}
         }
     } -match relation
+
+    test pipe-1.0 {
+        simple pipeline, no place holders
+    } -setup {
+    } -cleanup {
+    } -body {
+        pipe {
+            relation create {
+                A string B int
+            } {
+                A foo B 20
+            } {
+                A bar B 30
+            } |
+            relation cardinality
+        }
+    } -result {2}
+
+    test pipe-2.0 {
+        simple pipeline with placeholder
+    } -setup {
+    } -cleanup {
+    } -body {
+        pipe {
+            relation create {
+                A string B int
+            } {
+                A foo B 20
+            } {
+                A bar B 30
+            } |
+            relation list ~ B
+        }
+    } -result {20 30}
+
+    test pipe-3.0 {
+        pipeline stored in variable
+    } -setup {
+    } -cleanup {
+    } -body {
+        pipe {
+            relation create {
+                A string B int
+            } {
+                A foo B 20
+            } {
+                A bar B 30
+            } |
+            relation list ~ A
+        } cmd
+        eval $cmd
+    } -result {foo bar}
+
+    test pipe-3.1 {
+        pipeline stored in variable, timed execution
+    } -setup {
+    } -cleanup {
+    } -body {
+        set r [relation create {
+            A string B int
+        } {
+            A foo B 20
+        } {
+            A bar B 30
+        }]
+        puts [time {
+            pipe {
+                set r %
+                relation restrictwith ~ {$A eq "foo" || $A eq "baz"} %
+                relation list ~ B
+            } cmd %~
+        } 10000]
+        eval $cmd
+    } -result {20}
+
+    test pipe-4.0 {
+        longer pipeline, different separator
+    } -setup {
+    } -cleanup {
+    } -body {
+        set r [relation create {
+            A string B int
+        } {
+            A foo B 20
+        } {
+            A bar B 30
+        }]
+        pipe {
+            set r %
+            relation restrictwith ~ {$A eq "foo" || $A eq "baz"} %
+            relation list ~ B
+        } {} %~
+    } -result {20}
+
+    test pipe-4.0 {
+        one command pipeline
+    } -setup {
+    } -cleanup {
+    } -body {
+        set r [relation create {
+            A string B int
+        } {
+            A foo B 20
+        } {
+            A bar B 30
+        }]
+        pipe {
+            relation cardinality $r
+        }
+    } -result {2}
 
 if 0 {
     test -1.0 {

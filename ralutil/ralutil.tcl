@@ -49,8 +49,8 @@
 # without cluttering the TclRAL package proper.
 # 
 # $RCSfile: ralutil.tcl,v $
-# $Revision: 1.7 $
-# $Date: 2012/02/26 19:09:04 $
+# $Revision: 1.8 $
+# $Date: 2012/06/24 23:40:23 $
 #  *--
 
 package provide ralutil 0.10.2
@@ -83,30 +83,30 @@ namespace eval ::ralutil {
 # but the idea is the same.
 proc ::ralutil::pipe {fns {var {}} {sep |~}} {
     # Split out the separator characters
-    lassign [split $sep ""] s p
-    # create a valid tcl command
-    set cmd [nestcmds [string trim [split $fns $s]] $p]
-    # perform command
-    if {$var eq ""} {
-	return [uplevel $cmd]
+    lassign [split $sep {}] s p
+    # Split up the commands based on the separator character, pulling off the
+    # first command.
+    set pipeline [lassign [split $fns $s] cmd]
+    # Trim off whitespace so that the input can be more free form.
+    set cmd [string trim $cmd]
+    # Iterate over the remaining elements in the pipeline
+    foreach elem $pipeline {
+        set elem [string trim $elem]
+        # If there is no placeholder character in the command, then the
+        # pipeline result is just placed as the last argument. Otherwise, the
+        # accumulated pipeline is substituted for the placeholder.  N.B. the
+        # use of "string map" implies that _all_ the placeholders will be
+        # replaced.
+        set cmd [expr {[string first $p $elem] == -1 ?\
+            "$elem \[$cmd\]" : [string map [list $p "\[$cmd\]"] $elem]}]
+    }
+    # perform the command or save it into a variable
+    if {$var eq {}} {
+	return [uplevel 1 $cmd]
     } else {
-	upvar $var v
+	upvar 1 $var v
 	set v $cmd
     }
-}
-
-# nest one command inside another in reverse list order.
-# "p" is a place holder character denoting where the previous result
-# is to be placed in the command. If "p" is absent in the command,
-# then the previous result is simply appended to the command.
-proc ::ralutil::nestcmds {cmdList p} {
-    set cmd [string trim [lindex $cmdList end]]
-    if {[llength $cmdList] > 1} {
-	set innercmd "\[[nestcmds [lrange $cmdList 0 end-1] $p]\]"
-	set cmd [expr {[string first $p $cmd] < 0 ?\
-	    "$cmd $innercmd" : [string map [list $p $innercmd] $cmd]}]
-    }
-    return $cmd
 }
 
 # These procs form a scheme for system defined identifiers.
