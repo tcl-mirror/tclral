@@ -1,0 +1,7154 @@
+#LyX 2.0 created this file. For more info see http://www.lyx.org/
+\lyxformat 413
+\begin_document
+\begin_header
+\textclass article
+\use_default_options false
+\maintain_unincluded_children false
+\language american
+\language_package default
+\inputencoding auto
+\fontencoding global
+\font_roman times
+\font_sans default
+\font_typewriter default
+\font_default_family default
+\use_non_tex_fonts false
+\font_sc false
+\font_osf false
+\font_sf_scale 100
+\font_tt_scale 100
+
+\graphics default
+\default_output_format default
+\output_sync 0
+\bibtex_command default
+\index_command default
+\paperfontsize 10
+\spacing single
+\use_hyperref false
+\papersize default
+\use_geometry false
+\use_amsmath 1
+\use_esint 0
+\use_mhchem 0
+\use_mathdots 1
+\cite_engine basic
+\use_bibtopic false
+\use_indices false
+\paperorientation portrait
+\suppress_date false
+\use_refstyle 0
+\index Index
+\shortcut idx
+\color #008000
+\end_index
+\secnumdepth 3
+\tocdepth 3
+\paragraph_separation indent
+\paragraph_indentation default
+\quotes_language english
+\papercolumns 1
+\papersides 1
+\paperpagestyle default
+\tracking_changes false
+\output_changes false
+\html_math_output 0
+\html_css_as_file 0
+\html_be_strict false
+\end_header
+
+\begin_body
+
+\begin_layout Title
+TclRAL: A Relational Algebra for Tcl
+\end_layout
+
+\begin_layout Author
+Andrew Mangogna
+\end_layout
+
+\begin_layout Date
+13th Annual Tcl/Tk Conference
+\begin_inset Newline newline
+\end_inset
+
+October 11-13, 2006
+\end_layout
+
+\begin_layout Standard
+\align center
+
+\series bold
+Copyright
+\end_layout
+
+\begin_layout Quotation
+
+\size small
+Copyright 2006, by G.
+ Andrew Mangogna.
+ Permission to copy and distribute this article by any means is hereby granted
+ by the copyright holder provided the work is distributed in its entirety
+ and this notice appears on all copies.
+
+\size default
+ 
+\end_layout
+
+\begin_layout Abstract
+TclRAL is a "C" language extension to Tcl that provides commands to implement
+ a formal relational algebra.
+ This paper introduces TclRAL and describes the goals and background of
+ the extension.
+ Each command is described in detail and examples of a relational style
+ of programming are given to help explain the operations that the extension
+ provides.
+ A comparison with other approaches is also provided.
+\end_layout
+
+\begin_layout Date
+\begin_inset CommandInset toc
+LatexCommand tableofcontents
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset FloatList figure
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset Newpage newpage
+\end_inset
+
+
+\end_layout
+
+\begin_layout Section
+\begin_inset CommandInset label
+LatexCommand label
+name "sec:Introduction"
+
+\end_inset
+
+Introduction
+\end_layout
+
+\begin_layout Standard
+Throughout its evolution, Tcl has gained increasingly sophisticated data
+ structures.
+ Initially, only simple scalar variables, arrays and lists were supported
+ in the language.
+ Over time as ever larger applications were implemented in Tcl, more sophisticat
+ed data structures were added.
+ Most recently, 
+\shape smallcaps
+dictionaries
+\shape default
+ were added to the core.
+ Additionally, 
+\shape smallcaps
+tcllib
+\shape default
+ now supports a wide array of data structures ranging from trees and graphs
+ to matrices.
+ These developments improve the productivity of writing larger applications
+ in Tcl.
+ It is in this context that TclRAL was developed.
+\end_layout
+
+\begin_layout Subsection
+Goals of TclRAL
+\end_layout
+
+\begin_layout Standard
+TclRAL was designed to achieve the following goals:
+\end_layout
+
+\begin_layout Enumerate
+To provide relation values as native Tcl objects.
+\end_layout
+
+\begin_layout Enumerate
+To provide a rigorous and complete set of relational operators over the
+ relation values.
+\end_layout
+
+\begin_layout Enumerate
+To provide variables to hold relation values and a useful set of integrity
+ constraints on the values those variables may hold.
+\end_layout
+
+\begin_layout Enumerate
+To serve as a framework for exploring the use of relational concepts in
+ Tcl programming.
+\end_layout
+
+\begin_layout Subsection
+Availability of TclRAL
+\end_layout
+
+\begin_layout Standard
+TclRAL is an open source project housed at sourceforge.net and available
+ under the same license as Tcl itself.
+ See TclRAL 
+\begin_inset Flex URL
+status collapsed
+
+\begin_layout Plain Layout
+
+http://sourceforge.net/projects/tclral
+\end_layout
+
+\end_inset
+
+ for complete a complete description of the project.
+ As of this writing, Version 0.8 is available.
+\end_layout
+
+\begin_layout Section
+\begin_inset CommandInset label
+LatexCommand label
+name "sec:Relational-Algebra"
+
+\end_inset
+
+Relational Algebra
+\end_layout
+
+\begin_layout Standard
+The Relational Model of Data is the application of logic and set theory
+ to the management of data.
+ It is most often discussed in terms of 
+\noun on
+Database Management Systems
+\noun default
+ (DBMS
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+DBMS
+\end_layout
+
+\end_inset
+
+).
+ Database management systems are a major application of computing technology
+ and have tremendous commercial importance.
+ However, relations are logical entities divorced from any particular implementa
+tion and they may be realized in many different ways.
+ Although TclRAL shares many concepts with DBMS, it is important to distinguish
+ carefully between the logical view of relations and the particulars of
+ a given implementation.
+ In this section we define the basic concepts of relations and how those
+ concepts are represented in TclRAL.
+ There are many good and detailed expositions of relational theory and the
+ interested reader my wish to explore them further.
+ Here, space limits us to just enough explanation to provide the context
+ for discussing TclRAL.
+\end_layout
+
+\begin_layout Standard
+TclRAL follows very closely the relational algebra as formulated by Date
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Intro DB Sys"
+
+\end_inset
+
+ and Darwen
+\begin_inset CommandInset citation
+LatexCommand cite
+key "3rd Manifesto"
+
+\end_inset
+
+.
+ The parts of TclRAL that deal with referential integrity were patterned
+ after the relational ideas of the Shlaer-Mellor Method, now known as Executable
+ UML
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Modeling Data,Modeling States,XUML"
+
+\end_inset
+
+.
+ There are three primary entities in this formulation:
+\end_layout
+
+\begin_layout Itemize
+Tuples provide the basic unit of data aggregation.
+\end_layout
+
+\begin_layout Itemize
+Relations embody sets of tuples.
+\end_layout
+
+\begin_layout Itemize
+Relvars are variables that specifically store relation values.
+\end_layout
+
+\begin_layout Standard
+In the next sections we give an overview of these concepts as they are realized
+ in TclRAL.
+\end_layout
+
+\begin_layout Subsection
+\begin_inset CommandInset label
+LatexCommand label
+name "sub:Tuple"
+
+\end_inset
+
+Tuple
+\end_layout
+
+\begin_layout Standard
+A 
+\shape smallcaps
+tuple
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+tuple
+\end_layout
+
+\end_inset
+
+
+\shape default
+ consists of a heading and a set of corresponding values.
+ The heading consists of a set of 
+\emph on
+attribute
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+attribute
+\end_layout
+
+\end_inset
+
+
+\emph default
+ names and corresponding 
+\emph on
+data types
+\emph default
+
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+data type
+\end_layout
+
+\end_inset
+
+.
+ Attribute names must be distinct and every attribute is associated with
+ a data type.
+ The data type may be any valid Tcl data type, such as string, int, double,
+ list, 
+\emph on
+etc
+\emph default
+.
+ Attribute data types may also be Tuple or Relation types, supporting a
+ form of nesting or grouping.
+ In a tuple value, each attribute has exactly one value associated with
+ it.
+ That value must be coercible into the type that is defined for the attribute.
+\end_layout
+
+\begin_layout Standard
+As a well behaved Tcl value, Tuple values have a string representation.
+ A Tuple value is represented as a three element list where the elements
+ are:
+\end_layout
+
+\begin_layout Enumerate
+The keyword, 
+\family typewriter
+Tuple
+\family default
+.
+\end_layout
+
+\begin_layout Enumerate
+A list of attribute name / attribute type pairs.
+\end_layout
+
+\begin_layout Enumerate
+A list of attribute name / attribute value pairs.
+\end_layout
+
+\begin_layout Standard
+For example:
+\end_layout
+
+\begin_layout LyX-Code
+set d {
+\end_layout
+
+\begin_layout LyX-Code
+    Tuple
+\end_layout
+
+\begin_layout LyX-Code
+    {DogName string Weight double}
+\end_layout
+
+\begin_layout LyX-Code
+    {DogName Ralph Weight 4.7}
+\end_layout
+
+\begin_layout LyX-Code
+}
+\end_layout
+
+\begin_layout Standard
+sets the variable 
+\family typewriter
+d
+\family default
+ to a Tuple value that has two attributes, DogName and Weight
+\begin_inset Foot
+status collapsed
+
+\begin_layout Plain Layout
+More precisely, 
+\family typewriter
+d
+\family default
+ is set to a string value that if used later in a 
+\family typewriter
+::ral::tuple
+\family default
+ operation will be converted into a Tuple value.
+\end_layout
+
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+In a sense the 
+\family typewriter
+Tuple
+\family default
+ type is similar to the 
+\family typewriter
+dict
+\family default
+ type and is useful in some of the same contexts.
+ Like dictionaries, a tuple type consists of key-value pairs and each key
+ must be a unique name.
+ However, the primary use of tuples is as the components of relations as
+ discussed below.
+ At first consideration it may seem unusual to have to specify data type
+ information when defining a Tuple.
+ This could be considered not in keeping with the 
+\begin_inset Quotes eld
+\end_inset
+
+Tcl way
+\begin_inset Quotes erd
+\end_inset
+
+.
+ The type of an attribute is a very important integrity constraint on the
+ values.
+ When an attribute of a tuple is assigned a value, that value must be coercible
+ to the type given for the attribute.
+ Since string is the universal type in Tcl, any value supplied for a string
+ typed attribute is acceptable.
+ The type binding will become more important later when we discuss computational
+ operations on relations.
+\end_layout
+
+\begin_layout Subsection
+\begin_inset CommandInset label
+LatexCommand label
+name "sub:Relation"
+
+\end_inset
+
+Relation
+\end_layout
+
+\begin_layout Standard
+A 
+\noun on
+relation
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+relation
+\end_layout
+
+\end_inset
+
+
+\noun default
+ consists of a heading and a body.
+ The Relation heading is much like that of a Tuple heading, 
+\emph on
+i.e.
+
+\emph default
+ a set of attribute names and attribute data types.
+ The body of a relation is a set of tuple values.
+ Each attribute of each tuple in the body of a relation has a value and
+ that value must correspond to the data type defined for the attribute.
+ In addition each relation must have at least one 
+\noun on
+identifier
+\noun default
+
+\begin_inset Foot
+status collapsed
+
+\begin_layout Plain Layout
+Also known as a candidate key or a primary key.
+ I prefer the term identifier to avoid some of the confusion surrounding
+ the use of the term 
+\emph on
+key
+\emph default
+ in the DBMS arena.
+\end_layout
+
+\end_inset
+
+
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+identifier
+\end_layout
+
+\end_inset
+
+.
+ An identifier is a set of attributes for which the values must be unique
+ for all tuples in a relation.
+ Fundamentally, relations are sets and sets do not have duplicated members.
+ An identifier defines the set of attributes across which uniqueness is
+ to be considered.
+ A relation may have many identifiers, however, no identifier may have a
+ set of attributes that is a subset of another identifier, 
+\emph on
+i.e.
+
+\emph default
+ the identifiers must be minimal.
+\end_layout
+
+\begin_layout Standard
+Like Tuple values, Relation values also have a string representation.
+ The string representation of a Relation value is a list of four elements:
+\end_layout
+
+\begin_layout Enumerate
+The keyword, 
+\family typewriter
+Relation
+\family default
+.
+\end_layout
+
+\begin_layout Enumerate
+A list of attribute name / attribute type pairs.
+\end_layout
+
+\begin_layout Enumerate
+A list of identifiers, each one of which may be a list of attribute names.
+\end_layout
+
+\begin_layout Enumerate
+A list of tuple values forming the body of the relation.
+\end_layout
+
+\begin_layout Standard
+For example:
+\end_layout
+
+\begin_layout LyX-Code
+set r {
+\end_layout
+
+\begin_layout LyX-Code
+    Relation
+\end_layout
+
+\begin_layout LyX-Code
+    {DogName string Breed string Weight double}
+\end_layout
+
+\begin_layout LyX-Code
+    DogName
+\end_layout
+
+\begin_layout LyX-Code
+    {
+\end_layout
+
+\begin_layout LyX-Code
+        {DogName Fred Breed Poodle Weight 17.0}
+\end_layout
+
+\begin_layout LyX-Code
+        {DogName ChiChi Breed Dalmation Weight 22.0}
+\end_layout
+
+\begin_layout LyX-Code
+    }
+\end_layout
+
+\begin_layout LyX-Code
+}
+\end_layout
+
+\begin_layout Standard
+defines a relation consisting of three attributes (
+\family typewriter
+\size small
+DogName
+\family default
+\size default
+, 
+\family typewriter
+\size small
+Breed
+\family default
+\size default
+ and 
+\family typewriter
+\size small
+Weight
+\family default
+\size default
+), a single identifier consisting of a single attribute (
+\family typewriter
+\size small
+DogName
+\family default
+\size default
+) and with a body containing two tuples.
+\end_layout
+
+\begin_layout Subsection
+\begin_inset CommandInset label
+LatexCommand label
+name "sub:Relvar"
+
+\end_inset
+
+Relvar
+\end_layout
+
+\begin_layout Standard
+TclRAL defines a separate variable space for storing significant relation
+ values.
+ This is a bit unusual since relation values may be stored in ordinary Tcl
+ variables also.
+ The 
+\noun on
+relvar
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+relvar
+\end_layout
+
+\end_inset
+
+
+\noun default
+ variable space serves two distinct purposes:
+\end_layout
+
+\begin_layout Enumerate
+Relvars provide storage locations for relation values and operators to modify
+ in place the value contained in a relvar.
+\end_layout
+
+\begin_layout Enumerate
+Relvars may have integrity constraints defined between them and TclRAL will
+ insure that the values contained in the relvar storage satisfy the integrity
+ constraints.
+\end_layout
+
+\begin_layout Standard
+In a traditional DBMS, relvars represent the persistent storage of the database.
+ While TclRAL does not provide for any transparent persistence, the relvars
+ fulfill a similar role as in a DBMS.
+ As we will see below, integrity constraints are defined on relvars and
+ the only operators that modify a relation value in place are those operators
+ that deal with relvars.
+ Integrity constraints help insure that the state of the relation values
+ held in the relvars transitions from one valid state to another valid state
+ as the program executes.
+ It is often the case that the relation values contained in relvars serve
+ as the leaf terms in the algebraic expressions that compute the values
+ of interest to the program.
+\end_layout
+
+\begin_layout Standard
+The operators that deal with relation values typically exhibit 
+\noun on
+closure
+\noun default
+
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+closure
+\end_layout
+
+\end_inset
+
+, 
+\emph on
+i.e.
+
+\emph default
+ the operators take relation values as arguments and return a new relation
+ value as the result.
+ In that context, ordinary Tcl variables serve to hold temporary results
+ that may be reused in other calculations or for the sake of program clarity.
+ However, Tcl variables are very convenient and so a relvar also has an
+ associated Tcl variable so that the familiar dollar variable reference
+ still works ($Dog yields the relation value stored in the Dog relvar).
+ Further, the relvar variable space uses the same 
+\noun on
+namespace
+\noun default
+ based naming conventions as ordinary Tcl variables.
+ This avoids introducing new notation and makes managing a complex set of
+ relvars easier.
+\end_layout
+
+\begin_layout Subsection
+\begin_inset CommandInset label
+LatexCommand label
+name "sub:Table-Representation"
+
+\end_inset
+
+Table Representation
+\end_layout
+
+\begin_layout Standard
+It is convenient to represent relation values in a tabular format
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+tabular format
+\end_layout
+
+\end_inset
+
+ and TclRAL provides several commands to present relation values in a more
+ visually intuitive table arrangement.
+ However, we must not get too accustomed to the implied ordering of rows
+ or columns in a table.
+ Clearly some order must be imposed for display purposes, but that order
+ is not part of the relation value itself.
+ There are no operations in TclRAL that access tuples based on some notion
+ of row index.
+ Tuples in a relation may only be referenced by the values of their attributes.
+ Also there are no operations that access attributes based on some notion
+ of column index.
+ Attributes are referenced only by their names.
+ Clearly, the implementation stores attributes in some order within a tuple
+ and stores tuples in some order within a relation, however, the implementation
+ is free to rearrange that ordering in any way that it chooses.
+ In practice, the TclRAL implementation takes some care not to arbitrarily
+ rearrange the order of tuples and attributes based on the principle of
+ least surprise.
+ But logically there is no prescribed order to the tuples in a relation
+ or to the attributes in a tuple.
+ One very practical consequence of this is that you should not use list
+ or string operators on the string representations of relation values.
+ All the required operators are supplied by TclRAL and those operators will
+ maintain the integrity and invariants of the relation values.
+\end_layout
+
+\begin_layout Section
+\begin_inset CommandInset label
+LatexCommand label
+name "sec:Operations"
+
+\end_inset
+
+Operations
+\end_layout
+
+\begin_layout Standard
+In this section we will describe the operations that are provided by TclRAL.
+ The manual pages supplied with TclRAL give the formal and detailed syntax
+ and semantics of each command in the package.
+ Here we will try to focus on why particular operations are useful and how
+ they apply to our running example.
+ First we consider Tuple operations, then Relation operations and finally
+ Relvar operations.
+\end_layout
+
+\begin_layout Subsection
+\begin_inset CommandInset label
+LatexCommand label
+name "sub:Running-Example"
+
+\end_inset
+
+Running Example
+\end_layout
+
+\begin_layout Standard
+For the purposes of this paper, we will use a small running example to illustrat
+e the concepts of TclRAL.
+ In this example we will consider managing a dog adoption scenario.
+ Necessarily, the example is oversimplified to fit the constraints of this
+ space and does not represent any real situation.
+ We will keep track of dogs and people who own them.
+ We are interested in knowing who owns what dogs, when they became the owner
+ and how we might contact those owners if the need arises.
+ We will only keep track of people who actually own dogs that they have
+ obtained from us.
+ So we can have the situation where a dog is not owned by anyone.
+ We also insist that we be able to contact owners.
+ We will contact owners by phone or email or both if the owner happens to
+ be particularly communications enabled.
+\end_layout
+
+\begin_layout Standard
+To formalize this scenario, we will use six relvars.
+ Figure 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "cap:Graphical-Representation-of"
+
+\end_inset
+
+ shows a graphical representation of these relvars.
+ In this notation, rectangles represent relvars.
+ The names of the relvar's attributes are listed inside the rectangles.
+ Those attribute names preceded by an asterisk (*) are part of an identifier
+ and those preceded by a hyphen (-) are non-identifying attributes.
+ The lines in the graphic represent referential integrity constraints (discussed
+ in Section 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "sub:Relvar-Constraints"
+
+\end_inset
+
+ below).
+ Each constraint has a name (
+\emph on
+e.g.
+
+\emph default
+ 
+\family typewriter
+R1
+\family default
+) that is written along the line representing the constraint.
+ Where the line connects to a relvar, a single character represents the
+ multiplicity and conditionality of the constraint.
+ Relvar attributes that have a parenthetical reference to a constraint name
+ (
+\emph on
+e.g.
+
+\emph default
+ 
+\family typewriter
+(R2)
+\family default
+) are referring attributes in the named constraint.
+ The schema of our example could be represented graphically in many ways,
+ such as an entity-relationship diagram or even in UML.
+ The notation shown is similar to, and borrowed from, that of Shlaer and
+ Mellor
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Modeling Data"
+
+\end_inset
+
+.
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename example.pdf
+	rotateAngle -90
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption
+
+\begin_layout Plain Layout
+\begin_inset CommandInset label
+LatexCommand label
+name "cap:Graphical-Representation-of"
+
+\end_inset
+
+Graphical Representation of the Running Example
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+ To make our example complete we will need to populate the relvars with
+ relation values.
+ So we use the values as shown in Figures 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "cap:Dog-Relvar"
+
+\end_inset
+
+ to 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "cap:EmailAddress-Relvar"
+
+\end_inset
+
+ as our example population.
+ The representation shown is that returned from the 
+\family typewriter
+::ral::relformat
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+relformat
+\end_layout
+
+\end_inset
+
+
+\family default
+ command.
+ This command gives a printable string representing the relvar in tabular
+ form.
+ Those attributes in the heading that are part of any identifier are marked
+ with an equal sign (=).
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+wide false
+sideways false
+status collapsed
+
+\begin_layout LyX-Code
+\align center
++=======+---------+---+
+\begin_inset Newline newline
+\end_inset
+
+|DogName|Breed    |Age|
+\begin_inset Newline newline
+\end_inset
+
+|string |string   |int|
+\begin_inset Newline newline
+\end_inset
+
++=======+---------+---+
+\begin_inset Newline newline
+\end_inset
+
+|Fido   |Poodle   |2  |
+\begin_inset Newline newline
+\end_inset
+
+|Sam    |Collie   |4  |
+\begin_inset Newline newline
+\end_inset
+
+|Spot   |Terrier  |1  |
+\begin_inset Newline newline
+\end_inset
+
+|Rover  |Retriever|5  |
+\begin_inset Newline newline
+\end_inset
+
+|Fred   |Spaniel  |7  |
+\begin_inset Newline newline
+\end_inset
+
+|Jumper |Mutt     |3  |
+\begin_inset Newline newline
+\end_inset
+
++=======+---------+---+
+\end_layout
+
+\begin_layout LyX-Code
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption
+
+\begin_layout Plain Layout
+\begin_inset CommandInset label
+LatexCommand label
+name "cap:Dog-Relvar"
+
+\end_inset
+
+Dog Relvar
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\begin_inset Float figure
+wide false
+sideways false
+status collapsed
+
+\begin_layout LyX-Code
+\align center
++=========+---+
+\begin_inset Newline newline
+\end_inset
+
+|OwnerName|Age|
+\begin_inset Newline newline
+\end_inset
+
+|string   |int|
+\begin_inset Newline newline
+\end_inset
+
++=========+---+
+\begin_inset Newline newline
+\end_inset
+
+|Sue      |24 |
+\begin_inset Newline newline
+\end_inset
+
+|George   |35 |
+\begin_inset Newline newline
+\end_inset
+
+|Alice    |30 |
+\begin_inset Newline newline
+\end_inset
+
+|Mike     |50 |
+\begin_inset Newline newline
+\end_inset
+
+|Jim      |42 |
+\begin_inset Newline newline
+\end_inset
+
++=========+---+
+\end_layout
+
+\begin_layout LyX-Code
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption
+
+\begin_layout Plain Layout
+\begin_inset CommandInset label
+LatexCommand label
+name "cap:Owner-Relvar"
+
+\end_inset
+
+Owner Relvar
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\begin_inset Float figure
+wide false
+sideways false
+status collapsed
+
+\begin_layout LyX-Code
+\align center
++=========+=======+--------+
+\begin_inset Newline newline
+\end_inset
+
+|OwnerName|DogName|Acquired|
+\begin_inset Newline newline
+\end_inset
+
+|string   |string |string  |
+\begin_inset Newline newline
+\end_inset
+
++=========+=======+--------+
+\begin_inset Newline newline
+\end_inset
+
+|Sue      |Fido   |2001    |
+\begin_inset Newline newline
+\end_inset
+
+|Sue      |Sam    |2000    |
+\begin_inset Newline newline
+\end_inset
+
+|George   |Fido   |2001    |
+\begin_inset Newline newline
+\end_inset
+
+|George   |Sam    |2000    |
+\begin_inset Newline newline
+\end_inset
+
+|Alice    |Spot   |2001    |
+\begin_inset Newline newline
+\end_inset
+
+|Mike     |Rover  |2002    |
+\begin_inset Newline newline
+\end_inset
+
+|Jim      |Fred   |2003    |
+\begin_inset Newline newline
+\end_inset
+
++=========+=======+--------+
+\end_layout
+
+\begin_layout LyX-Code
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption
+
+\begin_layout Plain Layout
+\begin_inset CommandInset label
+LatexCommand label
+name "cap:Ownership-Relvar"
+
+\end_inset
+
+Ownership Relvar
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\begin_inset Float figure
+wide false
+sideways false
+status collapsed
+
+\begin_layout LyX-Code
+\align center
++=========+============+
+\begin_inset Newline newline
+\end_inset
+
+|OwnerName|ContactOrder|
+\begin_inset Newline newline
+\end_inset
+
+|string   |int         |
+\begin_inset Newline newline
+\end_inset
+
++=========+============+
+\begin_inset Newline newline
+\end_inset
+
+|Sue      |1           |
+\begin_inset Newline newline
+\end_inset
+
+|Sue      |2           |
+\begin_inset Newline newline
+\end_inset
+
+|George   |1           |
+\begin_inset Newline newline
+\end_inset
+
+|Alice    |1           |
+\begin_inset Newline newline
+\end_inset
+
+|Mike     |1           |
+\begin_inset Newline newline
+\end_inset
+
+|Mike     |2           |
+\begin_inset Newline newline
+\end_inset
+
+|Mike     |3           |
+\begin_inset Newline newline
+\end_inset
+
+|Jim      |1           |
+\begin_inset Newline newline
+\end_inset
+
++=========+============+
+\end_layout
+
+\begin_layout LyX-Code
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption
+
+\begin_layout Plain Layout
+\begin_inset CommandInset label
+LatexCommand label
+name "cap:Contact-Relvar"
+
+\end_inset
+
+Contact Relvar
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\begin_inset Float figure
+wide false
+sideways false
+status collapsed
+
+\begin_layout LyX-Code
+\align center
++=========+============+--------+--------+
+\begin_inset Newline newline
+\end_inset
+
+|OwnerName|ContactOrder|AreaCode|Number  |
+\begin_inset Newline newline
+\end_inset
+
+|string   |int         |string  |string  |
+\begin_inset Newline newline
+\end_inset
+
++=========+============+--------+--------+
+\begin_inset Newline newline
+\end_inset
+
+|Sue      |1           |111     |555-1212|
+\begin_inset Newline newline
+\end_inset
+
+|George   |1           |408     |555-2020|
+\begin_inset Newline newline
+\end_inset
+
+|Alice    |1           |555     |867-4309|
+\begin_inset Newline newline
+\end_inset
+
+|Mike     |1           |800     |555-3890|
+\begin_inset Newline newline
+\end_inset
+
+|Mike     |2           |866     |555-8821|
+\begin_inset Newline newline
+\end_inset
+
++=========+============+--------+--------+
+\end_layout
+
+\begin_layout LyX-Code
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption
+
+\begin_layout Plain Layout
+\begin_inset CommandInset label
+LatexCommand label
+name "cap:PhoneNumber-Relvar"
+
+\end_inset
+
+PhoneNumber Relvar
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\begin_inset Float figure
+wide false
+sideways false
+status collapsed
+
+\begin_layout LyX-Code
+\align center
++=========+============+--------+------------+
+\begin_inset Newline newline
+\end_inset
+
+|OwnerName|ContactOrder|UserName|DomainName  |
+\begin_inset Newline newline
+\end_inset
+
+|string   |int         |string  |string      |
+\begin_inset Newline newline
+\end_inset
+
++=========+============+--------+------------+
+\begin_inset Newline newline
+\end_inset
+
+|Sue      |2           |sue     |mymail.com  |
+\begin_inset Newline newline
+\end_inset
+
+|Mike     |3           |mikey   |yourmail.com|
+\begin_inset Newline newline
+\end_inset
+
+|Jim      |1           |jimbo   |domail.com  |
+\begin_inset Newline newline
+\end_inset
+
++=========+============+--------+------------+
+\end_layout
+
+\begin_layout LyX-Code
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption
+
+\begin_layout Plain Layout
+\begin_inset CommandInset label
+LatexCommand label
+name "cap:EmailAddress-Relvar"
+
+\end_inset
+
+EmailAddress Relvar
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+In the examples given below we will often refer to these relvars.
+ TclRAL is contained in the 
+\noun on
+ral
+\noun default
+ package which creates commands in the 
+\family typewriter
+\noun on
+::
+\noun default
+ral
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+::ral
+\end_layout
+
+\end_inset
+
+
+\family default
+ namespace.
+ As a convenience for the examples, we will assume that the 
+\family typewriter
+::ral
+\family default
+ commands have been imported in the namespace of the example.
+\end_layout
+
+\begin_layout Subsection
+Tuple Operations
+\end_layout
+
+\begin_layout Standard
+Relations are composed of sets of tuples, so a Tuple data type is necessary
+ to complete the ability to work with relation values.
+ There are 15 options for the 
+\family typewriter
+::ral::tuple
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+::ral::tuple
+\end_layout
+
+\end_inset
+
+
+\family default
+ ensemble command.
+ It is worth grouping them into several categories.
+ All the commands that implement tuple operations, except one, exhibit closure,
+ 
+\emph on
+i.e.
+
+\emph default
+ they take Tuple valued arguments and return a new Tuple result.
+ The exception is 
+\family typewriter
+tuple
+\begin_inset space ~
+\end_inset
+
+update
+\family default
+ which modifies in place the tuple value contained in a Tcl variable.
+ This command is used as part of the method in which relvars are updated
+ as we will see below.
+\end_layout
+
+\begin_layout Subsubsection
+Structural Operations
+\end_layout
+
+\begin_layout Standard
+The commands in this category are used to create tuples or extract subsets
+ of the attributes or otherwise affect the attribute structure of a Tuple
+ value.
+\end_layout
+
+\begin_layout Description
+create The 
+\family typewriter
+create
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+create
+\end_layout
+
+\end_inset
+
+
+\family default
+ command creates a new tuple.
+ This is a procedural way to create a tuple as an alternative to composing
+ its string representation.
+\end_layout
+
+\begin_layout Description
+extend The 
+\family typewriter
+extend
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+extend
+\end_layout
+
+\end_inset
+
+
+\family default
+ command creates a new tuple from an existing tuple by adding attributes.
+\end_layout
+
+\begin_layout Description
+project The 
+\family typewriter
+project
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+project
+\end_layout
+
+\end_inset
+
+
+\family default
+ command creates a new tuple from an existing tuple by selecting a subset
+ of the attributes.
+\end_layout
+
+\begin_layout Description
+eliminate The 
+\family typewriter
+eliminate
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+eliminate
+\end_layout
+
+\end_inset
+
+
+\family default
+ command is complementary to 
+\family typewriter
+project
+\family default
+.
+ It creates a new tuple by discarding attributes.
+ Sometimes it is easier to think about which attributes are to be discarded
+ rather than which ones are to be included.
+\end_layout
+
+\begin_layout Description
+rename The 
+\family typewriter
+rename
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+rename
+\end_layout
+
+\end_inset
+
+
+\family default
+ command creates a new tuple that has new names for its attributes.
+ Multiple attribute names can be changed, but the attribute types and values
+ remain unchanged.
+\end_layout
+
+\begin_layout LyX-Code
+% set t [tuple create {DogName string Breed string Age int}
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+    {DogName Fido Breed Poodle Age 2}]
+\end_layout
+
+\begin_layout LyX-Code
+Tuple {DogName string Breed string Age int}
+\end_layout
+
+\begin_layout LyX-Code
+{DogName Fido Breed Poodle Age 2}
+\end_layout
+
+\begin_layout LyX-Code
+% puts [tuple eliminate $t Age]
+\end_layout
+
+\begin_layout LyX-Code
+Tuple {DogName string Breed string}
+\end_layout
+
+\begin_layout LyX-Code
+{DogName Fido Breed Poodle}
+\end_layout
+
+\begin_layout LyX-Code
+% puts [tuple rename $t DogName Name]
+\end_layout
+
+\begin_layout LyX-Code
+Tuple {Name string Breed string Age int}
+\end_layout
+
+\begin_layout LyX-Code
+{Name Fido Breed Poodle Age 2}
+\end_layout
+
+\begin_layout Subsubsection
+Attribute Access
+\end_layout
+
+\begin_layout Standard
+The commands in this group are used to access the attribute values of a
+ tuple, moving them between tuples and regular Tcl variables.
+\end_layout
+
+\begin_layout Description
+assign The 
+\family typewriter
+assign
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+assign
+\end_layout
+
+\end_inset
+
+
+\family default
+ command creates Tcl variables and places attribute values into them.
+ This makes it possible to decompose a tuple into Tcl variables so that
+ values can be used in other procedures or expressions.
+ The interface for 
+\family typewriter
+tuple
+\begin_inset space ~
+\end_inset
+
+assign
+\family default
+ is intended to be mnemonic of the core 
+\family typewriter
+lassign
+\family default
+ command.
+\end_layout
+
+\begin_layout Description
+extract The 
+\family typewriter
+extract
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+extract
+\end_layout
+
+\end_inset
+
+
+\family default
+ command obtains one or more attribute values from a tuple.
+ No variable assignments are made and the values are returned from the command.
+\end_layout
+
+\begin_layout Description
+get The 
+\family typewriter
+get
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+get
+\end_layout
+
+\end_inset
+
+
+\family default
+ command returns a list of attribute name / attribute value pairs.
+ The list is suitable to use as an argument to 
+\family typewriter
+array
+\begin_inset space ~
+\end_inset
+
+set
+\family default
+ or can be operated on by any of the 
+\family typewriter
+dict
+\family default
+ command options.
+\end_layout
+
+\begin_layout Description
+update The 
+\family typewriter
+update
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+update
+\end_layout
+
+\end_inset
+
+
+\family default
+ command modifies in place a tuple value contained in a Tcl variable.
+ This is the only tuple command that behaves in this way and it is useful
+ in conjunction with the 
+\family typewriter
+relation
+\begin_inset space ~
+\end_inset
+
+update
+\family default
+ command described below.
+\end_layout
+
+\begin_layout LyX-Code
+set t {
+\end_layout
+
+\begin_layout LyX-Code
+    Tuple
+\end_layout
+
+\begin_layout LyX-Code
+    {DogName string Breed string Age int}
+\end_layout
+
+\begin_layout LyX-Code
+    {DogName Fido Breed Poodle Age 2}
+\end_layout
+
+\begin_layout LyX-Code
+}
+\end_layout
+
+\begin_layout LyX-Code
+% tuple assign $t
+\end_layout
+
+\begin_layout LyX-Code
+3
+\end_layout
+
+\begin_layout LyX-Code
+% puts $Breed
+\end_layout
+
+\begin_layout LyX-Code
+Poodle
+\end_layout
+
+\begin_layout LyX-Code
+% puts [tuple extract $t DogName]
+\end_layout
+
+\begin_layout LyX-Code
+Fido
+\end_layout
+
+\begin_layout LyX-Code
+% array set dogtuple [tuple get $t]
+\end_layout
+
+\begin_layout LyX-Code
+% parray dogtuple
+\end_layout
+
+\begin_layout LyX-Code
+dogtuple(Age)     = 2
+\end_layout
+
+\begin_layout LyX-Code
+dogtuple(Breed)   = Poodle
+\end_layout
+
+\begin_layout LyX-Code
+dogtuple(DogName) = Fido
+\end_layout
+
+\begin_layout LyX-Code
+% tuple update t Age [expr {[tuple extract $t Age] + 1}]
+\end_layout
+
+\begin_layout LyX-Code
+Tuple {DogName string Breed string Age int}
+\end_layout
+
+\begin_layout LyX-Code
+{DogName Fido Breed Poodle Age 3}
+\end_layout
+
+\begin_layout Subsubsection
+Comparison
+\end_layout
+
+\begin_layout Standard
+Only one comparison operation is defined and that is tuple equality.
+ Because relative ordering of attributes in a tuple is not defined, tuple
+ equality cannot be determined by simple string comparison.
+\end_layout
+
+\begin_layout Description
+equal The tuple 
+\family typewriter
+equal
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+equal
+\end_layout
+
+\end_inset
+
+
+\family default
+ command determines if two tuples are equal.
+ Two tuples are equal if and only if they have the same attribute names,
+ attribute types and attribute values.
+ Since attribute order does not matter, equal tuples may have different
+ string representations.
+ Another way of putting it is that there are, in general, many string representa
+tions of any given tuple.
+\end_layout
+
+\begin_layout Subsubsection
+Introspection
+\end_layout
+
+\begin_layout Standard
+In keeping with the usual conventions of Tcl, introspection into the structure
+ of a tuple is supported.
+\end_layout
+
+\begin_layout Description
+degree The 
+\family typewriter
+degree
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+degree
+\end_layout
+
+\end_inset
+
+
+\family default
+ command returns the number of attributes in a tuple.
+\end_layout
+
+\begin_layout Description
+heading The 
+\family typewriter
+heading
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+heading
+\end_layout
+
+\end_inset
+
+
+\family default
+ command returns the heading of tuple.
+\end_layout
+
+\begin_layout Description
+attributes The 
+\family typewriter
+attributes
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+attributes
+\end_layout
+
+\end_inset
+
+
+\family default
+ command returns as a list the attribute names of a tuple.
+\end_layout
+
+\begin_layout Subsubsection
+Composition
+\end_layout
+
+\begin_layout Standard
+It is possible to have Tuple values that have attributes that are themselves
+ Tuple valued.
+ This possiblity makes it necessary to have operators that will construct
+ tuple valued attributes from scalar attributes and to perform the inverse.
+\end_layout
+
+\begin_layout Description
+wrap The 
+\family typewriter
+wrap
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+wrap
+\end_layout
+
+\end_inset
+
+
+\family default
+ command creates a new tuple that has a new tuple valued attribute composed
+ from other attributes in the tuple.
+\end_layout
+
+\begin_layout Description
+unwrap The 
+\family typewriter
+unwrap
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+unwrap
+\end_layout
+
+\end_inset
+
+
+\family default
+ command is complementary to 
+\family typewriter
+wrap
+\family default
+ and 
+\begin_inset Quotes eld
+\end_inset
+
+flattens
+\begin_inset Quotes erd
+\end_inset
+
+ out a tuple valued attribute.
+\end_layout
+
+\begin_layout LyX-Code
+% set t2 [tuple wrap $t Props {Breed Age}]
+\end_layout
+
+\begin_layout LyX-Code
+Tuple {DogName string Props {Tuple {Breed string Age int}}}
+\end_layout
+
+\begin_layout LyX-Code
+{DogName Fido Props {Breed Poodle Age 2}}
+\end_layout
+
+\begin_layout LyX-Code
+% tuple unwrap $t2 Props
+\end_layout
+
+\begin_layout LyX-Code
+Tuple {DogName string Breed string Age int}
+\end_layout
+
+\begin_layout LyX-Code
+{DogName Fido Breed Poodle Age 2}
+\end_layout
+
+\begin_layout Subsection
+Relation Operations
+\end_layout
+
+\begin_layout Standard
+There are 38 options for the 
+\family typewriter
+::ral::relation
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+::ral::relation
+\end_layout
+
+\end_inset
+
+
+\family default
+ ensemble command.
+ We will group the operations in order to get a handle on the large number
+ of operators.
+ One very important property of the 
+\family typewriter
+relation
+\family default
+ ensemble commands is closure.
+ Most of the commands take relation values as argument and return a relation
+ value as the result (those that do not usually return simple integer or
+ boolean values).
+ None of the 
+\family typewriter
+relation
+\family default
+ subcommands modify a relation value in place.
+ This allows arbitrary nesting of operations in the form that we are all
+ very familiar with in Tcl.
+ There are commands in the 
+\family typewriter
+ral
+\family default
+ package that modify values in place and they are all grouped in the 
+\family typewriter
+relvar
+\family default
+ ensemble.
+\end_layout
+
+\begin_layout Subsubsection
+Fundamental Set Operations
+\end_layout
+
+\begin_layout Standard
+TclRAL provides the usual set operations across relation values.
+ For all these operators the relation value arguments must be of the same
+ type.
+ This means that they must have the same attributes and those attributes
+ must have the same data types.
+ These operations are:
+\end_layout
+
+\begin_layout Description
+union The command, 
+\family typewriter
+union
+\family default
+
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+union
+\end_layout
+
+\end_inset
+
+, computes the set union between two or more relation values.
+ The tuples that are in the result are those that appear in at least one
+ of the arguments, remembering that relation values never have any duplicates.
+\end_layout
+
+\begin_layout Description
+intersection The command, 
+\family typewriter
+intersect
+\family default
+
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+intersect
+\end_layout
+
+\end_inset
+
+, computes the set intersection between two or more relation values.
+ The result contains those tuples that appear in all of the arguments.
+\end_layout
+
+\begin_layout Description
+difference The command, 
+\family typewriter
+minus
+\family default
+
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+minus
+\end_layout
+
+\end_inset
+
+, computes the set difference between two relation values.
+ The result contains those tuples in the first relation that do not appear
+ in the second one.
+ Note that for this operation, argument order is important.
+\end_layout
+
+\begin_layout Description
+insertion The command, 
+\family typewriter
+include
+\family default
+
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+include
+\end_layout
+
+\end_inset
+
+, returns a new relation with additional tuples inserted.
+ This is much like union, except that an error is raised if any attempt
+ is made to insert a duplicate tuple.
+\end_layout
+
+\begin_layout Description
+comparison The full complement of comparison between two relation values
+ is also provided by the 
+\family typewriter
+is
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+is
+\end_layout
+
+\end_inset
+
+
+\family default
+ command.
+ Comparisons may only be made between relation values of the same type,
+ 
+\emph on
+i.e.
+
+\emph default
+ those relation values that have the same attribute names and corresponding
+ attribute data types.
+\end_layout
+
+\begin_deeper
+\begin_layout Itemize
+equality (==)
+\end_layout
+
+\begin_layout Itemize
+inequality (!=)
+\end_layout
+
+\begin_layout Itemize
+subset (<=)
+\end_layout
+
+\begin_layout Itemize
+proper subset (<)
+\end_layout
+
+\begin_layout Itemize
+superset (>=)
+\end_layout
+
+\begin_layout Itemize
+proper superset (>)
+\end_layout
+
+\end_deeper
+\begin_layout Standard
+For example, consider:
+\end_layout
+
+\begin_layout LyX-Code
+set newDog {
+\end_layout
+
+\begin_layout LyX-Code
+    Relation
+\end_layout
+
+\begin_layout LyX-Code
+    {DogName string Breed string Age int}
+\end_layout
+
+\begin_layout LyX-Code
+    DogName
+\end_layout
+
+\begin_layout LyX-Code
+    {
+\end_layout
+
+\begin_layout LyX-Code
+        {DogName Puffy Breed Poodle Age 1}
+\end_layout
+
+\begin_layout LyX-Code
+    }
+\end_layout
+
+\begin_layout LyX-Code
+}
+\end_layout
+
+\begin_layout LyX-Code
+% relformat [relation union $Dog $newDog]
+\end_layout
+
+\begin_layout LyX-Code
++=======+---------+---+
+\end_layout
+
+\begin_layout LyX-Code
+|DogName|Breed    |Age|
+\end_layout
+
+\begin_layout LyX-Code
+|string |string   |int|
+\end_layout
+
+\begin_layout LyX-Code
++=======+---------+---+
+\end_layout
+
+\begin_layout LyX-Code
+|Fido   |Poodle   |2  |
+\end_layout
+
+\begin_layout LyX-Code
+|Sam    |Collie   |4  |
+\end_layout
+
+\begin_layout LyX-Code
+|Spot   |Terrier  |1  |
+\end_layout
+
+\begin_layout LyX-Code
+|Rover  |Retriever|5  |
+\end_layout
+
+\begin_layout LyX-Code
+|Fred   |Spaniel  |7  |
+\end_layout
+
+\begin_layout LyX-Code
+|Jumper |Mutt     |3  |
+\end_layout
+
+\begin_layout LyX-Code
+|Puffy  |Poodle   |1  |
+\end_layout
+
+\begin_layout LyX-Code
++=======+---------+---+
+\end_layout
+
+\begin_layout LyX-Code
+% relation is $Dog < [relation include $Dog
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+    {DogName Puffy Breed Poodle Age 1}]
+\end_layout
+
+\begin_layout LyX-Code
+1
+\end_layout
+
+\begin_layout LyX-Code
+% relation is $newDog == $Dog
+\end_layout
+
+\begin_layout LyX-Code
+0
+\end_layout
+
+\begin_layout Subsubsection
+Restriction and Projection
+\end_layout
+
+\begin_layout Standard
+A very common operation is to select some subset of tuples from a relation
+ or some subset of attributes from a relation.
+ Casually speaking, we are often interested in some set of rows or some
+ set of columns.
+ As discussed before, there are no operators in TclRAL that correspond to
+ array indexing operations.
+ Tuples and attributes may only be referred to by values and names, respectively.
+ TclRAL provides the following operations for obtaining parts of a relation
+ value:
+\end_layout
+
+\begin_layout Description
+restrict The command, 
+\family typewriter
+restrict
+\family default
+
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+restrict
+\end_layout
+
+\end_inset
+
+, returns a relation by selecting tuples where an arbitrary Tcl expression
+ evaluates to true.
+ Each tuple in the argument relation value is successively assigned to a
+ variable and an expression is evaluated.
+ If the expression returns true, then the tuple is included in the result.
+ The expression is an arbitrary Tcl expression evaluated by 
+\family typewriter
+expr
+\family default
+.
+\end_layout
+
+\begin_layout Description
+restrictwith The 
+\family typewriter
+restrictwith
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+restrictwith
+\end_layout
+
+\end_inset
+
+
+\family default
+ command is a variation on 
+\family typewriter
+restrict
+\family default
+ where values of the attributes are split out into separate Tcl variables.
+ This is particularly convenient in simpler cases.
+\end_layout
+
+\begin_layout Description
+choose The command, 
+\family typewriter
+choose
+\family default
+
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+choose
+\end_layout
+
+\end_inset
+
+, returns a relation that contains at most one tuple whose identifying attribute
+ values are given.
+ In some cases the values of the attributes of an identifier are known and
+ just that one tuple in a relation is required.
+\end_layout
+
+\begin_layout Description
+emptyof The command, 
+\family typewriter
+emptyof
+\family default
+
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+emptyof
+\end_layout
+
+\end_inset
+
+, returns a relation that has the same heading as its argument, but whose
+ body is the empty set.
+ This is useful combined with, 
+\family typewriter
+relation
+\begin_inset space ~
+\end_inset
+
+include
+\family default
+, for building up a relation from data gathered from other sources in a
+ program.
+\end_layout
+
+\begin_layout Description
+project The command, 
+\family typewriter
+project
+\family default
+
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+project
+\end_layout
+
+\end_inset
+
+, returns a relation that contains only the attributes given as arguments.
+\end_layout
+
+\begin_layout Description
+eliminate The command, 
+\family typewriter
+eliminate
+\family default
+
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+eliminate
+\end_layout
+
+\end_inset
+
+, is complementary to project in that it returns a relation containing all
+ the attributes except the ones given as arguments.
+ Sometimes it is easier to think in terms of what needs to be discarded
+ rather than what needs to be retained.
+\end_layout
+
+\begin_layout Standard
+Consider the following examples:
+\end_layout
+
+\begin_layout LyX-Code
+% relformat [relation restrict $Dog d
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+    {[tuple extract $d Age] < 3}]
+\end_layout
+
+\begin_layout LyX-Code
++=======+-------+---+
+\end_layout
+
+\begin_layout LyX-Code
+|DogName|Breed  |Age|
+\end_layout
+
+\begin_layout LyX-Code
+|string |string |int|
+\end_layout
+
+\begin_layout LyX-Code
++=======+-------+---+
+\end_layout
+
+\begin_layout LyX-Code
+|Fido   |Poodle |2  |
+\end_layout
+
+\begin_layout LyX-Code
+|Spot   |Terrier|1  |
+\end_layout
+
+\begin_layout LyX-Code
++=======+-------+---+
+\end_layout
+
+\begin_layout LyX-Code
+% relformat [relation restrictwith $Dog {$Age <= 3}]
+\end_layout
+
+\begin_layout LyX-Code
++=======+-------+---+
+\end_layout
+
+\begin_layout LyX-Code
+|DogName|Breed  |Age|
+\end_layout
+
+\begin_layout LyX-Code
+|string |string |int|
+\end_layout
+
+\begin_layout LyX-Code
++=======+-------+---+
+\end_layout
+
+\begin_layout LyX-Code
+|Fido   |Poodle |2  |
+\end_layout
+
+\begin_layout LyX-Code
+|Spot   |Terrier|1  |
+\end_layout
+
+\begin_layout LyX-Code
+|Jumper |Mutt   |3  |
+\end_layout
+
+\begin_layout LyX-Code
++=======+-------+---+
+\end_layout
+
+\begin_layout LyX-Code
+% relformat [relation choose $Owner OwnerName Mike]
+\end_layout
+
+\begin_layout LyX-Code
++=========+---+
+\end_layout
+
+\begin_layout LyX-Code
+|OwnerName|Age|
+\end_layout
+
+\begin_layout LyX-Code
+|string   |int|
+\end_layout
+
+\begin_layout LyX-Code
++=========+---+
+\end_layout
+
+\begin_layout LyX-Code
+|Mike     |50 |
+\end_layout
+
+\begin_layout LyX-Code
++=========+---+
+\end_layout
+
+\begin_layout LyX-Code
+% relformat [relation project $Ownership OwnerName Acquired]
+\end_layout
+
+\begin_layout LyX-Code
++=========+========+
+\end_layout
+
+\begin_layout LyX-Code
+|OwnerName|Acquired|
+\end_layout
+
+\begin_layout LyX-Code
+|string   |string  |
+\end_layout
+
+\begin_layout LyX-Code
++=========+========+
+\end_layout
+
+\begin_layout LyX-Code
+|Sue      |2001    |
+\end_layout
+
+\begin_layout LyX-Code
+|Sue      |2000    |
+\end_layout
+
+\begin_layout LyX-Code
+|George   |2001    |
+\end_layout
+
+\begin_layout LyX-Code
+|George   |2000    |
+\end_layout
+
+\begin_layout LyX-Code
+|Alice    |2001    |
+\end_layout
+
+\begin_layout LyX-Code
+|Mike     |2002    |
+\end_layout
+
+\begin_layout LyX-Code
+|Jim      |2003    |
+\end_layout
+
+\begin_layout LyX-Code
++=========+========+
+\end_layout
+
+\begin_layout LyX-Code
+% relformat [relation eliminate $Dog Age]
+\end_layout
+
+\begin_layout LyX-Code
++=======+---------+
+\end_layout
+
+\begin_layout LyX-Code
+|DogName|Breed    |
+\end_layout
+
+\begin_layout LyX-Code
+|string |string   |
+\end_layout
+
+\begin_layout LyX-Code
++=======+---------+
+\end_layout
+
+\begin_layout LyX-Code
+|Fido   |Poodle   |
+\end_layout
+
+\begin_layout LyX-Code
+|Sam    |Collie   |
+\end_layout
+
+\begin_layout LyX-Code
+|Spot   |Terrier  |
+\end_layout
+
+\begin_layout LyX-Code
+|Rover  |Retriever|
+\end_layout
+
+\begin_layout LyX-Code
+|Fred   |Spaniel  |
+\end_layout
+
+\begin_layout LyX-Code
+|Jumper |Mutt     |
+\end_layout
+
+\begin_layout LyX-Code
++=======+---------+
+\end_layout
+
+\begin_layout Subsubsection
+Multiplication and Division
+\end_layout
+
+\begin_layout Standard
+The operators in this section are concerned with combining two or more relation
+ values.
+ The archetypical operation in the category is 
+\family typewriter
+join
+\family default
+, where two relation values are merged together in a very specific manner.
+ TclRAL provides several useful variations on this theme.
+\end_layout
+
+\begin_layout Description
+product The 
+\family typewriter
+times
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+times
+\end_layout
+
+\end_inset
+
+
+\family default
+ command computes the Cartesian product over two or more relations.
+\end_layout
+
+\begin_layout Description
+join TclRAL has the natural 
+\family typewriter
+join
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+join
+\end_layout
+
+\end_inset
+
+
+\family default
+ command.
+ There are many flavors and variations on the basic 
+\family typewriter
+join
+\family default
+ operator, but only natural join is supported here.
+\end_layout
+
+\begin_layout Description
+semijoin The 
+\family typewriter
+semijoin
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+semijoin
+\end_layout
+
+\end_inset
+
+
+\family default
+ command yields a join where only the attributes of one of the relations
+ is retained.
+ Roughly it gives the set of related tuples in another relation.
+ In many cases, 
+\family typewriter
+semijoin
+\family default
+ is a more appropriate operation than 
+\family typewriter
+join
+\family default
+.
+\end_layout
+
+\begin_layout Description
+semiminus The 
+\family typewriter
+semiminus
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+semiminus
+\end_layout
+
+\end_inset
+
+
+\family default
+ command is complementary to 
+\family typewriter
+semijoin
+\family default
+.
+ It returns a relation containing tuples not related to another relation.
+\end_layout
+
+\begin_layout LyX-Code
+% relformat [relation join $Owner $Contact]
+\end_layout
+
+\begin_layout LyX-Code
++=========+---+============+
+\end_layout
+
+\begin_layout LyX-Code
+|OwnerName|Age|ContactOrder|
+\end_layout
+
+\begin_layout LyX-Code
+|string   |int|int         |
+\end_layout
+
+\begin_layout LyX-Code
++=========+---+============+
+\end_layout
+
+\begin_layout LyX-Code
+|Sue      |24 |1           |
+\end_layout
+
+\begin_layout LyX-Code
+|Sue      |24 |2           |
+\end_layout
+
+\begin_layout LyX-Code
+|George   |35 |1           |
+\end_layout
+
+\begin_layout LyX-Code
+|Alice    |30 |1           |
+\end_layout
+
+\begin_layout LyX-Code
+|Mike     |50 |1           |
+\end_layout
+
+\begin_layout LyX-Code
+|Mike     |50 |2           |
+\end_layout
+
+\begin_layout LyX-Code
+|Mike     |50 |3           |
+\end_layout
+
+\begin_layout LyX-Code
+|Jim      |42 |1           |
+\end_layout
+
+\begin_layout LyX-Code
++=========+---+============+
+\end_layout
+
+\begin_layout LyX-Code
+% relformat [relation semijoin $PhoneNumber $Contact]
+\end_layout
+
+\begin_layout LyX-Code
++=========+============+
+\end_layout
+
+\begin_layout LyX-Code
+|OwnerName|ContactOrder|
+\end_layout
+
+\begin_layout LyX-Code
+|string   |int         |
+\end_layout
+
+\begin_layout LyX-Code
++=========+============+
+\end_layout
+
+\begin_layout LyX-Code
+|Sue      |1           |
+\end_layout
+
+\begin_layout LyX-Code
+|George   |1           |
+\end_layout
+
+\begin_layout LyX-Code
+|Alice    |1           |
+\end_layout
+
+\begin_layout LyX-Code
+|Mike     |1           |
+\end_layout
+
+\begin_layout LyX-Code
+|Mike     |2           |
+\end_layout
+
+\begin_layout LyX-Code
++=========+============+
+\end_layout
+
+\begin_layout LyX-Code
+% relformat [relation semiminus $PhoneNumber $Contact]
+\end_layout
+
+\begin_layout LyX-Code
++=========+============+
+\end_layout
+
+\begin_layout LyX-Code
+|OwnerName|ContactOrder|
+\end_layout
+
+\begin_layout LyX-Code
+|string   |int         |
+\end_layout
+
+\begin_layout LyX-Code
++=========+============+
+\end_layout
+
+\begin_layout LyX-Code
+|Sue      |2           |
+\end_layout
+
+\begin_layout LyX-Code
+|Mike     |3           |
+\end_layout
+
+\begin_layout LyX-Code
+|Jim      |1           |
+\end_layout
+
+\begin_layout LyX-Code
++=========+============+
+\end_layout
+
+\begin_layout Description
+division The 
+\family typewriter
+divide
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+divide
+\end_layout
+
+\end_inset
+
+
+\family default
+ command implements the relational divide operation.
+ This operation is useful in contexts where you are performing 
+\begin_inset Quotes eld
+\end_inset
+
+find all of
+\begin_inset Quotes erd
+\end_inset
+
+ type operations.
+ The operation is a bit complicated and involves three relations, the dividend,
+ the divisor and the mediator.
+ The headings of the dividend and divisor must be disjoint and the heading
+ of the mediator must be the union of the headings of the dividend and divisor.
+ The result (the quotient) is a new relation that has the same heading as
+ the dividend and contains all the tuples from the dividend whose corresponding
+ tuples in the mediator include all the tuples in divisor.
+ An example will help clarify the situation.
+ In this example we seek to find all the Dogs owned by both Sue and George.
+\end_layout
+
+\begin_layout LyX-Code
+% relformat [set dividend [relation project $Dog DogName]]
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+    Dividend:
+\end_layout
+
+\begin_layout LyX-Code
++=======+
+\end_layout
+
+\begin_layout LyX-Code
+|DogName|
+\end_layout
+
+\begin_layout LyX-Code
+|string |
+\end_layout
+
+\begin_layout LyX-Code
++=======+
+\end_layout
+
+\begin_layout LyX-Code
+|Fido   |
+\end_layout
+
+\begin_layout LyX-Code
+|Sam    |
+\end_layout
+
+\begin_layout LyX-Code
+|Spot   |
+\end_layout
+
+\begin_layout LyX-Code
+|Rover  |
+\end_layout
+
+\begin_layout LyX-Code
+|Fred   |
+\end_layout
+
+\begin_layout LyX-Code
+|Jumper |
+\end_layout
+
+\begin_layout LyX-Code
++=======+
+\end_layout
+
+\begin_layout LyX-Code
+Dividend:
+\end_layout
+
+\begin_layout LyX-Code
+---------
+\end_layout
+
+\begin_layout LyX-Code
+% relformat [set divisor [relation project
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+    [relation restrict $Owner t
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+    {[tuple extract $t OwnerName] eq "Sue" ||
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+        [tuple extract $t OwnerName] eq "George"}] OwnerName]]
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+    Divisor:
+\end_layout
+
+\begin_layout LyX-Code
++=========+
+\end_layout
+
+\begin_layout LyX-Code
+|OwnerName|
+\end_layout
+
+\begin_layout LyX-Code
+|string   |
+\end_layout
+
+\begin_layout LyX-Code
++=========+
+\end_layout
+
+\begin_layout LyX-Code
+|Sue      |
+\end_layout
+
+\begin_layout LyX-Code
+|George   |
+\end_layout
+
+\begin_layout LyX-Code
++=========+
+\end_layout
+
+\begin_layout LyX-Code
+Divisor:
+\end_layout
+
+\begin_layout LyX-Code
+--------
+\end_layout
+
+\begin_layout LyX-Code
+% relformat [set mediator [relation eliminate $Ownership Acquired]]
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+    Mediator:
+\end_layout
+
+\begin_layout LyX-Code
++=========+=======+
+\end_layout
+
+\begin_layout LyX-Code
+|OwnerName|DogName|
+\end_layout
+
+\begin_layout LyX-Code
+|string   |string |
+\end_layout
+
+\begin_layout LyX-Code
++=========+=======+
+\end_layout
+
+\begin_layout LyX-Code
+|Sue      |Fido   |
+\end_layout
+
+\begin_layout LyX-Code
+|Sue      |Sam    |
+\end_layout
+
+\begin_layout LyX-Code
+|George   |Fido   |
+\end_layout
+
+\begin_layout LyX-Code
+|George   |Sam    |
+\end_layout
+
+\begin_layout LyX-Code
+|Alice    |Spot   |
+\end_layout
+
+\begin_layout LyX-Code
+|Mike     |Rover  |
+\end_layout
+
+\begin_layout LyX-Code
+|Jim      |Fred   |
+\end_layout
+
+\begin_layout LyX-Code
++=========+=======+
+\end_layout
+
+\begin_layout LyX-Code
+Mediator:
+\end_layout
+
+\begin_layout LyX-Code
+---------
+\end_layout
+
+\begin_layout LyX-Code
+% relformat [relation divide $dividend $divisor $mediator]
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+    "All dogs owned by both Sue and George"
+\end_layout
+
+\begin_layout LyX-Code
++=======+
+\end_layout
+
+\begin_layout LyX-Code
+|DogName|
+\end_layout
+
+\begin_layout LyX-Code
+|string |
+\end_layout
+
+\begin_layout LyX-Code
++=======+
+\end_layout
+
+\begin_layout LyX-Code
+|Fido   |
+\end_layout
+
+\begin_layout LyX-Code
+|Sam    |
+\end_layout
+
+\begin_layout LyX-Code
++=======+
+\end_layout
+
+\begin_layout LyX-Code
+All dogs owned by both Sue and George
+\end_layout
+
+\begin_layout LyX-Code
+-------------------------------------
+\end_layout
+
+\begin_layout Standard
+Notice in this example that the quotient multiplied by the divisor yields
+ a subset of the mediator.
+ The key here is that the result includes only those tuples from the dividend
+ where all of the corresponding values from the divisor are found in the
+ mediator.
+\end_layout
+
+\begin_layout Subsubsection
+Computational Operations
+\end_layout
+
+\begin_layout Standard
+The operators discussed so far do not do any computation.
+ They have only provided a means to obtain subsets of relation values or
+ build new relation values by combining or partitioning relations.
+ In all cases the attribute values have not changed.
+ In this section the operations evaluate expressions and place the results
+ into relation values as new attributes.
+\end_layout
+
+\begin_layout Description
+extend The 
+\family typewriter
+extend
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+extend
+\end_layout
+
+\end_inset
+
+
+\family default
+ command adds new attributes to a relation and sets the values of those
+ attributes to be the result of an expression.
+ The expression values are computed using the core 
+\family typewriter
+expr
+\family default
+ command so any computation that can be done in Tcl can be placed in the
+ result.
+ Extending a relation value is a tuple-wise operation.
+ Simple units conversions are an example.
+ If we are interested in the age of a dog in months we can obtain that by
+ extending Dog, as in:
+\end_layout
+
+\begin_layout LyX-Code
+% relformat [relation eliminate
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+    [relation extend $Dog d
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+        AgeInMonths int {[tuple extract $d Age] * 12}]
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+    Age]
+\end_layout
+
+\begin_layout LyX-Code
++=======+---------+-----------+
+\begin_inset Newline newline
+\end_inset
+
+|DogName|Breed    |AgeInMonths|
+\begin_inset Newline newline
+\end_inset
+
+|string |string   |int        |
+\begin_inset Newline newline
+\end_inset
+
++=======+---------+-----------+
+\begin_inset Newline newline
+\end_inset
+
+|Fido   |Poodle   |24         |
+\begin_inset Newline newline
+\end_inset
+
+|Sam    |Collie   |48         |
+\begin_inset Newline newline
+\end_inset
+
+|Spot   |Terrier  |12         |
+\begin_inset Newline newline
+\end_inset
+
+|Rover  |Retriever|60         |
+\begin_inset Newline newline
+\end_inset
+
+|Fred   |Spaniel  |84         |
+\begin_inset Newline newline
+\end_inset
+
+|Jumper |Mutt     |36         |
+\begin_inset Newline newline
+\end_inset
+
++=======+---------+-----------+
+\end_layout
+
+\begin_layout Description
+summarize The 
+\family typewriter
+summarize
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+summarize
+\end_layout
+
+\end_inset
+
+
+\family default
+ command allows for computations that range across multiple tuples.
+ The concept is to select a subset of the tuples in a relation and generate
+ the value of a new attribute as a function of the subset.
+ Another relation is used to control how the subsets are selected and this
+ is called the 
+\emph on
+per
+\emph default
+ relation.
+ If the 
+\emph on
+per
+\emph default
+ relation is a projection of non-identifying attributes from the original
+ relation value, then there will be, in general, multiple tuples in the
+ original relation that have values that correspond to the values of the
+ 
+\emph on
+per
+\emph default
+ relation.
+ The net effect is that the 
+\emph on
+per
+\emph default
+ relation controls the selection of the subsets.
+ Consider the question of finding the number of dogs acquired in each year.
+ To accomplish this we would like to consider the 
+\family typewriter
+Ownership
+\family default
+ relation in such a way that those tuples that have the same value of 
+\family typewriter
+Acquired
+\family default
+ are together.
+ Then it is a simple matter of taking the cardinality of that subset of
+ 
+\family typewriter
+Ownership
+\family default
+.
+ This is what the summarize command accomplishes.
+\end_layout
+
+\begin_layout LyX-Code
+% relformat [relation summarize $Ownership
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+    [relation project $Ownership Acquired] o
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+    YearlyTotal int {[relation cardinality $o]}]
+\end_layout
+
+\begin_layout LyX-Code
++========+-----------+
+\end_layout
+
+\begin_layout LyX-Code
+|Acquired|YearlyTotal|
+\end_layout
+
+\begin_layout LyX-Code
+|string  |int        |
+\end_layout
+
+\begin_layout LyX-Code
++========+-----------+
+\end_layout
+
+\begin_layout LyX-Code
+|2001    |3          |
+\end_layout
+
+\begin_layout LyX-Code
+|2000    |2          |
+\end_layout
+
+\begin_layout LyX-Code
+|2002    |1          |
+\end_layout
+
+\begin_layout LyX-Code
+|2003    |1          |
+\end_layout
+
+\begin_layout LyX-Code
++========+-----------+
+\end_layout
+
+\begin_layout Standard
+We can see that the projection of Ownership.Acquired was extended by an attribute
+ whose value was calculated by taking the cardinality of another relation
+ held in the 
+\begin_inset Quotes eld
+\end_inset
+
+o
+\begin_inset Quotes erd
+\end_inset
+
+ variable.
+ The 
+\begin_inset Quotes eld
+\end_inset
+
+o
+\begin_inset Quotes erd
+\end_inset
+
+ relation is constructed by finding those tuples in Ownership that match
+ the value for each distinct value in the projection of the Acquired attribute.
+\end_layout
+
+\begin_layout Standard
+This same operation works even when the projection of the original relation
+ value has no attributes at all (the nullary projection).
+ By summarizing over the 
+\begin_inset Quotes eld
+\end_inset
+
+DEE
+\begin_inset Quotes erd
+\end_inset
+
+
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+DEE
+\end_layout
+
+\end_inset
+
+ relation, we can obtain a relation with a single attribute and a single
+ tuple to yield a single value that is a function of the entire relation.
+\end_layout
+
+\begin_layout LyX-Code
+proc ravg {rel attr} {
+\end_layout
+
+\begin_layout LyX-Code
+    set sum 0
+\end_layout
+
+\begin_layout LyX-Code
+    foreach val [relation list $rel $attr] {
+\end_layout
+
+\begin_layout LyX-Code
+        incr sum $val
+\end_layout
+
+\begin_layout LyX-Code
+    }
+\end_layout
+
+\begin_layout LyX-Code
+    return [expr {$sum / [relation cardinality $rel]}]
+\end_layout
+
+\begin_layout LyX-Code
+}
+\end_layout
+
+\begin_layout LyX-Code
+% set DEE {Relation {} {{}} {{}}}
+\end_layout
+
+\begin_layout LyX-Code
+Relation {} {{}} {{}}
+\end_layout
+
+\begin_layout LyX-Code
+% relformat [relation summarize $Dog $DEE o
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+    OverallAvgAge int {[ravg $o Age]}]
+\end_layout
+
+\begin_layout LyX-Code
++=============+
+\end_layout
+
+\begin_layout LyX-Code
+|OverallAvgAge|
+\end_layout
+
+\begin_layout LyX-Code
+|int          |
+\end_layout
+
+\begin_layout LyX-Code
++=============+
+\end_layout
+
+\begin_layout LyX-Code
+|3            |
+\end_layout
+
+\begin_layout LyX-Code
++=============+
+\end_layout
+
+\begin_layout Standard
+The 
+\begin_inset Quotes eld
+\end_inset
+
+DEE
+\begin_inset Quotes erd
+\end_inset
+
+ relation is that relation value whose attributes are the empty set and
+ whose body is the single tuple that is also the empty set
+\begin_inset Foot
+status collapsed
+
+\begin_layout Plain Layout
+Indeed the only tuple that such a relation could have.
+\end_layout
+
+\end_inset
+
+.
+ The other relation in this pair, 
+\begin_inset Quotes eld
+\end_inset
+
+DUM
+\begin_inset Quotes erd
+\end_inset
+
+
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+DUM
+\end_layout
+
+\end_inset
+
+, has an empty body.
+ These two relations play important roles as operator identities and operator
+ annihilators.
+ Clearly, computations other than just taking the cardinality are possible,
+ such as taking an average.
+ Indeed if you are using Tcl 8.5, the 
+\family typewriter
+::tcl::mathfunc
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+::tcl::mathfunc
+\end_layout
+
+\end_inset
+
+
+\family default
+ mechanism allows creating aggregate relation operations that map to the
+ 
+\family typewriter
+expr
+\family default
+ command syntax.
+\end_layout
+
+\begin_layout Subsubsection
+Introspection
+\end_layout
+
+\begin_layout Standard
+It is very much in keeping with the 
+\begin_inset Quotes eld
+\end_inset
+
+Tcl way
+\begin_inset Quotes erd
+\end_inset
+
+ to provide introspection commands.
+ For relation values, these commands report the sizes and structure of the
+ relation.
+ The commonly useful commands are 
+\family typewriter
+isempty
+\family default
+ and 
+\family typewriter
+isnotempty
+\family default
+.
+\end_layout
+
+\begin_layout Description
+cardinality The 
+\family typewriter
+cardinality
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+cardinality
+\end_layout
+
+\end_inset
+
+
+\family default
+ of a relation is the number of tuples in its body.
+\end_layout
+
+\begin_layout Description
+isempty The 
+\family typewriter
+isempty
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+isempty
+\end_layout
+
+\end_inset
+
+
+\family default
+ command is shorthand for 
+\family typewriter
+expr {[relation cardinalty $r] == 0}
+\family default
+.
+\end_layout
+
+\begin_layout Description
+isnotempty The 
+\family typewriter
+isnotempty
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+isnotempty
+\end_layout
+
+\end_inset
+
+
+\family default
+ command is shorthand for 
+\family typewriter
+expr {[relation cardinalty $r] != 0}
+\family default
+.
+\end_layout
+
+\begin_layout Description
+degree The 
+\family typewriter
+degree
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+degree
+\end_layout
+
+\end_inset
+
+
+\family default
+ of a relation is the number of attributes in its heading.
+\end_layout
+
+\begin_layout Description
+heading The 
+\family typewriter
+heading
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+heading
+\end_layout
+
+\end_inset
+
+
+\family default
+ command returns a three element list that is the first three parts of the
+ string representation of a relation.
+\end_layout
+
+\begin_layout Description
+attributes The 
+\family typewriter
+attributes
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+attributes
+\end_layout
+
+\end_inset
+
+
+\family default
+ command returns a list of attributes for the argument relation.
+\end_layout
+
+\begin_layout Description
+identifiers The 
+\family typewriter
+identifiers
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+identifiers
+\end_layout
+
+\end_inset
+
+
+\family default
+ command returns the list of identifiers for the given relation.
+ Each identifier, in turn, is a list of attributes.
+\end_layout
+
+\begin_layout LyX-Code
+% relation cardinality $Dog
+\end_layout
+
+\begin_layout LyX-Code
+6
+\end_layout
+
+\begin_layout LyX-Code
+% relation isempty [relation emptyof $Dog]
+\end_layout
+
+\begin_layout LyX-Code
+1
+\end_layout
+
+\begin_layout LyX-Code
+% relation isnotempty $Dog
+\end_layout
+
+\begin_layout LyX-Code
+1
+\end_layout
+
+\begin_layout LyX-Code
+% relation degree $Dog
+\end_layout
+
+\begin_layout LyX-Code
+3
+\end_layout
+
+\begin_layout LyX-Code
+% relation heading $Dog
+\end_layout
+
+\begin_layout LyX-Code
+Relation {DogName string Breed string Age int} DogName
+\end_layout
+
+\begin_layout LyX-Code
+% relation attributes $Dog
+\end_layout
+
+\begin_layout LyX-Code
+DogName Breed Age
+\end_layout
+
+\begin_layout LyX-Code
+% relation identifiers $Dog
+\end_layout
+
+\begin_layout LyX-Code
+DogName
+\end_layout
+
+\begin_layout Subsubsection
+Interface to Other Tcl Data Types
+\end_layout
+
+\begin_layout Standard
+There are a number of cases where the particular structure of a relation
+ value matches that of an existing Tcl data type.
+ In these cases, TclRAL provides commands to conveniently move data from
+ relation values into other Tcl data types.
+ The goal here is to make it easier to interface relation data with other,
+ presumably pre-existing Tcl commands.
+\end_layout
+
+\begin_layout Standard
+First we recognize that a Tuple value can represent a Relation value of
+ cardinality one without any loss of attribute values.
+ So we provide a means to extract the tuple from a relation that is of cardinali
+ty one.
+ The 
+\family typewriter
+relation
+\begin_inset space ~
+\end_inset
+
+tuple
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+tuple
+\end_layout
+
+\end_inset
+
+
+\family default
+ command will convert a relation value that contains a single tuple into
+ a tuple value.
+ It is an error to invoke 
+\family typewriter
+relation
+\begin_inset space ~
+\end_inset
+
+tuple
+\family default
+ with a relation value of cardinality that is not one.
+ With the tuple value, all the tuple commands discussed above are available.
+ Most useful are 
+\family typewriter
+tuple
+\begin_inset space ~
+\end_inset
+
+assign
+\family default
+ to assign attributes into Tcl variables and 
+\family typewriter
+tuple
+\begin_inset space ~
+\end_inset
+
+extract
+\family default
+ to obtain one or more attribute values from a tuple.
+ Indeed the need to move attribute values into Tcl variables or values is
+ common enough to warrant the 
+\family typewriter
+relation
+\begin_inset space ~
+\end_inset
+
+assign
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+assign
+\end_layout
+
+\end_inset
+
+
+\family default
+ and 
+\family typewriter
+relation
+\begin_inset space ~
+\end_inset
+
+extract
+\family default
+
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+extract
+\end_layout
+
+\end_inset
+
+.
+ These commands are short hand commands for invoking the corresponding tuple
+ commands on the return value of 
+\family typewriter
+relation
+\begin_inset space ~
+\end_inset
+
+tuple
+\family default
+.
+ Consider:
+\end_layout
+
+\begin_layout LyX-Code
+set mike [relation choose $Owner OwnerName Mike]
+\end_layout
+
+\begin_layout LyX-Code
+% relation cardinality $mike
+\end_layout
+
+\begin_layout LyX-Code
+1
+\end_layout
+
+\begin_layout LyX-Code
+% relation assign $mike
+\end_layout
+
+\begin_layout LyX-Code
+2
+\end_layout
+
+\begin_layout LyX-Code
+% puts $OwnerName
+\end_layout
+
+\begin_layout LyX-Code
+Mike
+\end_layout
+
+\begin_layout LyX-Code
+% puts $Age
+\end_layout
+
+\begin_layout LyX-Code
+50
+\end_layout
+
+\begin_layout LyX-Code
+% puts [relation extract $mike OwnerName]
+\end_layout
+
+\begin_layout LyX-Code
+Mike
+\end_layout
+
+\begin_layout LyX-Code
+% puts [relation extract $mike OwnerName Age]
+\end_layout
+
+\begin_layout LyX-Code
+Mike 50
+\end_layout
+
+\begin_layout Standard
+Both arrays and dictionaries
+\begin_inset Foot
+status collapsed
+
+\begin_layout Plain Layout
+TclRAL must be build against Tcl 8.5 in order to obtain support for dictionary
+ types.
+\end_layout
+
+\end_inset
+
+ provide a simple one-to-one mapping of a key to a value.
+ In relation terms, this implies that, for relation values that have a single
+ identifier and that identifier consists of a single attribute and where
+ there is only one other attribute in the relation, the tuples in the body
+ of the relation can be stored in a Tcl array or dictionary without any
+ loss of attribute values.
+ Although this is a very specialized condition for a relation value, it
+ is not an uncommon one and having commands to move data to other types
+ of Tcl values is particularly convenient.
+\end_layout
+
+\begin_layout Standard
+In our example, the Owner relvar is a simple mapping of the owner's name
+ to the owner's age and therefore matches the form to be transformed into
+ a dictionary or an array.
+\end_layout
+
+\begin_layout LyX-Code
+% dict get [relation dict $Owner] Mike
+\end_layout
+
+\begin_layout LyX-Code
+50
+\end_layout
+
+\begin_layout LyX-Code
+% relation array $Owner ownerarray
+\end_layout
+
+\begin_layout LyX-Code
+% parray ownerarray
+\end_layout
+
+\begin_layout LyX-Code
+ownerarray(Alice)  = 30
+\end_layout
+
+\begin_layout LyX-Code
+ownerarray(George) = 35
+\end_layout
+
+\begin_layout LyX-Code
+ownerarray(Jim)    = 42
+\end_layout
+
+\begin_layout LyX-Code
+ownerarray(Mike)   = 50
+\end_layout
+
+\begin_layout LyX-Code
+ownerarray(Sue)    = 24
+\end_layout
+
+\begin_layout Standard
+The projection of a relation value can also be used to create such simple
+ mappings, as in:
+\end_layout
+
+\begin_layout LyX-Code
+% relation array [relation project $Dog DogName Breed] dogbreed
+\end_layout
+
+\begin_layout LyX-Code
+% parray dogbreed
+\end_layout
+
+\begin_layout LyX-Code
+dogbreed(Fido)   = Poodle
+\end_layout
+
+\begin_layout LyX-Code
+dogbreed(Fred)   = Spaniel
+\end_layout
+
+\begin_layout LyX-Code
+dogbreed(Jumper) = Mutt
+\end_layout
+
+\begin_layout LyX-Code
+dogbreed(Rover)  = Retriever
+\end_layout
+
+\begin_layout LyX-Code
+dogbreed(Sam)    = Collie
+\end_layout
+
+\begin_layout LyX-Code
+dogbreed(Spot)   = Terrier
+\end_layout
+
+\begin_layout Standard
+Lists are a very important and useful data type in Tcl.
+ The 
+\family typewriter
+relation
+\begin_inset space ~
+\end_inset
+
+list
+\family default
+ command extracts the value of an attribute from all the tuples in a relation.
+ If that relation happens to be of degree one or if the attribute forms
+ an identifier, then the resulting list is also a set and that set may be
+ used with the 
+\family typewriter
+set
+\family default
+ package from 
+\noun on
+tcllib
+\noun default
+.
+\end_layout
+
+\begin_layout LyX-Code
+% relation list $Dog DogName
+\end_layout
+
+\begin_layout LyX-Code
+Fido Sam Spot Rover Fred Jumper
+\end_layout
+
+\begin_layout Standard
+TclRAL also provides commands to interface to the 
+\family typewriter
+matrix
+\family default
+ package in 
+\noun on
+tcllib
+\noun default
+.
+ A matrix can hold any relation value without loss of any attribute values.
+ The 
+\family typewriter
+relformat
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+relformat
+\end_layout
+
+\end_inset
+
+
+\family default
+ command that we have already encountered, is actually implemented by converting
+ a relation value into a 
+\family typewriter
+matrix
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+matrix
+\end_layout
+
+\end_inset
+
+
+\family default
+ and then using the 
+\family typewriter
+report
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+report
+\end_layout
+
+\end_inset
+
+
+\family default
+ package to generate text.
+ This approach gives considerable flexibility for controlling the form of
+ the output.
+\end_layout
+
+\begin_layout Subsubsection
+Miscellaneous Operations
+\end_layout
+
+\begin_layout Standard
+There are always a few items in any categorization that seem to defy the
+ pattern.
+ In this section we discuss some of the more unusual operations in TclRAL.
+ The commands in this section represent operations that are either clumsy
+ to compute using the other relation operators or for which there is a significa
+nt implementation advantage when doing the computation internally.
+\end_layout
+
+\begin_layout Description
+tclose The 
+\family typewriter
+tclose
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+tclose
+\end_layout
+
+\end_inset
+
+
+\family default
+ command computes the transitive closure
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+transitive closure
+\end_layout
+
+\end_inset
+
+ of its relation value argument.
+ The transitive closure operation is useful when dealing with hierarchically
+ structured data.
+ One familiar example is that of dealing with include file dependencies
+ in 
+\begin_inset Quotes eld
+\end_inset
+
+C
+\begin_inset Quotes erd
+\end_inset
+
+ language source code.
+ If some 
+\begin_inset Quotes eld
+\end_inset
+
+C
+\begin_inset Quotes erd
+\end_inset
+
+ source file includes a file which in turn includes other files, the original
+ source needs to be rebuilt when any of the included files are modified.
+ This implies that there is a graph of dependencies and we need to know
+ if there is any path from a 
+\begin_inset Quotes eld
+\end_inset
+
+C
+\begin_inset Quotes erd
+\end_inset
+
+ source file to some included file regardless of how many intervening files
+ there might be.
+ The 
+\family typewriter
+tclose
+\family default
+ command can compute this information.
+ It operates on binary relation values and has a tuple in the result if
+ there exists a path between any nodes of the implied graph.
+ Consider the following relation value that defines which files immediately
+ include other files in a set of 
+\begin_inset Quotes eld
+\end_inset
+
+C
+\begin_inset Quotes erd
+\end_inset
+
+ source files.
+ This data can be gleaned from the files by examining each 
+\begin_inset Quotes eld
+\end_inset
+
+C
+\begin_inset Quotes erd
+\end_inset
+
+ source file in isolation.
+ If we are then interested in finding the list of files whose modification
+ dates must be examined to determine if 
+\family typewriter
+a.c
+\family default
+ needs to be rebuilt we could proceed as follows.
+\end_layout
+
+\begin_layout LyX-Code
+set includes {
+\end_layout
+
+\begin_layout LyX-Code
+    Relation
+\end_layout
+
+\begin_layout LyX-Code
+    {Src string Inc string}
+\end_layout
+
+\begin_layout LyX-Code
+    {{Src Inc}}
+\end_layout
+
+\begin_layout LyX-Code
+    {
+\end_layout
+
+\begin_layout LyX-Code
+        {Src a.c Inc a.h}
+\end_layout
+
+\begin_layout LyX-Code
+        {Src a.c Inc b.h}
+\end_layout
+
+\begin_layout LyX-Code
+        {Src a.h Inc aa.h}
+\end_layout
+
+\begin_layout LyX-Code
+        {Src aa.h Inc stdio.h}
+\end_layout
+
+\begin_layout LyX-Code
+        {Src b.h Inc stdio.h}
+\end_layout
+
+\begin_layout LyX-Code
+    }
+\end_layout
+
+\begin_layout LyX-Code
+}
+\end_layout
+
+\begin_layout LyX-Code
+% relformat [set tclosure [relation tclose $includes]]
+\end_layout
+
+\begin_layout LyX-Code
++======+=======+
+\end_layout
+
+\begin_layout LyX-Code
+|Src   |Inc    |
+\end_layout
+
+\begin_layout LyX-Code
+|string|string |
+\end_layout
+
+\begin_layout LyX-Code
++======+=======+
+\end_layout
+
+\begin_layout LyX-Code
+|a.c   |a.h    |
+\end_layout
+
+\begin_layout LyX-Code
+|a.c   |b.h    |
+\end_layout
+
+\begin_layout LyX-Code
+|a.c   |aa.h   |
+\end_layout
+
+\begin_layout LyX-Code
+|a.c   |stdio.h|
+\end_layout
+
+\begin_layout LyX-Code
+|a.h   |aa.h   |
+\end_layout
+
+\begin_layout LyX-Code
+|a.h   |stdio.h|
+\end_layout
+
+\begin_layout LyX-Code
+|b.h   |stdio.h|
+\end_layout
+
+\begin_layout LyX-Code
+|aa.h  |stdio.h|
+\end_layout
+
+\begin_layout LyX-Code
++======+=======+
+\end_layout
+
+\begin_layout LyX-Code
+% relation list [relation project
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+    [relation restrictwith $tclosure {$Src eq "a.c"}]
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+    Inc]
+\end_layout
+
+\begin_layout LyX-Code
+a.h b.h aa.h stdio.h
+\end_layout
+
+\begin_layout LyX-Code
+
+\end_layout
+
+\begin_layout Description
+rank The 
+\family typewriter
+rank
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+rank
+\end_layout
+
+\end_inset
+
+
+\family default
+ command adds a new integer attribute that is the relative ranking of another
+ attribute.
+ The ranking is determined conceptually by sorting the relation value on
+ an given attribute and determining, for each tuple, how many of the tuples
+ in the relation have a value of the attribute that is less than or equal
+ to that of the given tuple.
+ This command is particularly convenient when trying to determine some ordinal
+ relationship among the values of an attribute.
+ For example, suppose we wish to know the two youngest dogs.
+ We could proceed as in:
+\end_layout
+
+\begin_layout LyX-Code
+% relformat [set rankedDogs [relation rank $Dog Age AgeRank]]
+\end_layout
+
+\begin_layout LyX-Code
++=======+---------+---+-------+
+\end_layout
+
+\begin_layout LyX-Code
+|DogName|Breed    |Age|AgeRank|
+\end_layout
+
+\begin_layout LyX-Code
+|string |string   |int|int    |
+\end_layout
+
+\begin_layout LyX-Code
++=======+---------+---+-------+
+\end_layout
+
+\begin_layout LyX-Code
+|Fido   |Poodle   |2  |2      |
+\end_layout
+
+\begin_layout LyX-Code
+|Sam    |Collie   |4  |4      |
+\end_layout
+
+\begin_layout LyX-Code
+|Spot   |Terrier  |1  |1      |
+\end_layout
+
+\begin_layout LyX-Code
+|Rover  |Retriever|5  |5      |
+\end_layout
+
+\begin_layout LyX-Code
+|Fred   |Spaniel  |7  |6      |
+\end_layout
+
+\begin_layout LyX-Code
+|Jumper |Mutt     |3  |3      |
+\end_layout
+
+\begin_layout LyX-Code
++=======+---------+---+-------+
+\end_layout
+
+\begin_layout LyX-Code
+% relformat [relation project
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+    [relation restrictwith $rankedDogs {$AgeRank <= 2}]
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+    DogName]
+\end_layout
+
+\begin_layout LyX-Code
++=======+
+\end_layout
+
+\begin_layout LyX-Code
+|DogName|
+\end_layout
+
+\begin_layout LyX-Code
+|string |
+\end_layout
+
+\begin_layout LyX-Code
++=======+
+\end_layout
+
+\begin_layout LyX-Code
+|Fido   |
+\end_layout
+
+\begin_layout LyX-Code
+|Spot   |
+\end_layout
+
+\begin_layout LyX-Code
++=======+
+\end_layout
+
+\begin_layout Description
+tag The 
+\family typewriter
+tag
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+tag
+\end_layout
+
+\end_inset
+
+
+\family default
+ command creates a new identifier that is an incrementing integer value
+ based on the ordering of an attribute.
+ It is often useful to tag a relation when you wish to project away an identifyi
+ng attribute and avoid losing any potential duplicates.
+ It is also possible to create new identifiers from an existing identifier
+ by adding an ordering attribute.
+ For example, the following expression creates a new identifier {OwnerName
+ AcqTag} which shows the order that a dog was acquired by a particular Owner.
+\end_layout
+
+\begin_layout LyX-Code
+% relformat [relation tag $Ownership -ascending Acquired
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+    -within OwnerName AcqTag]
+\end_layout
+
+\begin_layout LyX-Code
++=========+=======+--------+======+
+\end_layout
+
+\begin_layout LyX-Code
+|OwnerName|DogName|Acquired|AcqTag|
+\end_layout
+
+\begin_layout LyX-Code
+|string   |string |string  |int   |
+\end_layout
+
+\begin_layout LyX-Code
++=========+=======+--------+======+
+\end_layout
+
+\begin_layout LyX-Code
+|Sue      |Sam    |2000    |0     |
+\end_layout
+
+\begin_layout LyX-Code
+|George   |Sam    |2000    |0     |
+\end_layout
+
+\begin_layout LyX-Code
+|George   |Fido   |2001    |1     |
+\end_layout
+
+\begin_layout LyX-Code
+|Alice    |Spot   |2001    |0     |
+\end_layout
+
+\begin_layout LyX-Code
+|Sue      |Fido   |2001    |1     |
+\end_layout
+
+\begin_layout LyX-Code
+|Mike     |Rover  |2002    |0     |
+\end_layout
+
+\begin_layout LyX-Code
+|Jim      |Fred   |2003    |0     |
+\end_layout
+
+\begin_layout LyX-Code
++=========+=======+--------+======+
+\end_layout
+
+\begin_layout Description
+group The 
+\family typewriter
+group
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+group
+\end_layout
+
+\end_inset
+
+
+\family default
+ command produces a new relation by combining several attributes into a
+ relation valued attribute.
+ This gives a form of nesting.
+\end_layout
+
+\begin_layout LyX-Code
+% relformat [relation group $Ownership
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+    DogAcquisition DogName Acquired]
+\end_layout
+
+\begin_layout LyX-Code
++=========+------------------+
+\end_layout
+
+\begin_layout LyX-Code
+|OwnerName|DogAcquisition    |
+\end_layout
+
+\begin_layout LyX-Code
+|string   |Relation          |
+\end_layout
+
+\begin_layout LyX-Code
++=========+------------------+
+\end_layout
+
+\begin_layout LyX-Code
+|Sue      |+=======+--------+|
+\end_layout
+
+\begin_layout LyX-Code
+|         ||DogName|Acquired||
+\end_layout
+
+\begin_layout LyX-Code
+|         ||string |string  ||
+\end_layout
+
+\begin_layout LyX-Code
+|         |+=======+--------+|
+\end_layout
+
+\begin_layout LyX-Code
+|         ||Fido   |2001    ||
+\end_layout
+
+\begin_layout LyX-Code
+|         ||Sam    |2000    ||
+\end_layout
+
+\begin_layout LyX-Code
+|         |+=======+--------+|
+\end_layout
+
+\begin_layout LyX-Code
+|George   |+=======+--------+|
+\end_layout
+
+\begin_layout LyX-Code
+|         ||DogName|Acquired||
+\end_layout
+
+\begin_layout LyX-Code
+|         ||string |string  ||
+\end_layout
+
+\begin_layout LyX-Code
+|         |+=======+--------+|
+\end_layout
+
+\begin_layout LyX-Code
+|         ||Fido   |2001    ||
+\end_layout
+
+\begin_layout LyX-Code
+|         ||Sam    |2000    ||
+\end_layout
+
+\begin_layout LyX-Code
+|         |+=======+--------+|
+\end_layout
+
+\begin_layout LyX-Code
+|Alice    |+=======+--------+|
+\end_layout
+
+\begin_layout LyX-Code
+|         ||DogName|Acquired||
+\end_layout
+
+\begin_layout LyX-Code
+|         ||string |string  ||
+\end_layout
+
+\begin_layout LyX-Code
+|         |+=======+--------+|
+\end_layout
+
+\begin_layout LyX-Code
+|         ||Spot   |2001    ||
+\end_layout
+
+\begin_layout LyX-Code
+|         |+=======+--------+|
+\end_layout
+
+\begin_layout LyX-Code
+|Mike     |+=======+--------+|
+\end_layout
+
+\begin_layout LyX-Code
+|         ||DogName|Acquired||
+\end_layout
+
+\begin_layout LyX-Code
+|         ||string |string  ||
+\end_layout
+
+\begin_layout LyX-Code
+|         |+=======+--------+|
+\end_layout
+
+\begin_layout LyX-Code
+|         ||Rover  |2002    ||
+\end_layout
+
+\begin_layout LyX-Code
+|         |+=======+--------+|
+\end_layout
+
+\begin_layout LyX-Code
+|Jim      |+=======+--------+|
+\end_layout
+
+\begin_layout LyX-Code
+|         ||DogName|Acquired||
+\end_layout
+
+\begin_layout LyX-Code
+|         ||string |string  ||
+\end_layout
+
+\begin_layout LyX-Code
+|         |+=======+--------+|
+\end_layout
+
+\begin_layout LyX-Code
+|         ||Fred   |2003    ||
+\end_layout
+
+\begin_layout LyX-Code
+|         |+=======+--------+|
+\end_layout
+
+\begin_layout LyX-Code
++=========+------------------+
+\end_layout
+
+\begin_layout Description
+ungroup The 
+\family typewriter
+ungroup
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+ungroup
+\end_layout
+
+\end_inset
+
+
+\family default
+ command inverts the operation of the group command, 
+\emph on
+i.e.
+
+\emph default
+ a relation valued attribute is 
+\begin_inset Quotes eld
+\end_inset
+
+flattened
+\begin_inset Quotes erd
+\end_inset
+
+ into a set of scalar attributes.
+\end_layout
+
+\begin_layout Description
+tuple For relations that contain a single tuple, the 
+\family typewriter
+tuple
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+tuple
+\end_layout
+
+\end_inset
+
+
+\family default
+ command converts the Relation type value to a Tuple type value.
+\end_layout
+
+\begin_layout Description
+iteration There are times when it is convenient to iterate across the tuples
+ of a relation.
+ Iteration is not needed as often as one might first expect since most relation
+ operators function across the entire set.
+ Indeed one of the more powerful aspects of the relational approach is the
+ ability to do set-wise operations obviating the need to write iteration
+ loops repeatedly.
+ However, when generating output and under some other circumstances, examining
+ a relation on a tuple by tuple basis and in some particular tuple order
+ is necessary.
+ For this, TclRAL provides the 
+\family typewriter
+foreach
+\family default
+ command.
+ By analogy with the 
+\family typewriter
+foreach
+\family default
+ command in the Tcl core, 
+\family typewriter
+relation
+\begin_inset space ~
+\end_inset
+
+foreach
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+foreach
+\end_layout
+
+\end_inset
+
+
+\family default
+ makes each tuple of a relation available as a relation of cardinality one.
+ It also allows for visiting the tuples in the relation in a particular
+ order.
+\end_layout
+
+\begin_layout LyX-Code
+% relation foreach d $Dog -descending DogName {
+\end_layout
+
+\begin_layout LyX-Code
+      tuple assign [relation tuple $d]
+\end_layout
+
+\begin_layout LyX-Code
+      puts $DogName
+\end_layout
+
+\begin_layout LyX-Code
+  }
+\end_layout
+
+\begin_layout LyX-Code
+Spot
+\end_layout
+
+\begin_layout LyX-Code
+Sam
+\end_layout
+
+\begin_layout LyX-Code
+Rover
+\end_layout
+
+\begin_layout LyX-Code
+Jumper
+\end_layout
+
+\begin_layout LyX-Code
+Fred
+\end_layout
+
+\begin_layout LyX-Code
+Fido
+\end_layout
+
+\begin_layout Description
+rename For operations that create relation values of a different type from
+ their arguments, the possibility exists that the result would have duplicated
+ attribute names if the arguments had at least on common attribute name.
+ The 
+\family typewriter
+rename
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+rename
+\end_layout
+
+\end_inset
+
+
+\family default
+ command allows attributes names to be changed and provides a means to avoid
+ the errors that would otherwise arise form duplicated attribute names.
+\end_layout
+
+\begin_layout Subsection
+Relvar Operations
+\end_layout
+
+\begin_layout Standard
+TclRAL defines a separate variable space specifically to store relation
+ values.
+ This may seem unusual since as we have already seen, ordinary Tcl variables
+ readily hold relation values.
+ In a database situation, relvars hold those relation values that persist
+ in the database.
+ Although TclRAL does not provide any transparent persistence, relvars do
+ serve to strictly partition those operations that modify relation values
+ in place from those that return new relation values (
+\emph on
+i.e.
+
+\emph default
+ 
+\family typewriter
+::ral::relvar
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+::ral::relvar
+\end_layout
+
+\end_inset
+
+
+\family default
+ commands 
+\emph on
+vs.
+
+\emph default
+ 
+\family typewriter
+::ral::relation
+\family default
+ commands).
+ Also, relvars do serve as the basis of the load/store persistence that
+ is provided by TclRAL.
+ Another important use of relvars is for defining integrity constraints.
+ Integrity constraints are discussed in more detail below.
+\end_layout
+
+\begin_layout Standard
+The relvar variable names follow the familiar namespace resolved names like
+ ordinary Tcl variables.
+ Indeed each time a relvar is created, a corresponding Tcl variable of the
+ same name is also created.
+ Thus a relvar named 
+\family typewriter
+::myspace::Dog
+\family default
+ would have a Tcl variable also named 
+\family typewriter
+::myspace::Dog
+\family default
+.
+ There are a few implications of this.
+ In order to create the relvar, 
+\family typewriter
+::myspace::Dog,
+\family default
+ the namespace, 
+\family typewriter
+::myspace,
+\family default
+ must already exist, as would be the case for creating an ordinary Tcl variable.
+ TclRAL places a trace on the Tcl variable to prevent it from being written.
+ All writes to relvars should come via TclRAL and preventing writes is meant
+ to help accidental coding errors since determined scripts can overcome
+ the trace placed by TclRAL.
+ However, the existence of the Tcl variable that holds the same relation
+ value as the relvar is very convenient for programming since the values
+ held in relvars are often the starting terms for a relational expression.
+ The relvar variable space is resolved in the same way as for Tcl variable
+ name resolution.
+ Relvars created without fully resolved names (
+\emph on
+i.e.
+
+\emph default
+ without a leading 
+\begin_inset Quotes eld
+\end_inset
+
+::
+\begin_inset Quotes erd
+\end_inset
+
+) are placed in the current namespace.
+ Relative relvar references (
+\emph on
+i.e.
+
+\emph default
+ without a leading 
+\begin_inset Quotes eld
+\end_inset
+
+::
+\begin_inset Quotes erd
+\end_inset
+
+) are resolved first in the current namespace and then in the global namespace.
+ These rules also apply to the names given to integrity constraints.
+ This gives us a means of holding a set of relvars and their constraints
+ together in a namespace-like arrangement where naming conflicts can be
+ more easily avoided.
+\end_layout
+
+\begin_layout Standard
+The operations provided for relvars are given in the next sections.
+ Again we have grouped the operations into logically convenient sections.
+\end_layout
+
+\begin_layout Subsubsection
+Assignment
+\end_layout
+
+\begin_layout Standard
+A fundamental relvar operation is to assign the relvar a value.
+ It is important to remember that you may not change the type of a relvar
+ by assignment.
+ Only relation values that are of the same type as the relvar may be assigned
+ to the relvar.
+\end_layout
+
+\begin_layout Description
+creation A relvar is created using the 
+\family typewriter
+relvar
+\begin_inset space ~
+\end_inset
+
+create
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+create
+\end_layout
+
+\end_inset
+
+
+\family default
+ command.
+ This establishes the type of relation value that may be assigned to the
+ relvar.
+ The created relvar has an empty body.
+\end_layout
+
+\begin_layout Description
+set By analogy to the Tcl core command, 
+\family typewriter
+set
+\family default
+, 
+\family typewriter
+relvar
+\begin_inset space ~
+\end_inset
+
+set
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+set
+\end_layout
+
+\end_inset
+
+
+\family default
+ assigns a new value to a relvar if one is supplied and returns the current
+ value in any case.
+\end_layout
+
+\begin_layout Description
+unset Relvars may be deleted by 
+\family typewriter
+unset
+\family default
+ting
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+unset
+\end_layout
+
+\end_inset
+
+ them.
+ Again, this command follows the pattern of the core Tcl 
+\family typewriter
+unset
+\family default
+ command.
+ Note however, that you may not unset relvars that have constraints defined
+ upon them.
+ Those constraints must be deleted first.
+\end_layout
+
+\begin_layout Subsubsection
+Insertion
+\end_layout
+
+\begin_layout Standard
+A relvar may be populated by inserting tuple values.
+ The 
+\family typewriter
+relvar
+\begin_inset space ~
+\end_inset
+
+insert
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+insert
+\end_layout
+
+\end_inset
+
+
+\family default
+ command will insert zero or more tuple values into a relvar.
+ Insertion semantics are such that an error is raised by any attempt to
+ insert a duplicate tuple.
+\end_layout
+
+\begin_layout LyX-Code
+% relformat [relvar create MyDog [relation heading $Dog]]
+\end_layout
+
+\begin_layout LyX-Code
++=======+------+---+
+\end_layout
+
+\begin_layout LyX-Code
+|DogName|Breed |Age|
+\end_layout
+
+\begin_layout LyX-Code
+|string |string|int|
+\end_layout
+
+\begin_layout LyX-Code
++=======+------+---+
+\end_layout
+
+\begin_layout LyX-Code
++=======+------+---+
+\end_layout
+
+\begin_layout LyX-Code
+% relformat [relvar insert MyDog
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+    {Age 10 DogName Joan Breed {Afghan Hound}}
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+    {Breed Dachshund Age 1 DogName Alfred}]
+\end_layout
+
+\begin_layout LyX-Code
++=======+------------+---+
+\end_layout
+
+\begin_layout LyX-Code
+|DogName|Breed       |Age|
+\end_layout
+
+\begin_layout LyX-Code
+|string |string      |int|
+\end_layout
+
+\begin_layout LyX-Code
++=======+------------+---+
+\end_layout
+
+\begin_layout LyX-Code
+|Joan   |Afghan Hound|10 |
+\end_layout
+
+\begin_layout LyX-Code
+|Alfred |Dachshund   |1  |
+\end_layout
+
+\begin_layout LyX-Code
++=======+------------+---+
+\end_layout
+
+\begin_layout Subsubsection
+Deletion
+\end_layout
+
+\begin_layout Standard
+Two forms of deletion are provided.
+ One form is very general and the other is useful when a set of identifying
+ attributes is known.
+ In all cases the number of tuples deleted is returned.
+\end_layout
+
+\begin_layout Description
+delete In its first form, the 
+\family typewriter
+delete
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+delete
+\end_layout
+
+\end_inset
+
+
+\family default
+ command will delete those tuples from a relvar where an expression evaluates
+ to true.
+ The value of each tuple in the relvar is made available in a Tcl variable.
+\end_layout
+
+\begin_layout Description
+deleteone In many cases you know the value of a set of identifying attributes
+ and examining all the tuples in a relation to find the one the delete is
+ not necessary.
+ For this case the 
+\family typewriter
+deleteone
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+deleteone
+\end_layout
+
+\end_inset
+
+
+\family default
+ command is useful.
+\end_layout
+
+\begin_layout LyX-Code
+% relvar delete MyDog d {[tuple extract $d Age] > 2}
+\end_layout
+
+\begin_layout LyX-Code
+1
+\end_layout
+
+\begin_layout LyX-Code
+% relformat $MyDog
+\end_layout
+
+\begin_layout LyX-Code
++=======+---------+---+
+\end_layout
+
+\begin_layout LyX-Code
+|DogName|Breed    |Age|
+\end_layout
+
+\begin_layout LyX-Code
+|string |string   |int|
+\end_layout
+
+\begin_layout LyX-Code
++=======+---------+---+
+\end_layout
+
+\begin_layout LyX-Code
+|Alfred |Dachshund|1  |
+\end_layout
+
+\begin_layout LyX-Code
++=======+---------+---+
+\end_layout
+
+\begin_layout LyX-Code
+% relvar deleteone MyDog DogName Alfred
+\end_layout
+
+\begin_layout LyX-Code
+1
+\end_layout
+
+\begin_layout LyX-Code
+% relformat $MyDog
+\end_layout
+
+\begin_layout LyX-Code
++=======+------+---+
+\end_layout
+
+\begin_layout LyX-Code
+|DogName|Breed |Age|
+\end_layout
+
+\begin_layout LyX-Code
+|string |string|int|
+\end_layout
+
+\begin_layout LyX-Code
++=======+------+---+
+\end_layout
+
+\begin_layout LyX-Code
++=======+------+---+
+\end_layout
+
+\begin_layout Subsubsection
+Update
+\end_layout
+
+\begin_layout Standard
+Like 
+\family typewriter
+delete
+\family default
+, 
+\family typewriter
+update
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+update
+\end_layout
+
+\end_inset
+
+
+\family default
+ also comes in two forms for the same reason.
+ For 
+\family typewriter
+update
+\family default
+, an expression determines which tuples are to be updated.
+ For 
+\family typewriter
+updateone
+\family default
+
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+updateone
+\end_layout
+
+\end_inset
+
+, the tuple to update is determined by supplying the attribute values for
+ an identifier.
+ In both cases a script is executed for each tuple to update.
+ The script can modify the tuple to be updated and whatever the value is
+ at the end of the script is updated into the relvar.
+\end_layout
+
+\begin_layout LyX-Code
+% relvar update MyDog d {[tuple extract $d Age] > 2} {
+\end_layout
+
+\begin_layout LyX-Code
+    tuple update d Age [expr {[tuple extract $d Age] + 1}]
+\end_layout
+
+\begin_layout LyX-Code
+  }
+\end_layout
+
+\begin_layout LyX-Code
+1
+\end_layout
+
+\begin_layout LyX-Code
+% relvar updateone MyDog d {DogName Alfred} {
+\end_layout
+
+\begin_layout LyX-Code
+    tuple update d Age [expr {[tuple extract $d Age] + 1}]
+\end_layout
+
+\begin_layout LyX-Code
+  }
+\end_layout
+
+\begin_layout LyX-Code
+1
+\end_layout
+
+\begin_layout LyX-Code
+% relformat $MyDog
+\end_layout
+
+\begin_layout LyX-Code
++=======+------------+---+
+\end_layout
+
+\begin_layout LyX-Code
+|DogName|Breed       |Age|
+\end_layout
+
+\begin_layout LyX-Code
+|string |string      |int|
+\end_layout
+
+\begin_layout LyX-Code
++=======+------------+---+
+\end_layout
+
+\begin_layout LyX-Code
+|Joan   |Afghan Hound|11 |
+\end_layout
+
+\begin_layout LyX-Code
+|Alfred |Dachshund   |2  |
+\end_layout
+
+\begin_layout LyX-Code
++=======+------------+---+
+\end_layout
+
+\begin_layout Subsubsection
+Introspection
+\end_layout
+
+\begin_layout Standard
+The only introspection command provided by relvars is to obtain a list of
+ the names of all the relvars.
+ The 
+\family typewriter
+relvar names
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+names
+\end_layout
+
+\end_inset
+
+
+\family default
+ command returns a list of all the relvar names in fully resolved form.
+ Less than all the names can be obtain by supplying an optional matching
+ pattern argument.
+\end_layout
+
+\begin_layout Subsection
+\begin_inset CommandInset label
+LatexCommand label
+name "sub:Relvar-Constraints"
+
+\end_inset
+
+Relvar Constraints
+\end_layout
+
+\begin_layout Standard
+Up to this point we have been mainly concerned with the structure and operations
+ that can be performed on relations.
+ Another important aspect of managing data is integrity.
+ We have seen some integrity constraints already.
+ In this section we will discuss how TclRAL constrains the values of relations
+ helping to insure correct program operation.
+\end_layout
+
+\begin_layout Standard
+First, since each attribute has a declared data type, TclRAL insures that
+ the value of each attribute can be interpreted as that data type.
+ Indeed each tuple and relation attribute is converted to the declared type
+ when the value is of the attribute is set and any attempt to set an attribute
+ to a value that cannot be interpreted as the declared data type will cause
+ an error.
+ One important reason for this is to insure that calculation type operations
+ on values (
+\emph on
+e.g.
+
+\emph default
+ 
+\series bold
+\shape smallcaps
+summarize
+\series default
+\shape default
+) will not result in errors because the data values are not of the proper
+ arithmetic type.
+ Of course, any attribute can be set to be the 
+\family typewriter
+string
+\family default
+ type and all values are allowed.
+ In this way, one can then choose to interpret the string in a variety of
+ ways as is commonly done in Tcl.
+\end_layout
+
+\begin_layout Standard
+Another important constraint is that all relations must have at least one
+ identifier and duplicated tuples with respect to the identifiers of a relation
+ are not allowed.
+ Since relations are fundamentally sets and sets do not have duplicate members,
+ constraining the body of a relation to have tuples that are unique with
+ respect to the identifiers insures all the amazing properties that sets
+ have.
+ Most of the work to insure the set aspect of relations happens automatically
+ in the various operators.
+ For example, 
+\series bold
+\shape smallcaps
+project
+\series default
+\shape default
+ing a set of non-identifying attributes will result in a relation value
+ that potentially can have tuples elided since they would otherwise be duplicate
+s.
+ This is sometimes disconcerting to programmers when they first begin working
+ with relations but is essential to maintain the fundamental set notion
+ of relations.
+\end_layout
+
+\begin_layout Standard
+Usually, the set of relvars that represent the semantics of a particular
+ problem have natural relationships that arise from the semantics of the
+ problem domain.
+ In our running example, a natural relationship exists between Dogs and
+ Owners.
+ In the relational view, these relationships are implemented by having attribute
+s in one relvar refer to attributes in the related relvar.
+ Reference in this case implies that the values of attributes in the referring
+ relvar have the same values as corresponding attributes in the referred
+ to relvar.
+ The is the classic 
+\begin_inset Quotes eld
+\end_inset
+
+foreign key
+\begin_inset Quotes erd
+\end_inset
+
+ reference that is common in database management systems.
+\end_layout
+
+\begin_layout Standard
+Constraints in general are a means of insuring that the values of the relvars
+ in a program move from one valid state to another valid state.
+ There are many ways that constraints can be expressed but broadly we are
+ interested in either 
+\emph on
+procedural constraints
+\emph default
+ or 
+\emph on
+declarative constraints
+\emph default
+.
+ Procedural constraints are those that are determined by evaluating a relational
+ expression.
+ The system knows little if anything about the contents of the expression
+ associated with a procedural constraint.
+ It only knows to evaluate the expression and the constraint is satisfied
+ if the expression evaluates to true.
+ Declarative constraints are those that are determined by the system based
+ on a set of assertions about the relationships between the relvars.
+ TclRAL is concerned with declarative constraints.
+ This is not to say that procedural constraints are unimportant and indeed
+ TclRAL may support them in the future.
+\end_layout
+
+\begin_layout Standard
+The declarative constraints supported by TclRAL are concerned with defining
+ the referential integrity among a set of relvars.
+ Some relvars contain attributes whose values match those of attributes
+ in another relvar.
+ It is convenient to talk about a 
+\emph on
+referring
+\emph default
+ relvar
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+referring relvar
+\end_layout
+
+\end_inset
+
+ and a 
+\emph on
+referred to
+\emph default
+ relvar
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+referred to relvar
+\end_layout
+
+\end_inset
+
+.
+ In addition to the existence of some reference we are also concerned with
+ the multiplicity
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+multiplicity
+\end_layout
+
+\end_inset
+
+ and conditionality
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+conditionality
+\end_layout
+
+\end_inset
+
+ of the reference.
+ The notion of multiplicity determines whether or not a given tuple in a
+ relvar may be referred to more than one time.
+ The notion of conditionality determines whether or not a given tuple is
+ referred to at all.
+ With the ideas of reference, multiplicity and conditionality, we can build
+ a very powerful set of declarations that can be used to insure the integrity
+ of the data in the relvars without having to explicitly program the checks.
+\end_layout
+
+\begin_layout Subsubsection
+Association Constraints
+\end_layout
+
+\begin_layout Standard
+Association constraints
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+association constraints
+\end_layout
+
+\end_inset
+
+ declare that a set of attributes in a referring relvar have the same values
+ as the attributes which constitute an identifier in a referred to relvar.
+ In our running example, R2 is an association constraint.
+ It is declared as:
+\end_layout
+
+\begin_layout LyX-Code
+relvar association R2
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+    Contact OwnerName + Owner OwnerName 1
+\end_layout
+
+\begin_layout Standard
+This command declares an association type constraint named, 
+\family typewriter
+R2
+\family default
+, that exists between the 
+\family typewriter
+Contact
+\family default
+ relvar and the 
+\family typewriter
+Owner
+\family default
+ relvar.
+ 
+\family typewriter
+Contact
+\family default
+ is the referring relvar and 
+\family typewriter
+Owner
+\family default
+ is the referred to relvar.
+ One or more tuples of 
+\family typewriter
+Contact
+\family default
+ (as indicated by the + argument) have values of 
+\family typewriter
+Contact.OwnerName
+\family default
+ that are the same as some value of 
+\family typewriter
+Owner.OwnerName
+\family default
+.
+ Also every tuple of 
+\family typewriter
+Owner
+\family default
+ (as indicated by the 1 argument) has a value of 
+\family typewriter
+Owner.OwnerName
+\family default
+ that is equal to the value of 
+\family typewriter
+Contact.OwnerName
+\family default
+ in exactly one tuple of 
+\family typewriter
+Contact
+\family default
+.
+ Association constraints read left to right from referring relvar to referred
+ to relvar.
+ In general, the referring attributes can be a list of attributes, with
+ the number of referring attributes being equal to the number of referred
+ to attributes with the reference being between the corresponding attributes
+ in the two lists.
+ However the referred to attributes must constitute an identifier of the
+ referred to relvar (
+\family typewriter
+Owner
+\family default
+ in this case).
+ The multiplicity and conditionality are represented given by the characters
+ below, which are intended to be reminiscent of their usage in regular expressio
+n syntax
+\begin_inset Foot
+status open
+
+\begin_layout Plain Layout
+My thanks to my colleague, Paul Higham, for letting me blatantly steal this
+ idea from him.
+\end_layout
+
+\end_inset
+
+:
+\end_layout
+
+\begin_layout Description
++ ==> one or more (at least one)
+\end_layout
+
+\begin_layout Description
+* ==> zero or more (no constraint at all)
+\end_layout
+
+\begin_layout Description
+1 ==> exactly one
+\end_layout
+
+\begin_layout Description
+? ==> zero or one (at most one)
+\end_layout
+
+\begin_layout Standard
+For referring relvars (
+\emph on
+e.g.
+
+\emph default
+ 
+\family typewriter
+Contact
+\family default
+), the multiplicity and conditionality can be any of the above four cases
+ as dictated by the problem particulars.
+ For the referred to relvars (
+\emph on
+e.g.
+
+\emph default
+ 
+\family typewriter
+Owner
+\family default
+), the multiplicity and conditionality must be one of either 
+\begin_inset Quotes eld
+\end_inset
+
+1
+\begin_inset Quotes erd
+\end_inset
+
+ or 
+\begin_inset Quotes eld
+\end_inset
+
+?
+\begin_inset Quotes erd
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+The association type of constraint is very similar to the classic foreign
+ key reference constraint from database systems.
+ In TclRAL it is a bit more expressive in terms of being able to declare
+ both the referring relvar and referred to relvar multiplicity and conditionalit
+y.
+\end_layout
+
+\begin_layout Subsubsection
+Partition Constraints
+\end_layout
+
+\begin_layout Standard
+Partition constraints
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+partition constraints
+\end_layout
+
+\end_inset
+
+ declare a complete, disjoint set partitioning among a set of relvars.
+ In our running example R3 is a partition constraint.
+ It is declared as:
+\end_layout
+
+\begin_layout LyX-Code
+relvar partition R3
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+    Contact {OwnerName ContactOrder}
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+    PhoneNumber {OwnerName ContactOrder}
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+    EmailAddress {OwnerName ContactOrder}
+\end_layout
+
+\begin_layout Standard
+This constraint declares that 
+\family typewriter
+Contact
+\family default
+ is a super-set of 
+\family typewriter
+PhoneNumber
+\family default
+ and 
+\family typewriter
+EmailAddress
+\family default
+.
+ Conversely, 
+\family typewriter
+PhoneNumber
+\family default
+ and 
+\family typewriter
+EmailAddress
+\family default
+ are sub-sets of 
+\family typewriter
+Contact
+\family default
+.
+ Every tuple of a subset relvar refers to exactly one tuple of its super-set
+ relvar and every tuple in the super-set is referred to by exactly one tuple
+ from exactly one of the subset relvars.
+ The referred to attributes in the super-set must constitute an identifier
+ (as is the case for all sets of referred to attributes).
+ The singularity of the partition means that the referring attributes in
+ the subset relvars may also be used as identifiers, however TclRAL does
+ not require that the subset referring attributes be declared as an identifier
+ (although they are in the example).
+ Although it is possible to have only one subset relvar in the constraint,
+ in practice there is little utility in partitioning a set into a single
+ and therefore necessarily improper subset and such a partitioning is equivalent
+ to a one to one association constraint.
+\end_layout
+
+\begin_layout Standard
+The partition constraint may appear on first glance to be the same as a
+ set of 
+\begin_inset Quotes eld
+\end_inset
+
+1 -> ?
+\begin_inset Quotes erd
+\end_inset
+
+ type association constraints between the sub-type relvars and the super-type
+ relvar.
+ However, such an arrangement would allow for the possibility of a tuple
+ in the super-type relvar to be unreferenced by any tuples from the sub-type
+ relvars.
+ It is this situation that the partition constraint specifically covers.
+\end_layout
+
+\begin_layout Standard
+It is convenient to consider a partition constraint as enforcing the 
+\begin_inset Quotes eld
+\end_inset
+
+is a
+\begin_inset Quotes erd
+\end_inset
+
+ concept in the sense of:
+\end_layout
+
+\begin_layout Quote
+
+\family typewriter
+Contact
+\family default
+ is a 
+\family typewriter
+PhoneNumber
+\family default
+ or an 
+\family typewriter
+EmailAddress
+\end_layout
+
+\begin_layout Standard
+One consequence of the partition constraint is that the semijoins of all
+ the sub-type relvars to the super-type relvar have no intersection.
+ However, it is important not confuse the fundamental set partition idea
+ behind a partition constraint with any concept of inheritance, particularly
+ inheritance based on inclusion polymorphism that is found in many object
+ oriented programming languages.
+ This confusion is easily compounded by the fact that it is common design
+ practice to place attributes that are common among the sub-type relvars
+ as attributes of the super-type relvar since the singularity and unconditionali
+ty of the references make keeping track of common attributes in the super-type
+ relvar much more convenient.
+ In TclRAL, there is no concept of inheritance at all
+\begin_inset Foot
+status open
+
+\begin_layout Plain Layout
+That is not to say inheritance is a bad thing or that TclRAL doesn't need
+ some concept of inheritance.
+ It is just not there currently.
+\end_layout
+
+\end_inset
+
+.
+ What is true is that every tuple in 
+\family typewriter
+Contact
+\family default
+ is referred to by exactly one tuple in either 
+\family typewriter
+PhoneNumber
+\family default
+ or 
+\family typewriter
+EmailAddress
+\family default
+.
+\end_layout
+
+\begin_layout Subsubsection
+Correlation Constraints
+\end_layout
+
+\begin_layout Standard
+Association constraints can describe the integrity constraints when relvars
+ are related in a one-to-one fashion or a one-to-many fashion.
+ However, two other situations commonly arise.
+ Some relvars are associated in a many-to-many fashion and sometimes it
+ is necessary to store information about the association itself.
+ In these cases, simply adding referring attributes to one relvar is not
+ sufficient and a third relvar is required to hold the required number of
+ referring attributes or the information about the association itself.
+ Correlation constraints cover these situations.
+ In our example, the 
+\family typewriter
+Ownership
+\family default
+ relvar is a correlation relvar that exhibits both of the properties described
+ above.
+ It correlates the many-to-many association between 
+\family typewriter
+Dog
+\family default
+ and 
+\family typewriter
+Owner
+\family default
+ and the attribute 
+\family typewriter
+\size small
+Ownership.Acquired
+\family default
+\size default
+ is the year that an 
+\family typewriter
+\size small
+Owner
+\family default
+\size default
+ became the owner of a 
+\family typewriter
+\size small
+Dog
+\family default
+\size default
+.
+ It is descriptive of the ownership relationship itself and not of either
+ the 
+\family typewriter
+\size small
+Owner
+\family default
+\size default
+ or the 
+\family typewriter
+\size small
+Dog
+\family default
+\size default
+.
+\end_layout
+
+\begin_layout Standard
+Correlation constraints
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+correlation constraints
+\end_layout
+
+\end_inset
+
+ declare referential associations between two relvars that are mediated
+ by a third relvar, the correlating relvar.
+ The correlating relvar contains referential attributes that refer to the
+ two relvars that participate in the relationship.
+ In our running example, R1 is a correlation constraint.
+ It is declared as:
+\end_layout
+
+\begin_layout LyX-Code
+relvar constraint R1 Ownership
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+    OwnerName + Owner OwnerName
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+    DogName * Dog DogName
+\end_layout
+
+\begin_layout Standard
+This constraint declares that 
+\family typewriter
+R1
+\family default
+ is a correlation constraint between 
+\family typewriter
+\size small
+Owner
+\family default
+\size default
+ and 
+\family typewriter
+\size small
+Dog
+\family default
+\size default
+ with the 
+\family typewriter
+\size small
+Ownership
+\family default
+\size default
+ relvar mediating the correlation.
+ For every tuple in 
+\family typewriter
+Ownership
+\family default
+, 
+\family typewriter
+Ownership.OwnerName
+\family default
+ refers to some tuple in 
+\family typewriter
+Owner
+\family default
+ and 
+\family typewriter
+Ownership.DogName
+\family default
+ refers to some tuple in 
+\family typewriter
+Dog
+\family default
+.
+ Further, every tuple in 
+\family typewriter
+Owner
+\family default
+ is referred to one or more times by the tuples in 
+\family typewriter
+Ownership
+\family default
+.
+ For 
+\family typewriter
+Dog
+\family default
+, every tuple is referred to zero or more times by some tuple in 
+\family typewriter
+Ownership
+\family default
+.
+ Thus, the references by 
+\family typewriter
+\size small
+Ownership
+\family default
+\size default
+ are unconditional and for this example, the multiplicity and conditionality
+ of the constraint insures that every 
+\family typewriter
+\size small
+Owner
+\family default
+\size default
+ owns one or more 
+\family typewriter
+\size small
+Dog
+\family default
+\size default
+s, but that 
+\family typewriter
+\size small
+Dog
+\family default
+\size default
+s may exist that are not owned by any 
+\family typewriter
+\size small
+Owner
+\family default
+\size default
+.
+\end_layout
+
+\begin_layout Standard
+It is required that the attributes referred to by the correlation relvar
+ constitute an identifier for the participating relvar.
+ This implies that the union of the attribute sets that form the two references
+ in the correlation relvar will also server to identify an tuple in the
+ correlation relvar.
+ However, TclRAL does not insist that the correlation relvar have an identifier
+ that is the union of the two sets of referring attributes (although the
+ example does so).
+\end_layout
+
+\begin_layout Standard
+Sometimes a correlation constraint needs to be even more confining in the
+ sense that every tuple of each of the participating relvars must be correlated.
+ A matrix, for example, is a correlation of every row and every column such
+ that the correlation represents the Cartesian product of the rows and columns.
+ For this case, an optional 
+\emph on
+-complete
+\emph default
+ argument may be given and this will insure that the number of tuples in
+ the correlation relvar equals the product of the number of tuples in the
+ two related relvars.
+\end_layout
+
+\begin_layout Standard
+Correlation constraints appear as if they can be decomposed into two association
+ constraints, as in:
+\end_layout
+
+\begin_layout LyX-Code
+relvar association R1-Owner
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+    Ownership OwnerName + Owner OwnerName 1
+\end_layout
+
+\begin_layout LyX-Code
+relvar association R1-Dog
+\end_layout
+
+\begin_layout LyX-Code
+    Ownership DogName * Dog DogName 1
+\end_layout
+
+\begin_layout Standard
+Indeed, replacing 
+\family typewriter
+\size small
+R1
+\family default
+\size default
+ by 
+\family typewriter
+\size small
+R1-Owner
+\family default
+\size default
+ and 
+\family typewriter
+\size small
+R1-Dog
+\family default
+\size default
+ will result in data values of the relvars being constrained in the same
+ way.
+ However, TclRAL distinguishes association constraints from correlation
+ constraints because:
+\end_layout
+
+\begin_layout Itemize
+Semantically there is only one relationship and that is between Owner and
+ Dog.
+\end_layout
+
+\begin_layout Itemize
+There is redundant information in the two 
+\noun on
+association
+\noun default
+ definitions in that the multiplicity of the referred to relvar is always
+ 1.
+\end_layout
+
+\begin_layout Itemize
+Two distinct association constraints cannot be used to declare a 
+\emph on
+complete
+\emph default
+ correlation.
+\end_layout
+
+\begin_layout Subsubsection
+Constraint Evaluation
+\end_layout
+
+\begin_layout Standard
+It is important, during the execution of a program, that modifications to
+ the values of the relvars transition from one consistent state to another
+ consistent state.
+ However, frequently it requires more than one operation to make the constraints
+ between relvars consistent.
+ For example, if two relvars that are associated on a one-to-one unconditional
+ basis (
+\emph on
+e.g.
+
+\emph default
+ 
+\family typewriter
+relvar association X1 A B_ID 1 B B_ID 1
+\family default
+), then any insertion or deletion from one relvar must have a corresponding
+ insertion or deletion in the other.
+ So we must have some concept of when it is appropriate to evaluate the
+ relvar constraints.
+\end_layout
+
+\begin_layout Standard
+TclRAL evaluates constraints at the end of a 
+\family typewriter
+relvar
+\begin_inset space ~
+\end_inset
+
+eval
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+eval
+\end_layout
+
+\end_inset
+
+
+\family default
+ command or, if execution is outside of a 
+\family typewriter
+relvar
+\begin_inset space ~
+\end_inset
+
+eval
+\family default
+ command, then at the end of any relvar command that modifies a relvar.
+ For example:
+\end_layout
+
+\begin_layout LyX-Code
+
+\size footnotesize
+% relvar eval {
+\end_layout
+
+\begin_layout LyX-Code
+
+\size footnotesize
+    relvar insert Owner {OwnerName Tom Age 22}
+\end_layout
+
+\begin_layout LyX-Code
+
+\size footnotesize
+    relvar insert Ownership {OwnerName Tom DogName Jumper Acquired 2006}
+\end_layout
+
+\begin_layout LyX-Code
+
+\size footnotesize
+    relvar insert Contact {OwnerName Tom ContactOrder 1}
+\end_layout
+
+\begin_layout LyX-Code
+
+\size footnotesize
+    relvar insert PhoneNumber {OwnerName Tom ContactOrder 1 AreaCode 808
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+
+\size footnotesize
+        Number 555-2357}
+\end_layout
+
+\begin_layout LyX-Code
+
+\size footnotesize
+}
+\end_layout
+
+\begin_layout Standard
+executes as a transaction that leaves the relvars consistent and:
+\end_layout
+
+\begin_layout LyX-Code
+
+\size footnotesize
+% relvar insert Owner {OwnerName Tom Age 22}
+\end_layout
+
+\begin_layout LyX-Code
+
+\size footnotesize
+for correlation ::R1(::Owner <== [+] ::Ownership [*] ==> ::Dog), in relvar
+ ::Owner
+\end_layout
+
+\begin_layout LyX-Code
+
+\size footnotesize
+tuple {OwnerName Tom Age 22} is not referenced by any tuple
+\end_layout
+
+\begin_layout LyX-Code
+
+\size footnotesize
+for association ::R2(::Contact [+] ==> [1] ::Owner), in relvar ::Owner
+\end_layout
+
+\begin_layout LyX-Code
+
+\size footnotesize
+tuple {OwnerName Tom Age 22} is not referenced by any tuple
+\end_layout
+
+\begin_layout LyX-Code
+
+\end_layout
+
+\begin_layout Standard
+is executed outside of a transaction and leaves the 
+\family typewriter
+Ownership
+\family default
+ and 
+\family typewriter
+Contact
+\family default
+ relvars in an inconsistent state.
+ Anytime a constraint evaluation fails, the values of the relvars are rolled
+ back to their previous state.
+ The 
+\family typewriter
+relvar eval
+\family default
+ command may be nested to an arbitrary depth.
+\end_layout
+
+\begin_layout Subsubsection
+Constraint Introspection
+\end_layout
+
+\begin_layout Standard
+In the previous sections we saw the commands needed to create constraints
+ on relvars.
+ Here we examine the other constraint commands.
+ All other constraint manipulation is provided by the 
+\family typewriter
+::ral::relvar constraint
+\family default
+ option and the additional sub-options.
+\end_layout
+
+\begin_layout Standard
+Constraints may be deleted using 
+\family typewriter
+relvar constraint delete
+\family default
+
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+constraint delete
+\end_layout
+
+\end_inset
+
+.
+ It is important to remember that all constraints that refer to a relvar
+ must be deleted before the relvar itself may be deleted (
+\emph on
+i.e.
+\emph default
+, only unconstrained relvars may be deleted).
+ The constraints that a particular relvar participates in is available from
+ 
+\family typewriter
+constraint member
+\family default
+
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+constraint member
+\end_layout
+
+\end_inset
+
+.
+ Introspection into the constraints is provided by 
+\family typewriter
+constraint name
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+constraint name
+\end_layout
+
+\end_inset
+
+
+\family default
+ and 
+\family typewriter
+constraint info
+\family default
+.
+ These commands give the names of the constraints and details of their definitio
+ns.
+\end_layout
+
+\begin_layout LyX-Code
+% lsort [relvar constraint names]
+\end_layout
+
+\begin_layout LyX-Code
+::R1 ::R2 ::R3
+\end_layout
+
+\begin_layout LyX-Code
+% relvar constraint info R1
+\end_layout
+
+\begin_layout LyX-Code
+correlation ::R1 ::Ownership OwnerName + ::Owner OwnerName
+\end_layout
+
+\begin_layout LyX-Code
+DogName * ::Dog DogName
+\end_layout
+
+\begin_layout LyX-Code
+% relvar constraint info R3
+\end_layout
+
+\begin_layout LyX-Code
+partition ::R3 ::Contact {OwnerName ContactOrder}
+\end_layout
+
+\begin_layout LyX-Code
+::PhoneNumber {OwnerName ContactOrder} ::EmailAddress
+\end_layout
+
+\begin_layout LyX-Code
+{OwnerName ContactOrder}
+\end_layout
+
+\begin_layout Subsection
+Poor Man's Persistence
+\end_layout
+
+\begin_layout Standard
+TclRAL treats relation structured information in the same way that Tcl treats
+ any data stored in variables.
+ There is no transparent persistence
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+persistence
+\end_layout
+
+\end_inset
+
+ supported by the language.
+ Many different ways have grown up over time to provide data persistence
+ to programs that need to have information preserved between invocations.
+ For some of the more complex data structures in 
+\noun on
+tcllib
+\noun default
+ the packages provide the ability to serialize and deserialize the data
+ structure so it can be stored and retrieved easily.
+ TclRAL provides three mechanisms to help saving relvar data between program
+ invocations.
+ Note here that we are concerned with saving the state of the relvars and
+ their constraints as the significant program data that must persist.
+ Since relation values have a string representation, they are easily stored
+ and retrieved by conventional means.
+\end_layout
+
+\begin_layout Itemize
+The 
+\family typewriter
+serialize
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+serialize
+\end_layout
+
+\end_inset
+
+
+\family default
+ and 
+\family typewriter
+deserialize
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+deserialize
+\end_layout
+
+\end_inset
+
+
+\family default
+ commands produce a string that contains all the information to save and
+ restore the state of a set of relvars.
+ Clearly, the serialized string may be very large.
+\end_layout
+
+\begin_layout Itemize
+The 
+\family typewriter
+storeToMk
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+storeToMk
+\end_layout
+
+\end_inset
+
+
+\family default
+ and 
+\family typewriter
+loadFromMk
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+loadFromMk
+\end_layout
+
+\end_inset
+
+
+\family default
+ commands will save and load the relvars in a Metakit database.
+ Metakit is well suited to this storage not only because of its efficiency
+ but also because a Metakit view may be nested, easily handling relation
+ valued attributes.
+\end_layout
+
+\begin_layout Itemize
+The 
+\family typewriter
+dump
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+dump
+\end_layout
+
+\end_inset
+
+
+\family default
+ command produces a Tcl script that when evaluated will reproduce the relvar
+ state.
+ Storing data as the Tcl script that will reconstruct the data is an old
+ trick.
+ It has some distinct disadvantages, but is very convenient when small changes
+ need to be made with your favorite text editor or when the dump is made
+ part of a Tcl package that, for example, initializes an empty schema to
+ be used by the package.
+\end_layout
+
+\begin_layout Standard
+All of these mechanisms are unsatisfactory in the sense that they require
+ a program to explicitly manage the loading and storing of the relvar data
+ and in that all the relvar data must be able to be resident in memory at
+ the same time.
+ This ultimately limits the scale of program to which TclRAL may be applied,
+ but for a large class of applications these limitations are not onerous
+ and several million bytes of program data are easily handled.
+\end_layout
+
+\begin_layout Section
+Other Approaches
+\end_layout
+
+\begin_layout Standard
+There are many approaches to dealing with relation structured data.
+ These have been well summarized elsewhere
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Ratcl"
+
+\end_inset
+
+.
+ We are going to choose only a couple of examples to consider.
+ There are also many other approaches to dealing with program data that
+ are quite fashionable (
+\emph on
+e.g.
+
+\emph default
+ XML) that we will not consider here since they are not relationally oriented.
+ One way of comparing the TclRAL approach to others is simply to divide
+ the world into the SQL
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+SQL
+\end_layout
+
+\end_inset
+
+ and non-SQL categories.
+ For SQL based approaches there is a vast industry that supports the language
+ and its implementations.
+ Tcl is blessed with bindings to all the popular DBMS and so we will restrict
+ our attentions here to SQLite 
+\begin_inset Flex URL
+status collapsed
+
+\begin_layout Plain Layout
+
+http://www.sqlite.org
+\end_layout
+
+\end_inset
+
+, which is of more particular interest to Tcl'ers.
+ In the non-SQL category, Ratcl 
+\begin_inset Flex URL
+status collapsed
+
+\begin_layout Plain Layout
+
+http://www.vlerq.org/vlerq/ratcl
+\end_layout
+
+\end_inset
+
+ is very close in spirit to TclRAL.
+\end_layout
+
+\begin_layout Standard
+I will not devote much space here to SQL based approaches as these have
+ been discussed at length in so very many places.
+ SQLite
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+SQLite
+\end_layout
+
+\end_inset
+
+ is a phenomenal program that is so useful in so many contexts as is evidenced
+ by is enormous popularity.
+ However, SQLite is fundamentally about programming in SQL, despite the
+ significant help that the Tcl bindings to SQLite give to Tcl programmers.
+ SQL has many pros and cons, but the essential difficulty for a Tcl programmer
+ (and most other programmers for that matter) is that one has to know two
+ different languages and divide the program requirements between two distinct
+ syntactic environments.
+ When I program SQL from Tcl, which I do on many occasions, I am inevitably
+ frustrated by the syntax considerations of SQL.
+ I like to program in Tcl and I don't want to have to know two languages
+ when I am already programming in my favorite one.
+ This need to move between two different programming environments is sometimes
+ called an 
+\emph on
+impedance mismatch
+\emph default
+
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+impedence mismatch
+\end_layout
+
+\end_inset
+
+.
+ TclRAL has as one of its primary goals the minimization of the mismatch
+ between Tcl language constructs and relational data model concepts.
+\end_layout
+
+\begin_layout Standard
+Ratcl
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+Ratcl
+\end_layout
+
+\end_inset
+
+ is part of a larger project known as Vlerq
+\begin_inset Index idx
+status collapsed
+
+\begin_layout Plain Layout
+Vlerq
+\end_layout
+
+\end_inset
+
+.
+ Vlerq is a very interesting and ambitious project that clearly intends
+ to provide transparent, persistent, relationally structured data to programs
+ (among many other things).
+ Ratcl provides many relational operators, however there are some distinct
+ design differences, namely:
+\end_layout
+
+\begin_layout Itemize
+Ratcl is not purely relational.
+ It does allow duplicate rows in a 
+\emph on
+view
+\emph default
+.
+ It also supports the notion of a row index and column index where values
+ can be accessed based on positional knowledge.
+\end_layout
+
+\begin_layout Itemize
+Ratcl views do not have an external string representation.
+ This makes it difficult to hand views across interpreter boundaries.
+ There are some special rules used to manage the views when the Tcl variable
+ holding the view goes out of scope.
+ This leads to some difficulties in situations where shimmering occurs.
+\end_layout
+
+\begin_layout Itemize
+Expression evaluation within Ratcl operations has minor differences from
+ the Tcl core 
+\family typewriter
+expr
+\family default
+ command and requires special definitions to supply additional functions.
+\end_layout
+
+\begin_layout Itemize
+Ratcl is truly a Tcl binding to the relational data structuring of Vlerq
+ and that binding ultimately limits the degree to which it may be tightly
+ integrated into the internal Tcl type system.
+\end_layout
+
+\begin_layout Standard
+Those design differences in aside, Ratcl does provide virtually transparent
+ persistence with a very efficient back-end storage mechanism making it
+ one of the more remarkable approaches to non-SQL based relationally structured
+ data, especially for Tcl programmers.
+\end_layout
+
+\begin_layout Standard
+At this time it appears that Tcl is blessed with several different approaches
+ to relationally structured data.
+ This is analogous to the many different approaches to object oriented programmi
+ng that Tcl has.
+ I see this as positive in the same way that several different object oriented
+ extensions have given the Tcl community the opportunity to determine what
+ works best under the conditions of actual practice.
+ It is my hope that the same distillation would take place with the various
+ approaches to relationally structured data.
+\end_layout
+
+\begin_layout Section
+Future Work
+\end_layout
+
+\begin_layout Standard
+As of this writing, TclRAL is available as version 0.8.
+ This version is a complete re-write and refactoring of the previous version.
+ It is hoped that this has yielded a more easily maintained code base.
+ This version also introduces a more consistent command interface.
+ However, much remains to be done.
+\end_layout
+
+\begin_layout Description
+Relvar
+\begin_inset space ~
+\end_inset
+
+tracing Variable tracing is an important mechanism in Tcl.
+ Being able to place traces on relvars is equally important.
+\end_layout
+
+\begin_layout Description
+Cascading
+\begin_inset space ~
+\end_inset
+
+update
+\begin_inset space ~
+\end_inset
+
+and
+\begin_inset space ~
+\end_inset
+
+delete Changing the values of referential attributes implies making many
+ changes to keep referential integrity.
+ Since the that information is known via the constraint definitions, TclRAL
+ should be able to help make that task less tedious.
+\end_layout
+
+\begin_layout Description
+Default
+\begin_inset space ~
+\end_inset
+
+values Relvar definitions are an appropriate place to specify default values
+ for attributes that may be used if an attribute value is otherwise missing.
+ This would save programs from having to keep track of default values on
+ their own.
+ A related issue is that of system assigned identifiers.
+\end_layout
+
+\begin_layout Description
+Virtual
+\begin_inset space ~
+\end_inset
+
+relvars Version 0.7 of TclRAL had primitive support for virtual relvars (a.k.a
+ views).
+ This support was removed from version 0.8.
+ It should return in a future version when a more complete implementation
+ can be written to incorporate updating and constraint evaluation properly.
+\end_layout
+
+\begin_layout Description
+Procedural
+\begin_inset space ~
+\end_inset
+
+constraints Currently only the declarative type of constraints may be defined
+ and enforced.
+ It may be desirable to have some form of procedural constraint evaluation.
+ Exactly how this would interact with relvar tracing is not clear.
+\end_layout
+
+\begin_layout Description
+Transparent
+\begin_inset space ~
+\end_inset
+
+persistence Transparent persistence would greatly increase the scale of
+ problem to which TclRAL could be applied and is a desirable feature if
+ unfortunately rather complicated to implement well.
+\end_layout
+
+\begin_layout Description
+Code
+\begin_inset space ~
+\end_inset
+
+improvements There is always a need for more code refactoring, testing and
+ documentation.
+\end_layout
+
+\begin_layout Standard
+\begin_inset CommandInset index_print
+LatexCommand printindex
+type "idx"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+label "1"
+key "Intro DB Sys"
+
+\end_inset
+
+Date, C.J., 
+\shape italic
+An Introduction to Database Systems
+\shape default
+, 8th ed., ISBN 0-321-19784-4.
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+label "2"
+key "3rd Manifesto"
+
+\end_inset
+
+Date, C.J.
+ and Hugh Darwen, 
+\shape italic
+Databases, Types, and the Relational Model: The Third Manifesto
+\shape default
+, ISBN 0-321-39942-0.
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+label "3"
+key "Modeling Data"
+
+\end_inset
+
+Shlaer, Sally and Stephen J.
+ Mellor, 
+\emph on
+Object Oriented Analysis: Modeling the World in Data
+\emph default
+, ISBN 0-13-629023-X
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+label "4"
+key "Modeling States"
+
+\end_inset
+
+Shlaer, Sally and Stephen J.
+ Mellor, 
+\emph on
+Object Oriented Analysis: Modeling the World in States
+\emph default
+, ISBN 0-13-629940-7
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+label "5"
+key "XUML"
+
+\end_inset
+
+Mellor, Stephen J.
+ and Marc J.
+ Balcer, 
+\emph on
+Executable UML: A Foundation for Model-Driven Architecture
+\emph default
+, ISBN 0-201-74804-5
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+label "6"
+key "Ratcl"
+
+\end_inset
+
+Wippler, Jean-Claude, 
+\emph on
+Relational algebra for Tcl: introducing Ratcl and Rasql
+\emph default
+, http://www.equi4.com/docs/tcl2005e/ratcl.pdf
+\end_layout
+
+\end_body
+\end_document
