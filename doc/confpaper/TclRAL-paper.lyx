@@ -74,6 +74,10 @@ Andrew Mangogna
 \end_inset
 
 October 11-13, 2006
+\begin_inset Newline newline
+\end_inset
+
+Revision 2
 \end_layout
 
 \begin_layout Standard
@@ -105,6 +109,12 @@ TclRAL is a "C" language extension to Tcl that provides commands to implement
  of programming are given to help explain the operations that the extension
  provides.
  A comparison with other approaches is also provided.
+\end_layout
+
+\begin_layout Abstract
+N.B.
+ that this paper has been revised to match the latest revision of TclRAL
+ (0.10.2 as of this writing).
 \end_layout
 
 \begin_layout Date
@@ -204,13 +214,13 @@ status collapsed
 
 \begin_layout Plain Layout
 
-http://sourceforge.net/projects/tclral
+http://chiselapp.com/user/mangoa01/repository/tclral
 \end_layout
 
 \end_inset
 
  for complete a complete description of the project.
- As of this writing, Version 0.8 is available.
+ As of this writing, Version 0.10.2 is available.
 \end_layout
 
 \begin_layout Section
@@ -374,16 +384,7 @@ etc
 
 \begin_layout Standard
 As a well behaved Tcl value, Tuple values have a string representation.
- A Tuple value is represented as a three element list where the elements
- are:
-\end_layout
-
-\begin_layout Enumerate
-The keyword, 
-\family typewriter
-Tuple
-\family default
-.
+ A Tuple value is represented as a two element list where the elements are:
 \end_layout
 
 \begin_layout Enumerate
@@ -400,10 +401,6 @@ For example:
 
 \begin_layout LyX-Code
 set d {
-\end_layout
-
-\begin_layout LyX-Code
-    Tuple
 \end_layout
 
 \begin_layout LyX-Code
@@ -514,62 +511,13 @@ i.e.
  The body of a relation is a set of tuple values.
  Each attribute of each tuple in the body of a relation has a value and
  that value must correspond to the data type defined for the attribute.
- In addition each relation must have at least one 
-\noun on
-identifier
-\noun default
-
-\begin_inset Foot
-status collapsed
-
-\begin_layout Plain Layout
-Also known as a candidate key or a primary key.
- I prefer the term identifier to avoid some of the confusion surrounding
- the use of the term 
-\emph on
-key
-\emph default
- in the DBMS arena.
-\end_layout
-
-\end_inset
-
-
-\begin_inset Index idx
-status collapsed
-
-\begin_layout Plain Layout
-identifier
-\end_layout
-
-\end_inset
-
-.
- An identifier is a set of attributes for which the values must be unique
- for all tuples in a relation.
  Fundamentally, relations are sets and sets do not have duplicated members.
- An identifier defines the set of attributes across which uniqueness is
- to be considered.
- A relation may have many identifiers, however, no identifier may have a
- set of attributes that is a subset of another identifier, 
-\emph on
-i.e.
-
-\emph default
- the identifiers must be minimal.
+ So each tuple in a relation must be unique.
 \end_layout
 
 \begin_layout Standard
 Like Tuple values, Relation values also have a string representation.
- The string representation of a Relation value is a list of four elements:
-\end_layout
-
-\begin_layout Enumerate
-The keyword, 
-\family typewriter
-Relation
-\family default
-.
+ The string representation of a Relation value is a list of two elements:
 \end_layout
 
 \begin_layout Enumerate
@@ -577,11 +525,9 @@ A list of attribute name / attribute type pairs.
 \end_layout
 
 \begin_layout Enumerate
-A list of identifiers, each one of which may be a list of attribute names.
-\end_layout
-
-\begin_layout Enumerate
 A list of tuple values forming the body of the relation.
+ Each tuple value is, in turn, a list of attribute name / attribute value
+ pairs.
 \end_layout
 
 \begin_layout Standard
@@ -593,15 +539,7 @@ set r {
 \end_layout
 
 \begin_layout LyX-Code
-    Relation
-\end_layout
-
-\begin_layout LyX-Code
     {DogName string Breed string Weight double}
-\end_layout
-
-\begin_layout LyX-Code
-    DogName
 \end_layout
 
 \begin_layout LyX-Code
@@ -643,12 +581,6 @@ Breed
 Weight
 \family default
 \size default
-), a single identifier consisting of a single attribute (
-\family typewriter
-\size small
-DogName
-\family default
-\size default
 ) and with a body containing two tuples.
 \end_layout
 
@@ -687,6 +619,11 @@ relvar
 \begin_layout Enumerate
 Relvars provide storage locations for relation values and operators to modify
  in place the value contained in a relvar.
+\end_layout
+
+\begin_layout Enumerate
+Relvars have identity constraints that define a set of attributes whose
+ values must be unique.
 \end_layout
 
 \begin_layout Enumerate
@@ -1613,7 +1550,7 @@ rename
 \end_layout
 
 \begin_layout LyX-Code
-Tuple {DogName string Breed string Age int}
+{DogName string Breed string Age int}
 \end_layout
 
 \begin_layout LyX-Code
@@ -1625,7 +1562,7 @@ Tuple {DogName string Breed string Age int}
 \end_layout
 
 \begin_layout LyX-Code
-Tuple {DogName string Breed string}
+{DogName string Breed string}
 \end_layout
 
 \begin_layout LyX-Code
@@ -1637,7 +1574,7 @@ Tuple {DogName string Breed string}
 \end_layout
 
 \begin_layout LyX-Code
-Tuple {Name string Breed string Age int}
+{Name string Breed string Age int}
 \end_layout
 
 \begin_layout LyX-Code
@@ -1769,10 +1706,6 @@ set t {
 \end_layout
 
 \begin_layout LyX-Code
-    Tuple
-\end_layout
-
-\begin_layout LyX-Code
     {DogName string Breed string Age int}
 \end_layout
 
@@ -1833,7 +1766,7 @@ dogtuple(DogName) = Fido
 \end_layout
 
 \begin_layout LyX-Code
-Tuple {DogName string Breed string Age int}
+{DogName string Breed string Age int}
 \end_layout
 
 \begin_layout LyX-Code
@@ -2002,7 +1935,7 @@ flattens
 \end_layout
 
 \begin_layout LyX-Code
-Tuple {DogName string Props {Tuple {Breed string Age int}}}
+{DogName string Props {Tuple {Breed string Age int}}}
 \end_layout
 
 \begin_layout LyX-Code
@@ -2014,7 +1947,7 @@ Tuple {DogName string Props {Tuple {Breed string Age int}}}
 \end_layout
 
 \begin_layout LyX-Code
-Tuple {DogName string Breed string Age int}
+{DogName string Breed string Age int}
 \end_layout
 
 \begin_layout LyX-Code
@@ -2143,16 +2076,12 @@ minus
 \end_layout
 
 \begin_layout Description
-insertion The command, 
-\family typewriter
-include
-\family default
-
+insertion The command, insert
 \begin_inset Index idx
 status collapsed
 
 \begin_layout Plain Layout
-include
+insert
 \end_layout
 
 \end_inset
@@ -2221,10 +2150,6 @@ For example, consider:
 
 \begin_layout LyX-Code
 set newDog {
-\end_layout
-
-\begin_layout LyX-Code
-    Relation
 \end_layout
 
 \begin_layout LyX-Code
@@ -2304,7 +2229,7 @@ set newDog {
 \end_layout
 
 \begin_layout LyX-Code
-% relation is $Dog < [relation include $Dog
+% relation is $Dog < [relation insert $Dog
 \backslash
 
 \end_layout
@@ -2392,27 +2317,6 @@ restrict
 \end_layout
 
 \begin_layout Description
-choose The command, 
-\family typewriter
-choose
-\family default
-
-\begin_inset Index idx
-status collapsed
-
-\begin_layout Plain Layout
-choose
-\end_layout
-
-\end_inset
-
-, returns a relation that contains at most one tuple whose identifying attribute
- values are given.
- In some cases the values of the attributes of an identifier are known and
- just that one tuple in a relation is required.
-\end_layout
-
-\begin_layout Description
 emptyof The command, 
 \family typewriter
 emptyof
@@ -2435,7 +2339,7 @@ relation
 \begin_inset space ~
 \end_inset
 
-include
+insert
 \family default
 , for building up a relation from data gathered from other sources in a
  program.
@@ -2556,34 +2460,6 @@ Consider the following examples:
 
 \begin_layout LyX-Code
 +=======+-------+---+
-\end_layout
-
-\begin_layout LyX-Code
-% relformat [relation choose $Owner OwnerName Mike]
-\end_layout
-
-\begin_layout LyX-Code
-+=========+---+
-\end_layout
-
-\begin_layout LyX-Code
-|OwnerName|Age|
-\end_layout
-
-\begin_layout LyX-Code
-|string   |int|
-\end_layout
-
-\begin_layout LyX-Code
-+=========+---+
-\end_layout
-
-\begin_layout LyX-Code
-|Mike     |50 |
-\end_layout
-
-\begin_layout LyX-Code
-+=========+---+
 \end_layout
 
 \begin_layout LyX-Code
@@ -3953,7 +3829,15 @@ tuple
 \end_layout
 
 \begin_layout LyX-Code
-set mike [relation choose $Owner OwnerName Mike]
+set mike [relation restrictwith $Owner {$OwnerName eq 
+\begin_inset Quotes eld
+\end_inset
+
+Mike
+\begin_inset Quotes erd
+\end_inset
+
+}]
 \end_layout
 
 \begin_layout LyX-Code
@@ -4305,10 +4189,6 @@ a.c
 
 \begin_layout LyX-Code
 set includes {
-\end_layout
-
-\begin_layout LyX-Code
-    Relation
 \end_layout
 
 \begin_layout LyX-Code
@@ -5205,7 +5085,7 @@ insert
 \end_layout
 
 \begin_layout LyX-Code
-% relformat [relvar create MyDog [relation heading $Dog]]
+% relformat [relvar create MyDog [relation heading $Dog] DogName]
 \end_layout
 
 \begin_layout LyX-Code
@@ -5818,7 +5698,7 @@ Owner
  below, which are intended to be reminiscent of their usage in regular expressio
 n syntax
 \begin_inset Foot
-status open
+status collapsed
 
 \begin_layout Plain Layout
 My thanks to my colleague, Paul Higham, for letting me blatantly steal this
