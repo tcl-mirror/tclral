@@ -1,0 +1,1335 @@
+<html><head>
+<title>relvar - Relvar Operators</title>
+<style type="text/css"><!--
+    HTML {
+	background: 	#FFFFFF;
+	color: 		black;
+    }
+    BODY {
+	background: 	#FFFFFF;
+	color:	 	black;
+    }
+    DIV.doctools {
+	margin-left:	10%;
+	margin-right:	10%;
+    }
+    DIV.doctools H1,DIV.doctools H2 {
+	margin-left:	-5%;
+    }
+    H1, H2, H3, H4 {
+	margin-top: 	1em;
+	font-family:	sans-serif;
+	font-size:	large;
+	color:		#005A9C;
+	background: 	transparent;
+	text-align:		left;
+    }
+    H1.title {
+	text-align: center;
+    }
+    UL,OL {
+	margin-right: 0em;
+	margin-top: 3pt;
+	margin-bottom: 3pt;
+    }
+    UL LI {
+	list-style: disc;
+    }
+    OL LI {
+	list-style: decimal;
+    }
+    DT {
+	padding-top: 	1ex;
+    }
+    UL.toc,UL.toc UL, UL.toc UL UL {
+	font:		normal 12pt/14pt sans-serif;
+	list-style:	none;
+    }
+    LI.section, LI.subsection {
+	list-style: 	none;
+	margin-left: 	0em;
+	text-indent:	0em;
+	padding: 	0em;
+    }
+    PRE {
+	display: 	block;
+	font-family:	monospace;
+	white-space:	pre;
+	margin:		0%;
+	padding-top:	0.5ex;
+	padding-bottom:	0.5ex;
+	padding-left:	1ex;
+	padding-right:	1ex;
+	width:		100%;
+    }
+    PRE.example {
+	color: 		black;
+	background: 	#f5dcb3;
+	border:		1px solid black;
+    }
+    UL.requirements LI, UL.syntax LI {
+	list-style: 	none;
+	margin-left: 	0em;
+	text-indent:	0em;
+	padding:	0em;
+    }
+    DIV.synopsis {
+	color: 		black;
+	background: 	#80ffff;
+	border:		1px solid black;
+	font-family:	serif;
+	margin-top: 	1em;
+	margin-bottom: 	1em;
+    }
+    UL.syntax {
+	margin-top: 	1em;
+	border-top:	1px solid black;
+    }
+    UL.requirements {
+	margin-bottom: 	1em;
+	border-bottom:	1px solid black;
+    }
+--></style>
+</head>
+<! -- Generated from file 'files/relvar.html' by tcllib/doctools with format 'html'
+   -->
+<! -- Copyright &copy; 2004 - 2012 by G. Andrew Mangogna
+   -->
+<! -- CVS: $Id$ relvar.n
+   -->
+<body><div class="doctools">
+<hr> [
+  <a href="../toc.html">Table Of Contents</a>
+| <a href="../index.html">Keyword Index</a>
+] <hr>
+<h1 class="title">relvar(n) 0.10.2 ral &quot;Relvar Operators&quot;</h1>
+<div id="name" class="section"><h2><a name="name">Name</a></h2>
+<p>relvar - Operators for Relation Variables</p>
+</div>
+<div id="toc" class="section"><h2><a name="toc">Table Of Contents</a></h2>
+<ul class="toc">
+<li class="section"><a href="#toc">Table Of Contents</a></li>
+<li class="section"><a href="#synopsis">Synopsis</a></li>
+<li class="section"><a href="#section1">Description</a></li>
+<li class="section"><a href="#section2">RELVAR NAMES</a></li>
+<li class="section"><a href="#section3">CONSTRAINTS</a></li>
+<li class="section"><a href="#section4">COMMANDS</a></li>
+<li class="section"><a href="#section5">RELVAR TRACES</a></li>
+<li class="section"><a href="#see-also">See Also</a></li>
+<li class="section"><a href="#keywords">Keywords</a></li>
+<li class="section"><a href="#copyright">Copyright</a></li>
+</ul>
+</div>
+<div id="synopsis" class="section"><h2><a name="synopsis">Synopsis</a></h2>
+<div class="synopsis">
+<ul class="requirements">
+<li>package require <b class="pkgname">ral <span class="opt">?0.10.2?</span></b></li>
+</ul>
+<ul class="syntax">
+<li><a href="#1"><b class="cmd">::ral::relvar association</b> <i class="arg">name</i> <i class="arg">refrngRelvar</i> <i class="arg">refrngAttrList</i> <i class="arg">refToSpec</i> <i class="arg">refToRelvar</i> <i class="arg">refToAttrList</i> <i class="arg">refrngSpec</i></a></li>
+<li><a href="#2"><b class="cmd">::ral::relvar constraint delete</b> <span class="opt">?<i class="arg">name1</i> <i class="arg">name2</i> ...?</span></a></li>
+<li><a href="#3"><b class="cmd">::ral::relvar constraint exists</b> <i class="arg">name</i></a></li>
+<li><a href="#4"><b class="cmd">::ral::relvar constraint info</b> <i class="arg">name</i></a></li>
+<li><a href="#5"><b class="cmd">::ral::relvar constraint names</b> <span class="opt">?<i class="arg">pattern</i>?</span></a></li>
+<li><a href="#6"><b class="cmd">::ral::relvar constraint member</b> <i class="arg">relvarName</i></a></li>
+<li><a href="#7"><b class="cmd">::ral::relvar constraint path</b> <i class="arg">constraintName</i></a></li>
+<li><a href="#8"><b class="cmd">::ral::relvar correlation</b> <i class="arg"><span class="opt">?-complete?</span></i> <i class="arg">name</i> <i class="arg">correlRelvar</i> <i class="arg">correlAttrListA</i> <i class="arg">refToSpecA</i> <i class="arg">refToRelvarA</i> <i class="arg">refToAttrListA</i> <i class="arg">correlAttrListB</i> <i class="arg">refToSpecB</i> <i class="arg">refToRelvarB</i> <i class="arg">refToAttrListB</i></a></li>
+<li><a href="#9"><b class="cmd">::ral::relvar create</b> <i class="arg">relvarName</i> <i class="arg">heading</i> <i class="arg">id1</i> <span class="opt">?<i class="arg">id2 ...</i>?</span></a></li>
+<li><a href="#10"><b class="cmd">::ral::relvar delete</b> <i class="arg">relvarName</i> <i class="arg">tupleVarName</i> <i class="arg">expression</i></a></li>
+<li><a href="#11"><b class="cmd">::ral::relvar deleteone</b> <i class="arg">relvarName</i> <span class="opt">?attr1 value1 attr2 value2 ...?</span></a></li>
+<li><a href="#12"><b class="cmd">::ral::relvar dunion</b> <i class="arg">relvarName</i> <i class="arg"><span class="opt">?relationValue1 ...?</span></i></a></li>
+<li><a href="#13"><b class="cmd">::ral::relvar eval</b> <i class="arg">arg</i> <span class="opt">?arg ...?</span></a></li>
+<li><a href="#14"><b class="cmd">::ral::relvar exists</b> <i class="arg">relvarName</i></a></li>
+<li><a href="#15"><b class="cmd">::ral::relvar identifiers</b> <i class="arg">relvarName</i></a></li>
+<li><a href="#16"><b class="cmd">::ral::relvar insert</b> <i class="arg">relvarName</i> <span class="opt">?name-value-list ...?</span></a></li>
+<li><a href="#17"><b class="cmd">::ral::relvar intersect</b> <i class="arg">relvarName</i> <span class="opt">?relationValue1 relationValue2 ...?</span></a></li>
+<li><a href="#18"><b class="cmd">::ral::relvar minus</b> <i class="arg">relvarName</i> <i class="arg">relationValue</i></a></li>
+<li><a href="#19"><b class="cmd">::ral::relvar names</b> <span class="opt">?pattern?</span></a></li>
+<li><a href="#20"><b class="cmd">::ral::relvar partition</b> <i class="arg">name</i> <i class="arg">super</i> <i class="arg">superAttrList</i> <i class="arg">sub1</i> <i class="arg">sub1AttrList</i> <span class="opt">?sub2 sub2AttrList sub3 sub3AttrList ...?</span></a></li>
+<li><a href="#21"><b class="cmd">::ral::relvar path</b> <i class="arg">relvarName</i></a></li>
+<li><a href="#22"><b class="cmd">::ral::relvar procedural</b> <i class="arg">constraintName</i> <i class="arg">relvarName</i> <i class="arg"><span class="opt">?relvarName2 ...?</span></i> <i class="arg">script</i></a></li>
+<li><a href="#23"><b class="cmd">::ral::relvar restrictone</b> <i class="arg">relvarName</i> <i class="arg">attr1</i> <i class="arg">value1</i> <span class="opt">?<i class="arg">attr2 value2 ...</i>?</span></a></li>
+<li><a href="#24"><b class="cmd">::ral::relvar set</b> <i class="arg">relvarName</i> <span class="opt">?relationValue?</span></a></li>
+<li><a href="#25"><b class="cmd">::ral::relvar trace</b> <i class="arg">option</i> <i class="arg">type</i> <span class="opt">?<i class="arg">args</i>?</span></a></li>
+<li><a href="#26"><b class="cmd">::ral::relvar transaction</b> <i class="arg">option</i></a></li>
+<li><a href="#27"><b class="cmd">::ral::relvar uinsert</b> <i class="arg">relvarName</i> <span class="opt">?name-value-list ...?</span></a></li>
+<li><a href="#28"><b class="cmd">::ral::relvar union</b> <i class="arg">relvarName</i> <span class="opt">?relationValue1 relationValue2 ...?</span></a></li>
+<li><a href="#29"><b class="cmd">::ral::relvar unset</b> <span class="opt">?relvarName ...?</span></a></li>
+<li><a href="#30"><b class="cmd">::ral::relvar update</b> <i class="arg">relvarName</i> <i class="arg">tupleVarName</i> <i class="arg">expression</i> <i class="arg">script</i></a></li>
+<li><a href="#31"><b class="cmd">::ral::relvar updateone</b> <i class="arg">relvarName</i> <i class="arg">tupleVarName</i> <i class="arg">id-name-value-list</i> <i class="arg">script</i></a></li>
+<li><a href="#32"><b class="cmd">::ral::relvar updateper</b> <i class="arg">relvarName</i> <i class="arg">relationValue</i></a></li>
+</ul>
+</div>
+</div>
+<div id="section1" class="section"><h2><a name="section1">Description</a></h2>
+<p>This manpage describes the <b class="cmd">relvar</b> command.
+The <b class="cmd">relvar</b> command is part of the Tcl Relational Algebra Library
+(ral) package.</p>
+<p>TclRAL defines a variable space for relation variables.
+Relation variables hold relation values and the subcommands of the
+<b class="cmd">relvar</b> command generally operate directly on the values storing
+the results back into the relation variables.
+For this reason, most of the <b class="cmd">relvar</b> subcommands
+take the name of a relation variable as an argument.</p>
+<p>In the relational model as it applies to database management systems,
+relation variables play the important role of
+representing the persistent data base values.
+Relation variables are the leaves of the expression tree for a query and
+represent the core data from which results may be computed.
+That computation is usually expressed as a single, sometimes complex expression.
+This allows for a non-procedural way of specifying the computation and
+allows optimizers to find the most efficient manner of computing the result.</p>
+<p>In the TclRAL implementation of the relational model,
+relation variables serve a similar role although there
+is no implicit persistence supplied by the library.
+Relation values may be stored in Tcl variables like any other Tcl object.
+This does abandon the non-procedural nature of relational expressions
+as usually accomplished in the relational model, but is a better fit
+to the Tcl way of doing things.</p>
+</div>
+<div id="section2" class="section"><h2><a name="section2">RELVAR NAMES</a></h2>
+<p>Relvar names follows the familiar Tcl method of naming
+ordinary Tcl variables and thus relvars have Tcl namespace-like names.
+For example, a relvar named <b class="variable">Dog</b> created at the global level
+will be named <b class="variable">::Dog</b>.
+However, relvars names are held separately from Tcl variable names
+and despite the similar syntax and appearance,
+relvars are a concept only of TclRAL.
+Thus it is possible and indeed encouraged to group related relvars
+together in a namespace.
+If an application uses only one set of relvars,
+then the global namespace of relvars is most convenient.
+Using several distinct sets of relvars is best accomplished if each
+set is placed in their own relvar namespace.</p>
+<p>Since it is possible to store a relation value in an ordinary Tcl variable
+and since Tcl variables are convenient to use when formulating relational
+expressions (<em>i.e.</em> it is sometimes more convenient to say <b class="variable">$Dog</b>
+rather than <b class="cmd">[relvar set Dog]</b>),
+creating a relvar also creates a corresponding Tcl variable by the same name.
+The Tcl variable created is traced to prevent accidental writing to it,
+since all modifications to a relvar should come via the <b class="cmd">relvar</b> commands.
+So, creating a relvar named <b class="variable">Dog</b> at the global level creates a
+relvar named <b class="variable">::Dog</b> and a read-only Tcl variable also named <b class="variable">::Dog</b>.
+However, it should be noted that the automatically created Tcl variable is
+not protected against <em>unset</em>.
+It is allowed to unset the Tcl variable and still access the relation value
+stored in the relvar.</p>
+</div>
+<div id="section3" class="section"><h2><a name="section3">CONSTRAINTS</a></h2>
+<p>TclRAL supports the notion of <em>constraints</em> as a means of
+insuring integrity among a set of relvars.
+There are many types of constraints that might be used to insure integrity,
+but TclRAL supports three distinct types of constraints:
+identification constraints, referential constraints and procedural constraints.</p>
+<dl class="definitions">
+<dt>Identification</dt>
+<dd><p>Identification constraints define a set of attributes that must have
+unique values.
+Each relvar must specify at least one identifier.
+An identifier is one or more attributes whose values taken together must
+be unique for all tuples stored in the relvar.
+Identifiers must also be minimal in the sense that no two identifiers
+for a given relvar are allowed to be a subset of one another.</p></dd>
+<dt>Referential</dt>
+<dd><p>Referential constraints define how tuples of one relvar refer to tuples
+in another relvar.</p></dd>
+<dt>Procedural</dt>
+<dd><p>Procedural constraints define a Tcl script that is evaluated to determine
+if the constraint is satisfied.</p></dd>
+</dl>
+<p>Identification constraints are enforced on a relvar by any operation
+that modifies the relation value stored in the relvar.
+For referential types of constraints three forms are supported.</p>
+<dl class="definitions">
+<dt>Association</dt>
+<dd><p>Association constraints define a referential association between two relvars.
+In this context,
+an association declares that a set of attributes in one relvar refers to
+an identifier of another relvar.
+Thus for all the tuples in a given relvar,
+the given attribute values must match the corresponding attribute values
+of the identifier of the associated relvar.
+The association also declares the number of times that such matches may
+occur and if it is allowed not to match at all.</p></dd>
+<dt>Partition</dt>
+<dd><p>Partition constraints define a complete and disjoint
+referential partitioning between one relvar,
+known as the super set,
+and a given set of relvars,
+known as the sub sets.
+This constraint declares that every tuple of the super set relvar is
+referred to by exactly one tuple from among all the tuples in the
+sub set relvars.</p></dd>
+<dt>Correlation</dt>
+<dd><p>Correlation constraints define a referential association between two
+relvars that is mediated by a third relvar.
+The third relvar, the correlation relvar, contains attributes that
+reference identifiers in the two associated relvars.
+It is similar in some ways to two Association Constraints.</p></dd>
+</dl>
+<p>Procedural constraints are enforced by evaluating a Tcl script when
+a given set of relvars are modified.
+At the end of each <b class="cmd">::ral::eval</b> command or after a
+<b class="cmd">::ral::transaction end</b> command(see below) or,
+if outside of an <b class="cmd">eval</b> command,
+at the end of any command that modifies a relvar
+that participates in a referential constraint,
+all of the referential and procedural constraints defined for the
+modified relvars are evaluated.
+If any of the constraints fail, the relvar modifications are discarded
+and the relvar values are returned to the values they had before
+the modifications.
+Similarly,
+during the creation of a constraint, the constraint is evaluated
+on all the relvars associated with the constraint.
+If the evaluation fails,
+the constraint creation fails.
+Like relvars, constraints have names.
+Constraints names follow the same pattern as relvar names, i.e.
+unresolved names are created in the current namespace.
+Thus you are able to keep the relvars and their constraints organized
+together in namespace-like groups.</p>
+</div>
+<div id="section4" class="section"><h2><a name="section4">COMMANDS</a></h2>
+<dl class="definitions">
+<dt><a name="1"><b class="cmd">::ral::relvar association</b> <i class="arg">name</i> <i class="arg">refrngRelvar</i> <i class="arg">refrngAttrList</i> <i class="arg">refToSpec</i> <i class="arg">refToRelvar</i> <i class="arg">refToAttrList</i> <i class="arg">refrngSpec</i></a></dt>
+<dd><p>The <b class="cmd">association</b> subcommand creates a referential association
+between two relvars called <i class="arg">name</i>.
+The return value of <b class="cmd">association</b> is the empty string.
+Associations declare that one relvar has attributes that refer to
+an identifier of another relvar.
+The referring relvar name is given by the <i class="arg">refrngRelvar</i> argument
+and the referring attributes are given by <i class="arg">refrngAttrList</i> argument.
+The referred to relvar name is given by <i class="arg">refToRelvar</i> and the
+attributes that are referred to by <i class="arg">refToAttrList</i>. The referring
+and referred to attribute lists are ordered and referring attributes
+refer to the corresponding referred to attribute.
+The set of attributes given by <i class="arg">refToAttrList</i> must constitute
+an identifier for <i class="arg">refToRelvar</i>.
+The <i class="arg">refToSpec</i> argument defines
+the multiplicity and conditionality of the reference.
+It can be one of:</p>
+<dl class="definitions">
+<dt>*</dt>
+<dd><p>Each tuple in <i class="arg">refToRelvar</i> is referred to zero or more times by
+the tuples in <i class="arg">refrngRelvar</i>.</p></dd>
+<dt>+</dt>
+<dd><p>Each tuple in <i class="arg">refToRelvar</i> is referred to one or more times by
+the tuples in <i class="arg">refrngRelvar</i>.</p></dd>
+<dt>1</dt>
+<dd><p>Each tuple in <i class="arg">refToRelvar</i> is referred to exactly once by
+the tuples in <i class="arg">refrngRelvar</i>.</p></dd>
+<dt>?</dt>
+<dd><p>Each tuple in <i class="arg">refToRelvar</i> is referred to zero or one times by
+the tuples in <i class="arg">refrngRelvar</i>.</p></dd>
+</dl>
+<p>Similarly <i class="arg">refrngSpec</i> defines the multiplicity and conditionality
+associated with the references to <i class="arg">refToRelvar</i>.
+Necessarily, <i class="arg">refrngSpec</i> may only be &quot;1&quot; or &quot;?&quot; implying:</p>
+<dl class="definitions">
+<dt>1</dt>
+<dd><p>Each tuple in <i class="arg">refrngRelvar</i> refers to exactly one tuple in
+<i class="arg">refToRelvar</i>.</p></dd>
+<dt>?</dt>
+<dd><p>Each tuple in <i class="arg">refrngRelvar</i> refers to at most one tuple
+(and possibly none at all) in <i class="arg">refToRelvar</i>.</p></dd>
+</dl>
+<p>The symbols for <i class="arg">refrngSpec</i> and <i class="arg">refToSpec</i> were chosen
+by analogy to the use of those symbols in regular expression syntax.</p>
+<pre class="example">
+% relvar association A1 OWNERSHIP OwnerName + OWNER OwnerName 1
+% relvar association A2 OWNERSHIP DogName * DOG DogName 1
+</pre>
+<p>In this example,
+A1 declares that for every tuple in OWNERSHIP,
+the value of OWNERSHIP.OwnerName matches the value of OWNER.OwnerName
+in exactly one tuple of OWNER and that for every tuple in OWNER the
+value of OWNER.OwnerName matches the value of OWNERSHIP.OwnerName in
+at least one tuple of OWNERSHIP and possibly more.
+In the semantics of this example, the concepts of being an OWNER
+and that of OWNERSHIP of a DOG are unconditionally associated since
+no tuple of OWNER may exist without there being at least one associated
+tuple of OWNERSHIP.
+Also this constraint allows for OWNERS that may own more than one DOG.
+Compare this to the case of A2.
+A2 states that every tuple in OWNERSHIP must have a corresponding tuple
+in DOG, but that tuples in DOG may not be referenced by any tuple in OWNERSHIP.
+OWNERSHIP and DOG are conditionally associated
+and in the semantics of this problem, it is possible to have dogs that 
+are not owned at all and to have dogs that are owned multiple times.</p></dd>
+<dt><a name="2"><b class="cmd">::ral::relvar constraint delete</b> <span class="opt">?<i class="arg">name1</i> <i class="arg">name2</i> ...?</span></a></dt>
+<dd><p>The <b class="cmd">constraint delete</b> subcommand deletes all the
+constraints given by the <i class="arg">nameN</i> arguments.
+The return value is the empty string.</p></dd>
+<dt><a name="3"><b class="cmd">::ral::relvar constraint exists</b> <i class="arg">name</i></a></dt>
+<dd><p>The <b class="cmd">constraint exists</b> subcommand returns a boolean value of
+true if the relvar named <i class="arg">name</i> exists and false otherwise.
+The relvar <i class="arg">name</i> argument is resolved according to the rules
+described above.</p></dd>
+<dt><a name="4"><b class="cmd">::ral::relvar constraint info</b> <i class="arg">name</i></a></dt>
+<dd><p>The <b class="cmd">constraint info</b> subcommand returns the detailed information
+about the constraint named <i class="arg">name</i>.
+The information returned is of the same format as the command used
+to create the constraint minus the superfluous leading <b class="cmd">relvar</b> command
+word.
+Additionally,
+the relvar names and constraint names are returned in fully qualified form.</p>
+<pre class="example">
+% relvar constraint info A1
+association ::A1 ::OWNERSHIP OwnerName + ::OWNER OwnerName 1
+% relvar constraint info ::P1
+partition ::P1 ::Lamp SerialNo ::TableLamp SerialNo ::FloorLamp SerialNo
+% relvar constraint info G
+unknown constraint name, &quot;G&quot;
+</pre>
+</dd>
+<dt><a name="5"><b class="cmd">::ral::relvar constraint names</b> <span class="opt">?<i class="arg">pattern</i>?</span></a></dt>
+<dd><p>The <b class="cmd">constraint names</b> subcommand returns a list of constraint names.
+If the optional <i class="arg">pattern</i> is present,
+then only those constraint names that match <i class="arg">pattern</i> are returned.
+Name matching happens in the same manner as for the <b class="cmd">string match</b>.
+The returned names are fully qualified.</p>
+<pre class="example">
+% relvar constraint names
+::A1 ::A2
+% relvar constraint names *2
+::A2
+</pre>
+</dd>
+<dt><a name="6"><b class="cmd">::ral::relvar constraint member</b> <i class="arg">relvarName</i></a></dt>
+<dd><p>The <b class="cmd">constraint member</b> subcommand returns a list of constraint names
+in which <i class="arg">relvarName</i> participates in some fashion.
+The returned names are fully qualified.</p>
+<pre class="example">
+% relvar constraint member OWNERSHIP
+::A1 ::A2
+</pre>
+</dd>
+<dt><a name="7"><b class="cmd">::ral::relvar constraint path</b> <i class="arg">constraintName</i></a></dt>
+<dd><p>The <b class="cmd">constraint path</b> subcommand returns the fully qualified constraint
+name of <i class="arg">constraintName</i>.</p></dd>
+<dt><a name="8"><b class="cmd">::ral::relvar correlation</b> <i class="arg"><span class="opt">?-complete?</span></i> <i class="arg">name</i> <i class="arg">correlRelvar</i> <i class="arg">correlAttrListA</i> <i class="arg">refToSpecA</i> <i class="arg">refToRelvarA</i> <i class="arg">refToAttrListA</i> <i class="arg">correlAttrListB</i> <i class="arg">refToSpecB</i> <i class="arg">refToRelvarB</i> <i class="arg">refToAttrListB</i></a></dt>
+<dd><p>The <b class="cmd">correlation</b> subcommand creates a referential correlation
+called <i class="arg">name</i>.
+The referential correlation is between a correlation relvar, <i class="arg">correlRelvar</i>,
+and two other relvars, <i class="arg">refToRelvarA</i> and <i class="arg">refToRelvarB</i>.
+The return value of the <b class="cmd">correlation</b> command is the empty string.
+Correlations declare that every tuple in <i class="arg">correlRelvar</i> refers to
+exactly one tuple of <i class="arg">refToRelvarA</i> and exactly one tuple of
+<i class="arg">refToRelvarB</i>.
+The <i class="arg">correlAttrListA</i> attributes in <i class="arg">correlRelvar</i> refer to an
+identifier of <i class="arg">refToRelvarA</i> that is given by the
+attributes contained in the <i class="arg">refToAttrListA</i> list.
+Similarly,
+the <i class="arg">correlAttrListB</i> attributes in <i class="arg">correlRelvar</i> refer to an
+identifier of <i class="arg">refToRelvarB</i> that is given by <i class="arg">refToAttrListB</i>.
+Both <i class="arg">refToAttrListA</i> and <i class="arg">refToAttrListB</i> must constitute
+an identifier for their corresponding relvars.
+The <i class="arg">refToSpecA</i> and <i class="arg">refToSpecB</i> arguments can have the same values
+as for the <b class="cmd">::ral::relvar association</b> command and specify
+the multiplicity and conditionality of how <i class="arg">refToRelvarA</i> and
+<i class="arg">refToRelvarB</i> are referred to by the tuples of <i class="arg">correlRelvar</i>.
+If the <i class="arg">-complete</i> option is given,
+then every tuple of <i class="arg">refToRelvarA</i> must be correlated to every
+tuple of <i class="arg">refToRelvarB</i> and <em>vice versa</em>.
+The <i class="arg">-complete</i> option implies
+the cardinality of <i class="arg">correlRelvar</i> must equal the product
+of the cardinality of <i class="arg">refToRelvarA</i> and <i class="arg">refToRelvarB</i>.
+If the <i class="arg">-complete</i> option is missing,
+then <i class="arg">correlRelvar</i> is allowed to have a subset of the Cartesian product
+of the references.</p>
+<p>Correlation constraints are often used to enforce the referential
+constraints for relvars that are related in a many to many fashion.
+However, they also arise in situations where the multiplicity is not
+many-to-many but when the <i class="arg">correlRelvar</i> contains attributes that
+apply to the association between <i class="arg">refToRelvarA</i> and <i class="arg">refToRelvarB</i>
+themselves.</p>
+<pre class="example">
+% relvar correlation C1 OWNERSHIP OwnerName + OWNER OwnerName DogName * DOG DogName
+</pre>
+</dd>
+<dt><a name="9"><b class="cmd">::ral::relvar create</b> <i class="arg">relvarName</i> <i class="arg">heading</i> <i class="arg">id1</i> <span class="opt">?<i class="arg">id2 ...</i>?</span></a></dt>
+<dd><p>The <b class="cmd">create</b> subcommand creates a new relation variable whose name is given
+by <i class="arg">relvarName</i> and that will store a relation value whose
+heading matches that of the <i class="arg">heading</i> argument.
+The <i class="arg">heading</i> argument is a list with an even number of
+elements consisting of alternating attribute names and attribute data types
+as described for the <b class="cmd">::ral::relation</b> command.
+The tuples of the relation value will be identified by <i class="arg">id1</i> and
+any other supplied <i class="arg">idN</i> arguments.
+Each <i class="arg">idN</i> argument is a list of attribute names that appear in the
+<i class="arg">heading</i>.
+The subcommand returns the relation value of the newly created relvar,
+which necessarily will have cardinality of 0.
+If <i class="arg">relvarName</i> name begins with &quot;::&quot;, then it is interpreted
+as a fully resolved name and will be created in the given namespace.
+Otherwise, <i class="arg">relvarName</i> is interpreted as relative the to current namespace.
+In either case,
+an ordinary Tcl variable is also created by the same fully resolved
+name as the relvar.
+This implies that any namespaces referenced in <i class="arg">relvarName</i>
+must already exist.</p>
+<pre class="example">
+% relvar create OWNER {OwnerName string Age int City string} OwnerName
+{OwnerName string Age int City string} {}
+% puts [relformat $::OWNER]
++---------+---+------+
+|OwnerName|Age|City  |
+|string   |int|string|
++---------+---+------+
++---------+---+------+
+% relvar create DOG {DogName string Breed string} DogName
+{DogName string Breed string} {}
+% relvar create OWNERSHIP {OwnerName string DogName string Acquired string} {OwnerName DogName}
+{OwnerName string DogName string Acquired string} {}
+</pre>
+</dd>
+<dt><a name="10"><b class="cmd">::ral::relvar delete</b> <i class="arg">relvarName</i> <i class="arg">tupleVarName</i> <i class="arg">expression</i></a></dt>
+<dd><p>The <b class="cmd">delete</b> subcommands deletes tuples from the relation variable
+given by the <i class="arg">relvarName</i> argument.
+Each tuple in the body of <i class="arg">relvarName</i> is successively
+assigned to the tuple variable named <i class="arg">tupleVarName</i> and
+<i class="arg">expression</i> is evaluated.
+If <i class="arg">expression</i> returns true, then that tuple is deleted, directly
+modifying the value contained in <i class="arg">relvarName</i>.
+The return value of the subcommand is the number of tuples deleted.</p>
+<pre class="example">
+% puts [relformat $::OWNER &quot;Before deleting Sue&quot;]
++---------+---+-------------+
+|OwnerName|Age|City         |
+|string   |int|string       |
++---------+---+-------------+
+|Sue      |24 |Cupertino    |
+|George   |35 |Sunnyvale    |
+|Alice    |30 |San Jose     |
+|Mike     |50 |San Jose     |
+|Jim      |42 |San Francisco|
++---------+---+-------------+
+Before deleting Sue
+-------------------
+% relvar delete OWNER o {[tuple extract $o OwnerName] eq &quot;Sue&quot;}
+1
+% puts [relformat $::OWNER &quot;After deleting Sue&quot;]
++---------+---+-------------+
+|OwnerName|Age|City         |
+|string   |int|string       |
++---------+---+-------------+
+|George   |35 |Sunnyvale    |
+|Alice    |30 |San Jose     |
+|Mike     |50 |San Jose     |
+|Jim      |42 |San Francisco|
++---------+---+-------------+
+After deleting Sue
+------------------
+</pre>
+</dd>
+<dt><a name="11"><b class="cmd">::ral::relvar deleteone</b> <i class="arg">relvarName</i> <span class="opt">?attr1 value1 attr2 value2 ...?</span></a></dt>
+<dd><p>The <b class="cmd">deleteone</b> subcommand deletes at most one tuple from the
+relation variable given by the <i class="arg">relvarName</i> argument.
+The <i class="arg">attrN valueN</i> arguments must be given in pairs
+and are the attribute names and values that determine which tuple
+is deleted from the relation value held in <i class="arg">relvarName</i>.
+The set of attribute names in the <i class="arg">attrN valueN</i> arguments
+must form one of the identifiers of <i class="arg">relvarName</i>.
+If <i class="arg">relvarName</i> contains a tuple whose attribute values match those
+in given then that tuple is deleted and <i class="arg">relvarName</i>
+is modified in place.
+Otherwise <i class="arg">relvarName</i> is unchanged.
+This subcommand is useful in those contexts where the attribute values of an
+identifier are known and evaluating an expression over all the tuples
+in <i class="arg">relvarName</i> is superfluous.
+The return value of the subcommand is the number of tuples deleted which will
+necessarily be either 1 or 0.</p>
+<pre class="example">
+% puts [relformat $::OWNER &quot;Before deleting Mike&quot;]
++---------+---+-------------+
+|OwnerName|Age|City         |
+|string   |int|string       |
++---------+---+-------------+
+|Sue      |24 |Cupertino    |
+|George   |35 |Sunnyvale    |
+|Alice    |30 |San Jose     |
+|Mike     |50 |San Jose     |
+|Jim      |42 |San Francisco|
++---------+---+-------------+
+Before deleting Mike
+--------------------
+% relvar deleteone OWNER OwnerName Mike
+1
+% puts [relformat $::OWNER &quot;After deleting Mike&quot;]
++---------+---+-------------+
+|OwnerName|Age|City         |
+|string   |int|string       |
++---------+---+-------------+
+|Sue      |24 |Cupertino    |
+|George   |35 |Sunnyvale    |
+|Alice    |30 |San Jose     |
+|Jim      |42 |San Francisco|
++---------+---+-------------+
+After deleting Mike
+-------------------
+% relvar deleteone OWNER OwnerName Alfonse
+0
+% puts [relformat $::OWNER]
++---------+---+-------------+
+|OwnerName|Age|City         |
+|string   |int|string       |
++---------+---+-------------+
+|Sue      |24 |Cupertino    |
+|George   |35 |Sunnyvale    |
+|Alice    |30 |San Jose     |
+|Jim      |42 |San Francisco|
++---------+---+-------------+
+</pre>
+</dd>
+<dt><a name="12"><b class="cmd">::ral::relvar dunion</b> <i class="arg">relvarName</i> <i class="arg"><span class="opt">?relationValue1 ...?</span></i></a></dt>
+<dd><p>The <b class="cmd">dunion</b> subcommand performs the relation disjoint union of the
+relation value contained in <i class="arg">relvarName</i> with the given
+<i class="arg">relationValueN</i> arguments and assigns the result back into
+<i class="arg">relvarName</i>.
+This command is shorthand for:</p>
+<p>relvar set &lt;relvarName&gt; [relation dunion [relvar set &lt;relvarName&gt;]
+&lt;relationValue1&gt; ...]</p>
+<p>The headings of each <i class="arg">relationValueN</i> must match that of the value
+contained in <i class="arg">relvarName</i>.
+Any duplicated tuples will cause an error to be thrown and thus
+this command has insert type semantics.
+Since the disjoint union operation is commutative, the order of the
+<i class="arg">relationValueN</i> arguments does not affect the result.
+The return value of the command is the new relation value stored in
+<i class="arg">relvarName</i>.</p></dd>
+<dt><a name="13"><b class="cmd">::ral::relvar eval</b> <i class="arg">arg</i> <span class="opt">?arg ...?</span></a></dt>
+<dd><p>The <b class="cmd">eval</b> subcommand concatenates it arguments together and evaluates
+the resulting script as a relvar transaction.
+The return value of <b class="cmd">eval</b> is the return value of the last
+command executed in the script.
+At the end of the script,
+the constraints associated with any relvar that was modified
+by the script are evaluated.
+If either the script generates an error or any of the constraints fail,
+then the values of the modified relvars are returned to the values
+they held before the <b class="cmd">eval</b> command.
+It is an error to attempt to create relvars or constraints in the
+script executed by <b class="cmd">eval</b>.</p>
+<pre class="example">
+% puts [relformat $::OWNER]
++---------+---+-------------+
+|OwnerName|Age|City         |
+|string   |int|string       |
++---------+---+-------------+
+|Sue      |24 |Cupertino    |
+|George   |35 |Sunnyvale    |
+|Alice    |30 |San Jose     |
+|Mike     |50 |San Jose     |
+|Jim      |42 |San Francisco|
++---------+---+-------------+
+% relvar eval {
+&gt;       relvar insert OWNER {OwnerName Tom Age 22 City Tulsa}
+&gt; }
+for association ::A1(::OWNERSHIP [+] ==&gt; [1] ::OWNER), in relvar ::OWNER
+tuple {OwnerName Tom Age 22 City Tulsa} is not referenced by any tuple
+% puts [relformat $::OWNER]
++---------+---+-------------+
+|OwnerName|Age|City         |
+|string   |int|string       |
++---------+---+-------------+
+|Sue      |24 |Cupertino    |
+|George   |35 |Sunnyvale    |
+|Alice    |30 |San Jose     |
+|Mike     |50 |San Jose     |
+|Jim      |42 |San Francisco|
++---------+---+-------------+
+% relvar eval {
+&gt;       relvar insert OWNER {OwnerName Tom Age 22 City Tulsa}
+&gt;       relvar insert OWNERSHIP {OwnerName Tom DogName Skippy Acquired 2006}
+&gt; }
+for association ::A2(::OWNERSHIP [*] ==&gt; [1] ::DOG), in relvar ::OWNERSHIP
+tuple {OwnerName Tom DogName Skippy Acquired 2006} references no tuple
+% puts [relformat $::OWNER]
++---------+---+-------------+
+|OwnerName|Age|City         |
+|string   |int|string       |
++---------+---+-------------+
+|Sue      |24 |Cupertino    |
+|George   |35 |Sunnyvale    |
+|Alice    |30 |San Jose     |
+|Mike     |50 |San Jose     |
+|Jim      |42 |San Francisco|
++---------+---+-------------+
+% relvar eval {
+&gt;       relvar insert OWNER {OwnerName Tom Age 22 City Tulsa}
+&gt;       relvar insert OWNERSHIP {OwnerName Tom DogName Jumper Acquired 2006}
+&gt;       return
+&gt; }
+% puts [relformat $::OWNER]
++---------+---+-------------+
+|OwnerName|Age|City         |
+|string   |int|string       |
++---------+---+-------------+
+|Sue      |24 |Cupertino    |
+|George   |35 |Sunnyvale    |
+|Alice    |30 |San Jose     |
+|Mike     |50 |San Jose     |
+|Jim      |42 |San Francisco|
+|Tom      |22 |Tulsa        |
++---------+---+-------------+
+</pre>
+</dd>
+<dt><a name="14"><b class="cmd">::ral::relvar exists</b> <i class="arg">relvarName</i></a></dt>
+<dd><p>The <b class="cmd">exists</b> subcommand returns 1 if the relvar given by <i class="arg">relvarName</i>
+exists and 0 otherwise.
+The relvar name is resolved in the current namespace if it is not
+specified as fully qualified.</p></dd>
+<dt><a name="15"><b class="cmd">::ral::relvar identifiers</b> <i class="arg">relvarName</i></a></dt>
+<dd></dd>
+<dt><a name="16"><b class="cmd">::ral::relvar insert</b> <i class="arg">relvarName</i> <span class="opt">?name-value-list ...?</span></a></dt>
+<dd><p>The <b class="cmd">insert</b> subcommand inserts the tuples given by <i class="arg">name-value-list</i>
+arguments into the value of the relation stored in <i class="arg">relvarName</i>.
+The value of <i class="arg">relvarName</i> is modified in place.
+The return value is a relation value with the same heading as the
+value held in <i class="arg">relvarName</i> and whose body contains the tuples as they
+were actually inserted.
+This gives the caller access to any attributes that might have been added
+or modified by a relvar trace.
+It is an error to attempt to insert a duplicate tuple or a tuple whose
+heading does not match the heading of the value held in <i class="arg">relvarName</i>.
+The values of all attributes of the inserted tuples must be specified
+either in the command invocation or as supplied by any relvar insert traces
+with a valid value representation of the type associated with the attribute.
+However, because of relvar tracing, the tuple values given in
+<i class="arg">name-value-list</i> may not be the ones actually inserted into the relvar
+and relvar traces may extend the given <i class="arg">name-value-list</i> argument.</p>
+<pre class="example">
+% relvar insert DOG {DogName Skippy Breed Dalmation}
+    {DogName string Breed string} {{DogName Fido Breed Poodle} \ 
+    {DogName Sam Breed Collie} {DogName Spot Breed Terrier} \ 
+    {DogName Rover Breed Retriever} {DogName Fred Breed Spaniel} \ 
+    {DogName Jumper Breed Mutt} {DogName Skippy Breed Dalmation}}
+% relvar insert OWNER {OwnerName Tom Age 22 City Tulsa}
+for association ::A1(::OWNERSHIP [+] ==&gt; [1] ::OWNER), in relvar ::OWNER
+tuple {OwnerName Tom Age 22 City Tulsa} is not referenced by any tuple
+</pre>
+</dd>
+<dt><a name="17"><b class="cmd">::ral::relvar intersect</b> <i class="arg">relvarName</i> <span class="opt">?relationValue1 relationValue2 ...?</span></a></dt>
+<dd><p>The <b class="cmd">intersect</b> subcommand performs the relation intersection of the
+relation value contained in <i class="arg">relvarName</i> with the given
+<i class="arg">relationValueN</i> arguments and assigns the result back into
+<i class="arg">relvarName</i>.
+This command is shorthand for:</p>
+<p>relvar set &lt;relvarName&gt; [relation intersect [relvar set &lt;relvarName&gt;]
+&lt;relationValue1&gt; ...]</p>
+<p>The headings of each <i class="arg">relationValueN</i> must match that of the value
+contained in <i class="arg">relvarName</i>.
+Since the intersect operation is commutative, the order of the
+<i class="arg">relationValueN</i> arguments does not affect the result.
+The return value of the command is the new relation value stored in
+<i class="arg">relvarName</i>.</p></dd>
+<dt><a name="18"><b class="cmd">::ral::relvar minus</b> <i class="arg">relvarName</i> <i class="arg">relationValue</i></a></dt>
+<dd><p>The <b class="cmd">minus</b> subcommand performs the relation difference of the
+relation value contained in <i class="arg">relvarName</i> with
+the <i class="arg">relationValue</i> argument and assigns the result back into
+<i class="arg">relvarName</i>.
+This command is shorthand for:</p>
+<p>relvar set &lt;relvarName&gt; [relation minus [relvar set &lt;relvarName&gt;]
+&lt;relationValue1&gt;]</p>
+<p>The headings of <i class="arg">relationValue</i> must match that of the value
+contained in <i class="arg">relvarName</i>.
+Note that this operation is not commutative.
+The return value of the command is the new relation value stored in
+<i class="arg">relvarName</i>.</p></dd>
+<dt><a name="19"><b class="cmd">::ral::relvar names</b> <span class="opt">?pattern?</span></a></dt>
+<dd><p>The <b class="cmd">names</b> subcommand returns a list of the currently defined
+relation variables.
+If the <i class="arg">pattern</i> argument is specified then only those names matching
+<i class="arg">pattern</i> are returned.
+Name matching is performed as for the <b class="cmd">string match</b> command.
+The returned names are fully qualified.</p>
+<pre class="example">
+% relvar names
+::DOG ::OWNERSHIP ::OWNER
+% relvar names ::D*
+::DOG
+</pre>
+</dd>
+<dt><a name="20"><b class="cmd">::ral::relvar partition</b> <i class="arg">name</i> <i class="arg">super</i> <i class="arg">superAttrList</i> <i class="arg">sub1</i> <i class="arg">sub1AttrList</i> <span class="opt">?sub2 sub2AttrList sub3 sub3AttrList ...?</span></a></dt>
+<dd><p>The <b class="cmd">partition</b> subcommand defines a partition constraint named
+<i class="arg">name</i>.
+The relvar named <i class="arg">super</i> must have as one of its identifiers the
+attributes named in the <i class="arg">superAttrList</i> argument.
+The remaining arguments define the sub set relvars named <i class="arg">subN</i>
+and the attributes in those relvars that reference the super set relvar
+are given by the <i class="arg">subNAttrList</i> arguments.
+A partition constraint declares that every tuple in the <i class="arg">subN</i>
+relvars references exactly one tuple in the <i class="arg">super</i> relvar and that
+every tuple in the <i class="arg">super</i> relvar is referred to by exactly one
+tuple contained in one of the <i class="arg">subN</i> relvars.
+This constraint implies that the tuples in the <i class="arg">super</i> relvar are
+completely partitioned into the disjoint sub sets given by the the
+<i class="arg">subN</i> relvars.</p>
+<pre class="example">
+% relvar create Lamp {SerialNo string ModelNo string Make string} SerialNo
+{SerialNo string ModelNo string Make string} {}
+% relvar create TableLamp {SerialNo string Shade string} SerialNo
+{SerialNo string Shade string} {}
+% relvar create FloorLamp {SerialNo string Height int Sockets int} SerialNo
+{SerialNo string Height int Sockets int} {}
+% relvar partition P1 Lamp SerialNo TableLamp SerialNo FloorLamp SerialNo
+% relvar insert Lamp {SerialNo NF100 ModelNo FCN-22 Make Falcon}
+for partition ::P1(::Lamp is partitioned [::TableLamp | ::FloorLamp]), in relvar ::Lamp
+tuple {SerialNo NF100 ModelNo FCN-22 Make Falcon} is not referred to by any tuple
+% relvar eval {
+&gt;       relvar insert Lamp {SerialNo NF100 ModelNo FCN-22  Make Falcon}
+&gt;       relvar insert TableLamp {SerialNo NF100  Shade Blue}
+&gt;       return
+&gt;     }
+% relvar insert FloorLamp {SerialNo NF100 Height 72 Sockets 3}
+for partition ::P1(::Lamp is partitioned [::TableLamp | ::FloorLamp]), in relvar ::Lamp
+tuple {SerialNo NF100 ModelNo FCN-22 Make Falcon} is referred to by multiple tuples
+% relvar insert FloorLamp {SerialNo NF101 Height 72 Sockets 3}
+for partition ::P1(::Lamp is partitioned [::TableLamp | ::FloorLamp]), in relvar ::FloorLamp
+tuple {SerialNo NF101 Height 72 Sockets 3} references no tuple
+</pre>
+</dd>
+<dt><a name="21"><b class="cmd">::ral::relvar path</b> <i class="arg">relvarName</i></a></dt>
+<dd><p>The <b class="cmd">path</b> subcommand returns the fully qualified relvar
+name of <i class="arg">relvarName</i>.</p></dd>
+<dt><a name="22"><b class="cmd">::ral::relvar procedural</b> <i class="arg">constraintName</i> <i class="arg">relvarName</i> <i class="arg"><span class="opt">?relvarName2 ...?</span></i> <i class="arg">script</i></a></dt>
+<dd><p>The <b class="cmd">procedural</b> subcommand defines a procedural constraint.
+The name of the constraint is given by the <i class="arg">constraintName</i> argument.
+At the end of any transaction (or any command that modifies a relvar
+if there is no ongoing transaction),
+<i class="arg">script</i> is evaluated if any of the <i class="arg">relvarNameN</i> relvars is
+modified.
+The <i class="arg">script</i> must return a value that can be intepreted as a boolean.
+If <i class="arg">script</i> returns <em>true</em> then the constraint passes.
+If <i class="arg">script</i> returns <em>false</em> then the constraint is deemed to
+have failed an the transaction is rolled back.
+Procedural constraints are only evaluated at the end of a transaction
+and only if the relvars given in the <b class="cmd">procedural</b> command are
+modified during the transaction.
+Compare this to the behavior of <b class="cmd">relvar trace</b> procedures which
+are invoked on a tuple-by-tuple basis as the relvar value is being modified.</p>
+<p>The following example shows a constraint that insures that the
+Percentage attribute always totals to 100.</p>
+<pre class="example">
+% relvar create Ingredient {Name string   Percentage int} Name
+{Name string Percentage int} {}
+% relvar insert Ingredient {Name flour Percentage 100}
+{Name string Percentage int} {{Name flour Percentage 100}}
+% relvar procedural P2 Ingredient {
+&gt; set tot [relation summarizeby [relvar set Ingredient] {}\\
+&gt; ig TotalPercent int {rsum($ig, &quot;Percentage&quot;)}]
+&gt; return [expr {[relation extract $tot TotalPercent] == 100}]
+&gt; }
+% relvar eval {
+&gt; relvar insert Ingredient {Name butter Percentage 25}
+&gt; relvar updateone Ingredient ig {Name flour} {
+&gt; tuple update $ig Percentage 75}
+&gt; }
+% relformat $::Ingredient Ingredient
++------+----------+
+|Name  |Percentage|
+|string|int       |
++------+----------+
+|flour |75        |
+|butter|25        |
++------+----------+
+Ingredient
+----------
+% relvar insert Ingredient {Name salt Percentage 1}
+procedural contraint, &quot;::P2&quot;, failed
+% relformat $::Ingredient Ingredient
++------+----------+
+|Name  |Percentage|
+|string|int       |
++------+----------+
+|flour |75        |
+|butter|25        |
++------+----------+
+Ingredient
+----------
+</pre>
+</dd>
+<dt><a name="23"><b class="cmd">::ral::relvar restrictone</b> <i class="arg">relvarName</i> <i class="arg">attr1</i> <i class="arg">value1</i> <span class="opt">?<i class="arg">attr2 value2 ...</i>?</span></a></dt>
+<dd><p>The <b class="cmd">restrictone</b> subcommand returns a relation value containing
+the tuple whose attributes match those of the <i class="arg">attrN</i> and <i class="arg">valueN</i>
+arguments.
+The <i class="arg">attrN</i> arguments must form an identifier for the relvar.
+The returned relation value will be of cardinality 0 or 1.
+The relation value held in <i class="arg">relvarName</i> is not modified.</p></dd>
+<dt><a name="24"><b class="cmd">::ral::relvar set</b> <i class="arg">relvarName</i> <span class="opt">?relationValue?</span></a></dt>
+<dd><p>The <b class="cmd">set</b> subcommand replaces the current value held by the relation
+variable named <i class="arg">relvarName</i> with the value given by
+<i class="arg">relationValue</i>.
+It is an error to attempt to assign a relation value to a relation variable
+that is of a different type than the type of the value
+that the variable currently holds.
+In other words, it is not possible to change the type of a relvar
+by assignment.
+The return value of the subcommand is the current value
+held by <i class="arg">relvarName</i>.
+If the <i class="arg">relationValue</i> argument is missing, then no attempt is made to
+change the value of <i class="arg">relvarName</i>.
+This command operates in a manner analogous to the <b class="cmd">set</b> command for
+ordinary Tcl variables.</p>
+<pre class="example">
+% relvar create PUPPY {PuppyName string Dame string Sire string} PuppyName
+{PuppyName string Dame string Sire string} {}
+% relvar set PUPPY {
+&gt;   {PuppyName string Dame string Sire string} {
+&gt;       {PuppyName Bitsy Dame Spot Sire Jumper}
+&gt;   }
+&gt;}
+{PuppyName string Dame string Sire string} {{PuppyName Bitsy Dame Spot Sire Jumper}}
+% relvar set PUPPY $::DOG
+headings not equal, &quot;{DogName string Breed string}&quot;
+</pre>
+</dd>
+<dt><a name="25"><b class="cmd">::ral::relvar trace</b> <i class="arg">option</i> <i class="arg">type</i> <span class="opt">?<i class="arg">args</i>?</span></a></dt>
+<dd><dl class="definitions">
+<dt><b class="cmd">::ral::relvar trace add variable</b> <i class="arg">relvarName</i> <i class="arg">traceops</i> <i class="arg">cmdPrefix</i></dt>
+<dd></dd>
+<dt><b class="cmd">::ral::relvar trace remove variable</b> <i class="arg">relvarName</i> <i class="arg">traceops</i> <i class="arg">cmdPrefix</i></dt>
+<dd></dd>
+<dt><b class="cmd">::ral::relvar trace info variable</b> <i class="arg">relvarName</i></dt>
+<dd></dd>
+<dt><b class="cmd">::ral::relvar trace suspend variable</b> <i class="arg">relvarName</i> <i class="arg">script</i></dt>
+<dd></dd>
+<dt><b class="cmd">::ral::relvar trace add eval</b> <i class="arg">cmdPrefix</i></dt>
+<dd></dd>
+<dt><b class="cmd">::ral::relvar trace remove eval</b> <i class="arg">cmdPrefix</i></dt>
+<dd></dd>
+<dt><b class="cmd">::ral::relvar trace info eval</b></dt>
+<dd></dd>
+</dl>
+<p>The <b class="cmd">trace add variable</b> subcommand adds a trace to <i class="arg">relvarName</i>.
+The <i class="arg">traceops</i> argument is a list of one or more trace operation keywords
+from the list:</p>
+<dl class="definitions">
+<dt>delete</dt>
+<dd></dd>
+<dt>insert</dt>
+<dd></dd>
+<dt>set</dt>
+<dd></dd>
+<dt>unset</dt>
+<dd></dd>
+<dt>update</dt>
+<dd></dd>
+</dl>
+<p>The <b class="cmd">trace remove variable</b> subcommand deletes any trace on
+<i class="arg">relvarName</i> that matches <i class="arg">traceops</i> and <i class="arg">command</i>.
+The <b class="cmd">trace info variable</b> subcommand returns the trace information
+for the relvar whose name is given by <i class="arg">relvarName</i>.
+The trace information is a list each element of which describes one trace
+on the relvar.
+Each trace information element is in turn a list consisting of two elements,
+the <i class="arg">traceops</i> and <i class="arg">command</i>, of the relvar trace.
+It is an error to request any trace operation if <i class="arg">relvarName</i> does not
+exist.
+The <b class="cmd">trace suspend variable</b> subcommand suspends tracing on
+the relvar given by <i class="arg">relvarName</i> and executes <i class="arg">script</i> restoring
+tracing after <i class="arg">script</i> ends.
+This subcommand allows scripts to temporarily suspend tracing on a
+relvar.
+The <b class="cmd">trace add eval</b>, <b class="cmd">trace remove eval</b> and
+<b class="cmd">trace info eval</b> variations perform the corresponding
+operation for tracing transactions via the <b class="cmd">relvar eval</b> command.
+See the <em>RELVAR TRACES</em> section below for further details.</p></dd>
+<dt><a name="26"><b class="cmd">::ral::relvar transaction</b> <i class="arg">option</i></a></dt>
+<dd><dl class="definitions">
+<dt><b class="cmd">::ral::relvar transaction begin</b></dt>
+<dd></dd>
+<dt><b class="cmd">::ral::relvar transaction end</b></dt>
+<dd></dd>
+<dt><b class="cmd">::ral::relvar transaction rollback</b></dt>
+<dd></dd>
+</dl>
+<p>The <b class="cmd">transaction</b> subcommand controls the evaluation of relvar
+constraints.
+Like <b class="cmd">relvar eval</b>, <b class="cmd">relvar transaction</b> demarcates the
+boundaries of when relvar constraints are evaluated.
+<b class="cmd">relvar transaction begin</b> signals the beginning of a constraint
+transaction.
+When the matching <b class="cmd">relvar transaction end</b> is executed,
+all contraints for all relvars modified since the corresponding
+<b class="cmd">relvar transaction begin</b> command are evaluated.
+Executing the <b class="cmd">relvar transaction rollback</b> command, halts the
+transaction and discards all the modifications, restoring the relvar
+state to that which existed before the execution of
+<b class="cmd">relvar transaction begin</b>.
+This command is complementary to <b class="cmd">relvar eval</b> in that it provides
+the same behavior but for those circumstances where accumulating the
+relvar modifications into a single script is not convenient or possible.
+The command returns the empty string.
+If relvar modifications are such that the constraints are violated,
+then <b class="cmd">relvar transaction end</b> will throw an error.</p></dd>
+<dt><a name="27"><b class="cmd">::ral::relvar uinsert</b> <i class="arg">relvarName</i> <span class="opt">?name-value-list ...?</span></a></dt>
+<dd><p>The <b class="cmd">uinsert</b> subcommand inserts the tuples given by <i class="arg">name-value-list</i>
+arguments into the value of the relation stored in <i class="arg">relvarName</i>.
+The value of <i class="arg">relvarName</i> is modified in place.
+The return value is a relation value with the same heading as the
+value held in <i class="arg">relvarName</i> and whose body contains the tuples as they
+were actually inserted.
+This gives the caller access to any attributes that might have been added
+or modified by a relvar trace.
+The <b class="cmd">uinsert</b> command has union-like semantics and so any
+attempt to insert a duplicate tuple is silently ignored.
+It is an error to attempt to insert a tuple whose
+heading does not match the heading of the value held in <i class="arg">relvarName</i>.
+The values of all attributes of the inserted tuples must be specified
+either in the command invocation or as supplied by any relvar insert traces
+with a valid value representation of the type associated with the attribute.
+However, because of relvar tracing, the tuple values given in
+<i class="arg">name-value-list</i> may not be the ones actually inserted into the relvar
+and relvar traces may extend the given <i class="arg">name-value-list</i> argument.</p></dd>
+<dt><a name="28"><b class="cmd">::ral::relvar union</b> <i class="arg">relvarName</i> <span class="opt">?relationValue1 relationValue2 ...?</span></a></dt>
+<dd><p>The <b class="cmd">union</b> subcommand performs the relation union of the
+relation value contained in <i class="arg">relvarName</i> with the given
+<i class="arg">relationValueN</i> arguments and assigns the result back into
+<i class="arg">relvarName</i>.
+This command is shorthand for:</p>
+<p>relvar set &lt;relvarName&gt; [relation union [relvar set &lt;relvarName&gt;]
+&lt;relationValue1&gt; ...]</p>
+<p>The headings of each <i class="arg">relationValueN</i> must match that of the value
+contained in <i class="arg">relvarName</i>.
+Since the union operation is commutative, the order of the
+<i class="arg">relationValueN</i> arguments does not affect the result.
+The return value of the command is the new relation value stored in
+<i class="arg">relvarName</i>.</p></dd>
+<dt><a name="29"><b class="cmd">::ral::relvar unset</b> <span class="opt">?relvarName ...?</span></a></dt>
+<dd><p>The <b class="cmd">unset</b> subcommand deletes all the relation variables whose
+names are given as the subcommand arguments.
+The corresponding Tcl variables that were created when the relvar
+was created are also <b class="cmd">unset</b>.
+This command operates in a manner analogous to the <b class="cmd">unset</b> command for
+ordinary Tcl variables.
+It is an error to attempt to <b class="cmd">unset</b> a relvar that is associated
+with any constraints.</p></dd>
+<dt><a name="30"><b class="cmd">::ral::relvar update</b> <i class="arg">relvarName</i> <i class="arg">tupleVarName</i> <i class="arg">expression</i> <i class="arg">script</i></a></dt>
+<dd><p>The <b class="cmd">update</b> subcommand modifies the values of tuples in the relation
+value contained in the relation variable given by <i class="arg">relvarName</i>.
+Each tuple in <i class="arg">relvarName</i> is successively assigned to the tuple
+variable given by <i class="arg">tupleVarName</i> and <i class="arg">expression</i> is evaluated.
+If the result of the evaluation is true,
+then <i class="arg">script</i> is evaluated.
+The return value of <i class="arg">script</i> is then used to update the corresponding
+tuple in <i class="arg">relvarName</i>.
+The return value of the <b class="cmd">relvar update</b> subcommand
+is a relation value with the same heading as the
+value held in <i class="arg">relvarName</i> and whose body contains the tuples as they
+were actually updated into the relvar.
+This gives the caller access to any attributes that might have been modified
+by a relvar trace.
+If the <i class="arg">script</i> throws an error or the modified value of a tuple cannot
+be updated into <i class="arg">relvarName</i>, all changes to <i class="arg">relvarName</i> are
+discarded and the value of <i class="arg">relvarName</i> is restored to its previous value.
+Should <i class="arg">script</i> execute a <b class="cmd">break</b> or otherwise arrange to
+return a break result code,
+then the tuple is updated, but no further tuples in the relvar are considered.</p>
+<pre class="example">
+% puts [relformat $::OWNER]
++---------+---+-------------+
+|OwnerName|Age|City         |
+|string   |int|string       |
++---------+---+-------------+
+|Sue      |24 |Cupertino    |
+|George   |35 |Sunnyvale    |
+|Alice    |30 |San Jose     |
+|Mike     |50 |San Jose     |
+|Jim      |42 |San Francisco|
++---------+---+-------------+
+% relvar update OWNER o {[tuple extract $o OwnerName] eq &quot;Sue&quot;} {
+&gt;       tuple update $o Age [expr {[tuple extract $o Age] + 1}]
+&gt;     }
+% puts [relformat $::OWNER]
++---------+---+-------------+
+|OwnerName|Age|City         |
+|string   |int|string       |
++---------+---+-------------+
+|Sue      |25 |Cupertino    |
+|George   |35 |Sunnyvale    |
+|Alice    |30 |San Jose     |
+|Mike     |50 |San Jose     |
+|Jim      |42 |San Francisco|
++---------+---+-------------+
+% relvar update OWNER o {[tuple extract $o OwnerName] eq &quot;George&quot;} {
+&gt;       tuple update $o OwnerName Alfonse
+&gt;     }
+for association ::A1(::OWNERSHIP [+] ==&gt; [1] ::OWNER), in relvar ::OWNER
+tuple {OwnerName Alfonse Age 35 City Sunnyvale} is not referenced by any tuple
+for association ::A1(::OWNERSHIP [+] ==&gt; [1] ::OWNER), in relvar ::OWNERSHIP
+tuple {OwnerName George DogName Fido Acquired 2001} references no tuple
+tuple {OwnerName George DogName Sam Acquired 2000} references no tuple
+% puts [relformat $::OWNER]
++---------+---+-------------+
+|OwnerName|Age|City         |
+|string   |int|string       |
++---------+---+-------------+
+|Sue      |25 |Cupertino    |
+|George   |35 |Sunnyvale    |
+|Alice    |30 |San Jose     |
+|Mike     |50 |San Jose     |
+|Jim      |42 |San Francisco|
++---------+---+-------------+
+</pre>
+</dd>
+<dt><a name="31"><b class="cmd">::ral::relvar updateone</b> <i class="arg">relvarName</i> <i class="arg">tupleVarName</i> <i class="arg">id-name-value-list</i> <i class="arg">script</i></a></dt>
+<dd><p>The <b class="cmd">updateone</b> subcommand modifies at most one tuple from the
+relation variable given by the <i class="arg">relvarName</i> argument.
+The <i class="arg">id-name-value-list</i> must be list containing an even number of elements
+which are attribute names alternating with attribute values.
+The set of attribute names in <i class="arg">id-name-value-list</i> must form one of the
+identifiers of <i class="arg">relvarName</i>.
+If <i class="arg">relvarName</i> contains a tuple whose attribute values match those
+in <i class="arg">name-value-list</i> then
+that tuple is assigned to <i class="arg">tupleVarName</i> and <i class="arg">script</i> is executed.
+The tuple value returned by <i class="arg">script</i>
+replaces the original tuple, modifying <i class="arg">relvarName</i> in place.
+If no matching tuple is found, then <i class="arg">relvarName</i> is unchanged.
+This subcommand is useful in those contexts where the attribute values of an
+identifier are known and evaluating an expression over all the tuples
+in <i class="arg">relvarName</i> is superfluous.
+The return value is a relation value with the same heading as the
+value held in <i class="arg">relvarName</i> and whose body contains either the single
+tuple that was updated or is empty if no matching tuple was found.
+This gives the caller access to any attributes that might have been modified
+by a relvar trace.</p>
+<pre class="example">
+% puts [relformat $::OWNER]
++---------+---+-------------+
+|OwnerName|Age|City         |
+|string   |int|string       |
++---------+---+-------------+
+|Sue      |24 |Cupertino    |
+|George   |35 |Sunnyvale    |
+|Alice    |30 |San Jose     |
+|Mike     |50 |San Jose     |
+|Jim      |42 |San Francisco|
++---------+---+-------------+
+% relvar updateone OWNER o {OwnerName George} {
+&gt; tuple update $o Age 37 City {New York}
+&gt; }
+% puts [relformat $::OWNER]
++---------+---+-------------+
+|OwnerName|Age|City         |
+|string   |int|string       |
++---------+---+-------------+
+|Sue      |24 |Cupertino    |
+|George   |37 |New York     |
+|Alice    |30 |San Jose     |
+|Mike     |50 |San Jose     |
+|Jim      |42 |San Francisco|
++---------+---+-------------+
+</pre>
+</dd>
+<dt><a name="32"><b class="cmd">::ral::relvar updateper</b> <i class="arg">relvarName</i> <i class="arg">relationValue</i></a></dt>
+<dd><p>The <b class="cmd">updateper</b> subcommand modifies the relation value held in
+<i class="arg">relvarName</i> according to the tuples found in <i class="arg">relationValue</i>.
+The heading of <i class="arg">relationValue</i> must be a subset (possibly improper)
+of the heading of the value held in <i class="arg">relvarName</i>.
+The heading of <i class="arg">relationValue</i> must also contain all of the attributes
+of at least one of the identifiers of <i class="arg">relvarName</i>.
+The action of <b class="cmd">updateper</b> is to update the non-identifying attributes of
+all the tuples in <i class="arg">relvarName</i> whose identifying attributes are equal to
+the corresponding attributes in <i class="arg">relationValue</i>.
+The return value of the command is a relation value with the same heading as
+the value held in <i class="arg">relvarName</i> and whose body contains tuples that were
+updated.
+This gives the caller access to any attributes that might have been modified
+by a relvar trace.
+This command is most useful when a subset of tuples from a relvar
+are modified by a series of relational expressions and the results of those
+modification need to be updated back into the original relvar.</p>
+<pre class="example">
+% relvar updateper OWNER [relation table {OwnerName string Age int} {
+        George 37} {
+        Jim 44}]
+% puts [relformat $::OWNER]
++---------+---+-------------+
+|OwnerName|Age|City         |
+|string   |int|string       |
++---------+---+-------------+
+|Sue      |25 |Cupertino    |
+|George   |37 |Sunnyvale    |
+|Alice    |30 |San Jose     |
+|Mike     |50 |San Jose     |
+|Jim      |44 |San Francisco|
++---------+---+-------------+
+</pre>
+</dd>
+</dl>
+</div>
+<div id="section5" class="section"><h2><a name="section5">RELVAR TRACES</a></h2>
+<p>By analogy to tracing ordinary variables in Tcl,
+relvars can also be traced.
+However, relvar tracing must account for the
+operations that are applied to relvars.
+There are five operations that may be traced on the relation values
+held in relvars and one operation that allows tracing of transactions
+on relvars.
+For these operations, if a command prefix has been registered using
+<b class="cmd">relvar trace add variable</b> or <b class="cmd">relvar trace add transaction</b>
+then that command prefix will have
+additional arguments appended and will be invoked as described below.
+Relvar traces operate in a very similar fashion as traces on ordinary
+Tcl variables.
+The trace command is invoked when the corresponding relvar operation
+is invoked and is invoked in the context of the caller of the relvar operation,
+which, in general, is different from the caller of the <b class="cmd">relvar trace add</b>
+command.
+When executing a variable type trace for a relvar,
+all other variable type tracing for that relvar is inhibited.
+If multiple traces have been added to a relvar,
+the traces are invoked in the order of most recent first to oldest last.</p>
+<dl class="definitions">
+<dt>delete</dt>
+<dd><p>A delete trace is invoked for each tuple in a relvar that is deleted.
+Tuples are deleted from relvars by invocations of <b class="cmd">relvar delete</b>
+or <b class="cmd">relvar deleteone</b>.
+The delete trace command is invoked as:</p>
+<p><b class="cmd">cmdPrefix</b> <b class="cmd">delete</b> <i class="arg">relvarName</i> <i class="arg">tupleValue</i></p>
+<p>where <b class="cmd">cmdPrefix</b> is the command prefix of the trace as given
+in <b class="cmd">relvar trace add variable</b>,
+the string <b class="cmd">delete</b> indicates that a tuple is to be deleted from the relvar,
+<i class="arg">relvarName</i> is the fully qualified name of the relvar
+and <i class="arg">tupleValue</i> is the value of the tuple about to be deleted.
+The trace command is invoked before the tuple is actually removed from
+the relation value held in the relvar.
+If <b class="cmd">cmdPrefix</b> throws an error, then no other delete traces in the chain of
+delete traces for the relvar are invoked and <i class="arg">tupleValue</i> is not removed
+from the relvar value.</p></dd>
+<dt>insert</dt>
+<dd><p>An insert trace is invoked for each tuple in a relvar that is inserted.
+Tuples are inserted into relvars by invocations of <b class="cmd">relvar insert</b>.
+The insert trace command is invoked as:</p>
+<p><b class="cmd">cmdPrefix</b> <b class="cmd">insert</b> <i class="arg">relvarName</i> <i class="arg">tupleValue</i></p>
+<p>where <b class="cmd">cmdPrefix</b> is the command prefix of the trace as given
+in <b class="cmd">relvar trace add variable</b>,
+the string <b class="cmd">insert</b> indicates that a tuple
+is to be inserted into the relvar,
+<i class="arg">relvarName</i> is the fully qualified name of the relvar
+and <i class="arg">tupleValue</i> is the value of the tuple about to be inserted
+The trace command is invoked before the tuple is actually inserted into
+the relation value held in the relvar.
+The <b class="cmd">cmdPrefix</b> command must return a Tuple value.
+The returned Tuple value is passed along to the next insert trace command.
+The returned Tuple from the last trace command in the chain is then
+inserted into the relvar.
+Insert trace commands may choose to modify the value of <i class="arg">tupleValue</i> but
+are required to return a value that can be coerced into a Tuple type and the
+heading of the returned Tuple of the last trace command in the chain
+must match that of the relvar if it is to be successfully inserted.
+If <b class="cmd">cmdPrefix</b> throws an error, then no other insert traces in the chain of
+insert traces for the relvar are invoked and <i class="arg">tupleValue</i> is not inserted
+into the relvar value.</p></dd>
+<dt>set</dt>
+<dd><p>A set trace is invoked each time that the relation value held in a relvar
+is assigned.
+Relations values are assigned to relvars by invocation of the
+<b class="cmd">relvar set</b>,
+<b class="cmd">relvar union</b>,
+<b class="cmd">relvar intersect</b>
+or
+<b class="cmd">relvar minus</b>
+command.
+The set trace command is invoked as:</p>
+<p><b class="cmd">cmdPrefix</b> <b class="cmd">set</b> <i class="arg">relvarName</i> <i class="arg">relationValue</i></p>
+<p>where <b class="cmd">cmdPrefix</b> is the command prefix of the trace as given
+in <b class="cmd">relvar trace add variable</b>,
+the string <b class="cmd">set</b> indicates that a relation value
+is to be assigned to the relvar,
+<i class="arg">relvarName</i> is the fully qualified
+name of the relvar
+and <i class="arg">relationValue</i> is the relation value that is about to be assigned
+to the relvar.
+The trace command is invoked before the relation is actually assigned to the
+relvar.
+The <b class="cmd">cmdPrefix</b> command must return a Relation value.
+The returned Relation value is passed along to the next set trace command.
+The returned Relation from the last trace command in the chain is then
+assigned to the relvar.
+Set trace commands may choose to modify the value of <i class="arg">relationValue</i> but
+are required to return a value that can be coerced into a Relation type and the
+heading of the returned Relation of the last trace command in the chain
+must match that of the relvar if it is to be successfully assigned
+If <b class="cmd">cmdPrefix</b> throws an error, then no other set traces in the chain of
+set traces for the relvar are invoked and <i class="arg">relationValue</i> is not assigned
+to the relvar.</p></dd>
+<dt>unset</dt>
+<dd><p>An unset trace is invoked each time a relvar is destroyed.
+Relvars are destroyed by the invocation of the <b class="cmd">relvar unset</b> command.
+Note that due to a limitation of Tcl,
+relvar unset traces are not invoked when an interpreter is deleted.
+The unset trace command is invoked as:</p>
+<p><b class="cmd">cmdPrefix</b> <b class="cmd">unset</b> <i class="arg">relvarName</i></p>
+<p>where <b class="cmd">cmdPrefix</b> is the command prefix of the trace as given
+in <b class="cmd">relvar trace add variable</b>,
+the string <b class="cmd">unset</b> indicates that the relvar
+is being destroyed,
+and <i class="arg">relvarName</i> is the fully qualified
+name of the relvar.
+The trace command is invoked before the relvar is actually destroyed so
+the relation value stored in the relvar is still intact.
+Any errors thown by <b class="cmd">cmdPrefix</b> are ignored.</p></dd>
+<dt>update</dt>
+<dd><p>An update trace is invoked for each tuple in a relvar that is updated.
+Tuples are updated into relvars by invocations of <b class="cmd">relvar update</b>,
+<b class="cmd">relvar updateone</b> or <b class="cmd">relvar updateper</b> commands.
+The update trace command is invoked as:</p>
+<p><b class="cmd">cmdPrefix</b> <b class="cmd">update</b> <i class="arg">relvarName</i> <i class="arg">oldTupleValue</i>
+    <i class="arg">newTupleValue</i></p>
+<p>where <b class="cmd">cmdPrefix</b> is the command prefix of the trace as given
+in <b class="cmd">relvar trace add variable</b>,
+the string <b class="cmd">update</b> indicates that a tuple
+is to be updated in the relvar,
+<i class="arg">relvarName</i> is the fully qualified name of the relvar,
+<i class="arg">oldTupleValue</i> is the current value of the tuple in the relvar
+and <i class="arg">newTupleValue</i> is the value that the tuple will have when
+the update is performed.
+The trace command is invoked before the tuple is actually updated in
+the relation value held in the relvar.
+The <b class="cmd">cmdPrefix</b> command must return a Tuple value.
+The returned Tuple value is passed along to the next update trace command.
+The returned Tuple from the last trace command in the chain is then
+updated into the relvar.
+Update trace commands may choose to modify the value of <i class="arg">newTupleValue</i> but
+are required to return a value that can be coerced into a Tuple type and the
+heading of the returned Tuple of the last trace command in the chain
+must match that of the relvar if it is to be successfully updated.
+If <b class="cmd">cmdPrefix</b> throws an error, then no other update traces in the chain of
+update traces for the relvar are invoked and <i class="arg">tupleValue</i> is not updated
+into the relvar value.</p></dd>
+<dt>transaction</dt>
+<dd><p>A transaction trace is invoked each time that a <b class="cmd">relvar eval</b> begins and
+ends or when <b class="cmd">relvar transaction</b> commands are invoked.
+Eval traces are different from other relvar traces in that they provide a
+means of determining the boundaries of a transaction rather than specific
+operations on a relvar.
+The transaction trace command is invoked as:</p>
+<p><b class="cmd">cmdPrefix</b> <b class="cmd">transaction</b> <i class="arg">op</i> <i class="arg">level</i></p>
+<p>where <b class="cmd">cmdPrefix</b> is the command prefix of the trace as given
+in <b class="cmd">relvar trace add transaction</b>, 
+the string <b class="cmd">transaction</b> indicates that the relvar transaction is in
+progress, the <i class="arg">op</i> is either the string &quot;begin&quot; or &quot;end&quot; indicating whether
+or not the <b class="cmd">relvar transaction</b> is just starting or is ending and
+<i class="arg">level</i> is an integer greater than zero indicating the nesting depth
+of the transaction.
+The transaction trace is invoked with the &quot;begin&quot; op before the script
+associated with a <b class="cmd">relvar eval</b> or <b class="cmd">relvar transaction</b>
+is executed and
+is invoked with the &quot;end&quot; op after the script is executed but before the relvar
+constraints are evaluated for the transaction.
+Any errors thown by <b class="cmd">cmdPrefix</b> are ignored.</p></dd>
+</dl>
+</div>
+<div id="see-also" class="section"><h2><a name="see-also">See Also</a></h2>
+<p><a href="relation.html">relation</a>, <a href="tuple.html">tuple</a></p>
+</div>
+<div id="keywords" class="section"><h2><a name="keywords">Keywords</a></h2>
+<p><a href="../index.html#key1">relation</a>, <a href="../index.html#key3">variable</a></p>
+</div>
+<div id="copyright" class="section"><h2><a name="copyright">Copyright</a></h2>
+<p>Copyright &copy; 2004 - 2012 by G. Andrew Mangogna</p>
+</div>
+</div></body></html>

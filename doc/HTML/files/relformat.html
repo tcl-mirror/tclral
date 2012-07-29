@@ -1,0 +1,312 @@
+<html><head>
+<title>relformat - Relation formatting</title>
+<style type="text/css"><!--
+    HTML {
+	background: 	#FFFFFF;
+	color: 		black;
+    }
+    BODY {
+	background: 	#FFFFFF;
+	color:	 	black;
+    }
+    DIV.doctools {
+	margin-left:	10%;
+	margin-right:	10%;
+    }
+    DIV.doctools H1,DIV.doctools H2 {
+	margin-left:	-5%;
+    }
+    H1, H2, H3, H4 {
+	margin-top: 	1em;
+	font-family:	sans-serif;
+	font-size:	large;
+	color:		#005A9C;
+	background: 	transparent;
+	text-align:		left;
+    }
+    H1.title {
+	text-align: center;
+    }
+    UL,OL {
+	margin-right: 0em;
+	margin-top: 3pt;
+	margin-bottom: 3pt;
+    }
+    UL LI {
+	list-style: disc;
+    }
+    OL LI {
+	list-style: decimal;
+    }
+    DT {
+	padding-top: 	1ex;
+    }
+    UL.toc,UL.toc UL, UL.toc UL UL {
+	font:		normal 12pt/14pt sans-serif;
+	list-style:	none;
+    }
+    LI.section, LI.subsection {
+	list-style: 	none;
+	margin-left: 	0em;
+	text-indent:	0em;
+	padding: 	0em;
+    }
+    PRE {
+	display: 	block;
+	font-family:	monospace;
+	white-space:	pre;
+	margin:		0%;
+	padding-top:	0.5ex;
+	padding-bottom:	0.5ex;
+	padding-left:	1ex;
+	padding-right:	1ex;
+	width:		100%;
+    }
+    PRE.example {
+	color: 		black;
+	background: 	#f5dcb3;
+	border:		1px solid black;
+    }
+    UL.requirements LI, UL.syntax LI {
+	list-style: 	none;
+	margin-left: 	0em;
+	text-indent:	0em;
+	padding:	0em;
+    }
+    DIV.synopsis {
+	color: 		black;
+	background: 	#80ffff;
+	border:		1px solid black;
+	font-family:	serif;
+	margin-top: 	1em;
+	margin-bottom: 	1em;
+    }
+    UL.syntax {
+	margin-top: 	1em;
+	border-top:	1px solid black;
+    }
+    UL.requirements {
+	margin-bottom: 	1em;
+	border-bottom:	1px solid black;
+    }
+--></style>
+</head>
+<! -- Generated from file 'files/relformat.html' by tcllib/doctools with format 'html'
+   -->
+<! -- Copyright &copy; 2004 - 2012 by G. Andrew Mangogna
+   -->
+<! -- CVS: $Id$ relformat.n
+   -->
+<body><div class="doctools">
+<hr> [
+  <a href="../toc.html">Table Of Contents</a>
+| <a href="../index.html">Keyword Index</a>
+] <hr>
+<h1 class="title">relformat(n) 0.10.2 ral &quot;Relation formatting&quot;</h1>
+<div id="name" class="section"><h2><a name="name">Name</a></h2>
+<p>relformat - Text formatting for relations</p>
+</div>
+<div id="toc" class="section"><h2><a name="toc">Table Of Contents</a></h2>
+<ul class="toc">
+<li class="section"><a href="#toc">Table Of Contents</a></li>
+<li class="section"><a href="#synopsis">Synopsis</a></li>
+<li class="section"><a href="#section1">Description</a></li>
+<li class="section"><a href="#section2">DEPENDENCIES</a></li>
+<li class="section"><a href="#section3">COMMANDS</a></li>
+<li class="section"><a href="#see-also">See Also</a></li>
+<li class="section"><a href="#keywords">Keywords</a></li>
+<li class="section"><a href="#copyright">Copyright</a></li>
+</ul>
+</div>
+<div id="synopsis" class="section"><h2><a name="synopsis">Synopsis</a></h2>
+<div class="synopsis">
+<ul class="requirements">
+<li>package require <b class="pkgname">ral <span class="opt">?0.10.2?</span></b></li>
+</ul>
+<ul class="syntax">
+<li><a href="#1"><b class="cmd">::ral::relformat</b> <i class="arg">relationValue</i> <span class="opt">?title?</span> <span class="opt">?sortAttrs?</span> <span class="opt">?noheading?</span></a></li>
+<li><a href="#2"><b class="cmd">::ral::tuple2matrix</b> <i class="arg">tupleValue</i> <span class="opt">?noheading?</span></a></li>
+<li><a href="#3"><b class="cmd">::ral::relation2matrix</b> <i class="arg">relationValue</i> <span class="opt">?sortAttr?</span> <span class="opt">?noheading?</span></a></li>
+<li><a href="#4"><b class="cmd">::ral::csv</b> <i class="arg">relationValue</i> <span class="opt">?sortAttrs?</span> <span class="opt">?noheading?</span></a></li>
+<li><a href="#5"><b class="cmd">::ral::csvToFile</b> <i class="arg">relationValue</i> <i class="arg">fileName</i> <span class="opt">?sortAttr?</span> <span class="opt">?noheading?</span></a></li>
+<li><a href="#6"><b class="cmd">::ral::tupleAsTable</b> <span class="opt">?capRows?</span></a></li>
+<li><a href="#7"><b class="cmd">::ral::relationAsTable</b> <span class="opt">?idCols?</span> <span class="opt">?capRows?</span></a></li>
+</ul>
+</div>
+</div>
+<div id="section1" class="section"><h2><a name="section1">Description</a></h2>
+<p>This manpage describes a set of commands that are used for
+generating text output of relation and tuple values.
+These commands are part of the Tcl Relational Algebra Library (ral) package.</p>
+</div>
+<div id="section2" class="section"><h2><a name="section2">DEPENDENCIES</a></h2>
+<p>The commands described here depend upon access to the <b class="package">struct::matrix</b>,
+<b class="package">report</b> and <b class="package">csv</b> packages of the Tcl standard library.
+If your installation does not include <em>tcllib</em> then these commands
+will not be available to you.</p>
+</div>
+<div id="section3" class="section"><h2><a name="section3">COMMANDS</a></h2>
+<dl class="definitions">
+<dt><a name="1"><b class="cmd">::ral::relformat</b> <i class="arg">relationValue</i> <span class="opt">?title?</span> <span class="opt">?sortAttrs?</span> <span class="opt">?noheading?</span></a></dt>
+<dd><p>The <b class="cmd">relformat</b> command returns a string that contains a human
+readable form of the relation given by <i class="arg">relationValue</i>.
+<b class="cmd">Relformat</b> is intended to be to relations what the <b class="cmd">parray</b>
+command is to arrays, <em>i.e.</em> a easy means of obtaining human
+readable output.
+Rather than writing the output directly to a channel,
+<b class="cmd">relformat</b> returns it as a string.
+The returned string does not have a trailing newline character and so
+is suitable for handing directly to <b class="cmd">puts</b>.
+If the optional <i class="arg">title</i> argument is present, then it is used
+as a caption at the bottom of the relation printout.
+If the options <i class="arg">sortAttrs</i> argument is given then the relation is
+sorted by the list of attributes in <i class="arg">sortAttrs</i> before being displayed.
+If the <i class="arg">noheading</i> argument is set to 1, then two rows of attribute
+name and attribute type that by default are placed as a heading of the output
+are omitted.</p>
+<pre class="example">
+% puts [relformat $::DOG Dog]
++-------+---------+
+|DogName|Breed    |
+|string |string   |
++-------+---------+
+|Fido   |Poodle   |
+|Sam    |Collie   |
+|Spot   |Terrier  |
+|Rover  |Retriever|
+|Fred   |Spaniel  |
+|Jumper |Mutt     |
++-------+---------+
+Dog
+---
+% puts [relformat $::OWNERSHIP Ownership {DogName Acquired}]
++---------+-------+--------+
+|OwnerName|DogName|Acquired|
+|string   |string |string  |
++---------+-------+--------+
+|Sue      |Fido   |2001    |
+|George   |Fido   |2001    |
+|Jim      |Fred   |2003    |
+|Mike     |Rover  |2002    |
+|Sue      |Sam    |2000    |
+|George   |Sam    |2000    |
+|Alice    |Spot   |2001    |
++---------+-------+--------+
+Ownership
+---------
+% puts [relformat $::OWNER Owner &quot;&quot; 1]
++------+--+-------------+
+|Sue   |24|Cupertino    |
+|George|35|Sunnyvale    |
+|Alice |30|San Jose     |
+|Mike  |50|San Jose     |
+|Jim   |42|San Francisco|
++------+--+-------------+
+Owner
+-----
+% puts [relformat [relation group $::OWNERSHIP Owners OwnerName] &quot;&quot; DogName]
++-------+--------+-----------+
+|DogName|Acquired|Owners     |
+|string |string  |Relation   |
++-------+--------+-----------+
+|Fido   |2001    |+---------+|
+|       |        ||OwnerName||
+|       |        ||string   ||
+|       |        |+---------+|
+|       |        ||Sue      ||
+|       |        ||George   ||
+|       |        |+---------+|
+|Fred   |2003    |+---------+|
+|       |        ||OwnerName||
+|       |        ||string   ||
+|       |        |+---------+|
+|       |        ||Jim      ||
+|       |        |+---------+|
+|Rover  |2002    |+---------+|
+|       |        ||OwnerName||
+|       |        ||string   ||
+|       |        |+---------+|
+|       |        ||Mike     ||
+|       |        |+---------+|
+|Sam    |2000    |+---------+|
+|       |        ||OwnerName||
+|       |        ||string   ||
+|       |        |+---------+|
+|       |        ||Sue      ||
+|       |        ||George   ||
+|       |        |+---------+|
+|Spot   |2001    |+---------+|
+|       |        ||OwnerName||
+|       |        ||string   ||
+|       |        |+---------+|
+|       |        ||Alice    ||
+|       |        |+---------+|
++-------+--------+-----------+
+</pre>
+</dd>
+<dt><a name="2"><b class="cmd">::ral::tuple2matrix</b> <i class="arg">tupleValue</i> <span class="opt">?noheading?</span></a></dt>
+<dd><p>The <b class="cmd">tuple2matrix</b> command returns a matrix containing the values
+in <i class="arg">tupleValue</i>.
+The matrix is created using the <b class="package">struct::matrix</b> package
+from the standard Tcl library.
+By default, the first two rows of the matrix contain the attribute
+names and types.
+Setting the <i class="arg">noheading</i> argument to 1,
+removes those rows from the returned matrix.
+It is the responsibility of the caller to <b class="cmd">destroy</b> the matrix
+when it is no longer needed.</p></dd>
+<dt><a name="3"><b class="cmd">::ral::relation2matrix</b> <i class="arg">relationValue</i> <span class="opt">?sortAttr?</span> <span class="opt">?noheading?</span></a></dt>
+<dd><p>The <b class="cmd">relation2matrix</b> command returns a matrix containing the values
+in <i class="arg">relationValue</i>.
+The matrix is created using the <b class="package">struct::matrix</b> package
+from the standard Tcl library.
+If present, the <i class="arg">sortAttr</i> argument is a list of attributes
+that are used to sort the values before placing in the matrix.
+By default, the first two rows of the matrix contain the attribute
+names and types.
+Setting the <i class="arg">noheading</i> argument to 1,
+removes those rows from the returned matrix.
+It is the responsibility of the caller to <b class="cmd">destroy</b> the matrix
+when it is no longer needed.</p></dd>
+<dt><a name="4"><b class="cmd">::ral::csv</b> <i class="arg">relationValue</i> <span class="opt">?sortAttrs?</span> <span class="opt">?noheading?</span></a></dt>
+<dd><p>The <b class="cmd">csv</b> command formats the relation value given by <i class="arg">relationValue</i>
+into comma separated value formatted string.
+If <i class="arg">sortAttrs</i> is given, then the tuples of the relation value
+will appear in the order implied by the list of attributes contained
+in <i class="arg">sortAttrs</i>.
+If <i class="arg">noheading</i> is given as 1, then no heading will be placed in the returned
+CSV string.
+By default, heading information is placed in the output.
+This command uses the <b class="package">csv</b> package from <b class="cmd">tcllib</b>.</p></dd>
+<dt><a name="5"><b class="cmd">::ral::csvToFile</b> <i class="arg">relationValue</i> <i class="arg">fileName</i> <span class="opt">?sortAttr?</span> <span class="opt">?noheading?</span></a></dt>
+<dd><p>The <b class="cmd">csvToFile</b> command writes the value of <i class="arg">relationValue</i> to
+the file named <i class="arg">fileName</i> in comma separated values format.
+If <i class="arg">sortAttrs</i> is given, then the tuples of the relation value
+will appear in the order implied by the list of attributes contained
+in <i class="arg">sortAttrs</i>.
+If <i class="arg">noheading</i> is given as 1, then no heading will be placed in the returned
+CSV string.
+By default, heading information is placed in the output.
+This command uses the <b class="package">csv</b> package from <b class="cmd">tcllib</b>.</p></dd>
+<dt><a name="6"><b class="cmd">::ral::tupleAsTable</b> <span class="opt">?capRows?</span></a></dt>
+<dd><p>The <b class="cmd">tupleAsTable</b> command is a report style for use with the
+<b class="package">report</b> package in <b class="cmd">tcllib</b>.
+This is the default report style used by the commands in TclRAL for
+formatting tuples.</p></dd>
+<dt><a name="7"><b class="cmd">::ral::relationAsTable</b> <span class="opt">?idCols?</span> <span class="opt">?capRows?</span></a></dt>
+<dd><p>The <b class="cmd">relationAsTable</b> command is a report style for use with the
+<b class="package">report</b> package in <b class="cmd">tcllib</b>.
+This is the default report style used by the commands in TclRAL for
+formatting relations.</p></dd>
+</dl>
+</div>
+<div id="see-also" class="section"><h2><a name="see-also">See Also</a></h2>
+<p><a href="relation.html">relation</a>, <a href="relvar.html">relvar</a>, <a href="tuple.html">tuple</a></p>
+</div>
+<div id="keywords" class="section"><h2><a name="keywords">Keywords</a></h2>
+<p><a href="../index.html#key1">relation</a>, <a href="../index.html#key0">relvar</a>, <a href="../index.html#key2">tuple</a></p>
+</div>
+<div id="copyright" class="section"><h2><a name="copyright">Copyright</a></h2>
+<p>Copyright &copy; 2004 - 2012 by G. Andrew Mangogna</p>
+</div>
+</div></body></html>

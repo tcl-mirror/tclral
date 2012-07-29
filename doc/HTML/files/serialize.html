@@ -1,0 +1,318 @@
+<html><head>
+<title>serialize - Relation persistence</title>
+<style type="text/css"><!--
+    HTML {
+	background: 	#FFFFFF;
+	color: 		black;
+    }
+    BODY {
+	background: 	#FFFFFF;
+	color:	 	black;
+    }
+    DIV.doctools {
+	margin-left:	10%;
+	margin-right:	10%;
+    }
+    DIV.doctools H1,DIV.doctools H2 {
+	margin-left:	-5%;
+    }
+    H1, H2, H3, H4 {
+	margin-top: 	1em;
+	font-family:	sans-serif;
+	font-size:	large;
+	color:		#005A9C;
+	background: 	transparent;
+	text-align:		left;
+    }
+    H1.title {
+	text-align: center;
+    }
+    UL,OL {
+	margin-right: 0em;
+	margin-top: 3pt;
+	margin-bottom: 3pt;
+    }
+    UL LI {
+	list-style: disc;
+    }
+    OL LI {
+	list-style: decimal;
+    }
+    DT {
+	padding-top: 	1ex;
+    }
+    UL.toc,UL.toc UL, UL.toc UL UL {
+	font:		normal 12pt/14pt sans-serif;
+	list-style:	none;
+    }
+    LI.section, LI.subsection {
+	list-style: 	none;
+	margin-left: 	0em;
+	text-indent:	0em;
+	padding: 	0em;
+    }
+    PRE {
+	display: 	block;
+	font-family:	monospace;
+	white-space:	pre;
+	margin:		0%;
+	padding-top:	0.5ex;
+	padding-bottom:	0.5ex;
+	padding-left:	1ex;
+	padding-right:	1ex;
+	width:		100%;
+    }
+    PRE.example {
+	color: 		black;
+	background: 	#f5dcb3;
+	border:		1px solid black;
+    }
+    UL.requirements LI, UL.syntax LI {
+	list-style: 	none;
+	margin-left: 	0em;
+	text-indent:	0em;
+	padding:	0em;
+    }
+    DIV.synopsis {
+	color: 		black;
+	background: 	#80ffff;
+	border:		1px solid black;
+	font-family:	serif;
+	margin-top: 	1em;
+	margin-bottom: 	1em;
+    }
+    UL.syntax {
+	margin-top: 	1em;
+	border-top:	1px solid black;
+    }
+    UL.requirements {
+	margin-bottom: 	1em;
+	border-bottom:	1px solid black;
+    }
+--></style>
+</head>
+<! -- Generated from file 'files/serialize.html' by tcllib/doctools with format 'html'
+   -->
+<! -- Copyright &copy; 2004 - 2012 by G. Andrew Mangogna
+   -->
+<! -- CVS: $Id$ serialize.n
+   -->
+<body><div class="doctools">
+<hr> [
+  <a href="../toc.html">Table Of Contents</a>
+| <a href="../index.html">Keyword Index</a>
+] <hr>
+<h1 class="title">serialize(n) 0.10.2 ral &quot;Relation persistence&quot;</h1>
+<div id="name" class="section"><h2><a name="name">Name</a></h2>
+<p>serialize - Persistent storage for relations</p>
+</div>
+<div id="toc" class="section"><h2><a name="toc">Table Of Contents</a></h2>
+<ul class="toc">
+<li class="section"><a href="#toc">Table Of Contents</a></li>
+<li class="section"><a href="#synopsis">Synopsis</a></li>
+<li class="section"><a href="#section1">Description</a></li>
+<li class="section"><a href="#section2">COMMANDS</a></li>
+<li class="section"><a href="#section3">SERIALIZATION FORMAT</a></li>
+<li class="section"><a href="#see-also">See Also</a></li>
+<li class="section"><a href="#keywords">Keywords</a></li>
+<li class="section"><a href="#copyright">Copyright</a></li>
+</ul>
+</div>
+<div id="synopsis" class="section"><h2><a name="synopsis">Synopsis</a></h2>
+<div class="synopsis">
+<ul class="requirements">
+<li>package require <b class="pkgname">ral <i class="arg"><span class="opt">?0.10.2?</span></i></b></li>
+</ul>
+<ul class="syntax">
+<li><a href="#1"><b class="cmd">::ral::serialize</b> <i class="arg"><span class="opt">?pattern?</span></i></a></li>
+<li><a href="#2"><b class="cmd">::ral::serializeToFile</b> <i class="arg">fileName</i> <i class="arg"><span class="opt">?pattern?</span></i></a></li>
+<li><a href="#3"><b class="cmd">::ral::deserialize</b> <i class="arg">serialization</i> <i class="arg"><span class="opt">?namespace?</span></i></a></li>
+<li><a href="#4"><b class="cmd">::ral::deserializeFromFile</b> <i class="arg">fileName</i> <i class="arg"><span class="opt">?namespace?</span></i></a></li>
+<li><a href="#5"><b class="cmd">::ral::merge</b> <i class="arg">serialization</i> <i class="arg"><span class="opt">?namespace?</span></i></a></li>
+<li><a href="#6"><b class="cmd">::ral::mergeFromFile</b> <i class="arg">fileName</i> <i class="arg"><span class="opt">?namespace?</span></i></a></li>
+<li><a href="#7"><b class="cmd">::ral::deserialize-0.8.X</b> <i class="arg">serialization</i> <i class="arg"><span class="opt">?namespace?</span></i></a></li>
+<li><a href="#8"><b class="cmd">::ral::deserializeFromFile-0.8.X</b> <i class="arg">fileName</i> <i class="arg"><span class="opt">?namespace?</span></i></a></li>
+<li><a href="#9"><b class="cmd">::ral::storeToMk</b> <i class="arg">fileName</i> <i class="arg"><span class="opt">?pattern?</span></i></a></li>
+<li><a href="#10"><b class="cmd">::ral::loadFromMk</b> <i class="arg">fileName</i> <i class="arg"><span class="opt">?namespace?</span></i></a></li>
+<li><a href="#11"><b class="cmd">::ral::mergeFromMk</b> <i class="arg">fileName</i> <i class="arg"><span class="opt">?namespace?</span></i></a></li>
+<li><a href="#12"><b class="cmd">::ral::storeToSQLite</b> <i class="arg">fileName</i> <i class="arg"><span class="opt">?pattern?</span></i></a></li>
+<li><a href="#13"><b class="cmd">::ral::loadFromSQLite</b> <i class="arg">fileName</i> <i class="arg"><span class="opt">?namespace?</span></i></a></li>
+<li><a href="#14"><b class="cmd">::ral::dump</b> <i class="arg"><span class="opt">?pattern?</span></i></a></li>
+<li><a href="#15"><b class="cmd">::ral::dumpToFile</b> <i class="arg">fileName</i> <i class="arg"><span class="opt">?pattern?</span></i></a></li>
+</ul>
+</div>
+</div>
+<div id="section1" class="section"><h2><a name="section1">Description</a></h2>
+<p>This manpage describes a set of commands that are used for
+saving the values of relvars on external storage.
+All of the output commands below take an optional <i class="arg">pattern</i> argument.
+If present, then the command is applied to relvars that match the given
+<i class="arg">pattern</i>.
+Otherwise by default all relvars are considered.
+All of the input commands below take an optional <i class="arg">namespace</i> argument.
+If present, then the command will restore the relvars relative to the given
+<i class="arg">namespace</i>.
+Otherwise, relvars are restored relative to the global namespace.
+Upon serialization and output, the entire relvar name path is maintained.
+This allows relvars to be restored to their same relative positions
+in a different namespace from which they were originally taken.
+Since TclRAL manages relvar names using <b class="cmd">namespace</b>-like syntax,
+this may be used to manage distinct sets of relvars without risking
+naming conflicts.</p>
+</div>
+<div id="section2" class="section"><h2><a name="section2">COMMANDS</a></h2>
+<dl class="definitions">
+<dt><a name="1"><b class="cmd">::ral::serialize</b> <i class="arg"><span class="opt">?pattern?</span></i></a></dt>
+<dd><p>The <b class="cmd">serialize</b> command returns a string that represents the values
+and constraints for all of the relvars contained within <i class="arg">namespace</i>.
+The string returned by <b class="cmd">serialize</b> may be given to <b class="cmd">deserialize</b>
+to restore the values of the relvars.</p></dd>
+<dt><a name="2"><b class="cmd">::ral::serializeToFile</b> <i class="arg">fileName</i> <i class="arg"><span class="opt">?pattern?</span></i></a></dt>
+<dd><p>The <b class="cmd">serializeToFile</b> command invokes <b class="cmd">serialize</b> and places the
+resulting serialization string into the file given by <i class="arg">fileName</i>.</p></dd>
+<dt><a name="3"><b class="cmd">::ral::deserialize</b> <i class="arg">serialization</i> <i class="arg"><span class="opt">?namespace?</span></i></a></dt>
+<dd><p>The <b class="cmd">deserialize</b> command restores the values and constraints on a
+set of relvars.
+The <i class="arg">serialization</i> argument must be a value returned from the
+<b class="cmd">serialize</b> command.
+If the <i class="arg">namespace</i> argument is given,
+then the relvars and constraints are placed in the given namespace which
+need not exist prior to invoking the command.
+The <b class="cmd">deserialize</b> command also uses a set of heuristics to attempt
+to deserialize relvar data originally composed by the 0.8.X revisions
+of <b class="package">ral</b>.
+If it determines that the data may be from an older version, then
+<b class="cmd">deserialize-0.8.X</b> is invoked to restore the values.
+The <b class="cmd">deserialize-0.8.X</b> command may be invoked directly, see below.</p></dd>
+<dt><a name="4"><b class="cmd">::ral::deserializeFromFile</b> <i class="arg">fileName</i> <i class="arg"><span class="opt">?namespace?</span></i></a></dt>
+<dd><p>The <b class="cmd">deserializeFromFile</b> command reads the file given by the
+<i class="arg">fileName</i> argument and invokes <b class="cmd">deserialize</b> on its contents.</p></dd>
+<dt><a name="5"><b class="cmd">::ral::merge</b> <i class="arg">serialization</i> <i class="arg"><span class="opt">?namespace?</span></i></a></dt>
+<dd><p>The <b class="cmd">merge</b> command merges the relvars and constraints contained
+in <i class="arg">serialization</i>.
+If <i class="arg">namespace</i> is given then the merge is into that namespace and
+otherwise the merge is into the global namespace.
+The merge attempts to do a union of the relvars and constraints onto
+those already existing.
+The merge is done strictly be name with no consideration of structure,
+meaning that any relvars or constraints in
+<i class="arg">serialization</i> that do not currently exist are created,
+but existing relvars and constraints whose names match those in
+<i class="arg">serialization</i> have their structure preserved.
+The relation values of the relvars contained in <i class="arg">serialization</i> are
+unioned against the existing relvar by the same name.
+The return value of the command is a list of relvar names for which the
+union operation fails.
+The union of relvar values is carried out in a transaction.</p></dd>
+<dt><a name="6"><b class="cmd">::ral::mergeFromFile</b> <i class="arg">fileName</i> <i class="arg"><span class="opt">?namespace?</span></i></a></dt>
+<dd><p>The <b class="cmd">mergeFromFile</b> command invokes <b class="cmd">::ral::merge</b> on the
+contents of the file given by the <i class="arg">fileName</i> argument.</p></dd>
+<dt><a name="7"><b class="cmd">::ral::deserialize-0.8.X</b> <i class="arg">serialization</i> <i class="arg"><span class="opt">?namespace?</span></i></a></dt>
+<dd><p>The <b class="cmd">deserialize-0.8.X</b> command provides a way to read relvar values
+and constraints that were stored using the 0.8.X revisions of <b class="package">ral</b>.</p></dd>
+<dt><a name="8"><b class="cmd">::ral::deserializeFromFile-0.8.X</b> <i class="arg">fileName</i> <i class="arg"><span class="opt">?namespace?</span></i></a></dt>
+<dd><p>The <b class="cmd">deserializeFromFile-0.8.X</b> command invokes
+<b class="cmd">deserialize-0.8.X</b> on the contents of the <i class="arg">fileName</i> file.</p></dd>
+<dt><a name="9"><b class="cmd">::ral::storeToMk</b> <i class="arg">fileName</i> <i class="arg"><span class="opt">?pattern?</span></i></a></dt>
+<dd><p>The <b class="cmd">storeToMk</b> command stores the state of a set of relvars into
+a metaKit database.
+Each relvar is stored in a separate metaKit <em>view</em>.
+Several additional views are created to hold system catalog information.
+The additional views have names that start with <em>__ral</em>.
+If <i class="arg">fileName</i> exists already, it is renamed to be <i class="arg">fileName</i>~ before
+a new file is created with the current state of the relvars.</p></dd>
+<dt><a name="10"><b class="cmd">::ral::loadFromMk</b> <i class="arg">fileName</i> <i class="arg"><span class="opt">?namespace?</span></i></a></dt>
+<dd><p>The <b class="cmd">loadFromMk</b> command restores the state of a set of relvars
+from the information contained in a metaKit database.
+That database must have been created using the <b class="cmd">storeToMk</b> command.</p></dd>
+<dt><a name="11"><b class="cmd">::ral::mergeFromMk</b> <i class="arg">fileName</i> <i class="arg"><span class="opt">?namespace?</span></i></a></dt>
+<dd><p>The <b class="cmd">mergeFromMk</b> command merges the contents of the metakit contained
+in <i class="arg">fileName</i> into the namespace given by <i class="arg">namespace</i>.
+The rules of merging are the same as described for the <b class="cmd">merge</b>
+command above.</p></dd>
+<dt><a name="12"><b class="cmd">::ral::storeToSQLite</b> <i class="arg">fileName</i> <i class="arg"><span class="opt">?pattern?</span></i></a></dt>
+<dd><p>The <b class="cmd">storeToSQLite</b> command stores the state of a set of relvars into
+a SQLite database.
+Each relvar is stored in a separate SQL table.
+The schema created for the relvars includes referential (a.k.a. foreign key)
+constraints and creates indices for both identifiers and foreign key
+references.
+No all TclRAL constraints can be enforced by an SQL database,
+but many as can be mapped to SQL foreign key references.
+Several additional tables are created to hold system catalog information.
+The additional tables have names that start with <em>__ral</em>
+and they hold information that allows the relvar state to be restored
+exactly.
+If <i class="arg">fileName</i> exists already, it is renamed to be <i class="arg">fileName</i>~ before
+a new file is created with the current state of the relvars.</p></dd>
+<dt><a name="13"><b class="cmd">::ral::loadFromSQLite</b> <i class="arg">fileName</i> <i class="arg"><span class="opt">?namespace?</span></i></a></dt>
+<dd><p>The <b class="cmd">loadFromSQLite</b> command restores the state of a set of relvars
+from the information contained in a SQLite database.
+That database must have been created using the <b class="cmd">storeToSQLite</b> command.</p></dd>
+<dt><a name="14"><b class="cmd">::ral::dump</b> <i class="arg"><span class="opt">?pattern?</span></i></a></dt>
+<dd><p>The <b class="cmd">dump</b> command returns a Tcl script that when evaluated will
+restore the state of a set of relvars to be the same as when the <b class="cmd">dump</b>
+command was executed.
+The <b class="cmd">dump</b> command is another form of serialization for a set of relvars
+and is often useful when creating Tcl packages that create an empty
+schema of relvars.</p></dd>
+<dt><a name="15"><b class="cmd">::ral::dumpToFile</b> <i class="arg">fileName</i> <i class="arg"><span class="opt">?pattern?</span></i></a></dt>
+<dd><p>The <b class="cmd">dumpToFile</b> invokes the <b class="cmd">dump</b> command and writes the
+resulting script to the file given by <i class="arg">fileName</i>.</p></dd>
+</dl>
+</div>
+<div id="section3" class="section"><h2><a name="section3">SERIALIZATION FORMAT</a></h2>
+<p>The format used generated by <b class="cmd">serialize</b> and expected by
+<b class="cmd">deserialize</b> is a Tcl list consisting of eight elements.
+List elements form a dictionary whose keys denote the parts of the serialization
+and whose values contain the relvar information as described below.</p>
+<ul class="itemized">
+<li><p>Version &lt;library version&gt;</p></li>
+<li><p>Relvars &lt;list of relvar defs&gt;</p>
+<ul class="itemized">
+    
+<li><p>&lt;relvar name&gt;</p></li>
+<li><p>&lt;relation heading&gt;</p></li>
+<li><p>&lt;list of relvar identifiers&gt;</p></li>
+</ul>
+</li>
+<li><p>Constraints &lt;list of constraints&gt;</p>
+<ul class="itemized">
+    
+<li><p>association | partition | correlation</p></li>
+<li><p>&lt;constraint definition&gt;</p>
+<ul class="itemized">
+        
+<li><p>&lt;association constraint definition&gt;</p>
+<p>&lt;association name&gt; &lt;relvar name&gt; &lt;attribute list&gt; &lt;mult/cond&gt;
+            &lt;relvar name&gt; &lt;attribute list&gt; &lt;mult/cond&gt;</p></li>
+<li><p>&lt;partition constraint definition&gt;</p>
+<p>&lt;partition name&gt; &lt;superset&gt; &lt;attribute list&gt;
+            &lt;subset1&gt; &lt;attribute list&gt; &lt;subset2&gt; &lt;attribute list&gt; ...</p></li>
+<li><p>&lt;correlation constraint definition&gt;</p>
+<p>&lt;?-complete?&gt; &lt;correlation name&gt; &lt;relvar name&gt;
+            &lt;attribute list&gt; &lt;mult/cond&gt; &lt;relvar name&gt; &lt;attribute list&gt;
+            &lt;attribute list&gt; &lt;mult/cond&gt; &lt;relvar name&gt; &lt;attribute list&gt;</p></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p>Values &lt;list of relvar names/relation values&gt;</p>
+<ul class="itemized">
+    
+<li><p>&lt;relvar name&gt;</p></li>
+<li><p>&lt;relation value&gt;</p></li>
+</ul>
+</li>
+</ul>
+</div>
+<div id="see-also" class="section"><h2><a name="see-also">See Also</a></h2>
+<p><a href="relation.html">relation</a>, <a href="relvar.html">relvar</a>, <a href="tuple.html">tuple</a></p>
+</div>
+<div id="keywords" class="section"><h2><a name="keywords">Keywords</a></h2>
+<p><a href="../index.html#key1">relation</a>, <a href="../index.html#key0">relvar</a>, <a href="../index.html#key2">tuple</a></p>
+</div>
+<div id="copyright" class="section"><h2><a name="copyright">Copyright</a></h2>
+<p>Copyright &copy; 2004 - 2012 by G. Andrew Mangogna</p>
+</div>
+</div></body></html>

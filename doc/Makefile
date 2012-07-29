@@ -4,7 +4,6 @@ DOCS =\
     tuple\
     relformat\
     serialize\
-    ralutil\
     $(NULL)
 
 SRCS = $(patsubst %,ral/%.man,$(DOCS))
