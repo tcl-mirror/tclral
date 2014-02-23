@@ -105,3 +105,11 @@ relvar eval {
     relvar insert TableLamp\
         {ModelNum 2 Type Banker}
 }
+
+# Something for a procedural constraint
+relvar procedural valstatus S {
+    variable S
+    set city [::ral::relation project\
+        [::ral::relation restrictwith $S {$STATUS == 1}] CITY]
+    return [expr {[::ral::relation cardinality $city] < 2}]
+}

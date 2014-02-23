@@ -798,7 +798,7 @@ modified.
 The [arg script] must return a value that can be intepreted as a boolean.
 If [arg script] returns [emph true] then the constraint passes.
 If [arg script] returns [emph false] then the constraint is deemed to
-have failed an the transaction is rolled back.
+have failed and the transaction is rolled back.
 Procedural constraints are only evaluated at the end of a transaction
 and only if the relvars given in the [cmd procedural] command are
 modified during the transaction.

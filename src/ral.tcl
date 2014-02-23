@@ -1272,7 +1272,7 @@ proc ::ral::sqlSchema {{pattern *}} {
                     }
                 }
                 default {
-                    error "unknown constraint type, \"[lindex $info 0\""
+                    error "unknown constraint type, \"$ctype\""
                 }
             }
         }
@@ -1577,7 +1577,7 @@ proc ::ral::getRelativeConstraintInfo {cname} {
         }
         procedural {
             set endIndex [expr {[llength $cinfo] - 1}]
-            for {set index 1} {$index < $endEnd} {incr index} {
+            for {set index 1} {$index < $endIndex} {incr index} {
                 lset cinfo $index [namespace tail [lindex $cinfo $index]]
             }
         }
@@ -1617,7 +1617,7 @@ proc ::ral::setRelativeConstraintInfo {ns cinfo} {
         }
         procedural {
             set endIndex [expr {[llength $cinfo] - 1}]
-            for {set index 1} {$index < $endEnd} {incr index} {
+            for {set index 1} {$index < $endIndex} {incr index} {
                 lset cinfo $index\
                         ${ns}[string trimleft [lindex $cinfo $index] :]
             }
@@ -1644,4 +1644,4 @@ proc ::ral::mapTypeToSQL {type} {
             $sqlTypeMap($type) : "text"}]
 }
 
-package provide ral 0.10.2
+package provide ral 0.11.0

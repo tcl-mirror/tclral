@@ -65,7 +65,7 @@ INCLUDE FILES
 #include "ral_tupleheading.h"
 #include "ral_tupleobj.h"
 #include "ral_relationobj.h"
-#ifdef Tcl_GetBignumFromObj_TCL_DECLARED
+#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
 #   include "tclTomMath.h"
 #endif
 
@@ -144,7 +144,7 @@ static int doubleEqual(Tcl_Obj *, Tcl_Obj *) ;
 static int doubleCompare(Tcl_Obj *, Tcl_Obj *) ;
 static unsigned doubleHash(Tcl_Obj *) ;
 
-#ifdef Tcl_GetBignumFromObj_TCL_DECLARED
+#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
 static int isABignum(Tcl_Interp *, Tcl_Obj *) ;
 static int bignumEqual(Tcl_Obj *, Tcl_Obj *) ;
 static int bignumCompare(Tcl_Obj *, Tcl_Obj *) ;
@@ -163,7 +163,7 @@ static int listEqual(Tcl_Obj *, Tcl_Obj *) ;
 static int listCompare(Tcl_Obj *, Tcl_Obj *) ;
 static unsigned listHash(Tcl_Obj *) ;
 
-#   ifdef Tcl_DictObjSize_TCL_DECLARED
+#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
 static int isADict(Tcl_Interp *, Tcl_Obj *) ;
 static int dictEqual(Tcl_Obj *, Tcl_Obj *) ;
 static int dictCompare(Tcl_Obj *, Tcl_Obj *) ;
@@ -193,13 +193,13 @@ STATIC DATA ALLOCATION
  * find entries.
  */
 static struct ral_type const Ral_Types[] = {
-#	ifdef Tcl_GetBignumFromObj_TCL_DECLARED
+#       if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
     {"bignum", isABignum, bignumEqual, bignumCompare, bignumHash},
 #	endif
     {"boolean", isABoolean, booleanEqual, booleanCompare, booleanHash},
     {"bytearray", isAByteArray, byteArrayEqual, byteArrayCompare,
             byteArrayHash},
-#	ifdef Tcl_DictObjSize_TCL_DECLARED
+#       if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
     {"dict", isADict, dictEqual, dictCompare, dictHash},
 #	endif
     {"double", isADouble, doubleEqual, doubleCompare, doubleHash},
@@ -1126,7 +1126,7 @@ wideIntHash(
 }
 #   endif
 
-#   ifdef Tcl_GetBignumFromObj_TCL_DECLARED
+#   if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
 static int
 isABignum(
     Tcl_Interp *interp,
@@ -1233,7 +1233,7 @@ listHash(
     return stringHash(listObj) ;
 }
 
-#   ifdef Tcl_DictObjSize_TCL_DECLARED
+#   if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
 static int
 isADict(
     Tcl_Interp *interp,
