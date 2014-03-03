@@ -901,15 +901,16 @@ proc ::ral::storeToSQLite {filename {pattern *}} {
                             $rel1Attr, $ref2Attr, $c2, $rel2, $rel2Attr) ;}
                     }
                     procedural {
-                        set cname [lindex $cinfo 0]
+                        set cname [namespace tail [lindex $cinfo 0]]
                         set script [lindex $cinfo end]
                         sqlitedb eval {insert or ignore into __ral_procedural\
-                            (Cname, Script) values ($cname $script) ;}
+                            (Cname, Script) values ($cname, $script) ;}
                         foreach participant [lrange $cinfo 1 end-1] {
+                            set basename [namespace tail $participant]
                             sqlitedb eval {insert or ignore into\
                                 __ral_proc_participant\
                                 (Cname, ParticipantRelvar) values\
-                                ($cname, $participant) ;}
+                                ($cname, $basename) ;}
                         }
                     }
                     default {
@@ -965,6 +966,10 @@ proc ::ral::storeToSQLite {filename {pattern *}} {
                 # Finally after all of that, the actual populating of the
                 # SQLite tables is trivial.
                 relation foreach row $relValue {
+                    # "relation assign" for a tuple or relation valued
+                    # attribute gives the heading and the body. Later when we
+                    # are loading the results, the "relvar insert" command will
+                    # want that stripped off.
                     relation assign $row {*}$assignVars
                     sqlitedb eval $statement
                 }
@@ -1035,28 +1040,59 @@ proc ::ral::loadFromSQLite {filename {ns ::}} {
                     OneRefAttrs, OneRefSpec, OneRelvar, OneAttrs,\
                     OtherRefAttrs, OtherRefSpec, OtherRelvar, OtherAttrs\
                     from __ral_correlation}] {
-                ::ral::relvar correlation $ns$cname\
-                        [expr {$isComplete ? "-complete" : {}}]\
-                        $ns$assocRelvar $oneRefAttrs $oneRefSpec $nsOneRelvar\
+                set corrCmd [list\
+                    ::ral::relvar correlation $ns$cname\
+                        $ns$assocRelvar $oneRefAttrs $oneRefSpec $ns$oneRelvar\
                         $oneAttrs $otherRefAttrs $otherRefSpec $ns$otherRelvar\
-                        $otherAttrs
+                        $otherAttrs]
+                if {$isComplete} {
+                    set corrCmd [linsert $corrCmd 3 -complete]
+                }
+                eval $corrCmd
             }
             # The procedural contraints
-            # HERE add the SQLite procedural constraint extraction.
+            foreach {cname script}\
+                [sqlitedb eval {select Cname, Script from __ral_procedural}] {
+                # Create a list of the participating relvars
+                set partRels [list]
+                foreach participantRelvar\
+                    [sqlitedb eval {select ParticipantRelvar from\
+                        __ral_proc_participant where (Cname = $cname)}] {
+                    lappend partRels $ns$participantRelvar
+                }
+                ::ral::relvar procedural $ns$cname {*}$partRels $script
+            }
         }
         # Now insert the data from the tables.
         # We are careful here not to depend upon SQL column ordering.
         relvar eval {
             foreach vname $relvarNames {
                 set sqlTableName [mapNamesToSQL $vname]
-                set attrNames [relation attributes [relvar set $ns$vname]]
+                set qualName $ns$vname
+                set heading [relation heading [relvar set $qualName]]
+                set attrNames [relation attributes [relvar set $qualName]]
                 set sqlColNames [mapNamesToSQL $attrNames]
                 sqlitedb eval "select [join $sqlColNames {, }]\
                         from $sqlTableName" valArray {
                     # Build up the insert tuple
                     set insert [list]
-                    foreach attr $attrNames sqlCol $sqlColNames {
-                        lappend insert $attr $valArray($sqlCol)
+                    # Note we have to adjust the values for Tuple and
+                    # Relation valued attributes. The "relvar insert"
+                    # command just wants the bodies of the values.
+                    foreach {attr type} $heading sqlCol $sqlColNames {
+                        lappend insert $attr
+                        switch -glob -- $type {
+                            Relation* {
+                                lappend insert\
+                                        [relation body $valArray($sqlCol)]
+                            }
+                            Tuple* {
+                                lappend insert [tuple get $valArray($sqlCol)]
+                            }
+                            default {
+                                lappend insert $valArray($sqlCol)
+                            }
+                        }
                     }
                     ::ral::relvar insert $ns$vname $insert
                 }
@@ -1271,8 +1307,12 @@ proc ::ral::sqlSchema {{pattern *}} {
                             ($ref2Attr) ;\n"
                     }
                 }
+                procedural {
+                    # Procedural constraints do not add anything to the SQL
+                    # schema since they are not "foreign key" oriented.
+                }
                 default {
-                    error "unknown constraint type, \"[lindex $info 0\""
+                    error "unknown constraint type, \"$ctype\""
                 }
             }
         }
@@ -1577,7 +1617,7 @@ proc ::ral::getRelativeConstraintInfo {cname} {
         }
         procedural {
             set endIndex [expr {[llength $cinfo] - 1}]
-            for {set index 1} {$index < $endEnd} {incr index} {
+            for {set index 1} {$index < $endIndex} {incr index} {
                 lset cinfo $index [namespace tail [lindex $cinfo $index]]
             }
         }
@@ -1617,7 +1657,7 @@ proc ::ral::setRelativeConstraintInfo {ns cinfo} {
         }
         procedural {
             set endIndex [expr {[llength $cinfo] - 1}]
-            for {set index 1} {$index < $endEnd} {incr index} {
+            for {set index 1} {$index < $endIndex} {incr index} {
                 lset cinfo $index\
                         ${ns}[string trimleft [lindex $cinfo $index] :]
             }
@@ -1644,4 +1684,4 @@ proc ::ral::mapTypeToSQL {type} {
             $sqlTypeMap($type) : "text"}]
 }
 
-package provide ral 0.10.2
+package provide ral 0.11.0

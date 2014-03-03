@@ -64,7 +64,7 @@ INCLUDE FILES
 #include <stdio.h>
 #include <string.h>
 #include "tcl.h"
-#ifdef Tcl_GetBignumFromObj_TCL_DECLARED
+#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
 #   include "tclTomMath.h"
 #endif
 #include "ral_tuplecmd.h"
@@ -105,7 +105,7 @@ static char const ral_copyright[] =
     "This software is copyrighted 2004 - 2012 by G. Andrew Mangogna."
     " Terms and conditions for use are distributed with the source code." ;
 
-#ifdef Tcl_RegisterConfig_TCL_DECLARED
+#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
 static Tcl_Config ral_config[] = {
     {"pkgname", ral_pkgname},
     {"version", ral_version},
@@ -142,11 +142,11 @@ Ral_Init(
     if (Tcl_InitStubs(interp, TCL_VERSION, 0) == NULL) {
         return TCL_ERROR ;
     }
-#   ifdef Tcl_GetBignumFromObj_TCL_DECLARED
+#       if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
     if (Tcl_TomMath_InitStubs(interp, TCL_VERSION) == NULL) {
         return TCL_ERROR ;
     }
-#   endif
+#       endif
 
     /*
      * Create the namespace in which the package command reside.
@@ -154,7 +154,7 @@ Ral_Init(
     Tcl_DStringInit(&cmdName) ;
     Tcl_DStringAppend(&cmdName, nsSep, -1) ;
     Tcl_DStringAppend(&cmdName, ral_pkgname, -1) ;
-#   ifdef Tcl_CreateNamespace_TCL_DECLARED
+#       if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
     Tcl_Namespace *ralNs = Tcl_CreateNamespace(interp,
 	    Tcl_DStringValue(&cmdName), NULL, NULL) ;
 #	else
@@ -170,7 +170,7 @@ Ral_Init(
     Tcl_DStringAppend(&cmdName, tupleCmdName, -1) ;
     Tcl_CreateObjCommand(interp, Tcl_DStringValue(&cmdName), tupleCmd,
 	    NULL, NULL) ;
-#   ifdef Tcl_Export_TCL_DECLARED
+#       if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
     if (Tcl_Export(interp, ralNs, tupleCmdName, 0) != TCL_OK) {
 	return TCL_ERROR ;
     }
@@ -185,7 +185,7 @@ Ral_Init(
     Tcl_DStringAppend(&cmdName, relationCmdName, -1) ;
     Tcl_CreateObjCommand(interp, Tcl_DStringValue(&cmdName), relationCmd,
 	    NULL, NULL) ;
-#   ifdef Tcl_Export_TCL_DECLARED
+#   if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
     if (Tcl_Export(interp, ralNs, relationCmdName, 0) != TCL_OK) {
 	return TCL_ERROR ;
     }
@@ -201,7 +201,7 @@ Ral_Init(
     rInfo = Ral_RelvarNewInfo(ral_pkgname, interp) ;
     Tcl_CreateObjCommand(interp, Tcl_DStringValue(&cmdName), relvarCmd, rInfo,
 	    NULL) ;
-#   ifdef Tcl_Export_TCL_DECLARED
+#       if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
     if (Tcl_Export(interp, ralNs, relvarCmdName, 0) != TCL_OK) {
 	return TCL_ERROR ;
     }
@@ -212,9 +212,9 @@ Ral_Init(
     }
 #	endif
 
-#   ifdef Tcl_RegisterConfig_TCL_DECLARED
+#       if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
     Tcl_RegisterConfig(interp, ral_pkgname, ral_config, "iso8859-1") ;
-#   endif
+#       endif
 
     Tcl_PkgProvide(interp, ral_pkgname, ral_version) ;
 

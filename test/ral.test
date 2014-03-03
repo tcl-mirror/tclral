@@ -61,10 +61,10 @@ package require ral
 eval tcltest::configure $argv
 
 if {[package vsatisfies [package require Tcl] 8.6]} {
-    ::tcltest::testConstraint tcl8.6 1
+    ::tcltest::testConstraint mathFuncs 1
     ::tcltest::testConstraint haveDict 1
 } elseif {[package vsatisfies [package require Tcl] 8.5]} {
-    ::tcltest::testConstraint tcl8.5 1
+    ::tcltest::testConstraint mathFuncs 1
     ::tcltest::testConstraint haveDict 1
 } elseif {[package vsatisfies [package require Tcl] 8.4]} {
     ::tcltest::testConstraint tcl8.4 1
@@ -1285,7 +1285,7 @@ namespace eval ::ral::test {
 
     # relation dict subcommand
     test relation-dict-1.0 {supplier number / city map} -constraints {
-        tcl8.5
+        haveDict
     } -body {
         relation dict $S S# CITY
     } -result {
@@ -1546,7 +1546,7 @@ namespace eval ::ral::test {
     test relation-fromdict-1.0 {
         empty dict
     } -constraints {
-        tcl8.5
+        haveDict
     } -body {
         relation fromdict {} A int B string
     } -result {
@@ -1556,7 +1556,7 @@ namespace eval ::ral::test {
     test relation-fromdict-2.0 {
         single key / value pair
     } -constraints {
-        tcl8.5
+        haveDict
     } -body {
         relation fromdict {27 fred} A int B string
     } -result {
@@ -1566,7 +1566,7 @@ namespace eval ::ral::test {
     test relation-fromdict-3.0 {
         many element dictionary
     } -constraints {
-        tcl8.5
+        haveDict
     } -body {
         set d [dict create 27 fred 42 alice 38 george 15 sue]
         relation fromdict $d A int B string
@@ -1582,7 +1582,7 @@ namespace eval ::ral::test {
     test relation-fromdict-4.0 {
         duplicate dict key
     } -constraints {
-        tcl8.5
+        haveDict
     } -body {
         set d [dict create 27 fred 42 alice 38 george 27 sue]
         relation fromdict $d A int B string
@@ -1597,7 +1597,7 @@ namespace eval ::ral::test {
     test relation-fromdict-5.0 {
         bad element data type
     } -constraints {
-        tcl8.5
+        haveDict
     } -body {
         set d [dict create 27 fred 42 alice 38 george mary sue]
         relation fromdict $d A int B string
@@ -1606,7 +1606,7 @@ namespace eval ::ral::test {
     test relation-fromdict-6.0 {
         bad dictionary
     } -constraints {
-        tcl8.5
+        haveDict
     } -body {
         set d {27 fred 42 alice 38 george 13}
         relation fromdict $d A int B string
@@ -3497,7 +3497,7 @@ in expression "_@_< 20"} -returnCodes error
 
     # relation summarize subcommand
     test relation-summarize-1.0 {count} -constraints {
-        tcl8.5
+        mathFuncs
     } -body {
         set p [relation project $P P#]
         relation summarize $SP $p r Total int {rsum($r, "QTY")}
@@ -3532,7 +3532,7 @@ in expression "_@_< 20"} -returnCodes error
     } -match relation
 
     test relation-summarize-2.0 {summarize per dee} -constraints {
-        tcl8.5
+        mathFuncs
     } -body {
         relation summarize $SP $DEE r GrandTotal int {rsum($r, "QTY")}
     } -result {
@@ -3555,7 +3555,7 @@ in expression "_@_< 20"} -returnCodes error
     } -match relation
 
     test relation-summarize-2.1 {summarize per dee, average} -constraints {
-        tcl8.5
+        mathFuncs
     } -body {
         relation summarize $SP $DEE r GrandAvg int {ravg($r, "QTY")}
     } -result {
@@ -3578,7 +3578,7 @@ in expression "_@_< 20"} -returnCodes error
     } -match relation
 
     test relation-summarize-2.2 {summarize per dee, average} -constraints {
-        tcl8.5
+        mathFuncs
     } -body {
         relation summarize $OWNER $DEE r AverageAge int {ravg($r, "Age")}
     } -result {
@@ -3630,7 +3630,7 @@ in expression "_@_< 20"} -returnCodes error
     test relation-summarizeby-1.0 {
         count
     } -constraints {
-        tcl8.5
+        mathFuncs
     } -body {
         relation summarizeby $SP P# r Total int {rsum($r, "QTY")}
     } -result {
@@ -3647,7 +3647,7 @@ in expression "_@_< 20"} -returnCodes error
     test relation-summarizeby-2.0 {
         summarize no attributes
     } -constraints {
-        tcl8.5
+        mathFuncs
     } -body {
         relation summarizeby $SP {} r GrandTotal int {rsum($r, "QTY")}
     } -result {

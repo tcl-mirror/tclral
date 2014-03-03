@@ -1,5 +1,5 @@
 /*
-This software is copyrighted 2006 -2011 by G. Andrew Mangogna.  The following
+This software is copyrighted 2006 -2014 by G. Andrew Mangogna.  The following
 terms apply to all files associated with the software unless explicitly
 disclaimed in individual files.
 
@@ -107,8 +107,7 @@ static Tcl_Obj *Ral_RelvarObjExecTraces(Tcl_Interp *, Ral_Relvar, Tcl_ObjType *,
     Tcl_Obj *, Tcl_Obj *) ;
 static int relvarEndTransaction(Tcl_Interp *, Ral_RelvarInfo, int) ;
 static int relvarObjConstraintEval(Tcl_Interp *, Ral_Constraint) ;
-static int relvarProceduralConstraintEval(Tcl_Interp *, char const *,
-    Ral_ProceduralConstraint) ;
+static int relvarProceduralConstraintEval(Tcl_Interp *, Ral_Constraint) ;
 
 /*
 EXTERNAL DATA REFERENCES
@@ -632,13 +631,13 @@ Ral_RelvarObjUpdateTuple(
 	    "\n    (\"in ::ral::%s %s\" body line %d)" ;
 	char msg[sizeof(msgfmt) + TCL_INTEGER_SPACE + 50] ;
 
-#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 6
+#           if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 6
 	sprintf(msg, msgfmt, Ral_ErrorInfoGetCommand(errInfo),
 	    Ral_ErrorInfoGetOption(errInfo), Tcl_GetErrorLine(interp)) ;
-#else
+#           else
 	sprintf(msg, msgfmt, Ral_ErrorInfoGetCommand(errInfo),
 	    Ral_ErrorInfoGetOption(errInfo), interp->errorLine) ;
-#endif
+#           endif
 	Tcl_AddObjErrorInfo(interp, msg, -1) ;
 	return TCL_ERROR ;
     } else if (!(result == TCL_OK || result == TCL_RETURN
@@ -1448,6 +1447,7 @@ Ral_RelvarObjCreateProcedural(
     Tcl_DString resolve ;
     Ral_Constraint constraint ;
     Ral_ProceduralConstraint procedural ;
+    char *colonPlace ;
 
     /*
      * Creating a procedural constraint is not allowed during an "eval" script.
@@ -1469,11 +1469,6 @@ Ral_RelvarObjCreateProcedural(
 	return TCL_ERROR ;
     }
     procedural = constraint->constraint.procedural ;
-    /*
-     * Add the pointer to the script object to the constraint. Bump the
-     * reference count because we intend to hold on to it.
-     */
-    Tcl_IncrRefCount(procedural->script = script) ;
     /*
      * Loop through the set of relvar names, making sure each name
      * is indeed a relvar.
@@ -1503,6 +1498,52 @@ Ral_RelvarObjCreateProcedural(
          */
         Ral_PtrVectorPushBack(procedural->relvarList, relvar) ;
         Ral_PtrVectorPushBack(relvar->constraints, constraint) ;
+    }
+    /*
+     * We construct a script for the procedural constraint that will evaluate
+     * the argument script in the namespace implied by the fully-qualified
+     * constraint name. We do this by looking at the constraint name and, if it
+     * is not in the global namespace, enclosing it in a new script that
+     * contains "namespace eval <nsname>". When the procedural constraint is
+     * evaluated it is done so at the global level.
+     */
+    colonPlace = strrchr(constraint->name, ':') ;
+    if (colonPlace == NULL) {
+        /*
+         * If we can't find a colon in the constaint name then we assume
+         * the global namespace.
+         */
+        Tcl_IncrRefCount(procedural->script = script) ;
+    } else {
+        /*
+         * Adjust to point to the second colon and use the leading string as a
+         * namespace name.
+         */
+        colonPlace-- ;
+        /*
+         * Check if the constraint is in the global namespace. In that case
+         * we just save the script as given to us.
+         */
+        if (colonPlace == constraint->name) {
+            Tcl_IncrRefCount(procedural->script = script) ;
+        } else {
+            /*
+             * Otherwise we build up a "namespace eval" command script so that
+             * we can run the procedural constraint script in the same
+             * namespace as the constraint was defined.  Note that when we
+             * evaluate the script it is done "direct" so it is not byte code
+             * compiled. We toss the script immediately so byte code compiling
+             * is a waste.
+             */
+            Tcl_Obj *scriptObj = Tcl_NewStringObj("namespace eval ", -1) ;
+            Tcl_IncrRefCount(scriptObj) ;
+            Tcl_AppendToObj(scriptObj, constraint->name,
+                    colonPlace - constraint->name) ;
+            Tcl_AppendStringsToObj(scriptObj, " {", NULL) ;
+            Tcl_AppendObjToObj(scriptObj, script) ;
+            Tcl_AppendStringsToObj(scriptObj, "}", NULL) ;
+            Tcl_IncrRefCount(procedural->script = scriptObj) ;
+        }
     }
 
     if (!relvarObjConstraintEval(interp, constraint)) {
@@ -2457,7 +2498,7 @@ relvarGetNamespaceName(
     int isGlobal = 1 ;
     Tcl_DStringInit(nsVarName) ;
 
-#	ifdef Tcl_GetCurrentNamespace_TCL_DECLARED
+#       if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
     Tcl_Namespace *curr = Tcl_GetCurrentNamespace(interp) ;
 
     if (curr->parentPtr) {
@@ -2465,8 +2506,7 @@ relvarGetNamespaceName(
 	isGlobal = 0 ;
     }
 #	else
-    if (Tcl_Eval(interp, "namespace qualifiers [namespace current]")
-	    == TCL_OK) {
+    if (Tcl_Eval(interp, "namespace current") == TCL_OK) {
 	char const *result = Tcl_GetStringResult(interp) ;
 	if (strlen(result)) {
 	    Tcl_DStringAppend(nsVarName, result, -1) ;
@@ -2800,8 +2840,7 @@ relvarObjConstraintEval(
     int result ;
 
     if (constraint->type == ConstraintProcedural) {
-        result = relvarProceduralConstraintEval(interp, constraint->name,
-                constraint->constraint.procedural) ;
+        result = relvarProceduralConstraintEval(interp, constraint) ;
     } else {
         Tcl_DString errMsg ;
 
@@ -2824,16 +2863,19 @@ relvarObjConstraintEval(
 static int
 relvarProceduralConstraintEval(
     Tcl_Interp *interp,
-    char const *name,
-    Ral_ProceduralConstraint procedural)
+    Ral_Constraint constraint)
 {
     int scriptResult ;
     int result = 0 ;
+    Ral_ProceduralConstraint procedural ;
+
+    assert(constraint->type == ConstraintProcedural) ;
+    procedural = constraint->constraint.procedural ;
     /*
      * Evaluate the script.
      */
     Tcl_IncrRefCount(procedural->script) ;
-    scriptResult = Tcl_EvalObjEx(interp, procedural->script, 0) ;
+    scriptResult = Tcl_EvalObjEx(interp, procedural->script, TCL_EVAL_GLOBAL) ;
     Tcl_DecrRefCount(procedural->script) ;
     if (scriptResult == TCL_OK || scriptResult == TCL_RETURN) {
         /*
@@ -2851,20 +2893,22 @@ relvarProceduralConstraintEval(
             Tcl_ResetResult(interp) ;
             if (!result) {
                 Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
-                        "procedural contraint, \"", name, "\", failed",
-                        NULL) ;
+                        "procedural contraint, \"", constraint->name,
+                        "\", failed", NULL) ;
             }
         }
     } else if (scriptResult == TCL_CONTINUE) {
         Tcl_ResetResult(interp) ;
         Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
             "returned \"continue\" from procedural "
-                "contraint script for constraint, \"", name, "\"", NULL) ;
+                "contraint script for constraint, \"", constraint->name,
+                "\"", NULL) ;
     } else if (scriptResult == TCL_BREAK) {
         Tcl_ResetResult(interp) ;
         Tcl_AppendStringsToObj(Tcl_GetObjResult(interp),
             "returned \"break\" from procedural "
-                "contraint script for constraint, \"", name, "\"", NULL) ;
+                "contraint script for constraint, \"", constraint->name,
+                "\"", NULL) ;
     }
     return result ;
 }
