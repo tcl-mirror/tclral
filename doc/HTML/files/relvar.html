@@ -91,7 +91,7 @@
     }
 --></style>
 </head>
-<! -- Generated from file 'files/relvar.html' by tcllib/doctools with format 'html'
+<! -- Generated from file 'relvar.man' by tcllib/doctools with format 'html'
    -->
 <! -- Copyright &copy; 2004 - 2012 by G. Andrew Mangogna
    -->
@@ -102,7 +102,7 @@
   <a href="../toc.html">Table Of Contents</a>
 | <a href="../index.html">Keyword Index</a>
 ] <hr>
-<h1 class="title">relvar(n) 0.10.2 ral &quot;Relvar Operators&quot;</h1>
+<h1 class="title">relvar(n) 0.11.0 ral &quot;Relvar Operators&quot;</h1>
 <div id="name" class="section"><h2><a name="name">Name</a></h2>
 <p>relvar - Operators for Relation Variables</p>
 </div>
@@ -123,7 +123,7 @@
 <div id="synopsis" class="section"><h2><a name="synopsis">Synopsis</a></h2>
 <div class="synopsis">
 <ul class="requirements">
-<li>package require <b class="pkgname">ral <span class="opt">?0.10.2?</span></b></li>
+<li>package require <b class="pkgname">ral <span class="opt">?0.11.0?</span></b></li>
 </ul>
 <ul class="syntax">
 <li><a href="#1"><b class="cmd">::ral::relvar association</b> <i class="arg">name</i> <i class="arg">refrngRelvar</i> <i class="arg">refrngAttrList</i> <i class="arg">refToSpec</i> <i class="arg">refToRelvar</i> <i class="arg">refToAttrList</i> <i class="arg">refrngSpec</i></a></li>
@@ -800,10 +800,15 @@ At the end of any transaction (or any command that modifies a relvar
 if there is no ongoing transaction),
 <i class="arg">script</i> is evaluated if any of the <i class="arg">relvarNameN</i> relvars is
 modified.
+When <i class="arg">script</i> is run,
+it is evaluated in the namespace that is the same as the
+namespace implied by a fully resolved <i class="arg">constraintName</i>,
+<em>e.g.</em> a procedural constraint named <b class="cmd">::myns::myproc</b> will
+be evaluated in the <b class="namespace">::myns</b> namespace.
 The <i class="arg">script</i> must return a value that can be intepreted as a boolean.
 If <i class="arg">script</i> returns <em>true</em> then the constraint passes.
 If <i class="arg">script</i> returns <em>false</em> then the constraint is deemed to
-have failed an the transaction is rolled back.
+have failed and the transaction is rolled back.
 Procedural constraints are only evaluated at the end of a transaction
 and only if the relvars given in the <b class="cmd">procedural</b> command are
 modified during the transaction.

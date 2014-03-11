@@ -1,4 +1,4 @@
-[manpage_begin relation n 0.10.2]
+[manpage_begin relation n 0.11.0]
 [comment {
 # This software is copyrighted 2004 - 2011 by G. Andrew Mangogna.
 # The following terms apply to all files associated with the software unless
@@ -44,15 +44,12 @@
 # 
 # ABSTRACT:
 # 
-# $RCSfile: relation.man,v $
-# $Revision: 1.39 $
-# $Date: 2012/02/26 19:09:04 $
 #  *--
 }]
 [moddesc "Relation Operators"]
 [titledesc "Operators for Relation Values"]
 [copyright "2004 - 2012 by G. Andrew Mangogna"]
-[require ral [opt 0.10.2]]
+[require ral [opt 0.11.0]]
 [description]
 This manpage describes the [cmd relation] command.
 The [cmd relation]

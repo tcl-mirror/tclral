@@ -684,15 +684,22 @@ RelvarEvalCmd(
     objPtr = objc == 3 ? objv[2] : Tcl_ConcatObj(objc - 2, objv + 2) ;
     result = Tcl_EvalObjEx(interp, objPtr, 0) ;
     if (result == TCL_ERROR) {
-	static const char msgfmt[] =
-	    "\n    (\"in ::ral::relvar eval\" body line %d)" ;
-	char msg[sizeof(msgfmt) + TCL_INTEGER_SPACE] ;
-#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 6
-        sprintf(msg, msgfmt, Tcl_GetErrorLine(interp)) ;
+#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
+        Tcl_AppendObjToErrorInfo(interp, Tcl_ObjPrintf(
+        "\n    (\"in ::ral::relvar eval\" body line %d)",
+#       if TCL_MINOR_VERSION < 6
+        interp->errorLine
+#       else
+        Tcl_GetErrorLine(interp)
+#       endif
+        )) ;
 #else
+        static const char msgfmt[] =
+            "\n    (\"in ::ral::relvar eval\" body line %d)" ;
+        char msg[sizeof(msgfmt) + TCL_INTEGER_SPACE] ;
         sprintf(msg, msgfmt, interp->errorLine) ;
+        Tcl_AddErrorInfo(interp, msg) ;
 #endif
-	Tcl_AddObjErrorInfo(interp, msg, -1) ;
     }
 
     Ral_RelvarObjExecEvalTraces(interp, rInfo, 0,

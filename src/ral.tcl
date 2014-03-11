@@ -661,23 +661,17 @@ proc ::ral::storeToMk {fileName {pattern *}} {
 
         # Get the names of the relvars and insert them into the catalog.
         # Convert the names to be relative before inserting.  Also create the
-        # views that will hold the values.  In order to preserve the namespace
-        # names for reloading, the view name is constructed from the relvar
-        # name by substituting "::" with "__". Metakit doesn't like "::" in
-        # view names. To insure that the constructed view names are unique, an
-        # integer tag is added (i.e. we need to make sure that two relvars such
-        # as ::a::b and ::a__b don't collide).
-        set tagCtr 0
+        # views that will hold the values.  Metakit doesn't like "::" and some
+        # other characters in view names.
         set names [relvar names $pattern]
+        set basenames [list]
         foreach name $names {
+            set basename [namespace tail $name]
+            lappend basenames $basename
             set heading [relation heading [relvar set $name]]
             set ids [relvar identifiers $name]
-            # Strip the leading namespace separator. This is restored
-            # when the relvars are loaded back in.
-            set viewName [string map {:: __ - _} $name]_[incr tagCtr]
-            set nameViewMap($name) $viewName
-            ::mk::row append db.__ral_relvar Name_ral $name\
-                Heading_ral $heading Ids_ral $ids View_ral $viewName
+            ::mk::row append db.__ral_relvar Name_ral $basename\
+                Heading_ral $heading Ids_ral $ids View_ral $basename
             # Determine the structure of the view that will hold the relvar
             # value.  Special attention is required for Tuple and Relation
             # valued attributes.
@@ -685,17 +679,19 @@ proc ::ral::storeToMk {fileName {pattern *}} {
             foreach {attr type} $heading {
                 lappend relvarLayout [mkHeading $attr $type]
             }
-            ::mk::view layout db.$viewName $relvarLayout
+            ::mk::view layout db.$basename $relvarLayout
         }
         # Get the constraints and put them into the catalog.
         set partIndex 0
         foreach cname [relvar constraint names $pattern] {
-            ::mk::row append db.__ral_constraint\
-                Constraint_ral [relvar constraint info $cname]
+            set cinfo [relvar constraint info $cname]
+            # Constrain names must be made relative.
+            ::mk::row append db.__ral_constraint Constraint_ral\
+                [getRelativeConstraintInfo $cname]
         }
         # Populate the views for each relavar.
-        foreach name [array names nameViewMap] {
-            ::mk::cursor create cursor db.$nameViewMap($name) 0
+        foreach name $names basename $basenames {
+            ::mk::cursor create cursor db.$basename 0
             relation foreach r [relvar set $name] {
                 ::mk::row insert $cursor
                 mkStoreTuple $cursor [relation tuple $r]
@@ -707,7 +703,7 @@ proc ::ral::storeToMk {fileName {pattern *}} {
     return -options $opts $result
 }
 
-proc ::ral::loadFromMk {fileName {ns ::}} {
+proc ::ral::loadFromMk {fileName {ns {}}} {
     package require Mk4tcl
 
     set ns [string trimright $ns :]::
@@ -720,7 +716,7 @@ proc ::ral::loadFromMk {fileName {ns ::}} {
         # determine the relvar names and types by reading the catalog
         ::mk::loop rvCursor db.__ral_relvar {
             array set relvarInfo [::mk::get $rvCursor]
-            set relvarName $ns[string trimleft $relvarInfo(Name_ral) :]
+            set relvarName ${ns}$relvarInfo(Name_ral)
             # check that the parent namespace exists
             set parent [namespace qualifiers $relvarName]
             if {!($parent eq {} || [namespace exists $parent])} {
@@ -767,7 +763,7 @@ proc ::ral::mergeFromMk {fileName {ns ::}} {
         # determine the relvar names and types by reading the catalog
         ::mk::loop rvCursor db.__ral_relvar {
             array set relvarInfo [::mk::get $rvCursor]
-            set relvarName $ns[string trimleft $relvarInfo(Name_ral) :]
+            set relvarName ${ns}$relvarInfo(Name_ral)
             # Check if the relvar already exists
             if {![relvar exists $relvarName]} {
                 # New relvar
@@ -1529,7 +1525,8 @@ proc ::ral::mkStoreTuple {cursor tuple} {
     foreach {attr type} [tuple heading $tuple] {attr value} [tuple get $tuple] {
         switch -exact [lindex $type 0] {
             Tuple {
-                set tupCursor $cursor.$attr!0
+                #set tupCursor $cursor.$attr!0
+                ::mk::cursor create tupCursor $cursor.$attr
                 ::mk::row insert $tupCursor
                 mkStoreTuple $tupCursor [tuple extract $tuple $attr]
             }

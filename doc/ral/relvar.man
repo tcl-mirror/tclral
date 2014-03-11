@@ -1,4 +1,4 @@
-[manpage_begin relvar n 0.10.2]
+[manpage_begin relvar n 0.11.0]
 [comment {
 # This software is copyrighted 2004 - 2011 by G. Andrew Mangogna.
 # The following terms apply to all files associated with the software unless
@@ -46,15 +46,12 @@
 #   This file contains the documentation for the ::ral::relvar command.
 #   This command is part of TclRAL. This file is in Tcl Markup Language
 #   format.
-# $RCSfile: relvar.man,v $
-# $Revision: 1.36 $
-# $Date: 2012/02/26 19:09:04 $
 #  *--
 }]
 [moddesc "Relvar Operators"]
 [titledesc "Operators for Relation Variables"]
 [copyright "2004 - 2012 by G. Andrew Mangogna"]
-[require ral [opt 0.10.2]]
+[require ral [opt 0.11.0]]
 [description]
 This manpage describes the [cmd relvar] command.
 The [cmd relvar] command is part of the Tcl Relational Algebra Library
@@ -795,6 +792,11 @@ At the end of any transaction (or any command that modifies a relvar
 if there is no ongoing transaction),
 [arg script] is evaluated if any of the [arg relvarNameN] relvars is
 modified.
+When [arg script] is run,
+it is evaluated in the namespace that is the same as the
+namespace implied by a fully resolved [arg constraintName],
+[emph e.g.] a procedural constraint named [cmd ::myns::myproc] will
+be evaluated in the [namespace ::myns] namespace.
 The [arg script] must return a value that can be intepreted as a boolean.
 If [arg script] returns [emph true] then the constraint passes.
 If [arg script] returns [emph false] then the constraint is deemed to

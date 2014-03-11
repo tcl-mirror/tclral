@@ -627,18 +627,24 @@ Ral_RelvarObjUpdateTuple(
      */
     result = Tcl_EvalObjEx(interp, scriptObj, 0) ;
     if (result == TCL_ERROR) {
-	static const char msgfmt[] =
-	    "\n    (\"in ::ral::%s %s\" body line %d)" ;
-	char msg[sizeof(msgfmt) + TCL_INTEGER_SPACE + 50] ;
-
-#           if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 6
-	sprintf(msg, msgfmt, Ral_ErrorInfoGetCommand(errInfo),
-	    Ral_ErrorInfoGetOption(errInfo), Tcl_GetErrorLine(interp)) ;
-#           else
-	sprintf(msg, msgfmt, Ral_ErrorInfoGetCommand(errInfo),
-	    Ral_ErrorInfoGetOption(errInfo), interp->errorLine) ;
-#           endif
-	Tcl_AddObjErrorInfo(interp, msg, -1) ;
+#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
+        Tcl_AppendObjToErrorInfo(interp, Tcl_ObjPrintf(
+        "\n    (\"in ::ral::%s %s\" body line %d)",
+        Ral_ErrorInfoGetCommand(errInfo), Ral_ErrorInfoGetOption(errInfo),
+#       if TCL_MINOR_VERSION < 6
+        interp->errorLine
+#       else
+        Tcl_GetErrorLine(interp)
+#       endif
+        )) ;
+#else
+        static const char msgfmt[] =
+            "\n    (\"in ::ral::%s %s\" body line %d)" ;
+        char msg[sizeof(msgfmt) + TCL_INTEGER_SPACE] ;
+        sprintf(msg, msgfmt, Ral_ErrorInfoGetCommand(errInfo),
+            Ral_ErrorInfoGetOption(errInfo), interp->errorLine) ;
+        Tcl_AddErrorInfo(interp, msg) ;
+#endif
 	return TCL_ERROR ;
     } else if (!(result == TCL_OK || result == TCL_RETURN
             || result == TCL_CONTINUE)) {
@@ -2128,18 +2134,22 @@ Ral_RelvarObjTraceVarSuspend(
     relvar->traceFlags = TRACEOP_SUSPEND_FLAG ;
     result = Tcl_EvalObjEx(interp, script, 0) ;
     if (result == TCL_ERROR) {
+#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
+        Tcl_AppendObjToErrorInfo(interp, Tcl_ObjPrintf(
+        "\n    (\"in ::ral::relvar trace suspend variable\" body line %d)",
+#       if TCL_MINOR_VERSION < 6
+        interp->errorLine
+#       else
+        Tcl_GetErrorLine(interp)
+#       endif
+        )) ;
+#else
         static const char msgfmt[] =
             "\n    (\"in ::ral::relvar trace suspend variable\" body line %d)" ;
-        char msg[sizeof(msgfmt) + TCL_INTEGER_SPACE + 50] ;
-
-        sprintf(msg, msgfmt,
-#                       if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 6
-            Tcl_GetErrorLine(interp)
-#                       else
-            interp->errorLine
-#                       endif
-        ) ;
-        Tcl_AddObjErrorInfo(interp, msg, -1) ;
+        char msg[sizeof(msgfmt) + TCL_INTEGER_SPACE] ;
+        sprintf(msg, msgfmt, interp->errorLine) ;
+        Tcl_AddErrorInfo(interp, msg) ;
+#endif
     }
     relvar->traceFlags = 0 ;
     return result ;

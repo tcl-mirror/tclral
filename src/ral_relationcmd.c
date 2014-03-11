@@ -1203,21 +1203,32 @@ RelationForeachCmd(
 	Tcl_DecrRefCount(iterObj) ;
 
 	if (result != TCL_OK) {
-	    if (result == TCL_CONTINUE) {
+            /*
+             * We interpret continue and return as short circuiting
+             * the script evaluation to start the next iteration.
+             */
+	    if (result == TCL_CONTINUE || result == TCL_RETURN) {
 		result = TCL_OK ;
 	    } else if (result == TCL_BREAK) {
 		result = TCL_OK ;
 		break ;
 	    } else if (result == TCL_ERROR) {
-		static const char msgfmt[] =
-		    "\n    (\"relation foreach\" body line %d)" ;
-		char msg[sizeof(msgfmt) + TCL_INTEGER_SPACE] ;
-#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 6
-		sprintf(msg, msgfmt, Tcl_GetErrorLine(interp)) ;
+#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
+                Tcl_AppendObjToErrorInfo(interp, Tcl_ObjPrintf(
+		    "\n    (\"::ral::relation foreach\" body line %d)",
+#                   if TCL_MINOR_VERSION < 6
+                    interp->errorLine
+#                   else
+                    Tcl_GetErrorLine(interp)
+#                   endif
+                )) ;
 #else
+		static const char msgfmt[] =
+		    "\n    (\"::ral::relation foreach\" body line %d)" ;
+		char msg[sizeof(msgfmt) + TCL_INTEGER_SPACE] ;
 		sprintf(msg, msgfmt, interp->errorLine) ;
+		Tcl_AddErrorInfo(interp, msg) ;
 #endif
-		Tcl_AddObjErrorInfo(interp, msg, -1) ;
 		break ;
 	    } else {
 		break ;
@@ -3486,20 +3497,24 @@ RelationUpdateCmd(
              */
             result = Tcl_EvalObjEx(interp, scriptObj, 0) ;
             if (result == TCL_ERROR) {
-                static const char msgfmt[] =
-                    "\n    (\"in ::ral::relation update\" body line %d)" ;
-                char msg[sizeof(msgfmt) + TCL_INTEGER_SPACE + 50] ;
-
-                sprintf(msg, msgfmt,
-#                       if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 6
-                    Tcl_GetErrorLine(interp)
-#                       else
+#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
+                Tcl_AppendObjToErrorInfo(interp, Tcl_ObjPrintf(
+                    "\n    (\"in ::ral::relation update\" body line %d)",
+#                   if TCL_MINOR_VERSION < 6
                     interp->errorLine
-#                       endif
-                ) ;
-                Tcl_AddObjErrorInfo(interp, msg, -1) ;
+#                   else
+                    Tcl_GetErrorLine(interp)
+#                   endif
+                )) ;
+#else
+		static const char msgfmt[] =
+                    "\n    (\"in ::ral::relation update\" body line %d)" ;
+		char msg[sizeof(msgfmt) + TCL_INTEGER_SPACE] ;
+		sprintf(msg, msgfmt, interp->errorLine) ;
+		Tcl_AddErrorInfo(interp, msg) ;
+#endif
                 break ;
-            } else if (result == TCL_BREAK) {
+            } else if (result == TCL_BREAK || result == TCL_RETURN) {
                 result = TCL_OK ;
                 break ;
             }
