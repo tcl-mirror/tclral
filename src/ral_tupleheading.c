@@ -208,12 +208,12 @@ Ral_TupleHeadingAppend(
     if (first > src->finish) {
 	Tcl_Panic(
 	"Ral_TupleHeadingAppend: out of bounds access at source offset \"%d\"",
-	    first - src->start) ;
+	    (int)(first - src->start)) ;
     }
     if (last > src->finish) {
 	Tcl_Panic(
 	"Ral_TupleHeadingAppend: out of bounds access at source offset \"%d\"",
-	    last - src->start) ;
+	    (int)(last - src->start)) ;
     }
     n = last - first ;
     if (dst->finish + n > dst->endStorage) {
@@ -283,7 +283,7 @@ Ral_TupleHeadingStore(
     if (i >= Ral_TupleHeadingEnd(h)) {
 	Tcl_Panic(
 	    "Ral_TupleHeadingStore: out of bounds access at offset \"%d\"",
-	    i - h->start) ;
+	    (int)(i - h->start)) ;
     }
 
     /*
