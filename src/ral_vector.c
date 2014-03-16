@@ -290,7 +290,7 @@ Ral_IntVectorInsert(
 
     if (pos > v->finish) {
 	Tcl_Panic("Ral_IntVectorInsert: out of bounds access at offset \"%d\"",
-	    pos - v->start) ;
+	    (int)(pos - v->start)) ;
     }
 
     size = Ral_IntVectorSize(v) ;
@@ -326,11 +326,11 @@ Ral_IntVectorErase(
 {
     if (first > v->finish) {
 	Tcl_Panic("Ral_IntVectorErase: out of bounds access at offset \"%d\"",
-	    first - v->start) ;
+	    (int)(first - v->start)) ;
     }
     if (last > v->finish) {
 	Tcl_Panic("Ral_IntVectorErase: out of bounds access at offset \"%d\"",
-	    last - v->start) ;
+	    (int)(last - v->start)) ;
     }
     memmove(first, last, (v->finish - last) * sizeof(*first)) ;
     v->finish -= last - first ;
@@ -596,17 +596,17 @@ Ral_IntVectorCopy(
     if (first > src->finish) {
 	Tcl_Panic(
 	    "Ral_IntVectorCopy: out of bounds access at source offset \"%d\"",
-	    first - src->start) ;
+	    (int)(first - src->start)) ;
     }
     if (last > src->finish) {
 	Tcl_Panic(
 	    "Ral_IntVectorCopy: out of bounds access at source offset \"%d\"",
-	    last - src->start) ;
+	    (int)(last - src->start)) ;
     }
     if (pos > dst->finish) {
 	Tcl_Panic(
 	    "Ral_IntVectorCopy: out of bounds access at dest offset \"%d\"",
-	    pos - dst->start) ;
+	    (int)(pos - dst->start)) ;
     }
 
     n = last - first ;
@@ -793,7 +793,7 @@ Ral_PtrVectorInsert(
 
     if (pos > v->finish) {
 	Tcl_Panic("Ral_PtrVectorInsert: out of bounds access at offset \"%d\"",
-	    pos - v->start) ;
+	    (int)(pos - v->start)) ;
     }
 
     size = Ral_PtrVectorSize(v) ;
@@ -829,11 +829,11 @@ Ral_PtrVectorErase(
 {
     if (first > v->finish) {
 	Tcl_Panic("Ral_PtrVectorErase: out of bounds access at offset \"%d\"",
-	    first - v->start) ;
+	    (int)(first - v->start)) ;
     }
     if (last > v->finish) {
 	Tcl_Panic("Ral_PtrVectorErase: out of bounds access at offset \"%d\"",
-	    last - v->start) ;
+	    (int)(last - v->start)) ;
     }
     memmove(first, last, (v->finish - last) * sizeof(*first)) ;
     v->finish -= last - first ;
@@ -939,17 +939,17 @@ Ral_PtrVectorCopy(
     if (first > src->finish) {
 	Tcl_Panic(
 	    "Ral_PtrVectorCopy: out of bounds access at source offset \"%d\"",
-	    first - src->start) ;
+	    (int)(first - src->start)) ;
     }
     if (last > src->finish) {
 	Tcl_Panic(
 	    "Ral_PtrVectorCopy: out of bounds access at source offset \"%d\"",
-	    last - src->start) ;
+	    (int)(last - src->start)) ;
     }
     if (pos > dst->finish) {
 	Tcl_Panic(
 	    "Ral_PtrVectorCopy: out of bounds access at dest offset \"%d\"",
-	    pos - dst->start) ;
+	    (int)(pos - dst->start)) ;
     }
 
     n = last - first ;
