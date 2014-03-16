@@ -98,7 +98,7 @@
 <! -- CVS: $Id$ ralutil.n
    -->
 <body><div class="doctools">
-<h1 class="title">ralutil(n) 0.10.2 ralutil &quot;Ralutil Package&quot;</h1>
+<h1 class="title">ralutil(n) 0.11.0 ralutil &quot;Ralutil Package&quot;</h1>
 <div id="name" class="section"><h2><a name="name">Name</a></h2>
 <p>ralutil - Commands for the ralutil package</p>
 </div>
@@ -117,7 +117,7 @@
 <div id="synopsis" class="section"><h2><a name="synopsis">Synopsis</a></h2>
 <div class="synopsis">
 <ul class="requirements">
-<li>package require <b class="pkgname">ral <span class="opt">?0.10.2?</span></b></li>
+<li>package require <b class="pkgname">ral <span class="opt">?0.11.0?</span></b></li>
 </ul>
 <ul class="syntax">
 <li><a href="#1"><b class="variable">::ralutil::DUM</b></a></li>
@@ -127,6 +127,7 @@
 <li><a href="#5"><b class="cmd">::ralutil::rvajoin</b> <i class="arg">rel1</i> <i class="arg">rel2</i> <i class="arg">newAttr</i> <i class="arg"><span class="opt">?attr1 attr2 ...?</span></i></a></li>
 <li><a href="#6"><b class="cmd">::ralutil::sysIdsInit</b></a></li>
 <li><a href="#7"><b class="cmd">::ralutil::sysIdsGenSystemId</b> <i class="arg">relvarName</i> <i class="arg">attrName</i></a></li>
+<li><a href="#8"><b class="cmd">::ralutil::attrConstraint</b> <i class="arg">relvarName</i> <i class="arg">attrExpr</i></a></li>
 </ul>
 </div>
 </div>
@@ -363,6 +364,28 @@ attribute of the relvar, <i class="arg">relvarName</i>, be assigned a system gen
 identifier.
 This procedure uses relvar tracing to assign a unique integer value to
 <i class="arg">attrName</i> when a tuple is inserted into <i class="arg">relvarName</i>.</p></dd>
+<dt><a name="8"><b class="cmd">::ralutil::attrConstraint</b> <i class="arg">relvarName</i> <i class="arg">attrExpr</i></a></dt>
+<dd><p>The <b class="cmd">attrConstraint</b> command
+provides a simpler interface to relvar tracing.
+It adds a variable trace for insert and update
+on the given <i class="arg">relvarName</i>.
+The trace
+evaluates <i class="arg">attrExpr</i> and if true,
+allows the insert or update to procede.
+The expression may contain references to attribute names of the form
+:&lt;attr name&gt;: (e.g. for an attribute called A1, &quot;expr&quot; may contain
+tokens of the form, :A1:).
+When the trace is evaluated, all of the attribute
+attribute name tokens are replaced by the value of the attribute.
+The intended use case is when you wish to constrain an attribute value
+to be within some subrange of the data type. For example, if an int
+typed attribute called, <b class="cmd">Status</b> should be greater than 0 and
+less than 22, then</p>
+<pre class="example">
+attrConstraint myRelvar {:Status: &gt; 0 &amp;&amp; :Status: &lt; 22}
+</pre>
+<p>will install a variable trace on &quot;myRelvar&quot; to insure that each
+insert or update to it has a proper value for &quot;Status&quot;.</p></dd>
 </dl>
 </div>
 <div id="see-also" class="section"><h2><a name="see-also">See Also</a></h2>

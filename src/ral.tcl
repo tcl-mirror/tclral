@@ -1,4 +1,4 @@
-# This software is copyrighted 2004 - 2010 by G. Andrew Mangogna.
+# This software is copyrighted 2004 - 2014 by G. Andrew Mangogna.
 # The following terms apply to all files associated with the software unless
 # explicitly disclaimed in individual files.
 # 
@@ -43,10 +43,6 @@
 # 
 # ABSTRACT:
 # This file contains the Tcl script portions of the TclRAL package.
-# 
-# $RCSfile: ral.tcl,v $
-# $Revision: 1.50 $
-# $Date: 2012/02/26 19:09:04 $
 #  *--
 
 namespace eval ::ral {
@@ -707,6 +703,7 @@ proc ::ral::loadFromMk {fileName {ns {}}} {
     package require Mk4tcl
 
     set ns [string trimright $ns :]::
+    namespace eval $ns {}
 
     ::mk::file open db $fileName -readonly
     catch {
@@ -716,11 +713,12 @@ proc ::ral::loadFromMk {fileName {ns {}}} {
         # determine the relvar names and types by reading the catalog
         ::mk::loop rvCursor db.__ral_relvar {
             array set relvarInfo [::mk::get $rvCursor]
-            set relvarName ${ns}$relvarInfo(Name_ral)
-            # check that the parent namespace exists
-            set parent [namespace qualifiers $relvarName]
-            if {!($parent eq {} || [namespace exists $parent])} {
-                namespace eval $parent {}
+            # Check for old style serialization that included namespace
+            # information.
+            if {[string first : $relvarInfo(Name_ral)] != -1} {
+                set relvarName ${ns}[namespace tail $relvarInfo(Name_ral)]
+            } else {
+                set relvarName ${ns}$relvarInfo(Name_ral)
             }
             eval [list ::ral::relvar create $relvarName\
                     $relvarInfo(Heading_ral)] $relvarInfo(Ids_ral)
@@ -1525,7 +1523,6 @@ proc ::ral::mkStoreTuple {cursor tuple} {
     foreach {attr type} [tuple heading $tuple] {attr value} [tuple get $tuple] {
         switch -exact [lindex $type 0] {
             Tuple {
-                #set tupCursor $cursor.$attr!0
                 ::mk::cursor create tupCursor $cursor.$attr
                 ::mk::row insert $tupCursor
                 mkStoreTuple $tupCursor [tuple extract $tuple $attr]

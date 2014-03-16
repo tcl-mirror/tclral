@@ -1,7 +1,7 @@
 #!/bin/sh
 # \
 exec tclsh "$0" "$@"
-# This software is copyrighted 2006 by G. Andrew Mangogna.
+# This software is copyrighted 2006 - 2014 by G. Andrew Mangogna.
 # The following terms apply to all files associated with the software unless
 # explicitly disclaimed in individual files.
 # 
@@ -47,9 +47,6 @@ exec tclsh "$0" "$@"
 # 
 # ABSTRACT:
 # 
-# $RCSfile: serialize.test,v $
-# $Revision: 1.6 $
-# $Date: 2011/01/16 23:18:42 $
 #  *--
 
 package require tcltest 2.2
@@ -161,6 +158,26 @@ namespace eval ::ral::test {
 	storeToMk $mkFile
 	loadFromMk $mkFile $dstNs
 	cmpRelvars [namespace current] $dstNs
+    } -result {1}
+
+    test loadFromMk-1.0 {
+        load metakit serialization in old format
+    } -setup {
+        set nsnew [namespace current]::new
+        set nsold [namespace current]::old
+        deserializeFromFile merge1.ral $nsnew
+    } -cleanup {
+	eval relvar constraint delete\
+	    [relvar constraint names ${nsnew}::*]
+	eval relvar unset [relvar names ${nsnew}::*]
+	namespace delete $nsnew
+	eval relvar constraint delete\
+	    [relvar constraint names ${nsold}::*]
+	eval relvar unset [relvar names ${nsold}::*]
+	namespace delete $nsold
+    } -body {
+        loadFromMk merge1-old.mk $nsold
+	cmpRelvars $nsnew $nsold
     } -result {1}
 
     test dump-1.0 {

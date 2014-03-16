@@ -1,6 +1,6 @@
 [manpage_begin serialize n 0.11.0]
 [comment {
-# This software is copyrighted 2004 - 2011 by G. Andrew Mangogna.
+# This software is copyrighted 2004 - 2014 by G. Andrew Mangogna.
 # The following terms apply to all files associated with the software unless
 # explicitly disclaimed in individual files.
 # 
@@ -48,25 +48,36 @@
 }]
 [moddesc "Relation persistence"]
 [titledesc "Persistent storage for relations"]
-[copyright "2004 - 2012 by G. Andrew Mangogna"]
+[copyright "2004 - 2014 by G. Andrew Mangogna"]
 [require ral [arg [opt 0.11.0]]]
 [description]
 This manpage describes a set of commands that are used for
-saving the values of relvars on external storage.
-All of the output commands below take an optional [arg pattern] argument.
-If present, then the command is applied to relvars that match the given
+saving the values of relvars to external storage.
+All of the serialization commands below take an optional [arg pattern] argument.
+If present, then the command is applied to relvars whose names
+that match the given
 [arg pattern].
-Otherwise by default all relvars are considered.
-All of the input commands below take an optional [arg namespace] argument.
+Otherwise by default all relvars are considered
+([emph i.e.] the default pattern is "*").
+Pattern matching happens as for the [cmd "string match"] command.
+All of the deserialization commands below take an optional
+[arg namespace] argument.
 If present, then the command will restore the relvars relative to the given
 [arg namespace].
 Otherwise, relvars are restored relative to the global namespace.
-Upon serialization and output, the entire relvar name path is maintained.
-This allows relvars to be restored to their same relative positions
-in a different namespace from which they were originally taken.
-Since TclRAL manages relvar names using [cmd namespace]-like syntax,
-this may be used to manage distinct sets of relvars without risking
-naming conflicts.
+
+Upon serialization,
+only the last component of the relvar and constraint names is retained.
+This is done to allow the serialized information to be restored into
+an arbitrary namespace.
+Consequently, [arg pattern] arguments should yield a set of relvar
+and constraint names that are unique within the last part of the fully
+resolved name.
+Otherwise naming conflicts will occur.
+The common use case supported is that of saving and restoring
+all the relvars and constraints that are leaves of the naming [arg pattern].
+In general patterns should be of the form: [arg "::ns1::ns2:: ... ::*"]
+to insure unique leave names.
 
 [section COMMANDS]
 [list_begin definitions]

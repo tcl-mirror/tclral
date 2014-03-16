@@ -1,4 +1,4 @@
-# This software is copyrighted 2006, 2007, 2008, 2009 by G. Andrew Mangogna.
+# This software is copyrighted 2006 - 2014 by G. Andrew Mangogna.
 # The following terms apply to all files associated with the software unless
 # explicitly disclaimed in individual files.
 # 
@@ -48,14 +48,11 @@
 # purpose for this package is to determine what works well in practice
 # without cluttering the TclRAL package proper.
 # 
-# $RCSfile: ralutil.tcl,v $
-# $Revision: 1.8 $
-# $Date: 2012/06/24 23:40:23 $
 #  *--
 
-package provide ralutil 0.10.2
+package provide ralutil 0.11.0
 
-package require ral 0.10.2
+package require ral 0.11.0
 
 namespace eval ::ralutil {
     namespace export pipe
@@ -63,6 +60,7 @@ namespace eval ::ralutil {
     namespace export sysIdsGenSystemId
     namespace export crosstab
     namespace export rvajoin
+    namespace export attrConstraint
 
     namespace import ::ral::*
 
@@ -125,7 +123,7 @@ proc ::ralutil::sysIdsInit {} {
 # a relvar in order to have the system assign a unique value
 # to that attribute.
 proc ::ralutil::sysIdsGenSystemId {relvarName attrName} {
-    relvar trace add variable [uplevel 1 relvar path $relvarName] insert\
+    relvar trace add variable [uplevel 1 ::ral::relvar path $relvarName] insert\
 	[list ::ralutil::sysIdsCreateIdFor $attrName]
 }
 
@@ -267,4 +265,44 @@ proc ::ralutil::rvajoin {r1 r2 newAttr args} {
                     [tuple project $r1tup {*}$joinAttrs]]
         }] {*}[dict keys $rvaHeading]]
     }]
+}
+
+# This procedure provides a simpler interface to relvar tracing.
+# It adds a variable trace for insert and update
+# on the given "relvarName". The trace
+# evaluates "expr" and if true, allows the insert or update to procede.
+# The expression may contain references to attribute names of the form
+# :<attr name>: (e.g. for an attribute called A1, "expr" may contain
+# tokens of :A1:). When the trace is evaluated, all of the attribute
+# tokens are replaced by the value of the attribute.
+# The intended use case is when you wish to constrain an attribute value
+# to be within some subrange of the data type. For example, if an int
+# typed attribute called, "Status" should be > 0 and < 22, then
+#
+#       attrConstraint myRelvar {:Status: > 0 && :Status: < 22}
+#
+# will install a variable trace on "myRelvar" to insure that each
+# insert or update to it has a proper value for "Status".
+proc ::ralutil::attrConstraint {relvarName expr} {
+    set attrs [relation attributes [uplevel 1 ::ral::relvar set $relvarName]]
+    foreach attr $attrs {
+        set expr [regsub -all -- ":${attr}:" $expr\
+                " \[::ral::tuple extract \$newTup $attr\] "]
+    }
+    set body [format {
+        if {$op eq  "insert"} {
+            set newTup [lindex $args 0]
+        } elseif {$op eq "update"} {
+            set newTup [lindex $args 1]
+        } else {
+            error "unknown relvar operation, \"$op\""
+        }
+        if {%s} {
+            return $newTup
+        } else {
+            error "constraint, \"{%s}\", on $relvarName failed"
+        }
+    } $expr $expr]
+    uplevel 1 [list ::ral::relvar trace add variable $relvarName\
+            {insert update} [list ::apply [list {op relvarName args} $body]]]
 }

@@ -1207,7 +1207,7 @@ RelationForeachCmd(
              * We interpret continue and return as short circuiting
              * the script evaluation to start the next iteration.
              */
-	    if (result == TCL_CONTINUE || result == TCL_RETURN) {
+	    if (result == TCL_CONTINUE) {
 		result = TCL_OK ;
 	    } else if (result == TCL_BREAK) {
 		result = TCL_OK ;

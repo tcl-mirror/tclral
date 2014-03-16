@@ -1,6 +1,6 @@
-[manpage_begin ralutil n 0.10.2]
+[manpage_begin ralutil n 0.11.0]
 [comment {
-# This software is copyrighted 2004 - 2011
+# This software is copyrighted 2004 - 2014
 # by G. Andrew Mangogna.
 # The following terms apply to all files associated with the software unless
 # explicitly disclaimed in individual files.
@@ -45,15 +45,12 @@
 #	ralutil.man -- Manual page for the TclRal "ralutil" package
 # ABSTRACT:
 # 
-# $RCSfile: ralutil.man,v $
-# $Revision: 1.10 $
-# $Date: 2012/02/26 19:09:04 $
 #  *--
 }]
 [moddesc "Ralutil Package"]
 [titledesc "Commands for the ralutil package"]
 [copyright "2004 - 2012 by G. Andrew Mangogna"]
-[require ral [opt 0.10.2]]
+[require ral [opt 0.11.0]]
 [description]
 This manpage describes the [package ralutil] package.
 The [package ralutil] package is a supplementary package to the
@@ -297,6 +294,29 @@ attribute of the relvar, [arg relvarName], be assigned a system generated
 identifier.
 This procedure uses relvar tracing to assign a unique integer value to
 [arg attrName] when a tuple is inserted into [arg relvarName].
+
+[call [cmd ::ralutil::attrConstraint] [arg relvarName] [arg attrExpr]]
+The [cmd attrConstraint] command
+provides a simpler interface to relvar tracing.
+It adds a variable trace for insert and update
+on the given [arg relvarName].
+The trace
+evaluates [arg attrExpr] and if true,
+allows the insert or update to procede.
+The expression may contain references to attribute names of the form
+:<attr name>: (e.g. for an attribute called A1, "expr" may contain
+tokens of the form, :A1:).
+When the trace is evaluated, all of the attribute
+attribute name tokens are replaced by the value of the attribute.
+The intended use case is when you wish to constrain an attribute value
+to be within some subrange of the data type. For example, if an int
+typed attribute called, [cmd Status] should be greater than 0 and
+less than 22, then
+[example {
+attrConstraint myRelvar {:Status: > 0 && :Status: < 22}
+}]
+will install a variable trace on "myRelvar" to insure that each
+insert or update to it has a proper value for "Status".
 
 [list_end]
 
