@@ -62,6 +62,14 @@ namespace eval ::ral::sql::test {
 
     # example relvar data to use
     source [file join [file dirname [info script]] testdata.tcl]
+
+    proc checkForTable {file tablename} {
+        sqlite3 ::tbls $file
+        set masternames [::tbls eval {select name from sqlite_master
+                where type = 'table' order by name ;}]
+        ::tbls close
+        return [expr {$tablename in $masternames}]
+    }
  
     test sql-1.0 {
 	SQL to create schema
@@ -82,7 +90,9 @@ namespace eval ::ral::sql::test {
     } -body {
         db eval {pragma foreign_keys=ON}
         db eval $::ral::ralSQLSchema
-    } -result {}
+        db close
+        checkForTable meta.sqlite3 __ral_attribute
+    } -result {1}
  
     test storeToSQLite-1.0 {
 	store schema to SQLite
@@ -91,7 +101,8 @@ namespace eval ::ral::sql::test {
         # file delete test.sqlite3
     } -body {
         storeToSQLite test.sqlite3
-    } -result {}
+        checkForTable test.sqlite3 People
+    } -result {1}
  
     test loadFromSQLite-1.0 {
 	load schema from SQLite

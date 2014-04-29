@@ -130,14 +130,18 @@ int
 Ral_Init(
     Tcl_Interp *interp)
 {
-    static char const nsSep[] = "::" ;
-    static char const tupleCmdName[] = "tuple" ;
-    static char const relationCmdName[] = "relation" ;
-    static char const relvarCmdName[] = "relvar" ;
+    static char const tupleCmdName[] = "::ral::tuple" ;
+    static char const relationCmdName[] = "::ral::relation" ;
+    static char const relvarCmdName[] = "::ral::relvar" ;
+#       if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
+    static char const pkgNamespace[] = "::ral" ;
+#       endif
 
-    Tcl_DString cmdName ;
     Ral_RelvarInfo rInfo ;
-    int baseLen;
+#       if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
+    Tcl_Obj *mapObj ;
+    Tcl_Command ensembleCmdToken ;
+#       endif
 
     if (Tcl_InitStubs(interp, TCL_VERSION, 0) == NULL) {
         return TCL_ERROR ;
@@ -151,12 +155,9 @@ Ral_Init(
     /*
      * Create the namespace in which the package command reside.
      */
-    Tcl_DStringInit(&cmdName) ;
-    Tcl_DStringAppend(&cmdName, nsSep, -1) ;
-    Tcl_DStringAppend(&cmdName, ral_pkgname, -1) ;
 #       if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
-    Tcl_Namespace *ralNs = Tcl_CreateNamespace(interp,
-	    Tcl_DStringValue(&cmdName), NULL, NULL) ;
+    Tcl_Namespace *ralNs = Tcl_CreateNamespace(interp, pkgNamespace, NULL,
+            NULL) ;
 #	else
     if (Tcl_Eval(interp, "namespace eval ::ral {}") != TCL_OK) {
 	return TCL_ERROR ;
@@ -164,54 +165,65 @@ Ral_Init(
 #	endif
     /*
      * Create the package commands.
+     * First the "tuple" command.
      */
-    Tcl_DStringAppend(&cmdName, nsSep, -1) ;
-    baseLen = strlen(Tcl_DStringValue(&cmdName)) ;
-    Tcl_DStringAppend(&cmdName, tupleCmdName, -1) ;
-    Tcl_CreateObjCommand(interp, Tcl_DStringValue(&cmdName), tupleCmd,
-	    NULL, NULL) ;
-#       if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
-    if (Tcl_Export(interp, ralNs, tupleCmdName, 0) != TCL_OK) {
-	return TCL_ERROR ;
-    }
-#	else
-    if (Tcl_Eval(interp, "namespace eval ::ral namespace export tuple")
-	    != TCL_OK) {
-	return TCL_ERROR ;
-    }
-#	endif
-
-    Tcl_DStringSetLength(&cmdName, baseLen) ;
-    Tcl_DStringAppend(&cmdName, relationCmdName, -1) ;
-    Tcl_CreateObjCommand(interp, Tcl_DStringValue(&cmdName), relationCmd,
-	    NULL, NULL) ;
-#   if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
-    if (Tcl_Export(interp, ralNs, relationCmdName, 0) != TCL_OK) {
-	return TCL_ERROR ;
-    }
-#	else
-    if (Tcl_Eval(interp, "namespace eval ::ral namespace export relation")
-	    != TCL_OK) {
-	return TCL_ERROR ;
-    }
-#	endif
-
-    Tcl_DStringSetLength(&cmdName, baseLen) ;
-    Tcl_DStringAppend(&cmdName, relvarCmdName, -1) ;
+    Tcl_CreateObjCommand(interp, tupleCmdName, tupleCmd, NULL, NULL) ;
+    /*
+     * Next the "relation" command.
+     */
+    Tcl_CreateObjCommand(interp, relationCmdName, relationCmd, NULL, NULL) ;
+    /*
+     * Finally, the "relvar" command.
+     */
     rInfo = Ral_RelvarNewInfo(ral_pkgname, interp) ;
-    Tcl_CreateObjCommand(interp, Tcl_DStringValue(&cmdName), relvarCmd, rInfo,
-	    NULL) ;
+    Tcl_CreateObjCommand(interp, relvarCmdName, relvarCmd, rInfo, NULL) ;
+    /*
+     * Export all the commands from the namespace.
+     */
 #       if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
-    if (Tcl_Export(interp, ralNs, relvarCmdName, 0) != TCL_OK) {
+    if (Tcl_Export(interp, ralNs, "*", 0) != TCL_OK) {
 	return TCL_ERROR ;
     }
 #	else
-    if (Tcl_Eval(interp, "namespace eval ::ral namespace export relvar")
+    if (Tcl_Eval(interp, "namespace eval ::ral namespace export *")
 	    != TCL_OK) {
 	return TCL_ERROR ;
     }
 #	endif
-
+    /*
+     * Create an ensemble command on the namespace.
+     */
+#       if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
+    ensembleCmdToken = Tcl_CreateEnsemble(interp, "::ral", ralNs, 0) ;
+    /*
+     * Following the pattern in Tcl sources, we set the mapping dictionary
+     * of the ensemble. This will allow the ensemble to be extended
+     * at the script level.
+     */
+    mapObj = Tcl_NewDictObj() ;
+    if (Tcl_DictObjPut(interp, mapObj,
+                Tcl_NewStringObj("tuple", -1),
+                Tcl_NewStringObj(tupleCmdName, -1)) != TCL_OK) {
+        goto errorout ;
+    }
+    if (Tcl_DictObjPut(interp, mapObj,
+                Tcl_NewStringObj("relation", -1),
+                Tcl_NewStringObj(relationCmdName, -1)) != TCL_OK) {
+        goto errorout ;
+    }
+    if (Tcl_DictObjPut(interp, mapObj,
+                Tcl_NewStringObj("relvar", -1),
+                Tcl_NewStringObj(relvarCmdName, -1)) != TCL_OK) {
+        goto errorout ;
+    }
+    if (Tcl_SetEnsembleMappingDict(interp, ensembleCmdToken, mapObj) !=
+            TCL_OK) {
+        goto errorout ;
+    }
+#	endif
+    /*
+     * Support for package configuration.
+     */
 #       if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
     Tcl_RegisterConfig(interp, ral_pkgname, ral_config, "iso8859-1") ;
 #       endif
@@ -219,6 +231,12 @@ Ral_Init(
     Tcl_PkgProvide(interp, ral_pkgname, ral_version) ;
 
     return TCL_OK ;
+
+#       if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
+errorout:
+    Tcl_DecrRefCount(mapObj) ;
+    return TCL_ERROR ;
+#       endif
 }
 
 /*

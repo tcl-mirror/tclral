@@ -67,7 +67,35 @@ namespace eval ::ral {
     namespace export dumpToFile
     namespace export csv
     namespace export csvToFile
-    if {![package vsatisfies [package require Tcl] 8.5]} {
+    if {[package vsatisfies [package require Tcl] 8.5]} {
+        # Configure the exported commands into the namespace ensemble
+        # for the other package commands.
+        set map [namespace ensemble configure ::ral -map]
+        set map [dict merge $map {
+            tuple2matrix ::ral::tuple2matrix
+            relation2matrix ::ral::relation2matrix
+            relformat ::ral::relformat
+            tupleformat ::ral::tupleformat
+            serialize ::ral::serialize
+            serializeToFile ::ral::serializeToFile
+            deserialize ::ral::deserialize
+            deserializeFromFile ::ral::deserializeFromFile
+            deserialize-0.8.X ::ral::deserialize-0.8.X
+            deserializeFromFile-0.8.X ::ral::deserializeFromFile-0.8.X
+            merge ::ral::merge
+            mergeFromFile ::ral::mergeFromFile
+            storeToMk ::ral::storeToMk
+            loadFromMk ::ral::loadFromMk
+            mergeFromMk ::ral::mergeFromMk
+            storeToSQLite ::ral::storeToSQLite
+            loadFromSQLite ::ral::loadFromSQLite
+            dump ::ral::dump
+            dumpToFile ::ral::dumpToFile
+            csv ::ral::csv
+            csvToFile ::ral::csvToFile
+        }]
+        namespace ensemble configure ::ral -map $map
+    } else {
         namespace export rcount
         namespace export rcountd
         namespace export rsum
@@ -1678,4 +1706,4 @@ proc ::ral::mapTypeToSQL {type} {
             $sqlTypeMap($type) : "text"}]
 }
 
-package provide ral 0.11.0
+package provide ral 0.11.1
