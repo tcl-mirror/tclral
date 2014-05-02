@@ -63,6 +63,7 @@ namespace eval ::ral {
     namespace export mergeFromMk
     namespace export storeToSQLite
     namespace export loadFromSQLite
+    namespace export mergeFromSQLite
     namespace export dump
     namespace export dumpToFile
     namespace export csv
@@ -89,6 +90,7 @@ namespace eval ::ral {
             mergeFromMk ::ral::mergeFromMk
             storeToSQLite ::ral::storeToSQLite
             loadFromSQLite ::ral::loadFromSQLite
+            mergeFromSQLite ::ral::mergeFromSQLite
             dump ::ral::dump
             dumpToFile ::ral::dumpToFile
             csv ::ral::csv
@@ -1021,18 +1023,8 @@ proc ::ral::loadFromSQLite {filename {ns ::}} {
         set relvarNames [sqlitedb eval {select Vname from __ral_relvar}]
         sqlitedb transaction {
             # The relvars
-            foreach vname $relvarNames {
-                set heading [list]
-                foreach {aname type} [sqlitedb eval {select Aname, Type from\
-                        __ral_attribute where Vname = $vname}] {
-                    lappend heading $aname $type
-                }
-                set idents [dict create]
-                foreach {idnum attrName} [sqlitedb eval {select IdNum, Attr\
-                        from __ral_identifier where Vname = $vname}] {
-                    dict lappend idents $idnum $attrName
-                }
-                ::ral::relvar create $ns$vname $heading {*}[dict values $idents]
+            foreach relvarName $relvarNames {
+                createRelvarFromSQLite sqlitedb $ns $relvarName
             }
             # The association constraints
             foreach {cname referring referringAttrs refToSpec refTo refToAttrs\
@@ -1124,6 +1116,127 @@ proc ::ral::loadFromSQLite {filename {ns ::}} {
 
     sqlitedb close
     return -options $opts
+}
+# Merge data from a SQLite store of relvars.
+# All relvars that are in the database but not currently defined are created.
+# All relvars whose names and headings match currently defined relvars
+# will have their relation values unioned with those in the file.
+proc ::ral::mergeFromSQLite {filename {ns ::}} {
+    if {![file exists $filename]} {
+        error "no such file, \"$filename\""
+    }
+    set ns [string trimright $ns :]::
+    if {![namespace exists $ns]} {
+        error "namespace, \"$ns\", does not exist"
+    }
+    package require sqlite3
+    sqlite3 [namespace current]::sqlitedb $filename
+    catch {
+        # First we query database to find out its version and the
+        # relvars it contains.
+        set version [sqlitedb onecolumn {select Vnum from __ral_version ;}]
+        if {![package vsatisfies $version [getCompatVersion]]} {
+            error "incompatible version number, \"$version\",\
+                current library version is, \"[getVersion]\""
+        }
+        # Compare the contents of the database to that already present.  We are
+        # looking for things in the database that are not already present.
+        # First we look for new relvars.
+        set dbrelvars [sqlitedb eval {select Vname from __ral_relvar}]
+        foreach dbrelvar $dbrelvars {
+            if {![::ral::relvar exists $${ns}$dbrelvar]} {
+                # New relvar, create it.
+                createRelvarFromSQLite sqlitedb $ns $dbrelvar
+            }
+        }
+        # Next do the same for constraints.
+        # We consider each different type of association.
+        # First associations
+        set dbassocs [sqlitedb eval {select Cname from __ral_association}]
+        foreach dbassoc $dbassocs {
+            if {![::ral::relvar constaints exists ${ns}$dbassoc]} {
+                createAssocFromSQLite sqlitedb $ns $dbassoc
+            }
+        }
+        # Next partitions
+        set dbparts [sqlitedb eval {select Cname from __ral_partition}]
+        foreach dbpart $dbparts {
+            if {![::ral::relvar constraint exists ${ns}$dbpart]} {
+                createPartitionFromSQLite dsqlitedb $ns $dbpart
+            }
+        }
+        # Next correlations
+        set dbcorrels [sqlitedb eval {select Cname from __ral_correlation}]
+        foreach dbcorrel $dbcorrels {
+            if {![::ral::relvar constraint exists ${ns}$dbcorrel]} {
+                createCorrelFromSQLite dbsqlitedb $ns $dbcorrel
+            }
+        }
+        # Finally procedural constraints
+        set dbprocs [sqlite eval {select Cname from __ral_procedural}]
+        foreach dbproc $dbprocs {
+            if {![::ral::relvar constraint exists ${ns}$dbproc]} {
+                createProcFromSQLite dbsqlitedb $ns $dbproc
+            }
+        }
+    }
+}
+
+proc ::ral::createRelvarFromSQLite {db ns relvarName} {
+    set heading [list]
+    foreach {aname type} [$db eval {select Aname, Type from\
+            __ral_attribute where Vname = $relvarName}] {
+        lappend heading $aname $type
+    }
+    set idents [dict create]
+    foreach {idnum attrName} [$db eval {select IdNum, Attr\
+            from __ral_identifier where Vname = $relvarName}] {
+        dict lappend idents $idnum $attrName
+    }
+    ::ral::relvar create $ns$relvarName $heading {*}[dict values $idents]
+}
+
+proc ::ral::createAssocFromSQLite {db ns assocName} {
+    # Fetch association from the data base.
+    set assocElems [$db eval {select Cname, Referring,\
+            ReferringAttrs, RefToSpec, RefTo, RefToAttrs, ReferringSpec\
+            from __ral_association where Cname = $assocName}]
+    # Put the keyword at the beginning.
+    set assocElems [linsert $assocElems 0 association]
+    # Create the association making the names fully qualified.
+    eval ::ral::relvar [setRelativeConstraintInfo $ns $assocElems]
+}
+
+proc ::ral::createPartitionFromSQLite {db ns partitionName} {
+    set partitionElems [$db eval {select Cname, SuperType, SuperAttrs\
+            from __ral_partition where Cname = $partitionName}]
+    foreach {subtype subattr} [$db eval {select Subtype,\
+            SubAttrs from __ral_subtype where Cname = $cname}] {
+        lappend partitionElems $subtype $subattr
+    }
+    set paritionElems [linsert $partitionElems 0 partition]
+    eval ::ral::relvar [setRelativeConstraintInfo $ns $partitionElems]
+}
+
+proc ::ral::createCorrelFromSQLite {db ns correlName} {
+    set correlElems [$db eval {select Cname, IsComplete, AssocRelvar,\
+            OneRefAttrs, OneRefSpec, OneRelvar, OneAttrs,\
+            OtherRefAttrs, OtherRefSpec, OtherRelvar, OtherAttrs\
+            from __ral_correlation where Cname = $correlName}]
+    if {[lindex $correlElems 2] == "true"} {
+        lset correlElems 2 -complete
+    }
+    set correlElems [linsert $correlElems 0 correlation]
+    eval ::ral::relvar [setRelativeConstraintInfo $ns $correlElems]
+}
+
+proc ::ral::createProcFromSQLite {db ns procName} {
+    set script [$db eval {select Script from __ral__procedural\
+            where Cname = $procName}]
+    set participants [$db eval {select ParticipantRelvar from\
+            __ral__proc_participant where Cname = $procName}]
+    set procElems [list procedural $procName {*}$participants $scrip]
+    eval ::ral::relvar [setRelativeConstraintInfo $ns $procElems]
 }
 
 proc ::ral::dump {{pattern *}} {
@@ -1655,16 +1768,14 @@ proc ::ral::setRelativeConstraintInfo {ns cinfo} {
         association {
             variable assocIndices
             foreach index $assocIndices {
-                lset cinfo $index\
-                        ${ns}[string trimleft [lindex $cinfo $index] :]
+                lset cinfo $index ${ns}[lindex $cinfo $index]
             }
         }
         partition {
-            lset cinfo 1 ${ns}[string trimleft [lindex $cinfo 1] :]
-            lset cinfo 2 ${ns}[string trimleft [lindex $cinfo 2] :]
+            lset cinfo 1 ${ns}[lindex $cinfo 1]
+            lset cinfo 2 ${ns}[lindex $cinfo 2]
             for {set index 4} {$index < [llength $cinfo]} {incr index 2} {
-                lset cinfo $index\
-                        ${ns}[string trimleft [lindex $cinfo $index] :]
+                lset cinfo $index ${ns}[lindex $cinfo $index]
             }
         }
         correlation {
@@ -1673,15 +1784,14 @@ proc ::ral::setRelativeConstraintInfo {ns cinfo} {
             set cIndices [expr {[lindex $cinfo 1] eq "-complete" ?\
                 $compCorrelIndices : $correlIndices}]
             foreach index $cIndices {
-                lset cinfo $index\
-                        ${ns}[string trimleft [lindex $cinfo $index] :]
+                lset cinfo $index ${ns}[lindex $cinfo $index]
             }
         }
         procedural {
             set endIndex [expr {[llength $cinfo] - 1}]
             for {set index 1} {$index < $endIndex} {incr index} {
                 lset cinfo $index\
-                        ${ns}[string trimleft [lindex $cinfo $index] :]
+                        ${ns}[lindex $cinfo $index]
             }
         }
         default {
