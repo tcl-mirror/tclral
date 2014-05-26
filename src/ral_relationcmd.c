@@ -101,9 +101,7 @@ static int RelationCardinalityCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationComposeCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationCreateCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationDegreeCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
-#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
 static int RelationDictCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
-#endif
 static int RelationDivideCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationDunionCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationEliminateCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
@@ -111,9 +109,7 @@ static int RelationEmptyofCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationExtendCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationExtractCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationForeachCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
-#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
 static int RelationFromdictCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
-#endif
 static int RelationFromlistCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationGroupCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int RelationHeadingCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
@@ -188,9 +184,7 @@ relationCmd(
 	{"compose", RelationComposeCmd},
 	{"create", RelationCreateCmd},
 	{"degree", RelationDegreeCmd},
-#	    if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
 	{"dict", RelationDictCmd},
-#	    endif
 	{"divide", RelationDivideCmd},
         {"dunion", RelationDunionCmd},
 	{"eliminate", RelationEliminateCmd},
@@ -198,9 +192,7 @@ relationCmd(
 	{"extend", RelationExtendCmd},
 	{"extract", RelationExtractCmd},
 	{"foreach", RelationForeachCmd},
-#	    if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
 	{"fromdict", RelationFromdictCmd},
-#	    endif
 	{"fromlist", RelationFromlistCmd},
 	{"group", RelationGroupCmd},
 	{"heading", RelationHeadingCmd},
@@ -622,7 +614,6 @@ RelationDegreeCmd(
     return TCL_OK ;
 }
 
-#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
 static int
 RelationDictCmd(
     Tcl_Interp *interp,
@@ -682,7 +673,6 @@ RelationDictCmd(
     Tcl_SetObjResult(interp, dictObj) ;
     return TCL_OK ;
 }
-#endif
 
 static int
 RelationDivideCmd(
@@ -1221,14 +1211,8 @@ RelationForeachCmd(
 #                   else
                     Tcl_GetErrorLine(interp)
 #                   endif
-                )) ;
-#else
-		static const char msgfmt[] =
-		    "\n    (\"::ral::relation foreach\" body line %d)" ;
-		char msg[sizeof(msgfmt) + TCL_INTEGER_SPACE] ;
-		sprintf(msg, msgfmt, interp->errorLine) ;
-		Tcl_AddErrorInfo(interp, msg) ;
 #endif
+                )) ;
 		break ;
 	    } else {
 		break ;
@@ -1247,7 +1231,6 @@ RelationForeachCmd(
     return result ;
 }
 
-#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
 static int RelationFromdictCmd(
     Tcl_Interp *interp,
     int objc,
@@ -1330,7 +1313,6 @@ errout:
     Ral_RelationDelete(relation) ;
     return TCL_ERROR ;
 }
-#endif
 
 static int RelationFromlistCmd(
     Tcl_Interp *interp,
@@ -3506,12 +3488,6 @@ RelationUpdateCmd(
                     Tcl_GetErrorLine(interp)
 #                   endif
                 )) ;
-#else
-		static const char msgfmt[] =
-                    "\n    (\"in ::ral::relation update\" body line %d)" ;
-		char msg[sizeof(msgfmt) + TCL_INTEGER_SPACE] ;
-		sprintf(msg, msgfmt, interp->errorLine) ;
-		Tcl_AddErrorInfo(interp, msg) ;
 #endif
                 break ;
             } else if (result == TCL_BREAK || result == TCL_RETURN) {

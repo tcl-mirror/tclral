@@ -2568,16 +2568,6 @@ Ral_RelationIndexByAttrs(
         entry = Tcl_CreateHashEntry(index, (char const *)&key, &newPtr) ;
 
         /*
-         * This is to overcome the problem in Tcl 8.4 and earlier
-         * hash code. See comment under tupleAttrHashMultiEntryAlloc().
-         */
-#       if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VIERSION < 5
-        if (newPtr) {
-            Tcl_SetHashValue(entry, Ral_IntVectorNewEmpty(3)) ;
-        }
-#       endif
-
-        /*
          * N.B. that we don't care about whether or not a new entry
          * was created. The vector of indices held in the entry can record
          * multiple tuples that have the same attribute values.
@@ -2728,23 +2718,11 @@ tupleAttrHashMultiEntryAlloc(
     newKey = (Ral_TupleAttrHashKey)(hPtr + 1) ;
     hPtr->key.oneWordValue = (char *)newKey ;
     /*
-     * There is a significant "bug" or misfeature in the hash code for Tcl 8.4.
-     * This was changed in Tcl 8.5 so that the ClientData field is only set
-     * to NULL if allocation entry was not supplied in the hash type table.
-     * Whenever a new hash entry is created (i.e. this code would be invoked to
-     * allocate the entry), the ClientData field is set to NULL,
-     * unconditionally. This whips out anything we would do here. So, for Tcl
-     * 8.4, we must set the ClientData after the entry has been created which
-     * also necessitates testing that indeed a new entry was created.
-     */
-#   if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VIERSION >= 5
-    /*
      * We have to guess here what we think is the most probable case of tuples
      * that hash to the same place.  We guess 3. This is just to try to prevent
      * expanding the vector at run time and yet still not waste too much memory.
      */
     hPtr->clientData = Ral_IntVectorNewEmpty(3) ;
-#   endif
     /*
      * Initialize the new key from the old key.  Tuples are reference counted
      * so we just copy the pointer and increment the reference count.

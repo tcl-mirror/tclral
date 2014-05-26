@@ -53,6 +53,9 @@ $Revision: 1.45 $
 $Date: 2012/02/26 19:09:04 $
  *--
  */
+#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION < 5
+#error "Tcl version must be at least 8.5"
+#endif
 
 /*
 PRAGMAS
@@ -64,9 +67,7 @@ INCLUDE FILES
 #include <stdio.h>
 #include <string.h>
 #include "tcl.h"
-#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
-#   include "tclTomMath.h"
-#endif
+#include "tclTomMath.h"
 #include "ral_tuplecmd.h"
 #include "ral_relationcmd.h"
 #include "ral_relationobj.h"
@@ -99,21 +100,16 @@ STATIC DATA ALLOCATION
 */
 static char const ral_pkgname[] = PACKAGE_NAME ;
 static char const ral_version[] = PACKAGE_VERSION ;
-static char const ral_rcsid[] =
-    "$Id: ral.c,v 1.45 2012/02/26 19:09:04 mangoa01 Exp $" ;
 static char const ral_copyright[] =
-    "This software is copyrighted 2004 - 2012 by G. Andrew Mangogna."
+    "This software is copyrighted 2004 - 2014 by G. Andrew Mangogna."
     " Terms and conditions for use are distributed with the source code." ;
 
-#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
 static Tcl_Config ral_config[] = {
     {"pkgname", ral_pkgname},
     {"version", ral_version},
-    {"rcsid", ral_rcsid},
     {"copyright", ral_copyright},
     {NULL, NULL}
 } ;
-#endif
 
 /*
 FUNCTION DEFINITIONS
@@ -131,112 +127,92 @@ Ral_Init(
     Tcl_Interp *interp)
 {
     static char const tupleCmdName[] = "::ral::tuple" ;
+    static char const tupleStr[] = "tuple" ;
     static char const relationCmdName[] = "::ral::relation" ;
+    static char const relationStr[] = "relation" ;
     static char const relvarCmdName[] = "::ral::relvar" ;
-#       if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
+    static char const relvarStr[] = "relvar" ;
     static char const pkgNamespace[] = "::ral" ;
-#       endif
 
     Ral_RelvarInfo rInfo ;
-#       if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
     Tcl_Obj *mapObj ;
     Tcl_Command ensembleCmdToken ;
-#       endif
+    Tcl_Namespace *ralNs ;
 
     if (Tcl_InitStubs(interp, TCL_VERSION, 0) == NULL) {
         return TCL_ERROR ;
     }
-#       if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
     if (Tcl_TomMath_InitStubs(interp, TCL_VERSION) == NULL) {
         return TCL_ERROR ;
     }
-#       endif
-
     /*
      * Create the namespace in which the package command reside.
      */
-#       if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
-    Tcl_Namespace *ralNs = Tcl_CreateNamespace(interp, pkgNamespace, NULL,
-            NULL) ;
-#	else
-    if (Tcl_Eval(interp, "namespace eval ::ral {}") != TCL_OK) {
-	return TCL_ERROR ;
-    }
-#	endif
+    ralNs = Tcl_CreateNamespace(interp, pkgNamespace, NULL, NULL) ;
     /*
      * Create the package commands.
      * First the "tuple" command.
      */
+    mapObj = Tcl_NewDictObj() ;
     Tcl_CreateObjCommand(interp, tupleCmdName, tupleCmd, NULL, NULL) ;
+    if (Tcl_Export(interp, ralNs, tupleStr, 0) != TCL_OK) {
+        goto errorout ;
+    }
+    if (Tcl_DictObjPut(interp, mapObj,
+                Tcl_NewStringObj(tupleStr, -1),
+                Tcl_NewStringObj(tupleCmdName, -1)) != TCL_OK) {
+        goto errorout ;
+    }
     /*
      * Next the "relation" command.
      */
     Tcl_CreateObjCommand(interp, relationCmdName, relationCmd, NULL, NULL) ;
+    if (Tcl_Export(interp, ralNs, relationStr, 0) != TCL_OK) {
+        goto errorout ;
+    }
+    if (Tcl_DictObjPut(interp, mapObj,
+                Tcl_NewStringObj(relationStr, -1),
+                Tcl_NewStringObj(relationCmdName, -1)) != TCL_OK) {
+        goto errorout ;
+    }
     /*
      * Finally, the "relvar" command.
      */
     rInfo = Ral_RelvarNewInfo(ral_pkgname, interp) ;
     Tcl_CreateObjCommand(interp, relvarCmdName, relvarCmd, rInfo, NULL) ;
-    /*
-     * Export all the commands from the namespace.
-     */
-#       if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
-    if (Tcl_Export(interp, ralNs, "*", 0) != TCL_OK) {
-	return TCL_ERROR ;
+    if (Tcl_Export(interp, ralNs, relvarStr, 0) != TCL_OK) {
+        goto errorout ;
     }
-#	else
-    if (Tcl_Eval(interp, "namespace eval ::ral namespace export *")
-	    != TCL_OK) {
-	return TCL_ERROR ;
+    if (Tcl_DictObjPut(interp, mapObj,
+                Tcl_NewStringObj(relvarStr, -1),
+                Tcl_NewStringObj(relvarCmdName, -1)) != TCL_OK) {
+        goto errorout ;
     }
-#	endif
     /*
      * Create an ensemble command on the namespace.
      */
-#       if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
     ensembleCmdToken = Tcl_CreateEnsemble(interp, "::ral", ralNs, 0) ;
     /*
      * Following the pattern in Tcl sources, we set the mapping dictionary
      * of the ensemble. This will allow the ensemble to be extended
      * at the script level.
      */
-    mapObj = Tcl_NewDictObj() ;
-    if (Tcl_DictObjPut(interp, mapObj,
-                Tcl_NewStringObj("tuple", -1),
-                Tcl_NewStringObj(tupleCmdName, -1)) != TCL_OK) {
-        goto errorout ;
-    }
-    if (Tcl_DictObjPut(interp, mapObj,
-                Tcl_NewStringObj("relation", -1),
-                Tcl_NewStringObj(relationCmdName, -1)) != TCL_OK) {
-        goto errorout ;
-    }
-    if (Tcl_DictObjPut(interp, mapObj,
-                Tcl_NewStringObj("relvar", -1),
-                Tcl_NewStringObj(relvarCmdName, -1)) != TCL_OK) {
-        goto errorout ;
-    }
     if (Tcl_SetEnsembleMappingDict(interp, ensembleCmdToken, mapObj) !=
             TCL_OK) {
         goto errorout ;
     }
-#	endif
     /*
      * Support for package configuration.
      */
-#       if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
     Tcl_RegisterConfig(interp, ral_pkgname, ral_config, "iso8859-1") ;
-#       endif
 
     Tcl_PkgProvide(interp, ral_pkgname, ral_version) ;
 
     return TCL_OK ;
 
-#       if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
 errorout:
     Tcl_DecrRefCount(mapObj) ;
     return TCL_ERROR ;
-#       endif
 }
 
 /*
@@ -249,7 +225,6 @@ Ral_SafeInit(
     return Ral_Init(interp) ;
 }
 
-#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
 /*
  * If we have the "unload" command we can provide the functions it likes to
  * have.  Nothing really to do here. All the data will be cleaned up when the
@@ -270,4 +245,3 @@ Ral_SafeUnload(
 {
     return Ral_Unload(interp) ;
 }
-#endif

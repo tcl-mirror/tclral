@@ -139,13 +139,6 @@ namespace eval ::ral {
     # Relation and Tuple values are always shown in their "normal" width.
     variable maxColLen 30
 
-    # We need lassign
-    if {[info procs lassign] eq ""} {
-        proc lassign {values args} {
-            uplevel 1 [list foreach $args $values break]
-            lrange $values [llength $args] end
-        }
-    }
     # Define a proc to determine if the version of a serialized file
     # is compatible with the library. We use "pkgconfig" if it is
     # available, "package require" if not. If building for some older
@@ -447,19 +440,18 @@ proc ::ral::deserialize {value {ns ::}} {
         deserialize-0.8.X $value [expr {$ns eq {} ? "::" : $ns}]
         return
     }
-    set ns [string trimright $ns :]::
+
+    set ns [string trimright $ns :]
+    if {$ns ne {}} {
+        namespace eval $ns {}
+    }
+    set ns ${ns}::
     if {[llength $value] != 8} {
         error "bad value format, expected list of 8 items,\
                 got [llength $value] items"
     }
-    set versionKeyWord [lindex $value 0]
-    set versionNumber [lindex $value 1]
-    set relvarKeyWord [lindex $value 2]
-    set relvarDefs [lindex $value 3]
-    set cnstrKeyWord [lindex $value 4]
-    set cnstrDefs [lindex $value 5]
-    set bodyKeyWord [lindex $value 6]
-    set bodyDefs [lindex $value 7]
+    lassign $value versionKeyWord versionNumber relvarKeyWord relvarDefs\
+            cnstrKeyWord cnstrDefs bodyKeyWord bodyDefs
 
     if {$versionKeyWord ne "Version"} {
         error "expected keyword \"Version\", got \"$versionKeyWord\""
@@ -473,19 +465,14 @@ proc ::ral::deserialize {value {ns ::}} {
         error "expected keyword \"Relvars\", got \"$revarKeyWord\""
     }
     foreach {rvName rvHead rvIds} $relvarDefs {
-        set fullName $ns[string trimleft $rvName :]
-        set quals [namespace qualifiers $fullName]
-        if {!($quals eq {} || [namespace exists $quals])} {
-            namespace eval $quals {}
-        }
-        eval [list ::ral::relvar create $fullName $rvHead] $rvIds
+        ::ral::relvar create ${ns}$rvName $rvHead {*}$rvIds
     }
 
     if {$cnstrKeyWord ne "Constraints"} {
         error "expected keyword \"Constraints\", got \"$cnstrKeyWord\""
     }
     foreach constraint $cnstrDefs {
-        eval ::ral::relvar [setRelativeConstraintInfo $ns $constraint]
+        ::ral::relvar {*}[setRelativeConstraintInfo $ns $constraint]
     }
 
     if {$bodyKeyWord ne "Values"} {
@@ -494,7 +481,7 @@ proc ::ral::deserialize {value {ns ::}} {
     relvar eval {
         foreach body $bodyDefs {
             foreach {relvarName relvarBody} $body {
-                ::ral::relvar set $ns[string trimleft $relvarName :] $relvarBody
+                ::ral::relvar set ${ns}$relvarName $relvarBody
             }
         }
     }
@@ -514,10 +501,7 @@ proc ::ral::deserialize-0.8.X {value {ns ::}} {
         error "bad value format, expected list of 4 items,\
                 got [llength $value] items"
     }
-    set version [lindex $value 0]
-    set relvars [lindex $value 1]
-    set constraints [lindex $value 2]
-    set bodies [lindex $value 3]
+    lassign $value version relvars constraints bodies
 
     lassign $version versionKeyWord verNum
     if {$versionKeyWord ne "Version"} {
@@ -589,18 +573,14 @@ proc ::ral::deserializeFromFile-0.8.X {fileName {ns ::}} {
 
 proc ::ral::merge {value {ns ::}} {
     set ns [string trimright $ns :]::
+    # Despite the fact that the merge data is a dictionary, we do this here
+    # using only list commands so that it will continue to function under 8.4.
     if {[llength $value] != 8} {
         error "bad value format, expected list of 8 items,\
                 got [llength $value] items"
     }
-    set versionKeyWord [lindex $value 0]
-    set versionNumber [lindex $value 1]
-    set relvarKeyWord [lindex $value 2]
-    set relvarDefs [lindex $value 3]
-    set cnstrKeyWord [lindex $value 4]
-    set cnstrDefs [lindex $value 5]
-    set bodyKeyWord [lindex $value 6]
-    set bodyDefs [lindex $value 7]
+    lassign value versionKeyWord versionNumber relvarKeyWord\
+            relvarDefs cnstrKeyWord cnstrDefs bodyKeyWord bodyDefs
 
     if {$versionKeyWord ne "Version"} {
         error "expected keyword \"Version\", got \"$versionKeyWord\""
@@ -613,14 +593,23 @@ proc ::ral::merge {value {ns ::}} {
     if {$relvarKeyWord ne "Relvars"} {
         error "expected keyword \"Relvars\", got \"$revarKeyWord\""
     }
+    set newRelvars [list]
+    set matchingRelvars [list]
+    set mismatched [list]
     foreach {rvName rvHead rvIds} $relvarDefs {
-        set fullName $ns[string trimleft $rvName :]
-        set quals [namespace qualifiers $fullName]
-        if {!($quals eq {} || [namespace exists $quals])} {
-            namespace eval $quals {}
-        }
+        set fullName ${ns}$rvName
         if {![relvar exists $fullName]} {
-            eval [list ::ral::relvar create $fullName $rvHead] $rvIds
+            # New relvars are just created.
+            ::ral::relvar create $fullName $rvHead {*}$rvIds
+            lappend newRelvars $rvName
+        } else {
+            # For existing relvars we test if the type is the same.
+            set mergeRelation [relation create $rvHead]
+            if {[relation issametype $mergeRelation [relvar set $fullName]]} {
+                lappend matchingRelvars $rvName
+            } else {
+                lappend mismatched $rvName
+            }
         }
     }
 
@@ -632,7 +621,7 @@ proc ::ral::merge {value {ns ::}} {
         if {$cname eq "-complete"} {
             set cname [lindex $constraint 2]
         }
-        set cname $ns[string trimleft $cname :]
+        set cname ${ns}$cname
         if {![relvar constraint exists $cname]} {
             eval ::ral::relvar [setRelativeConstraintInfo $ns $constraint]
         }
@@ -642,19 +631,18 @@ proc ::ral::merge {value {ns ::}} {
         error "expected keyword \"Values\", got \"$bodyKeyWord\""
     }
 
-    set failedMerge [list]
     relvar eval {
         foreach body $bodyDefs {
             foreach {relvarName relvarBody} $body {
-                set relvarName $ns[string trimleft $relvarName :]
-                if {[catch {::ral::relvar union $relvarName $relvarBody}]} {
-                    lappend failedMerge $relvarName $::errorCode
+                set fullName ${ns}$relvarName
+                relation foreach row $relvarBody {
+                    relvar uinsert $fullName [relation body $row]
                 }
             }
         }
     }
 
-    return $failedMerge
+    return $mismatched
 }
 
 proc ::ral::mergeFromFile {fileName {ns ::}} {
@@ -710,7 +698,6 @@ proc ::ral::storeToMk {fileName {pattern *}} {
         # Get the constraints and put them into the catalog.
         set partIndex 0
         foreach cname [relvar constraint names $pattern] {
-            set cinfo [relvar constraint info $cname]
             # Constrain names must be made relative.
             ::mk::row append db.__ral_constraint Constraint_ral\
                 [getRelativeConstraintInfo $cname]
@@ -732,8 +719,11 @@ proc ::ral::storeToMk {fileName {pattern *}} {
 proc ::ral::loadFromMk {fileName {ns {}}} {
     package require Mk4tcl
 
-    set ns [string trimright $ns :]::
-    namespace eval $ns {}
+    set ns [string trimright $ns :]
+    if {$ns ne {}} {
+        namespace eval $ns {}
+    }
+    set ns ${ns}::
 
     ::mk::file open db $fileName -readonly
     catch {
@@ -750,23 +740,22 @@ proc ::ral::loadFromMk {fileName {ns {}}} {
             } else {
                 set relvarName ${ns}$relvarInfo(Name_ral)
             }
-            eval [list ::ral::relvar create $relvarName\
-                    $relvarInfo(Heading_ral)] $relvarInfo(Ids_ral)
+            ::ral::relvar create $relvarName\
+                    $relvarInfo(Heading_ral) {*}$relvarInfo(Ids_ral)
         }
         # create the constraints
-        set assocCols {Name RingRelvar RtoRelvar}
         ::mk::loop cnstrCursor db.__ral_constraint {
-            eval ::ral::relvar [setRelativeConstraintInfo\
-                $ns [lindex [::mk::get $cnstrCursor] 1]]
+            ::ral::relvar {*}[setRelativeConstraintInfo $ns\
+                    [lindex [::mk::get $cnstrCursor] 1]]
         }
         # fetch the relation values from the views
         relvar eval {
             ::mk::loop rvCursor db.__ral_relvar {
                 array set relvarInfo [::mk::get $rvCursor]
+                #parray relvarInfo
                 ::mk::loop vCursor db.$relvarInfo(View_ral) {
-                    eval [list ::ral::relvar insert\
-                        $ns[string trimleft $relvarInfo(Name_ral) :]\
-                        [mkLoadTuple $vCursor $relvarInfo(Heading_ral)]]
+                    ::ral::relvar insert ${ns}$relvarInfo(Name_ral)\
+                        [mkLoadTuple $vCursor $relvarInfo(Heading_ral)]
                 }
             }
         }
@@ -789,27 +778,34 @@ proc ::ral::mergeFromMk {fileName {ns ::}} {
     catch {
         mkCheckVersion db
         # determine the relvar names and types by reading the catalog
+        set newRelvars [list]
+        set sameTypeRelvars [list]
+        set mismatched [list]
         ::mk::loop rvCursor db.__ral_relvar {
             array set relvarInfo [::mk::get $rvCursor]
             set relvarName ${ns}$relvarInfo(Name_ral)
             # Check if the relvar already exists
             if {![relvar exists $relvarName]} {
                 # New relvar
-                # check that the parent namespace exists
-                set parent [namespace qualifiers $relvarName]
-                if {!($parent eq {} || [namespace exists $parent])} {
-                    namespace eval $parent {}
+                ::ral::relvar create $relvarName $relvarInfo(Heading_ral)]\
+                        {*}$relvarInfo(Ids_ral)
+            } else {
+                set typeRelation [::ral::relation create\
+                        $relvarInfo(Heading_ral)]
+                if {[relation issametype $typeRelation\
+                        [relvar set $relvarName]]} {
+                    lappend sameTypeRelvars $relvarInfo(Name_ral)
+                } else {
+                    lappend mismatched $relvarInfo(Name_ral)
                 }
-                eval [list ::ral::relvar create $relvarName\
-                        $relvarInfo(Heading_ral)] $relvarInfo(Ids_ral)
             }
         }
         # create the constraints
-        set assocCols {Name RingRelvar RtoRelvar}
         ::mk::loop cnstrCursor db.__ral_constraint {
-            catch {
-                eval ::ral::relvar [setRelativeConstraintInfo\
-                    $ns [lindex [::mk::get $cnstrCursor] 1]]
+            set cinfo [lindex [::mk::get $cnstrCursor] 1]
+            set cName ${ns}[lindex $cinfo 1]
+            if {![relvar constraint exists $cName]} {
+                ::ral::relvar {*}[setRelativeConstraintInfo $ns $cinfo]
             }
         }
         # fetch the relation values from the views
@@ -817,21 +813,20 @@ proc ::ral::mergeFromMk {fileName {ns ::}} {
         relvar eval {
             ::mk::loop rvCursor db.__ral_relvar {
                 array set relvarInfo [::mk::get $rvCursor]
-                set body [list]
-                ::mk::loop vCursor db.$relvarInfo(View_ral) {
-                    lappend body [mkLoadTuple $vCursor $relvarInfo(Heading_ral)]
+                if {$relvarInfo(Name_ral) in $newRelvars} {
+                    set op insert
+                } elseif {$relvarInfo(Name_ral) in $sameTypeRelvars} {
+                    set op uinsert
+                } else {
+                    continue
                 }
-                set value [eval\
-                    [list relation create $relvarInfo(Heading_ral)] $body]
-                if {[catch {::ral::relvar union\
-                        $ns[string trimleft $relvarInfo(Name_ral) :] $value}]} {
-                    lappend failedMerge\
-                        $ns[string trimleft $relvarInfo(Name_ral) :]\
-                        $::errorCode
+                ::mk::loop vCursor db.$relvarInfo(View_ral) {
+                    ::ral::relvar $op ${ns}$relvarInfo(Name_ral)\
+                        [mkLoadTuple $vCursor $relvarInfo(Heading_ral)]
                 }
             }
         }
-        set failedMerge
+        set mismatched
     } result opts
 
     ::mk::file close db
@@ -981,7 +976,7 @@ proc ::ral::storeToSQLite {filename {pattern *}} {
                 set sqlVars [list]
                 foreach attr $attrNames sqlCol $sqlCols {
                     lappend assignVars [list $attr $sqlCol]
-                    lappend sqlVars \$$sqlCol
+                    lappend sqlVars :$sqlCol
                 }
                 # This completes the composition of the "insert" statement.  We
                 # just managed to add a list of variable references (i.e.
@@ -1009,8 +1004,13 @@ proc ::ral::loadFromSQLite {filename {ns ::}} {
     if {![file exists $filename]} {
         error "no such file, \"$filename\""
     }
-    set ns [string trimright $ns :]::
-    namespace eval $ns {}
+
+    set ns [string trimright $ns :]
+    if {$ns ne {}} {
+        namespace eval $ns {}
+    }
+    set ns ${ns}::
+
     package require sqlite3
     sqlite3 [namespace current]::sqlitedb $filename
     catch {
@@ -1081,35 +1081,7 @@ proc ::ral::loadFromSQLite {filename {ns ::}} {
         # We are careful here not to depend upon SQL column ordering.
         relvar eval {
             foreach vname $relvarNames {
-                set sqlTableName [mapNamesToSQL $vname]
-                set qualName $ns$vname
-                set heading [relation heading [relvar set $qualName]]
-                set attrNames [relation attributes [relvar set $qualName]]
-                set sqlColNames [mapNamesToSQL $attrNames]
-                sqlitedb eval "select [join $sqlColNames {, }]\
-                        from $sqlTableName" valArray {
-                    # Build up the insert tuple
-                    set insert [list]
-                    # Note we have to adjust the values for Tuple and
-                    # Relation valued attributes. The "relvar insert"
-                    # command just wants the bodies of the values.
-                    foreach {attr type} $heading sqlCol $sqlColNames {
-                        lappend insert $attr
-                        switch -glob -- $type {
-                            Relation* {
-                                lappend insert\
-                                        [relation body $valArray($sqlCol)]
-                            }
-                            Tuple* {
-                                lappend insert [tuple get $valArray($sqlCol)]
-                            }
-                            default {
-                                lappend insert $valArray($sqlCol)
-                            }
-                        }
-                    }
-                    ::ral::relvar insert $ns$vname $insert
-                }
+                loadRelvarFromSQLite sqlitedb $ns $vname insert
             }
         }
     } result opts
@@ -1143,10 +1115,28 @@ proc ::ral::mergeFromSQLite {filename {ns ::}} {
         # looking for things in the database that are not already present.
         # First we look for new relvars.
         set dbrelvars [sqlitedb eval {select Vname from __ral_relvar}]
+        set newRelvars [list]
+        set sameTypeRelvars [list]
         foreach dbrelvar $dbrelvars {
-            if {![::ral::relvar exists $${ns}$dbrelvar]} {
+            set qualRelvar ${ns}$dbrelvar
+            if {![::ral::relvar exists $qualRelvar]} {
                 # New relvar, create it.
                 createRelvarFromSQLite sqlitedb $ns $dbrelvar
+                lappend newRelvars $dbrelvar
+            } else {
+                # Determine if the heading of the relvar in the database
+                # matches that of the existing relvar. We will do this
+                # by creating an empty relation with each heading and
+                # invoke "relation issametype" to do the comparison.
+                # If that returns true, the we will keep a list of those
+                # that have the same type.
+                set heading [sqlitedb eval {select Aname, Type from\
+                        __ral_attribute where Vname = $dbrelvar}]
+                set dbrel [::ral::relation create $heading]
+                if {[::ral::relation issametype $dbrel\
+                        [relvar set $qualRelvar]]} {
+                    lappend sameTypeRelvars $dbrelvar
+                }
             }
         }
         # Next do the same for constraints.
@@ -1179,7 +1169,30 @@ proc ::ral::mergeFromSQLite {filename {ns ::}} {
                 createProcFromSQLite dbsqlitedb $ns $dbproc
             }
         }
-    }
+        # Now we populate the merge from the SQLite data base.  Newly created
+        # relvars, as contained in the "newRelvars" variable can be loaded
+        # straight in. For other relvars, we must verify that he heading is the
+        # same as that in the database. For those that match, we union in the
+        # data base contents.  N.B. that we use "uinsert" to merge in data base
+        # contents.  Using "relvar union" has some corner cases that are not
+        # what you might expect (i.e. the union might fail identity contraints
+        # for those tuples which have the same identifier values but different
+        # values for the other attributes.
+        relvar eval {
+            foreach dbrelvar $dbrelvars {
+                if {$dbrelvar in $newRelvars} {
+                    loadRelvarFromSQLite sqlitedb $ns $dbrelvar insert
+                } elseif {$dbrelvar in $sameTypeRelvars} {
+                    loadRelvarFromSQLite sqlitedb $ns $dbrelvar uinsert
+                }
+                # Else it must be that the type of the relvar in the database
+                # did not match that of an existing relvar. So it is skipped.
+            }
+        }
+    } result opts
+
+    sqlitedb close
+    return -options $opts
 }
 
 proc ::ral::createRelvarFromSQLite {db ns relvarName} {
@@ -1194,6 +1207,38 @@ proc ::ral::createRelvarFromSQLite {db ns relvarName} {
         dict lappend idents $idnum $attrName
     }
     ::ral::relvar create $ns$relvarName $heading {*}[dict values $idents]
+}
+
+proc ::ral::loadRelvarFromSQLite {db ns relvarName operation} {
+    set sqlTableName [mapNamesToSQL $relvarName]
+    set qualName $ns$relvarName
+    set heading [relation heading [relvar set $qualName]]
+    set attrNames [relation attributes [relvar set $qualName]]
+    set sqlColNames [mapNamesToSQL $attrNames]
+    $db eval "select [join $sqlColNames {, }]\
+            from $sqlTableName" valArray {
+        # Build up the insert tuple
+        set insert [list]
+        # Note we have to adjust the values for Tuple and
+        # Relation valued attributes. The "relvar insert"
+        # command just wants the bodies of the values.
+        foreach {attr type} $heading sqlCol $sqlColNames {
+            lappend insert $attr
+            switch -glob -- $type {
+                Relation* {
+                    lappend insert\
+                            [relation body $valArray($sqlCol)]
+                }
+                Tuple* {
+                    lappend insert [tuple get $valArray($sqlCol)]
+                }
+                default {
+                    lappend insert $valArray($sqlCol)
+                }
+            }
+        }
+        ::ral::relvar $operation $qualName $insert
+    }
 }
 
 proc ::ral::createAssocFromSQLite {db ns assocName} {

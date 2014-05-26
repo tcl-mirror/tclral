@@ -65,9 +65,7 @@ INCLUDE FILES
 #include "ral_tupleheading.h"
 #include "ral_tupleobj.h"
 #include "ral_relationobj.h"
-#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
-#   include "tclTomMath.h"
-#endif
+#include "tclTomMath.h"
 
 /*
 MACRO DEFINITIONS
@@ -144,12 +142,10 @@ static int doubleEqual(Tcl_Obj *, Tcl_Obj *) ;
 static int doubleCompare(Tcl_Obj *, Tcl_Obj *) ;
 static unsigned doubleHash(Tcl_Obj *) ;
 
-#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
 static int isABignum(Tcl_Interp *, Tcl_Obj *) ;
 static int bignumEqual(Tcl_Obj *, Tcl_Obj *) ;
 static int bignumCompare(Tcl_Obj *, Tcl_Obj *) ;
 static unsigned bignumHash(Tcl_Obj *) ;
-#endif
 
 #   ifndef NO_WIDE_TYPE
 static int isAWideInt(Tcl_Interp *, Tcl_Obj *) ;
@@ -163,12 +159,10 @@ static int listEqual(Tcl_Obj *, Tcl_Obj *) ;
 static int listCompare(Tcl_Obj *, Tcl_Obj *) ;
 static unsigned listHash(Tcl_Obj *) ;
 
-#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
 static int isADict(Tcl_Interp *, Tcl_Obj *) ;
 static int dictEqual(Tcl_Obj *, Tcl_Obj *) ;
 static int dictCompare(Tcl_Obj *, Tcl_Obj *) ;
 static unsigned dictHash(Tcl_Obj *) ;
-#   endif
 
 static int isAString(Tcl_Interp *, Tcl_Obj *) ;
 static int stringEqual(Tcl_Obj *, Tcl_Obj *) ;
@@ -193,15 +187,11 @@ STATIC DATA ALLOCATION
  * find entries.
  */
 static struct ral_type const Ral_Types[] = {
-#       if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
     {"bignum", isABignum, bignumEqual, bignumCompare, bignumHash},
-#	endif
     {"boolean", isABoolean, booleanEqual, booleanCompare, booleanHash},
     {"bytearray", isAByteArray, byteArrayEqual, byteArrayCompare,
             byteArrayHash},
-#       if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
     {"dict", isADict, dictEqual, dictCompare, dictHash},
-#	endif
     {"double", isADouble, doubleEqual, doubleCompare, doubleHash},
     {"int", isAnInt, intEqual, intCompare, intHash},
     {"list", isAList, listEqual, listCompare, listHash},
@@ -1126,7 +1116,6 @@ wideIntHash(
 }
 #   endif
 
-#   if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
 static int
 isABignum(
     Tcl_Interp *interp,
@@ -1198,7 +1187,6 @@ bignumHash(
 
     return hash ;
 }
-#   endif
 
 static int
 isAList(
@@ -1233,7 +1221,6 @@ listHash(
     return stringHash(listObj) ;
 }
 
-#   if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
 static int
 isADict(
     Tcl_Interp *interp,
@@ -1265,7 +1252,6 @@ dictHash(
 {
     return stringHash(dictObj) ;
 }
-#	endif
 
 static int
 isAString(

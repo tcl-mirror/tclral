@@ -637,13 +637,6 @@ Ral_RelvarObjUpdateTuple(
         Tcl_GetErrorLine(interp)
 #       endif
         )) ;
-#else
-        static const char msgfmt[] =
-            "\n    (\"in ::ral::%s %s\" body line %d)" ;
-        char msg[sizeof(msgfmt) + TCL_INTEGER_SPACE] ;
-        sprintf(msg, msgfmt, Ral_ErrorInfoGetCommand(errInfo),
-            Ral_ErrorInfoGetOption(errInfo), interp->errorLine) ;
-        Tcl_AddErrorInfo(interp, msg) ;
 #endif
 	return TCL_ERROR ;
     } else if (!(result == TCL_OK || result == TCL_RETURN
@@ -2143,12 +2136,6 @@ Ral_RelvarObjTraceVarSuspend(
         Tcl_GetErrorLine(interp)
 #       endif
         )) ;
-#else
-        static const char msgfmt[] =
-            "\n    (\"in ::ral::relvar trace suspend variable\" body line %d)" ;
-        char msg[sizeof(msgfmt) + TCL_INTEGER_SPACE] ;
-        sprintf(msg, msgfmt, interp->errorLine) ;
-        Tcl_AddErrorInfo(interp, msg) ;
 #endif
     }
     relvar->traceFlags = 0 ;
@@ -2506,24 +2493,16 @@ relvarGetNamespaceName(
     Tcl_DString *nsVarName)
 {
     int isGlobal = 1 ;
+    Tcl_Namespace *curr ;
+
     Tcl_DStringInit(nsVarName) ;
 
-#       if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
-    Tcl_Namespace *curr = Tcl_GetCurrentNamespace(interp) ;
+    curr = Tcl_GetCurrentNamespace(interp) ;
 
     if (curr->parentPtr) {
 	Tcl_DStringAppend(nsVarName, curr->fullName, -1) ;
 	isGlobal = 0 ;
     }
-#	else
-    if (Tcl_Eval(interp, "namespace current") == TCL_OK) {
-	char const *result = Tcl_GetStringResult(interp) ;
-	if (strlen(result)) {
-	    Tcl_DStringAppend(nsVarName, result, -1) ;
-	    isGlobal = 0 ;
-	}
-    }
-#	endif
     Tcl_DStringAppend(nsVarName, "::", -1) ;
     Tcl_DStringAppend(nsVarName, name, -1) ;
 

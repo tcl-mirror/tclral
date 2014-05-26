@@ -86,9 +86,8 @@ namespace eval ::ral::sql::test {
         file delete meta.sqlite3
         sqlite3 ::db meta.sqlite3
     } -cleanup {
-        # file delete meta.sqlite3
+        file delete meta.sqlite3
     } -body {
-        db eval {pragma foreign_keys=ON}
         db eval $::ral::ralSQLSchema
         db close
         checkForTable meta.sqlite3 __ral_attribute
@@ -98,7 +97,6 @@ namespace eval ::ral::sql::test {
 	store schema to SQLite
     } -setup {
     } -cleanup {
-        # file delete test.sqlite3
     } -body {
         storeToSQLite test.sqlite3
         checkForTable test.sqlite3 People
@@ -109,6 +107,7 @@ namespace eval ::ral::sql::test {
     } -setup {
         namespace eval testns {}
     } -cleanup {
+        file delete test.sqlite3
     } -body {
         loadFromSQLite test.sqlite3 [namespace current]::testns
         relvar constraint info [namespace current]::testns::valstatus

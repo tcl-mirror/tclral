@@ -49,7 +49,7 @@ exec tclsh "$0" "$@"
 # 
 #  *--
 
-package require tcltest 2.2
+package require tcltest
 package require ral
 
 eval tcltest::configure $argv
@@ -88,6 +88,12 @@ namespace eval ::ral::test {
 	return 1
     }
 
+    proc cleanUpNamespace {ns} {
+	relvar constraint delete {*}[relvar constraint names ${ns}::*]
+	relvar unset {*}[relvar names ${ns}::*]
+	namespace delete $ns
+    }
+
     # example relvar data to use
     source [file join [file dirname [info script]] testdata.tcl]
  
@@ -104,10 +110,9 @@ namespace eval ::ral::test {
 	deserialize relvar data
     } -setup {
 	set dstNs ::ral::deserial
+        namespace eval $dstNs {}
     } -cleanup {
-	relvar constraint delete {*}[relvar constraint names ${dstNs}::*]
-	relvar unset {*}[relvar names ${dstNs}::*]
-	namespace delete $dstNs
+        cleanUpNamespace $dstNs
     } -body {
 	deserialize $s $dstNs
 	cmpRelvars [namespace current] $dstNs
@@ -117,11 +122,9 @@ namespace eval ::ral::test {
         deserialize from old format data
     } -setup {
 	set dstNs ::ral::deserial
+        namespace eval $dstNs {}
     } -cleanup {
-	eval relvar constraint delete\
-	    [relvar constraint names ${dstNs}::*]
-	eval relvar unset [relvar names ${dstNs}::*]
-	namespace delete $dstNs
+        cleanUpNamespace $dstNs
     } -body {
 	deserializeFromFile-0.8.X serialized0.8.9.ral $dstNs
         #puts [relvar names]
@@ -133,11 +136,9 @@ namespace eval ::ral::test {
         deserialize from old format data using 0.9 command
     } -setup {
 	set dstNs ::ral::deserial
+        namespace eval $dstNs {}
     } -cleanup {
-	eval relvar constraint delete\
-	    [relvar constraint names ${dstNs}::*]
-	eval relvar unset [relvar names ${dstNs}::*]
-	namespace delete $dstNs
+        cleanUpNamespace $dstNs
     } -body {
 	deserializeFromFile serialized0.8.9.ral $dstNs
 	cmpRelvars [namespace current] $dstNs
@@ -147,12 +148,10 @@ namespace eval ::ral::test {
 	metakit persistence for relvars
     } -setup {
 	set dstNs ::ral::deserial
+        namespace eval $dstNs {}
 	set mkFile [file join [temporaryDirectory] storeToMk-1.0.mk]
     } -cleanup {
-	eval relvar constraint delete\
-	    [relvar constraint names ${dstNs}::*]
-	eval relvar unset [relvar names ${dstNs}::*]
-	namespace delete $dstNs
+        cleanUpNamespace $dstNs
 	file delete $mkFile
     } -body {
 	storeToMk $mkFile
@@ -160,70 +159,17 @@ namespace eval ::ral::test {
 	cmpRelvars [namespace current] $dstNs
     } -result {1}
 
-    test loadFromMk-1.0 {
-        load metakit serialization in old format
-    } -setup {
-        set nsnew [namespace current]::new
-        set nsold [namespace current]::old
-        deserializeFromFile merge1.ral $nsnew
-    } -cleanup {
-	eval relvar constraint delete\
-	    [relvar constraint names ${nsnew}::*]
-	eval relvar unset [relvar names ${nsnew}::*]
-	namespace delete $nsnew
-	eval relvar constraint delete\
-	    [relvar constraint names ${nsold}::*]
-	eval relvar unset [relvar names ${nsold}::*]
-	namespace delete $nsold
-    } -body {
-        loadFromMk merge1-old.mk $nsold
-	cmpRelvars $nsnew $nsold
-    } -result {1}
-
     test dump-1.0 {
 	serialize relvars as a Tcl script
     } -setup {
 	set dstNs ::ral::deserial
     } -cleanup {
-	eval relvar constraint delete\
-	    [relvar constraint names ${dstNs}::*]
-	eval relvar unset [relvar names ${dstNs}::*]
-	namespace delete $dstNs
+        cleanUpNamespace $dstNs
     } -body {
 	set d [dump]
 	namespace eval $dstNs $d
 	cmpRelvars [namespace current] $dstNs
     } -result {1}
-
-    test merge-1.0 {
-        merge data from separate files
-    } -setup {
-	set dstNs ::ral::deserial
-        deserializeFromFile merge1.ral $dstNs
-    } -cleanup {
-	eval relvar constraint delete\
-	    [relvar constraint names ${dstNs}::*]
-	eval relvar unset [relvar names ${dstNs}::*]
-	namespace delete $dstNs
-    } -body {
-        mergeFromFile merge2.ral $dstNs
-        relation cardinality [relvar set ${dstNs}::Domain]
-    } -result {2}
-
-    test mergeFromMk-1.0 {
-        merge data from metakit files
-    } -setup {
-	set dstNs ::ral::deserial
-        loadFromMk merge1.mk $dstNs
-    } -cleanup {
-	eval relvar constraint delete\
-	    [relvar constraint names ${dstNs}::*]
-	eval relvar unset [relvar names ${dstNs}::*]
-	namespace delete $dstNs
-    } -body {
-        mergeFromMk merge2.mk $dstNs
-        relation cardinality [relvar set ${dstNs}::Domain]
-    } -result {2}
 
 if 0 {
     test -1.0 {

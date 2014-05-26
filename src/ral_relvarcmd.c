@@ -693,12 +693,6 @@ RelvarEvalCmd(
         Tcl_GetErrorLine(interp)
 #       endif
         )) ;
-#else
-        static const char msgfmt[] =
-            "\n    (\"in ::ral::relvar eval\" body line %d)" ;
-        char msg[sizeof(msgfmt) + TCL_INTEGER_SPACE] ;
-        sprintf(msg, msgfmt, interp->errorLine) ;
-        Tcl_AddErrorInfo(interp, msg) ;
 #endif
     }
 
