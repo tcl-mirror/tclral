@@ -1,0 +1,8 @@
+Package ral 0.11.1
+Meta description This package consists of both {"C"} based commands and
+Meta description Tcl commands.
+Meta entrykeep   pkgIndex.tcl
+Meta included    pkgIndex.tcl ral.tcl libral0.11.1.dylib
+Meta platform    macosx10.9-i386-x86_64
+Meta summary     TclRAL -- Relational Algebra Library
+

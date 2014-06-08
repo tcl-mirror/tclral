@@ -1,0 +1,5 @@
+#!/bin/bash
+../../configure \
+	CPPFLAGS=-DNDEBUG \
+	CFLAGS="-arch i386 -arch x86_64" \
+	--with-tcl=/Library/Frameworks/Tcl.framework
