@@ -858,6 +858,12 @@ isAByteArray(
     Tcl_Interp *interp,
     Tcl_Obj *byteArrayObj)
 {
+    /*
+     * We call Tcl_GetByteArrayFromObj() because if we've been handed
+     * as string, then there is conversion to bytes that happens here.
+     * That conversion, however, never seems to fail.
+     */
+    (void)Tcl_GetByteArrayFromObj(byteArrayObj, NULL) ;
     return TCL_OK ;
 }
 
