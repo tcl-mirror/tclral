@@ -188,6 +188,13 @@ The [cmd loadFromSQLite] command restores the state of a set of relvars
 from the information contained in a SQLite database.
 That database must have been created using the [cmd storeToSQLite] command.
 
+[call [cmd "::ral::mergeFromSQLite"] [arg fileName] [arg [opt namespace]]]
+The [cmd mergeFromSQLite] command merges the contents of the SQLite
+serialization contained
+in [arg fileName] into the namespace given by [arg namespace].
+The rules of merging are the same as described for the [cmd merge]
+command above.
+
 [call [cmd "::ral::dump"] [arg [opt pattern]]]
 
 The [cmd dump] command returns a Tcl script that when evaluated will

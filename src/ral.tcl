@@ -161,6 +161,7 @@ namespace eval ::ral {
     variable sqlTypeMap ; array set sqlTypeMap {
         int         integer
         double      real
+        bytearray   blob
     }
 
     # This is the SQL schema required to store the ral meta-data into SQL so

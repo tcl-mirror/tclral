@@ -137,8 +137,9 @@
 <li><a href="#11"><b class="cmd">::ral::mergeFromMk</b> <i class="arg">fileName</i> <i class="arg"><span class="opt">?namespace?</span></i></a></li>
 <li><a href="#12"><b class="cmd">::ral::storeToSQLite</b> <i class="arg">fileName</i> <i class="arg"><span class="opt">?pattern?</span></i></a></li>
 <li><a href="#13"><b class="cmd">::ral::loadFromSQLite</b> <i class="arg">fileName</i> <i class="arg"><span class="opt">?namespace?</span></i></a></li>
-<li><a href="#14"><b class="cmd">::ral::dump</b> <i class="arg"><span class="opt">?pattern?</span></i></a></li>
-<li><a href="#15"><b class="cmd">::ral::dumpToFile</b> <i class="arg">fileName</i> <i class="arg"><span class="opt">?pattern?</span></i></a></li>
+<li><a href="#14"><b class="cmd">::ral::mergeFromSQLite</b> <i class="arg">fileName</i> <i class="arg"><span class="opt">?namespace?</span></i></a></li>
+<li><a href="#15"><b class="cmd">::ral::dump</b> <i class="arg"><span class="opt">?pattern?</span></i></a></li>
+<li><a href="#16"><b class="cmd">::ral::dumpToFile</b> <i class="arg">fileName</i> <i class="arg"><span class="opt">?pattern?</span></i></a></li>
 </ul>
 </div>
 </div>
@@ -259,14 +260,20 @@ a new file is created with the current state of the relvars.</p></dd>
 <dd><p>The <b class="cmd">loadFromSQLite</b> command restores the state of a set of relvars
 from the information contained in a SQLite database.
 That database must have been created using the <b class="cmd">storeToSQLite</b> command.</p></dd>
-<dt><a name="14"><b class="cmd">::ral::dump</b> <i class="arg"><span class="opt">?pattern?</span></i></a></dt>
+<dt><a name="14"><b class="cmd">::ral::mergeFromSQLite</b> <i class="arg">fileName</i> <i class="arg"><span class="opt">?namespace?</span></i></a></dt>
+<dd><p>The <b class="cmd">mergeFromSQLite</b> command merges the contents of the SQLite
+serialization contained
+in <i class="arg">fileName</i> into the namespace given by <i class="arg">namespace</i>.
+The rules of merging are the same as described for the <b class="cmd">merge</b>
+command above.</p></dd>
+<dt><a name="15"><b class="cmd">::ral::dump</b> <i class="arg"><span class="opt">?pattern?</span></i></a></dt>
 <dd><p>The <b class="cmd">dump</b> command returns a Tcl script that when evaluated will
 restore the state of a set of relvars to be the same as when the <b class="cmd">dump</b>
 command was executed.
 The <b class="cmd">dump</b> command is another form of serialization for a set of relvars
 and is often useful when creating Tcl packages that create an empty
 schema of relvars.</p></dd>
-<dt><a name="15"><b class="cmd">::ral::dumpToFile</b> <i class="arg">fileName</i> <i class="arg"><span class="opt">?pattern?</span></i></a></dt>
+<dt><a name="16"><b class="cmd">::ral::dumpToFile</b> <i class="arg">fileName</i> <i class="arg"><span class="opt">?pattern?</span></i></a></dt>
 <dd><p>The <b class="cmd">dumpToFile</b> invokes the <b class="cmd">dump</b> command and writes the
 resulting script to the file given by <i class="arg">fileName</i>.</p></dd>
 </dl>

@@ -858,7 +858,7 @@ isAByteArray(
     Tcl_Interp *interp,
     Tcl_Obj *byteArrayObj)
 {
-    return 1 ;
+    return TCL_OK ;
 }
 
 static int
