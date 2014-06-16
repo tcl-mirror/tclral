@@ -194,6 +194,29 @@ namespace eval ::ralutil::test {
         }
     } -result {2}
 
+    test attrConstraint-1.0 {
+        Value contraint on an attribute
+    } -setup {
+        relvar create B {
+            Name string
+            Size double
+        } Name
+        ralutil attrConstraint B {:Size: > 0 && :Size: < 27}
+    } -cleanup {
+    } -body {
+        relvar insert B {Name a Size 13}
+        relation extract [relvar restrictone B Name a] Size
+    } -result {13}
+
+    test attrConstraint-2.0 {
+        Value contraint on an attribute -- failed
+    } -setup {
+    } -cleanup {
+        relvar unset B
+    } -body {
+        relvar insert B {Name a Size 43}
+    } -result {constraint, "{ 43  > 0 &&  43  < 27}", on ::ralutil::test::B failed} -returnCodes error
+
 if 0 {
     test -1.0 {
     } -setup {

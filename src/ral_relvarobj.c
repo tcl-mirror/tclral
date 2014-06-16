@@ -41,12 +41,9 @@ terms specified in this license.
 /*
  *++
 MODULE:
+    ral_relvarobj.c
 
 ABSTRACT:
-
-$RCSfile: ral_relvarobj.c,v $
-$Revision: 1.49 $
-$Date: 2012/02/26 19:09:04 $
  *--
  */
 
@@ -1446,7 +1443,6 @@ Ral_RelvarObjCreateProcedural(
     Tcl_DString resolve ;
     Ral_Constraint constraint ;
     Ral_ProceduralConstraint procedural ;
-    char *colonPlace ;
 
     /*
      * Creating a procedural constraint is not allowed during an "eval" script.
@@ -1468,6 +1464,11 @@ Ral_RelvarObjCreateProcedural(
 	return TCL_ERROR ;
     }
     procedural = constraint->constraint.procedural ;
+    /*
+     * Add the pointer to the script object to the constraint. Bump the
+     * reference count because we intend to hold on to it.
+     */
+    Tcl_IncrRefCount(procedural->script = script) ;
     /*
      * Loop through the set of relvar names, making sure each name
      * is indeed a relvar.
@@ -1497,52 +1498,6 @@ Ral_RelvarObjCreateProcedural(
          */
         Ral_PtrVectorPushBack(procedural->relvarList, relvar) ;
         Ral_PtrVectorPushBack(relvar->constraints, constraint) ;
-    }
-    /*
-     * We construct a script for the procedural constraint that will evaluate
-     * the argument script in the namespace implied by the fully-qualified
-     * constraint name. We do this by looking at the constraint name and, if it
-     * is not in the global namespace, enclosing it in a new script that
-     * contains "namespace eval <nsname>". When the procedural constraint is
-     * evaluated it is done so at the global level.
-     */
-    colonPlace = strrchr(constraint->name, ':') ;
-    if (colonPlace == NULL) {
-        /*
-         * If we can't find a colon in the constaint name then we assume
-         * the global namespace.
-         */
-        Tcl_IncrRefCount(procedural->script = script) ;
-    } else {
-        /*
-         * Adjust to point to the second colon and use the leading string as a
-         * namespace name.
-         */
-        colonPlace-- ;
-        /*
-         * Check if the constraint is in the global namespace. In that case
-         * we just save the script as given to us.
-         */
-        if (colonPlace == constraint->name) {
-            Tcl_IncrRefCount(procedural->script = script) ;
-        } else {
-            /*
-             * Otherwise we build up a "namespace eval" command script so that
-             * we can run the procedural constraint script in the same
-             * namespace as the constraint was defined.  Note that when we
-             * evaluate the script it is done "direct" so it is not byte code
-             * compiled. We toss the script immediately so byte code compiling
-             * is a waste.
-             */
-            Tcl_Obj *scriptObj = Tcl_NewStringObj("namespace eval ", -1) ;
-            Tcl_IncrRefCount(scriptObj) ;
-            Tcl_AppendToObj(scriptObj, constraint->name,
-                    colonPlace - constraint->name) ;
-            Tcl_AppendStringsToObj(scriptObj, " {", NULL) ;
-            Tcl_AppendObjToObj(scriptObj, script) ;
-            Tcl_AppendStringsToObj(scriptObj, "}", NULL) ;
-            Tcl_IncrRefCount(procedural->script = scriptObj) ;
-        }
     }
 
     if (!relvarObjConstraintEval(interp, constraint)) {
@@ -2857,15 +2812,61 @@ relvarProceduralConstraintEval(
     int scriptResult ;
     int result = 0 ;
     Ral_ProceduralConstraint procedural ;
+    char *colonPlace ;
 
     assert(constraint->type == ConstraintProcedural) ;
-    procedural = constraint->constraint.procedural ;
     /*
-     * Evaluate the script.
+     * Evaluate the script. We want to evaluate the script in the
+     * same namespace implied by the contraint name.
      */
-    Tcl_IncrRefCount(procedural->script) ;
-    scriptResult = Tcl_EvalObjEx(interp, procedural->script, TCL_EVAL_GLOBAL) ;
-    Tcl_DecrRefCount(procedural->script) ;
+    procedural = constraint->constraint.procedural ;
+
+    colonPlace = strrchr(constraint->name, ':') ;
+    if (colonPlace == NULL) {
+        /*
+         * If we can't find a colon in the containt name then we simply
+         * evaluate the script in the current namespace. This shouldn't
+         * happen, but we allow for it.
+         */
+        Tcl_IncrRefCount(procedural->script) ;
+        scriptResult = Tcl_EvalObjEx(interp, procedural->script, 0) ;
+        Tcl_DecrRefCount(procedural->script) ;
+    } else {
+        /*
+         * Adjust to point to the second colon and use the leading string as a
+         * namespace name.
+         */
+        colonPlace-- ;
+        /*
+         * Check if the constraint is in the global namespace. In that case
+         * we can evaluate it directly.
+         */
+        if (colonPlace == constraint->name) {
+            Tcl_IncrRefCount(procedural->script) ;
+            scriptResult = Tcl_EvalObjEx(interp, procedural->script,
+                    TCL_EVAL_GLOBAL) ;
+            Tcl_DecrRefCount(procedural->script) ;
+        } else {
+            /*
+             * Otherwise we build up a "namespace eval" command script so that
+             * we can run the procedural constraint script in the same
+             * namespace as the constraint was defined.  Note that when we
+             * evaluate the script it is done "direct" so it is not byte code
+             * compiled. We toss the script immediately so byte code compiling
+             * is a waste.
+             */
+            Tcl_Obj *scriptObj = Tcl_NewStringObj("namespace eval ", -1) ;
+            Tcl_IncrRefCount(scriptObj) ;
+            Tcl_AppendToObj(scriptObj, constraint->name,
+                    colonPlace - constraint->name) ;
+            Tcl_AppendStringsToObj(scriptObj, " {", NULL) ;
+            Tcl_AppendObjToObj(scriptObj, procedural->script) ;
+            Tcl_AppendStringsToObj(scriptObj, "}", NULL) ;
+            scriptResult = Tcl_EvalObjEx(interp, scriptObj, TCL_EVAL_DIRECT) ;
+            Tcl_DecrRefCount(scriptObj) ;
+        }
+    }
+
     if (scriptResult == TCL_OK || scriptResult == TCL_RETURN) {
         /*
          * Fetch the return value of the script and try to get a boolean value

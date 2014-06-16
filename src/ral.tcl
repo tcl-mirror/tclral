@@ -1505,23 +1505,19 @@ proc ::ral::sqlSchema {{pattern *}} {
     return $result
 }
 
-# If we have Tcl 8.5, then we can supply some "aggregate scalar functions" that
-# are useful and have "expr" syntax. If we don't have Tcl 8.5 then we
-# will define these in the "::ral" namespace and they will require
-# "proc" type syntax.
-set sfuncNS [expr {[package vsatisfies [package require Tcl] 8.5] ?\
-    "::tcl::mathfunc" : "::ral"}]
+# With Tcl 8.5, then we can supply some "aggregate scalar functions" that
+# are useful and have "expr" syntax.
 # Count the number of tuples in a relation
-proc ${sfuncNS}::rcount {relation} {
+proc ::tcl::mathfunc::rcount {relation} {
     return [::ral::relation cardinality $relation]
 }
 # Count the number of distinct values of an attribute in a relation
-proc ${sfuncNS}::rcountd {relation attr} {
+proc ::tcl::mathfunc::rcountd {relation attr} {
     return [::ral::relation cardinality\
         [::ral::relation project $relation $attr]]
 }
 # Compute the sum over an attribute
-proc ${sfuncNS}::rsum {relation attr} {
+proc ::tcl::mathfunc::rsum {relation attr} {
     set result 0
     foreach v [::ral::relation list $relation $attr] {
         incr result $v
@@ -1529,7 +1525,7 @@ proc ${sfuncNS}::rsum {relation attr} {
     return $result
 }
 # Compute the sum over the distinct values of an attribute.
-proc ${sfuncNS}::rsumd {relation attr} {
+proc ::tcl::mathfunc::rsumd {relation attr} {
     set result 0
     ::ral::relation foreach v [::ral::relation list\
         [::ral::relation project $relation $attr]] {
@@ -1537,27 +1533,16 @@ proc ${sfuncNS}::rsumd {relation attr} {
     }
     return $result
 }
-if {[package vsatisfies [package require Tcl] 8.5]} {
-    # Compute the average of the values of an attribute
-    proc ${sfuncNS}::ravg {relation attr} {
-        return [expr {rsum($relation, $attr) / rcount($relation)}]
-    }
-    # Compute the average of the distinct values of an attribute
-    proc ${sfuncNS}::ravgd {relation attr} {
-        return [expr {rsumd($relation, $attr) / rcount($relation)}]
-    }
-} else {
-    # Compute the average of the values of an attribute
-    proc ${sfuncNS}::ravg {relation attr} {
-        return [expr {[rsum $relation $attr] / [rcount $relation]}]
-    }
-    # Compute the average of the distinct values of an attribute
-    proc ${sfuncNS}::ravgd {relation attr} {
-        return [expr {[rsumd $relation $attr] / [rcount $relation]}]
-    }
+# Compute the average of the values of an attribute
+proc ::tcl::mathfunc::ravg {relation attr} {
+    return [expr {rsum($relation, $attr) / rcount($relation)}]
+}
+# Compute the average of the distinct values of an attribute
+proc ::tcl::mathfunc::ravgd {relation attr} {
+    return [expr {rsumd($relation, $attr) / rcount($relation)}]
 }
 # Compute the minimum. N.B. this does not handle "empty" relations properly.
-proc ${sfuncNS}::rmin {relation attr} {
+proc ::tcl::mathfunc::rmin {relation attr} {
     set values [::ral::relation list $relation $attr]
     set min [lindex $values 0]
     foreach v [lrange $values 1 end] {
@@ -1568,7 +1553,7 @@ proc ${sfuncNS}::rmin {relation attr} {
     return $min
 }
 # Again, empty relations are not handled properly.
-proc ${sfuncNS}::rmax {relation attr} {
+proc ::tcl::mathfunc::rmax {relation attr} {
     set values [::ral::relation list $relation $attr]
     set max [lindex $values 0]
     foreach v [lrange $values 1 end] {
@@ -1862,4 +1847,4 @@ proc ::ral::mapTypeToSQL {type} {
             $sqlTypeMap($type) : "text"}]
 }
 
-package provide ral 0.11.1
+package provide ral 0.11.2

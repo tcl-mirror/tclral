@@ -49,9 +49,6 @@ exec tclsh "$0" "$@"
 #   "tcltest" to test the code associated with the TCL Relational
 #   Algebra library.
 # 
-# $RCSfile: ral.test,v $
-# $Revision: 1.58 $
-# $Date: 2012/02/26 19:09:04 $
 #  *--
 
 package require tcltest 2.2
@@ -65,13 +62,8 @@ if {[package vsatisfies [package require Tcl] 8.6]} {
 } elseif {[package vsatisfies [package require Tcl] 8.5]} {
     ::tcltest::testConstraint mathFuncs 1
     ::tcltest::testConstraint haveDict 1
-} elseif {[package vsatisfies [package require Tcl] 8.4]} {
-    ::tcltest::testConstraint tcl8.4 1
-    if {![catch {package require dict}]} {
-        ::tcltest::testConstraint haveDict 1
-    }
 } else {
-    error "TclRAL has only been tested against Tcl 8.4, 8.5 and 8.6"
+    error "TclRAL has only been tested against Tcl 8.5 and 8.6"
 }
 
 namespace eval ::ral::test {
@@ -3519,40 +3511,10 @@ in expression "_@_< 20"} -returnCodes error
         }
     } -match relation
 
-    # For tcl8.4
-    test relation-summarize-1.0.1 {count} -constraints {
-        tcl8.4
-    } -body {
-        set p [relation project $P P#]
-        relation summarize $SP $p r Total int {[rsum $r "QTY"]}
-    } -result {
-        {P# string Total int}
-        {
-            {P# P1 Total 600}
-            {P# P2 Total 1000}
-            {P# P3 Total 400}
-            {P# P4 Total 500}
-            {P# P5 Total 500}
-            {P# P6 Total 100}
-        }
-    } -match relation
-
     test relation-summarize-2.0 {summarize per dee} -constraints {
         mathFuncs
     } -body {
         relation summarize $SP $DEE r GrandTotal int {rsum($r, "QTY")}
-    } -result {
-        {GrandTotal int}
-        {
-            {GrandTotal 3100}
-        }
-    } -match relation
-
-    # For tcl8.4
-    test relation-summarize-2.0.1 {summarize per dee} -constraints {
-        tcl8.4
-    } -body {
-        relation summarize $SP $DEE r GrandTotal int {[rsum $r "QTY"]}
     } -result {
         {GrandTotal int}
         {
@@ -3571,34 +3533,10 @@ in expression "_@_< 20"} -returnCodes error
         }
     } -match relation
 
-    # For tcl8.4
-    test relation-summarize-2.1.1 {summarize per dee, average} -constraints {
-        tcl8.4
-    } -body {
-        relation summarize $SP $DEE r GrandAvg int {[ravg $r "QTY"]}
-    } -result {
-        {GrandAvg int}
-        {
-            {GrandAvg 258}
-        }
-    } -match relation
-
     test relation-summarize-2.2 {summarize per dee, average} -constraints {
         mathFuncs
     } -body {
         relation summarize $OWNER $DEE r AverageAge int {ravg($r, "Age")}
-    } -result {
-        {AverageAge int}
-        {
-            {AverageAge 36}
-        }
-    } -match relation
-
-    # For tcl8.4
-    test relation-summarize-2.2.1 {summarize per dee, average} -constraints {
-        tcl8.4
-    } -body {
-        relation summarize $OWNER $DEE r AverageAge int {[ravg $r "Age"]}
     } -result {
         {AverageAge int}
         {

@@ -61,6 +61,7 @@ namespace eval ::ralutil {
     namespace export crosstab
     namespace export rvajoin
     namespace export attrConstraint
+    namespace ensemble create
 
     namespace import ::ral::*
 

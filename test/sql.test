@@ -63,6 +63,17 @@ namespace eval ::ral::sql::test {
     # example relvar data to use
     source [file join [file dirname [info script]] testdata.tcl]
 
+    proc readTestData {filename {ns ::}} {
+        namespace eval $ns [list source\
+                [file join [file dirname [info script]] $filename]]
+    }
+
+    proc rmTestData {ns} {
+        relvar constraint delete {*}[relvar constraint names ${ns}::*]
+        relvar unset {*}[relvar names ${ns}::*]
+        namespace delete $ns
+    }
+
     proc checkForTable {file tablename} {
         sqlite3 ::tbls $file
         set masternames [::tbls eval {select name from sqlite_master
@@ -96,50 +107,48 @@ namespace eval ::ral::sql::test {
     test storeToSQLite-1.0 {
 	store schema to SQLite
     } -setup {
+        set testns [namespace current]::td1
+        readTestData testdata.tcl $testns
     } -cleanup {
+        rmTestData $testns
     } -body {
-        storeToSQLite test.sqlite3
+        storeToSQLite test.sqlite3 ${testns}::*
         checkForTable test.sqlite3 People
     } -result {1}
  
     test loadFromSQLite-1.0 {
 	load schema from SQLite
     } -setup {
-        namespace eval testns {}
+        set testns [namespace current]::testns
+        namespace eval $testns {}
     } -cleanup {
-        file delete test.sqlite3
+        rmTestData $testns
+        #file delete test.sqlite3
     } -body {
-        loadFromSQLite test.sqlite3 [namespace current]::testns
-        relvar constraint info [namespace current]::testns::valstatus
-    } -result {procedural ::ral::sql::test::testns::valstatus ::ral::sql::test::testns::S {namespace eval ::ral::sql::test::testns {namespace eval ::ral::sql::test {
-    variable S
-    set city [::ral::relation project [::ral::relation restrictwith $S {$STATUS == 1}] CITY]
-    return [expr {[::ral::relation cardinality $city] < 2}]
-}}}}
+        loadFromSQLite test.sqlite3 $testns
+        relvar exists ${testns}::People
+    } -result {1}
  
     test storeToSQLite-2.0 {
 	store schema to SQLite
     } -setup {
-        namespace eval pyccatest {}
-        deserializeFromFile pycca_test.ral pyccatest
+        set testns [namespace current]::pyccatest
+        namespace eval $testns {}
+        deserializeFromFile pycca_test.ral $testns
     } -cleanup {
-        relvar constraint delete {*}[relvar constraint names *pyccatest*]
-        relvar unset {*}[relvar names *pyccatest*]
-        namespace delete pyccatest
+        rmTestData $testns
     } -body {
-        storeToSQLite pycca_test.sqlite3 *pyccatest*
+        storeToSQLite pycca_test.sqlite3 ${testns}::*
     } -result {}
  
     test loadFromSQLite-2.0 {
 	load schema from SQLite
     } -setup {
-        namespace eval pyccatest {}
+        set testns [namespace current]::pyccatest
     } -cleanup {
-        relvar constraint delete {*}[relvar constraint names *pyccatest*]
-        relvar unset {*}[relvar names *pyccatest*]
-        namespace delete pyccatest
+        rmTestData $testns
     } -body {
-        loadFromSQLite pycca_test.sqlite3 [namespace current]::pyccatest
+        loadFromSQLite pycca_test.sqlite3 $testns
     } -result {}
 
 if 0 {

@@ -45,10 +45,6 @@ exec tclsh "$0" "$@"
 #   all.test -- test cases for the Tcl Relational Algebra Library
 # 
 # ABSTRACT:
-# 
-# $RCSfile: all,v $
-# $Revision: 1.1 $
-# $Date: 2007/01/02 04:15:06 $
 #  *--
 
 package require Tcl
