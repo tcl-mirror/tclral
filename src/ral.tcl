@@ -447,40 +447,26 @@ proc ::ral::deserialize {value {ns ::}} {
         namespace eval $ns {}
     }
     set ns ${ns}::
-    if {[llength $value] != 8} {
-        error "bad value format, expected list of 8 items,\
-                got [llength $value] items"
+    if {[dict size $value] != 4} {
+        error "bad value format, expected dictionary of 4 items,\
+                got [dict size $value] items"
     }
-    lassign $value versionKeyWord versionNumber relvarKeyWord relvarDefs\
-            cnstrKeyWord cnstrDefs bodyKeyWord bodyDefs
 
-    if {$versionKeyWord ne "Version"} {
-        error "expected keyword \"Version\", got \"$versionKeyWord\""
-    }
-    if {![package vsatisfies $versionNumber [getCompatVersion]]} {
+    if {![package vsatisfies [dict get $value Version] [getCompatVersion]]} {
         error "incompatible version number, \"$versionNumber\",\
             current library version is, \"[getVersion]\""
     }
 
-    if {$relvarKeyWord ne "Relvars"} {
-        error "expected keyword \"Relvars\", got \"$revarKeyWord\""
-    }
-    foreach {rvName rvHead rvIds} $relvarDefs {
+    foreach {rvName rvHead rvIds} [dict get $value Relvars] {
         ::ral::relvar create ${ns}$rvName $rvHead {*}$rvIds
     }
 
-    if {$cnstrKeyWord ne "Constraints"} {
-        error "expected keyword \"Constraints\", got \"$cnstrKeyWord\""
-    }
-    foreach constraint $cnstrDefs {
+    foreach constraint [dict get $value Constraints] {
         ::ral::relvar {*}[setRelativeConstraintInfo $ns $constraint]
     }
 
-    if {$bodyKeyWord ne "Values"} {
-        error "expected keyword \"Values\", got \"$bodyKeyWord\""
-    }
     relvar eval {
-        foreach body $bodyDefs {
+        foreach body [dict get $value Values] {
             foreach {relvarName relvarBody} $body {
                 ::ral::relvar set ${ns}$relvarName $relvarBody
             }
@@ -574,30 +560,19 @@ proc ::ral::deserializeFromFile-0.8.X {fileName {ns ::}} {
 
 proc ::ral::merge {value {ns ::}} {
     set ns [string trimright $ns :]::
-    # Despite the fact that the merge data is a dictionary, we do this here
-    # using only list commands so that it will continue to function under 8.4.
-    if {[llength $value] != 8} {
-        error "bad value format, expected list of 8 items,\
-                got [llength $value] items"
+    if {[dict size $value] != 4} {
+        error "bad value format, expected dictionary of 4 items,\
+                got [dict size $value] items"
     }
-    lassign value versionKeyWord versionNumber relvarKeyWord\
-            relvarDefs cnstrKeyWord cnstrDefs bodyKeyWord bodyDefs
-
-    if {$versionKeyWord ne "Version"} {
-        error "expected keyword \"Version\", got \"$versionKeyWord\""
-    }
-    if {![package vsatisfies $versionNumber [getCompatVersion]]} {
+    if {![package vsatisfies [dict get $value Version] [getCompatVersion]]} {
         error "incompatible version number, \"$versionNumber\",\
             current library version is, \"[getVersion]\""
     }
 
-    if {$relvarKeyWord ne "Relvars"} {
-        error "expected keyword \"Relvars\", got \"$revarKeyWord\""
-    }
     set newRelvars [list]
     set matchingRelvars [list]
     set mismatched [list]
-    foreach {rvName rvHead rvIds} $relvarDefs {
+    foreach {rvName rvHead rvIds} [dict get $value Relvars] {
         set fullName ${ns}$rvName
         if {![relvar exists $fullName]} {
             # New relvars are just created.
@@ -614,10 +589,7 @@ proc ::ral::merge {value {ns ::}} {
         }
     }
 
-    if {$cnstrKeyWord ne "Constraints"} {
-        error "expected keyword \"Constraints\", got \"$cnstrKeyWord\""
-    }
-    foreach constraint $cnstrDefs {
+    foreach constraint [dict get $value Constraints] {
         set cname [lindex $constraint 1]
         if {$cname eq "-complete"} {
             set cname [lindex $constraint 2]
@@ -628,12 +600,8 @@ proc ::ral::merge {value {ns ::}} {
         }
     }
 
-    if {$bodyKeyWord ne "Values"} {
-        error "expected keyword \"Values\", got \"$bodyKeyWord\""
-    }
-
     relvar eval {
-        foreach body $bodyDefs {
+        foreach body [dict get $value Values] {
             foreach {relvarName relvarBody} $body {
                 set fullName ${ns}$relvarName
                 relation foreach row $relvarBody {
