@@ -1,7 +1,7 @@
 #!/bin/sh
 # \
 exec tclsh "$0" "$@"
-# This software is copyrighted 2006 - 2014 by G. Andrew Mangogna.
+# This software is copyrighted 2014 by G. Andrew Mangogna.
 # The following terms apply to all files associated with the software unless
 # explicitly disclaimed in individual files.
 # 
@@ -42,7 +42,7 @@ exec tclsh "$0" "$@"
 # 
 #  *++
 # MODULE:
-#   serialize.test -- test cases for serializing relvars in the
+#   merge.test -- test cases for merging relvars in the
 #	Tcl Relational Algebra Library
 # 
 # ABSTRACT:
@@ -57,16 +57,6 @@ eval tcltest::configure $argv
 namespace eval ::ral::test {
     namespace import ::tcltest::*
     namespace import ::ral::*
-
-    proc tupleMatch {expected actual} {
-	return [::ral::tuple equal $expected $actual]
-    }
-    customMatch tuple [namespace current]::tupleMatch
-
-    proc relationMatch {expected actual} {
-	return [::ral::relation is $expected == $actual]
-    }
-    customMatch relation [namespace current]::relationMatch
 
     proc cmpRelvars {ns1 ns2} {
 	set names1 [lsort [relvar names ${ns1}*]]
@@ -89,97 +79,51 @@ namespace eval ::ral::test {
     }
 
     proc cleanUpNamespace {ns} {
-	relvar constraint delete {*}[relvar constraint names ${ns}::*]
-	relvar unset {*}[relvar names ${ns}::*]
-	namespace delete $ns
+        set qualns [namespace current]::${ns}
+	relvar constraint delete {*}[relvar constraint names ${qualns}::*]
+	relvar unset {*}[relvar names ${qualns}::*]
+	namespace delete $qualns
     }
 
     # example relvar data to use
-    source [file join [file dirname [info script]] testdata.tcl]
- 
-    test serialize-1.0 {
-	serialize relvar data
-    } -setup {
-    } -cleanup {
-    } -body {
-	set s [serialize]
-        dict size $s
-    } -result {4}
- 
-    test deserialize-1.0 {
-	deserialize relvar data
-    } -setup {
-	set dstNs ::ral::deserial
-        namespace eval $dstNs {}
-    } -cleanup {
-        cleanUpNamespace $dstNs
-    } -body {
-	deserialize $s $dstNs
-	cmpRelvars [namespace current] $dstNs
-    } -result {1}
+    set testdir [file join [file dirname [info script]]]
 
-    test deserialize-0.8.X-1.0 {
-        deserialize from old format data
-    } -setup {
-	set dstNs ::ral::deserial
-        namespace eval $dstNs {}
-    } -cleanup {
-        cleanUpNamespace $dstNs
-    } -body {
-	deserializeFromFile-0.8.X serialized0.8.9.ral $dstNs
-        #puts [relvar names]
-        #puts [relvar constraint names]
-	cmpRelvars [namespace current] $dstNs
-    } -result {1}
+    # Make the test files for text based serialization
+    namespace eval testfiles [list source [file join $testdir merge1.tcl]]
+    namespace eval testfiles [list source [file join $testdir pop1.tcl]]
+    makeFile [serialize [namespace current]::testfiles::*] mergetest1.ral
+    cleanUpNamespace testfiles
 
-    test deserialize-0.8.X-2.0 {
-        deserialize from old format data using 0.9 command
-    } -setup {
-	set dstNs ::ral::deserial
-        namespace eval $dstNs {}
-    } -cleanup {
-        cleanUpNamespace $dstNs
-    } -body {
-	deserializeFromFile serialized0.8.9.ral $dstNs
-	cmpRelvars [namespace current] $dstNs
-    } -result {1}
+    namespace eval testfiles [list source [file join $testdir merge1.tcl]]
+    namespace eval testfiles [list source [file join $testdir pop2.tcl]]
+    makeFile [serialize [namespace current]::testfiles::*] mergetest2.ral
+    cleanUpNamespace testfiles
 
-    test storeToMk-1.0 {
-	metakit persistence for relvars
+    test merge-1.0 {
+	merge same data twice
     } -setup {
-	set dstNs ::ral::deserial
-        namespace eval $dstNs {}
-	set mkFile [file join [temporaryDirectory] storeToMk-1.0.mk]
+        deserializeFromFile [file join [testsDirectory] mergetest1.ral]\
+                mergetest
     } -cleanup {
-        cleanUpNamespace $dstNs
-	file delete $mkFile
+        cleanUpNamespace mergetest
     } -body {
-	storeToMk $mkFile
-	loadFromMk $mkFile $dstNs
-	cmpRelvars [namespace current] $dstNs
+        set subfields [relation cardinality [relvar set mergetest::SubField]]
+        mergeFromFile [file join [testsDirectory] mergetest1.ral]\
+            mergetest
+        expr {$subfields ==\
+            [relation cardinality [relvar set mergetest::SubField]]}
     } -result {1}
-
-    test dump-1.0 {
-	serialize relvars as a Tcl script
-    } -setup {
-	set dstNs ::ral::deserial
-    } -cleanup {
-        cleanUpNamespace $dstNs
-    } -body {
-	set d [dump]
-	namespace eval $dstNs $d
-	cmpRelvars [namespace current] $dstNs
-    } -result {1}
-
-if 0 {
-    test -1.0 {
-    } -setup {
-    } -cleanup {
-    } -body {
-    } -result {}
-}
 
     cleanupTests
 }
 
 namespace delete ::ral::test
+ 
+if 0 {
+
+    test XX-1.0 {
+    } -setup {
+    } -cleanup {
+    } -body {
+    } -result {}
+}

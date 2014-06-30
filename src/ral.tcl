@@ -434,6 +434,17 @@ proc ::ral::serializeToFile {fileName {pattern *}} {
     return
 }
 
+# Clean up a namespace name and append trailing colons.
+# Eval a null script in the namespace to make sure to create it
+# paying careful attention to non-qualified names
+proc ::ral::EvalNS {ns} {
+    if {[string range $ns 0 1] ne "::"} {
+        set ns [uplevel 3 namespace current]::$ns
+    }
+    namespace eval $ns {}
+    return [string trimright $ns :]::
+}
+
 # Restore the relvar values from a string.
 proc ::ral::deserialize {value {ns ::}} {
     if {[llength $value] == 4} {
@@ -441,12 +452,8 @@ proc ::ral::deserialize {value {ns ::}} {
         deserialize-0.8.X $value [expr {$ns eq {} ? "::" : $ns}]
         return
     }
+    set ns [EvalNS $ns]
 
-    set ns [string trimright $ns :]
-    if {$ns ne {}} {
-        namespace eval $ns {}
-    }
-    set ns ${ns}::
     if {[dict size $value] != 4} {
         error "bad value format, expected dictionary of 4 items,\
                 got [dict size $value] items"
@@ -484,6 +491,7 @@ proc ::ral::deserializeFromFile {fileName {ns ::}} {
 }
 
 proc ::ral::deserialize-0.8.X {value {ns ::}} {
+    set ns [EvalNS $ns]
     if {[llength $value] != 4} {
         error "bad value format, expected list of 4 items,\
                 got [llength $value] items"
@@ -559,7 +567,7 @@ proc ::ral::deserializeFromFile-0.8.X {fileName {ns ::}} {
 }
 
 proc ::ral::merge {value {ns ::}} {
-    set ns [string trimright $ns :]::
+    set ns [EvalNS $ns]
     if {[dict size $value] != 4} {
         error "bad value format, expected dictionary of 4 items,\
                 got [dict size $value] items"
@@ -685,15 +693,10 @@ proc ::ral::storeToMk {fileName {pattern *}} {
     return -options $opts $result
 }
 
-proc ::ral::loadFromMk {fileName {ns {}}} {
+proc ::ral::loadFromMk {fileName {ns ::}} {
     package require Mk4tcl
 
-    set ns [string trimright $ns :]
-    if {$ns ne {}} {
-        namespace eval $ns {}
-    }
-    set ns ${ns}::
-
+    set ns [EvalNS $ns]
     ::mk::file open db $fileName -readonly
     catch {
         # Check that a "version" view exists and that the information
@@ -973,12 +976,7 @@ proc ::ral::loadFromSQLite {filename {ns ::}} {
     if {![file exists $filename]} {
         error "no such file, \"$filename\""
     }
-
-    set ns [string trimright $ns :]
-    if {$ns ne {}} {
-        namespace eval $ns {}
-    }
-    set ns ${ns}::
+    set ns [EvalNS $ns]
 
     package require sqlite3
     sqlite3 [namespace current]::sqlitedb $filename
