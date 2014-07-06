@@ -100,7 +100,7 @@ namespace eval ::ral::test {
     cleanUpNamespace testfiles
 
     test merge-1.0 {
-	merge same data twice
+	merge same data -- no effect
     } -setup {
         deserializeFromFile [file join [testsDirectory] mergetest1.ral]\
                 mergetest
@@ -113,6 +113,65 @@ namespace eval ::ral::test {
         expr {$subfields ==\
             [relation cardinality [relvar set mergetest::SubField]]}
     } -result {1}
+
+    test merge-2.0 {
+	merge with file that adds more tuples
+    } -setup {
+        deserializeFromFile [file join [testsDirectory] mergetest1.ral]\
+                merge2
+    } -cleanup {
+        cleanUpNamespace merge2
+    } -body {
+        set subfields [relation cardinality [relvar set merge2::SubField]]
+        mergeFromFile [file join [testsDirectory] mergetest2.ral]\
+            merge2
+        expr {$subfields + 2 ==\
+            [relation cardinality [relvar set merge2::SubField]]}
+    } -result {1}
+
+    # Make the test files for SQLite based serialization
+    namespace eval testfiles [list source [file join $testdir merge1.tcl]]
+    namespace eval testfiles [list source [file join $testdir pop1.tcl]]
+    storeToSQLite mergetest1.sqlite3 testfiles::*
+    cleanUpNamespace testfiles
+
+    namespace eval testfiles [list source [file join $testdir merge1.tcl]]
+    namespace eval testfiles [list source [file join $testdir pop2.tcl]]
+    storeToSQLite mergetest2.sqlite3 testfiles::*
+    cleanUpNamespace testfiles
+
+    test mergeFromSQLite-1.0 {
+	merge same data -- no effect
+    } -setup {
+        loadFromSQLite [file join [testsDirectory] mergetest1.sqlite3]\
+                mergesqlite
+    } -cleanup {
+        cleanUpNamespace mergesqlite
+    } -body {
+        set subfields [relation cardinality [relvar set mergesqlite::SubField]]
+        mergeFromSQLite [file join [testsDirectory] mergetest1.sqlite3]\
+            mergesqlite
+        expr {$subfields ==\
+            [relation cardinality [relvar set mergesqlite::SubField]]}
+    } -result {1}
+
+    test mergeFromSQLite-2.0 {
+	merge with file that adds more tuples
+    } -setup {
+        loadFromSQLite [file join [testsDirectory] mergetest1.sqlite3]\
+                merge2
+    } -cleanup {
+        cleanUpNamespace merge2
+    } -body {
+        set subfields [relation cardinality [relvar set merge2::SubField]]
+        mergeFromSQLite [file join [testsDirectory] mergetest2.sqlite3]\
+            merge2
+        expr {$subfields + 2 ==\
+            [relation cardinality [relvar set merge2::SubField]]}
+    } -result {1}
+
+    file delete mergetest1.sqlite3
+    file delete mergetest2.sqlite3
 
     cleanupTests
 }

@@ -46,42 +46,25 @@
 
 ral relvar eval {
     ral relvar insert Field {
-        Name    PwrCtrl
+        Name    InCtrl
         Size    8
     }
 
     ral relvar insert SubField {
-        Name        PwrCtrl
-        Sub         Volts
-        Offset      0
+        Name        InCtrl
+        Sub         Unit1
+        Offset      3
     } {
-        Name        PwrCtrl
-        Sub         Amps
+        Name        InCtrl
+        Sub         Unit2
         Offset      4
     }
 
-    ral relvar insert IntField {
-        Name        PwrCtrl
-        Sub         Volts
-        Width       4
-        Sign        true
+    ral relvar insert BitField {
+        Name        InCtrl
+        Sub         Unit1
     } {
-        Name        PwrCtrl
-        Sub         Amps
-        Width       4
-        Sign        false
-    }
-
-    ral relvar insert SymValue {
-        Type        int
-        Name        Off
-        Value       0
-    }
-
-    ral relvar insert SymFieldValue {
-        FieldName       PwrCtrl
-        SubFieldName    Volts
-        SymType         int
-        SymName         Off
+        Name        InCtrl
+        Sub         Unit2
     }
 }

@@ -373,7 +373,7 @@ proc ::ral::tupleformat {tupleValue {title {}} {noheading 0}} {
 #   <list of relvar defs> :
 #       {<relvar name> <relation heading> <list of relvar identfiers}
 #
-#   <list of constaints> :
+#   <list of constraints> :
 #       {association | partition | correlation | procedural <constraint detail>}
 #   <association constaint detail> :
 #       <association name> <relvar name> {<attr list>} <mult/cond>\
@@ -393,6 +393,7 @@ proc ::ral::tupleformat {tupleValue {title {}} {noheading 0}} {
 # Generate a string that encodes all the relvars.
 
 proc ::ral::serialize {{pattern *}} {
+    set pattern [SerializePattern $pattern]
     set result [list]
 
     lappend result Version [getVersion]
@@ -425,6 +426,7 @@ proc ::ral::serialize {{pattern *}} {
 }
 
 proc ::ral::serializeToFile {fileName {pattern *}} {
+    set pattern [SerializePattern $pattern]
     set chan [::open $fileName w]
     set gotErr [catch {puts $chan [serialize $pattern]} result]
     ::close $chan
@@ -434,17 +436,6 @@ proc ::ral::serializeToFile {fileName {pattern *}} {
     return
 }
 
-# Clean up a namespace name and append trailing colons.
-# Eval a null script in the namespace to make sure to create it
-# paying careful attention to non-qualified names
-proc ::ral::EvalNS {ns} {
-    if {[string range $ns 0 1] ne "::"} {
-        set ns [uplevel 3 namespace current]::$ns
-    }
-    namespace eval $ns {}
-    return [string trimright $ns :]::
-}
-
 # Restore the relvar values from a string.
 proc ::ral::deserialize {value {ns ::}} {
     if {[llength $value] == 4} {
@@ -452,7 +443,7 @@ proc ::ral::deserialize {value {ns ::}} {
         deserialize-0.8.X $value [expr {$ns eq {} ? "::" : $ns}]
         return
     }
-    set ns [EvalNS $ns]
+    set ns [DeserialNS $ns]
 
     if {[dict size $value] != 4} {
         error "bad value format, expected dictionary of 4 items,\
@@ -484,6 +475,7 @@ proc ::ral::deserialize {value {ns ::}} {
 }
 
 proc ::ral::deserializeFromFile {fileName {ns ::}} {
+    set ns [DeserialNS $ns]
     set chan [::open $fileName r]
     catch {deserialize [read $chan] $ns} result opts
     ::close $chan
@@ -491,7 +483,7 @@ proc ::ral::deserializeFromFile {fileName {ns ::}} {
 }
 
 proc ::ral::deserialize-0.8.X {value {ns ::}} {
-    set ns [EvalNS $ns]
+    set ns [DeserialNS $ns]
     if {[llength $value] != 4} {
         error "bad value format, expected list of 4 items,\
                 got [llength $value] items"
@@ -567,7 +559,7 @@ proc ::ral::deserializeFromFile-0.8.X {fileName {ns ::}} {
 }
 
 proc ::ral::merge {value {ns ::}} {
-    set ns [EvalNS $ns]
+    set ns [DeserialNS $ns]
     if {[dict size $value] != 4} {
         error "bad value format, expected dictionary of 4 items,\
                 got [dict size $value] items"
@@ -611,10 +603,7 @@ proc ::ral::merge {value {ns ::}} {
     relvar eval {
         foreach body [dict get $value Values] {
             foreach {relvarName relvarBody} $body {
-                set fullName ${ns}$relvarName
-                relation foreach row $relvarBody {
-                    relvar uinsert $fullName [relation body $row]
-                }
+                relvar uinsert ${ns}$relvarName {*}[relation body $relvarBody]
             }
         }
     }
@@ -623,6 +612,7 @@ proc ::ral::merge {value {ns ::}} {
 }
 
 proc ::ral::mergeFromFile {fileName {ns ::}} {
+    set ns [DeserialNS $ns]
     set chan [::open $fileName r]
     catch {merge [read $chan] $ns} result opts
     ::close $chan
@@ -631,6 +621,7 @@ proc ::ral::mergeFromFile {fileName {ns ::}} {
 
 proc ::ral::storeToMk {fileName {pattern *}} {
     package require Mk4tcl
+    set pattern [SerializePattern $pattern]
 
     # Back up an existing file
     catch {file rename -force -- $fileName $fileName~}
@@ -696,7 +687,7 @@ proc ::ral::storeToMk {fileName {pattern *}} {
 proc ::ral::loadFromMk {fileName {ns ::}} {
     package require Mk4tcl
 
-    set ns [EvalNS $ns]
+    set ns [DeserialNS $ns]
     ::mk::file open db $fileName -readonly
     catch {
         # Check that a "version" view exists and that the information
@@ -744,8 +735,7 @@ proc ::ral::loadFromMk {fileName {ns ::}} {
 proc ::ral::mergeFromMk {fileName {ns ::}} {
     package require Mk4tcl
 
-    set ns [string trimright $ns :]::
-
+    set ns [DeserialNS $ns]
     ::mk::file open db $fileName -readonly
     catch {
         mkCheckVersion db
@@ -811,6 +801,7 @@ proc ::ral::mergeFromMk {fileName {ns ::}} {
 proc ::ral::storeToSQLite {filename {pattern *}} {
     package require sqlite3
 
+    set pattern [SerializePattern $pattern]
     catch {file rename -force -- $filename $filename~}
     sqlite3 [namespace current]::sqlitedb $filename
     sqlitedb eval "pragma foreign_keys=ON;"
@@ -976,7 +967,7 @@ proc ::ral::loadFromSQLite {filename {ns ::}} {
     if {![file exists $filename]} {
         error "no such file, \"$filename\""
     }
-    set ns [EvalNS $ns]
+    set ns [DeserialNS $ns]
 
     package require sqlite3
     sqlite3 [namespace current]::sqlitedb $filename
@@ -1061,14 +1052,12 @@ proc ::ral::loadFromSQLite {filename {ns ::}} {
 # All relvars whose names and headings match currently defined relvars
 # will have their relation values unioned with those in the file.
 proc ::ral::mergeFromSQLite {filename {ns ::}} {
+    package require sqlite3
+
     if {![file exists $filename]} {
         error "no such file, \"$filename\""
     }
-    set ns [string trimright $ns :]::
-    if {![namespace exists $ns]} {
-        error "namespace, \"$ns\", does not exist"
-    }
-    package require sqlite3
+    set ns [DeserialNS $ns]
     sqlite3 [namespace current]::sqlitedb $filename
     catch {
         # First we query database to find out its version and the
@@ -1111,7 +1100,7 @@ proc ::ral::mergeFromSQLite {filename {ns ::}} {
         # First associations
         set dbassocs [sqlitedb eval {select Cname from __ral_association}]
         foreach dbassoc $dbassocs {
-            if {![::ral::relvar constaints exists ${ns}$dbassoc]} {
+            if {![::ral::relvar constraint exists ${ns}$dbassoc]} {
                 createAssocFromSQLite sqlitedb $ns $dbassoc
             }
         }
@@ -1130,7 +1119,7 @@ proc ::ral::mergeFromSQLite {filename {ns ::}} {
             }
         }
         # Finally procedural constraints
-        set dbprocs [sqlite eval {select Cname from __ral_procedural}]
+        set dbprocs [sqlitedb eval {select Cname from __ral_procedural}]
         foreach dbproc $dbprocs {
             if {![::ral::relvar constraint exists ${ns}$dbproc]} {
                 createProcFromSQLite dbsqlitedb $ns $dbproc
@@ -1252,6 +1241,7 @@ proc ::ral::createProcFromSQLite {db ns procName} {
 }
 
 proc ::ral::dump {{pattern *}} {
+    set pattern [SerializePattern $pattern]
     set result {}
     set names [lsort [relvar names $pattern]]
 
@@ -1277,7 +1267,8 @@ proc ::ral::dump {{pattern *}} {
     append result "::ral::relvar eval \{\n"
     foreach name $names {
         append result\
-            "    ::ral::relvar set [namespace tail  $name] [list [relvar set $name]]" \n
+            "    ::ral::relvar set [namespace tail  $name]\
+                [list [relvar set $name]]" \n
     }
     append result "\}"
 
@@ -1531,6 +1522,28 @@ proc ::tcl::mathfunc::rmax {relation attr} {
 }
 
 # PRIVATE PROCS
+
+# Clean up a namespace name for deserialization and append trailing colons.
+# Eval a null script in the namespace to make sure to create it
+# paying careful attention to non-qualified names.
+proc ::ral::DeserialNS {ns} {
+    if {[string range $ns 0 1] ne "::"} {
+        set callerns [string trimright [uplevel 2 namespace current] :]
+        set ns ${callerns}::$ns
+    }
+    set ns [string trimright $ns :]
+    namespace eval $ns {}
+    set ns ${ns}::
+    return $ns
+}
+
+proc ::ral::SerializePattern {pattern} {
+    if {[string range $pattern 0 1] ne "::"} {
+        set callerns [string trimright [uplevel 2 namespace current] :]
+        set pattern ${callerns}::$pattern
+    }
+    return $pattern
+}
 
 # Add heading rows to the matrix.
 proc ::ral::addHeading {matrix heading} {

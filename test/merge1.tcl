@@ -45,6 +45,7 @@
 #  *--
 
 package require ral
+package require ralutil
 
 ral relvar create Field {
     Name    string
@@ -95,19 +96,31 @@ ral relvar correlation R3 SymFieldValue\
     {FieldName SubFieldName} * IntField {Name Sub}\
     {SymType SymName} + SymValue {Type Name}
 
-# Make sure that the total width of IntFields in a given field
-# does not exceed 8.
+# Make sure that the total width of IntField's and the total number of
+# BitField's in a given field does not exceed the size of the field.
 ral relvar procedural R4 IntField {
-    # Group the subfields together
-    set fields [ral relation group [ral relvar set IntField]\
-        IntFields Sub Width Sign]
+    # Group the intfields and bitfields together with the field size information
+    set fields [ralutil pipe {
+        ral relvar set Field |
+        ral relation join ~ [ral relvar set IntField] |
+        ral relation group ~ IntFields Sub Width Sign |
+        ral relation join ~ [ral relvar set BitField] |
+        ral relation group ~ BitFields Sub
+    }]
     # Iterate across the fields
     ral relation foreach field $fields {
         # Sum all the widths of the subfields.
-        set tw [ral relation summarizeby\
-            [ral relation extract $field IntFields]\
-            {} f TotalWidth int {rsum($f, "Width")}]
-        if {[ral relation extract $tw TotalWidth] > 8} {
+        set totalintfields [ralutil pipe {
+            ral relation extract $field IntFields |
+            ral relation summarizeby ~ {} f TotalWidth int {rsum($f, "Width")} |
+            ral relation extract ~ TotalWidth
+        }]
+        set totalbitfields [ralutil pipe {
+            ral relation extract $field BitFields |
+            ral relation cardinality
+        }]
+        if {$totalintfields + $totalbitfields >\
+                    [ral relation extract $field Width]} {
             return false
         }
     }
