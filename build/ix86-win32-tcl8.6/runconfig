@@ -1,0 +1,6 @@
+#!/bin/bash
+../../configure\
+        --build=i686-linux-gnu\
+        --host=i686-w64-mingw32\
+        --with-tcl=/home/andrewm/local/tcl8.6-i686-w64-mingw32/lib\
+        CPPFLAGS=-DNDEBUG
