@@ -394,30 +394,36 @@ proc ::ral::tupleformat {tupleValue {title {}} {noheading 0}} {
 
 proc ::ral::serialize {{pattern *}} {
     set pattern [SerializePattern $pattern]
+    set rnames [BaseNames [relvar names $pattern]]
+    set cnames [BaseNames [relvar constraint names $pattern]]
+
     set result [list]
 
     lappend result Version [getVersion]
 
-    # Get the names
-    set names [lsort [relvar names $pattern]]
+    # Gather the headings and identifiers
     set relNameList [list]
-    foreach name $names {
-        lappend relNameList [namespace tail $name]\
-            [relation heading [relvar set $name]] [relvar identifiers $name]
+    relation foreach rname $rnames {
+        relation assign $rname
+        lappend relNameList $Base\
+            [relation heading [relvar set $Qualified]]\
+            [relvar identifiers $Qualified]
     }
     lappend result Relvars $relNameList
 
-    # Constraint information contains fully qualified relvar names
-    # and must be flattened to a single level.
+    # Gather the contraints
     set constraints [list]
-    foreach cname [lsort [relvar constraint names $pattern]] {
-        lappend constraints [getRelativeConstraintInfo $cname]
+    relation foreach cname $cnames {
+        relation assign $cname
+        lappend constraints [getRelativeConstraintInfo $Qualified]
     }
     lappend result Constraints $constraints
 
+    # Gather the bodies
     set bodies [list]
-    foreach name $names {
-        lappend bodies [list [namespace tail $name] [relvar set $name]]
+    relation foreach rname $rnames {
+        relation assign $rname
+        lappend bodies [list $Base [relvar set $Qualified]]
     }
 
     lappend result Values $bodies
@@ -603,7 +609,10 @@ proc ::ral::merge {value {ns ::}} {
     relvar eval {
         foreach body [dict get $value Values] {
             foreach {relvarName relvarBody} $body {
-                relvar uinsert ${ns}$relvarName {*}[relation body $relvarBody]
+                if {$relvarName in $matchingRelvars} {
+                    relvar uinsert ${ns}$relvarName\
+                            {*}[relation body $relvarBody]
+                }
             }
         }
     }
@@ -622,6 +631,8 @@ proc ::ral::mergeFromFile {fileName {ns ::}} {
 proc ::ral::storeToMk {fileName {pattern *}} {
     package require Mk4tcl
     set pattern [SerializePattern $pattern]
+    set rnames [BaseNames [relvar names $pattern]]
+    set cnames [BaseNames [relvar constraint names $pattern]]
 
     # Back up an existing file
     catch {file rename -force -- $fileName $fileName~}
@@ -645,15 +656,12 @@ proc ::ral::storeToMk {fileName {pattern *}} {
         # Convert the names to be relative before inserting.  Also create the
         # views that will hold the values.  Metakit doesn't like "::" and some
         # other characters in view names.
-        set names [relvar names $pattern]
-        set basenames [list]
-        foreach name $names {
-            set basename [namespace tail $name]
-            lappend basenames $basename
-            set heading [relation heading [relvar set $name]]
-            set ids [relvar identifiers $name]
-            ::mk::row append db.__ral_relvar Name_ral $basename\
-                Heading_ral $heading Ids_ral $ids View_ral $basename
+        relation foreach rname $rnames {
+            relation assign $rname
+            set heading [relation heading [relvar set $Qualified]]
+            set ids [relvar identifiers $Qualified]
+            ::mk::row append db.__ral_relvar Name_ral $Base\
+                Heading_ral $heading Ids_ral $ids View_ral $Base
             # Determine the structure of the view that will hold the relvar
             # value.  Special attention is required for Tuple and Relation
             # valued attributes.
@@ -661,19 +669,20 @@ proc ::ral::storeToMk {fileName {pattern *}} {
             foreach {attr type} $heading {
                 lappend relvarLayout [mkHeading $attr $type]
             }
-            ::mk::view layout db.$basename $relvarLayout
+            ::mk::view layout db.$Base $relvarLayout
         }
         # Get the constraints and put them into the catalog.
-        set partIndex 0
-        foreach cname [relvar constraint names $pattern] {
+        relation foreach cname $cnames {
+            relation assign $cname
             # Constrain names must be made relative.
             ::mk::row append db.__ral_constraint Constraint_ral\
-                [getRelativeConstraintInfo $cname]
+                [getRelativeConstraintInfo $Qualified]
         }
         # Populate the views for each relavar.
-        foreach name $names basename $basenames {
-            ::mk::cursor create cursor db.$basename 0
-            relation foreach r [relvar set $name] {
+        relation foreach rname $rnames {
+            relation assign $rname
+            ::mk::cursor create cursor db.$Base 0
+            relation foreach r [relvar set $Qualified] {
                 ::mk::row insert $cursor
                 mkStoreTuple $cursor [relation tuple $r]
                 ::mk::cursor incr cursor
@@ -802,6 +811,9 @@ proc ::ral::storeToSQLite {filename {pattern *}} {
     package require sqlite3
 
     set pattern [SerializePattern $pattern]
+    set rnames [BaseNames [relvar names $pattern]]
+    set cnames [BaseNames [relvar constraint names $pattern]]
+
     catch {file rename -force -- $filename $filename~}
     sqlite3 [namespace current]::sqlitedb $filename
     sqlitedb eval "pragma foreign_keys=ON;"
@@ -814,27 +826,27 @@ proc ::ral::storeToSQLite {filename {pattern *}} {
             set version [getVersion]
             sqlitedb eval {insert into __ral_version (Vnum, Date)\
                 values ($version, CURRENT_TIMESTAMP) ;}
-            foreach relvar [relvar names $pattern] {
+            relation foreach rname $rnames {
+                relation assign $rname
                 # First the relvars and their attributes and identifiers
-                set basename [namespace tail $relvar]
                 sqlitedb eval {insert into __ral_relvar (Vname)\
-                        values ($basename) ;}
+                        values ($Base) ;}
                 foreach {attrName type} [relation heading\
-                        [relvar set $relvar]] {
+                        [relvar set $Qualified]] {
                     sqlitedb eval {insert into __ral_attribute (Vname, Aname,\
-                            Type) values ($basename, $attrName, $type) ;}
+                            Type) values ($Base, $attrName, $type) ;}
                 }
                 set idCounter 0
-                foreach identifier [relvar identifiers $relvar] {
+                foreach identifier [relvar identifiers $Qualified] {
                     foreach idattr $identifier {
                         sqlitedb eval {insert into\
                             __ral_identifier (IdNum, Vname, Attr)\
-                            values ($idCounter, $basename, $idattr) ;}
+                            values ($idCounter, $Base, $idattr) ;}
                     }
                     incr idCounter
                 }
                 # Next the constraints
-                foreach constraint [relvar constraint member $relvar] {
+                foreach constraint [relvar constraint member $Qualified] {
                     set cinfo [lassign [relvar constraint info $constraint]\
                         ctype]
                     switch -exact -- $ctype {
@@ -923,9 +935,10 @@ proc ::ral::storeToSQLite {filename {pattern *}} {
         # We choose as the alternate variable names the names given to the
         # SQLite columns.
         sqlitedb transaction exclusive {
-            foreach relvar [relvar names $pattern] {
-                set relValue [relvar set $relvar]
-                set sqlTableName [mapNamesToSQL [namespace tail $relvar]]
+            relation foreach rname $rnames {
+                relation assign $rname
+                set relValue [relvar set $Qualified]
+                set sqlTableName [mapNamesToSQL $Base]
                 set attrNames [relation attributes $relValue]
                 # Map the attribute names to a set of SQLite column names.
                 set sqlCols [mapNamesToSQL $attrNames]
@@ -1543,6 +1556,25 @@ proc ::ral::SerializePattern {pattern} {
         set pattern ${callerns}::$pattern
     }
     return $pattern
+}
+
+# Returns a relation value with the heading {Qualified string Base string}
+# that represents the fully qualified relvar names and their corresponding
+# leaf base names. Checks that all the relvars that "names" have unique base
+# names.
+proc ::ral::BaseNames {names} {
+    set rnames [relation extend [relation fromlist $names Qualified string]\
+        rn Base string {
+            [namespace tail [tuple extract $rn Qualified]]
+        }]
+
+    set bnames [relation list [relation project $rnames Base]]
+
+    if {[relation cardinality $rnames] != [llength $bnames]} {
+        error "set of relvar names results in duplicated base names, \"$names\""
+    }
+
+    return $rnames
 }
 
 # Add heading rows to the matrix.

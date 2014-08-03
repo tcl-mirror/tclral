@@ -99,6 +99,11 @@ namespace eval ::ral::test {
     makeFile [serialize [namespace current]::testfiles::*] mergetest2.ral
     cleanUpNamespace testfiles
 
+    namespace eval testfiles [list source [file join $testdir merge2.tcl]]
+    namespace eval testfiles [list source [file join $testdir pop3.tcl]]
+    makeFile [serialize [namespace current]::testfiles::*] mergetest3.ral
+    cleanUpNamespace testfiles
+
     test merge-1.0 {
 	merge same data -- no effect
     } -setup {
@@ -127,6 +132,21 @@ namespace eval ::ral::test {
             merge2
         expr {$subfields + 2 ==\
             [relation cardinality [relvar set merge2::SubField]]}
+    } -result {1}
+
+    test merge-3.0 {
+	merge with file that has relvar with the same name but different type
+    } -setup {
+        deserializeFromFile [file join [testsDirectory] mergetest1.ral]\
+                merge3
+    } -cleanup {
+        cleanUpNamespace merge3
+    } -body {
+        set subfields [relation cardinality [relvar set merge3::Field]]
+        set mismatch [mergeFromFile [file join [testsDirectory] mergetest3.ral]\
+                merge3]
+        expr {$subfields == [relation cardinality [relvar set merge3::Field]]\
+                && [string match *Field [lindex $mismatch 0]]}
     } -result {1}
 
     # Make the test files for SQLite based serialization
@@ -170,8 +190,48 @@ namespace eval ::ral::test {
             [relation cardinality [relvar set merge2::SubField]]}
     } -result {1}
 
+    # Make the test files for Metakit based serialization
+    namespace eval testfiles [list source [file join $testdir merge1.tcl]]
+    namespace eval testfiles [list source [file join $testdir pop1.tcl]]
+    storeToMk mergetest1.mk testfiles::*
+    cleanUpNamespace testfiles
+
+    namespace eval testfiles [list source [file join $testdir merge1.tcl]]
+    namespace eval testfiles [list source [file join $testdir pop2.tcl]]
+    storeToMk mergetest2.mk testfiles::*
+    cleanUpNamespace testfiles
+
+    test mergeFromMk-1.0 {
+	merge same data -- no effect
+    } -setup {
+        loadFromMk [file join [testsDirectory] mergetest1.mk] mergemk
+    } -cleanup {
+        cleanUpNamespace mergemk
+    } -body {
+        set subfields [relation cardinality [relvar set mergemk::SubField]]
+        mergeFromMk [file join [testsDirectory] mergetest1.mk] mergemk
+        expr {$subfields ==\
+            [relation cardinality [relvar set mergemk::SubField]]}
+    } -result {1}
+
+    test mergeFromMk-2.0 {
+	merge with file that adds more tuples
+    } -setup {
+        loadFromMk [file join [testsDirectory] mergetest1.mk] merge3
+    } -cleanup {
+        cleanUpNamespace merge3
+    } -body {
+        set subfields [relation cardinality [relvar set merge3::SubField]]
+        mergeFromMk [file join [testsDirectory] mergetest2.mk] merge3
+        expr {$subfields + 2 ==\
+            [relation cardinality [relvar set merge3::SubField]]}
+    } -result {1}
+
     file delete mergetest1.sqlite3
     file delete mergetest2.sqlite3
+
+    file delete mergetest1.mk
+    file delete mergetest2.mk
 
     cleanupTests
 }

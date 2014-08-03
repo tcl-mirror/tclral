@@ -102,7 +102,7 @@
   <a href="../toc.html">Table Of Contents</a>
 | <a href="../index.html">Keyword Index</a>
 ] <hr>
-<h1 class="title">relvar(n) 0.11.1 ral &quot;Relvar Operators&quot;</h1>
+<h1 class="title">relvar(n) 0.11.2 ral &quot;Relvar Operators&quot;</h1>
 <div id="name" class="section"><h2><a name="name">Name</a></h2>
 <p>relvar - Operators for Relation Variables</p>
 </div>
@@ -123,7 +123,7 @@
 <div id="synopsis" class="section"><h2><a name="synopsis">Synopsis</a></h2>
 <div class="synopsis">
 <ul class="requirements">
-<li>package require <b class="pkgname">ral <span class="opt">?0.11.1?</span></b></li>
+<li>package require <b class="pkgname">ral <span class="opt">?0.11.2?</span></b></li>
 </ul>
 <ul class="syntax">
 <li><a href="#1"><b class="cmd">::ral::relvar association</b> <i class="arg">name</i> <i class="arg">refrngRelvar</i> <i class="arg">refrngAttrList</i> <i class="arg">refToSpec</i> <i class="arg">refToRelvar</i> <i class="arg">refToAttrList</i> <i class="arg">refrngSpec</i></a></li>
@@ -681,7 +681,10 @@ exists and 0 otherwise.
 The relvar name is resolved in the current namespace if it is not
 specified as fully qualified.</p></dd>
 <dt><a name="15"><b class="cmd">::ral::relvar identifiers</b> <i class="arg">relvarName</i></a></dt>
-<dd></dd>
+<dd><p>The <b class="cmd">identifiers</b> subcommand returns a list of the identifiers
+of <i class="arg">relvarName</i>.
+Each element of the returned list is also a list giving the set of
+attributes of <i class="arg">relvarName</i> that constitute the identifier.</p></dd>
 <dt><a name="16"><b class="cmd">::ral::relvar insert</b> <i class="arg">relvarName</i> <span class="opt">?name-value-list ...?</span></a></dt>
 <dd><p>The <b class="cmd">insert</b> subcommand inserts the tuples given by <i class="arg">name-value-list</i>
 arguments into the value of the relation stored in <i class="arg">relvarName</i>.
