@@ -1,3 +1,11 @@
+========= ral 0.11.2 =========
+2014/08/03
+    * Procedural constraints are now evaluated in the namespace implied
+      by the fully qualified constraint name.
+    * The commands are now a proper ensemble with a mapping dictionary.
+    * Corrected a number of problems in the SQLite serialization and
+      added mergeToSQLite.
+
 ========= ral 0.10.2 =========
 2012/02/26 mangoa01
 
