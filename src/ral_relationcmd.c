@@ -44,10 +44,6 @@ MODULE:
     ral_relationcmd -- command interface functions for the "relation" command
 
 ABSTRACT:
-
-$RCSfile: ral_relationcmd.c,v $
-$Revision: 1.51 $
-$Date: 2012/02/26 19:09:04 $
  *--
  */
 
@@ -3490,8 +3486,39 @@ RelationUpdateCmd(
                 )) ;
 #endif
                 break ;
-            } else if (result == TCL_BREAK || result == TCL_RETURN) {
+            } else if (result == TCL_RETURN) {
                 result = TCL_OK ;
+            } else if (result != TCL_OK) {
+                /*
+                 * TCL_CONTINUE or TCL_BREAK or custom codes are not allowed.
+                 */
+                switch (result) {
+                case TCL_BREAK:
+                    Tcl_SetObjResult(interp, Tcl_NewStringObj(
+                            "invoked \"break\" outside of a loop", -1)) ;
+                    break ;
+
+                case TCL_CONTINUE:
+                    Tcl_SetObjResult(interp, Tcl_NewStringObj(
+                            "invoked \"continue\" outside of a loop", -1)) ;
+                    break ;
+
+                default:
+                    Tcl_SetObjResult(interp, Tcl_ObjPrintf(
+                            "unknown return code %d", -1)) ;
+                    break ;
+                }
+#if TCL_MAJOR_VERSION >= 8 && TCL_MINOR_VERSION >= 5
+                Tcl_AppendObjToErrorInfo(interp, Tcl_ObjPrintf(
+                    "\n    (\"in ::ral::relation update\" body line %d)",
+#                   if TCL_MINOR_VERSION < 6
+                    interp->errorLine
+#                   else
+                    Tcl_GetErrorLine(interp)
+#                   endif
+                )) ;
+#endif
+                result = TCL_ERROR ;
                 break ;
             }
             /*

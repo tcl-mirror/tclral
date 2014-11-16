@@ -904,6 +904,32 @@ namespace eval ::ral::test {
         expr {$name eq "Smith"}
     } -result 1
 
+    test relation-assign-4.0 {
+	relation assign where an attribute has the same name as a relvar
+        and triggers the write trace on the relvar
+    } -setup {
+        namespace eval other {
+            namespace import ::ral::*
+            relvar create Duplicate {
+                A1 string
+                B1 int
+            } A1
+            relvar insert Duplicate {
+                A1 foo B1 20
+            } {
+                A1 bar B1 40
+            }
+        }
+    } -cleanup {
+        relvar unset other::Duplicate
+        namespace forget other
+    } -body {
+        namespace upvar other Duplicate Duplicate
+        relation assign [relation create {Duplicate string Status int}\
+            {Duplicate foo Status 100}]
+        set Duplicate
+    } -result {foo}
+
     # relation attributes subcommand
     test relation-attributes-1.0 {DOG relation} -body {
         lsort [relation attributes $P]
@@ -4326,6 +4352,36 @@ in expression "_@_< 20"} -returnCodes error
 	    {Status -1 Name Alice}
         }
     } -match relation
+
+    test relation-update-2.1 {
+	expression is true, uses return
+    } -setup {
+        set x [relation create {Name string Status int}\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}]
+    } -cleanup {
+    } -body {
+	relation update $x xt {1} {return $xt}
+    } -result {
+        {Name string Status int} {
+	    {Name George Status 20}
+	    {Name Fred Status 30}
+	    {Status 40 Name Alice}
+        }
+    } -match relation
+
+    test relation-update-2.2 {
+	expression is true, encounter break
+    } -setup {
+        set x [relation create {Name string Status int}\
+	    {Name George Status 20}\
+	    {Name Fred Status 30}\
+	    {Status 40 Name Alice}]
+    } -cleanup {
+    } -body {
+	relation update $x xt {1} {break}
+    } -result {invoked "break" outside of a loop} -returnCodes error
 
     test relvar-update-3.0 {
 	subset is updated

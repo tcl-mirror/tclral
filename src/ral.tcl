@@ -1858,4 +1858,4 @@ proc ::ral::mapTypeToSQL {type} {
             $sqlTypeMap($type) : "text"}]
 }
 
-package provide ral 0.11.2
+package provide ral 0.11.3

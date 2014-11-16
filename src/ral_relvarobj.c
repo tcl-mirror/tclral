@@ -2385,6 +2385,16 @@ relvarTraceProc(
     /*
      * For write tracing, the value has been changed, so we must
      * restore it and spit back an error message.
+     * N.B. when you attempt to write to relvar that has been "upvar"ed in some
+     * way (i.e. upvar or namespace upvar), then you will still trigger the
+     * trace here, but we will not find the relvar. In that case we let the
+     * write go through since it does not really overwrite the relvar value. In
+     * the code below, we resolve the name given in the trace and attempt to
+     * find the relvar using the usual criteria.  But the name given to the
+     * trace may not resolve to a relvar if that relvar is in another namespace
+     * and we have "upvar"ed it.  So no harm is done by simply letting the
+     * write go on since we have not actually modified the relvar value by the
+     * write.
      */
     if (flags & TCL_TRACE_WRITES) {
 	Ral_RelvarInfo info = (Ral_RelvarInfo) clientData ;
@@ -2392,18 +2402,20 @@ relvarTraceProc(
 	char const *resolvedName =
 	    relvarResolveName(interp, name1, &resolve) ;
 	Ral_Relvar relvar = Ral_RelvarFind(info, resolvedName) ;
-	Tcl_Obj *newValue ;
 
-	assert(relvar != NULL) ;
-	newValue = Tcl_SetVar2Ex(interp, resolvedName, NULL, relvar->relObj,
-	    flags) ;
+        if (relvar != NULL) {
+            Tcl_Obj *newValue = Tcl_SetVar2Ex(interp, resolvedName, NULL,
+                    relvar->relObj, flags) ;
+            /*
+             * Should not be modified because tracing is suspended while
+             * tracing.
+             */
+            assert(newValue == relvar->relObj) ;
+            (void)newValue ;
+            result =
+                "relvar may only be modified using \"::ral::relvar\" command" ;
+        }
 	Tcl_DStringFree(&resolve) ;
-	/*
-	 * Should not be modified because tracing is suspended while tracing.
-	 */
-	assert(newValue == relvar->relObj) ;
-        (void)newValue ;
-	result = "relvar may only be modified using \"::ral::relvar\" command" ;
     } else {
 	Tcl_Panic("relvarTraceProc: trace on non-write, flags = %#x\n", flags) ;
     }

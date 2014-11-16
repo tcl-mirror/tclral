@@ -1,2 +1,4 @@
 #!/bin/bash
-../../configure CFLAGS=-DNDEBUG --with-tcl=/opt/ActiveTcl-8.6/lib
+../../configure\
+    CFLAGS=-DNDEBUG\
+    --with-tcl=/home/andrewm/local/tcl8.6-linux-glibc2.19-x86_64/lib

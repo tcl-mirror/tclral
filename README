@@ -31,6 +31,15 @@ cases located in directories below the package files.
 CONTACT
 =======
 
-TclRAL is a hosted at SourceForge and bug reports and requests can be posted
-there:
-    http://sourceforge.net/projects/tclral
+The definitive source for TclRAL has moved from SourceForge to fossil
+repositories:
+
+    https://chiselapp.com/user/mangoa01/repository/tclral/index
+
+OR
+
+    http://repos.modelrealization.com/cgi-bin/fossil/tclral
+
+The files provided at SourceForge are copies of the releases from the fossil
+repositories. If you want the latest source, please clone the fossil repository
+from one of the above sources.

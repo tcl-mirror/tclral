@@ -1,4 +1,5 @@
 #!/bin/bash
 ../../configure \
     CPPFLAGS=-DNDEBUG\
-    --with-tcl=/home/andrewm/local/tcl8.6/lib
+    CFLAGS=-m32\
+    --with-tcl=/home/andrewm/local/tcl8.6-linux-glibc2.19-i686/lib

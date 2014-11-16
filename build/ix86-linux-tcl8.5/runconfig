@@ -1,4 +1,0 @@
-#!/bin/bash
-../../configure\
-        CPPFLAGS=-DNDEBUG\
-        --with-tcl=/home/andrewm/local/tcl8.5/lib
