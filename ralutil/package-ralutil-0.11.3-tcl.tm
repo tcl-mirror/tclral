@@ -2,11 +2,11 @@
 # -- Tcl Module
 
 # @@ Meta Begin
-# Package ralutil 0.11.2
+# Package ralutil 0.11.3
 # Meta description The ralutil package contains a set of procedures useful
 # Meta description with TclRAL.
 # Meta platform    tcl
-# Meta require     {ral 0.11.2}
+# Meta require     {ral 0.11.3}
 # Meta require     Tcl
 # Meta summary     TclRAL utilities
 # @@ Meta End
@@ -14,14 +14,14 @@
 
 # ACTIVESTATE TEAPOT-PKG BEGIN REQUIREMENTS
 
-package require ral 0.11.2
+package require ral 0.11.3
 package require Tcl
 
 # ACTIVESTATE TEAPOT-PKG END REQUIREMENTS
 
 # ACTIVESTATE TEAPOT-PKG BEGIN DECLARE
 
-package provide ralutil 0.11.2
+package provide ralutil 0.11.3
 
 # ACTIVESTATE TEAPOT-PKG END DECLARE
 # ACTIVESTATE TEAPOT-PKG END TM
@@ -77,9 +77,9 @@ package provide ralutil 0.11.2
 # 
 #  *--
 
-package provide ralutil 0.11.2
+package provide ralutil 0.11.3
 
-package require ral 0.11.2
+package require ral 0.11.3
 
 namespace eval ::ralutil {
     namespace export pipe
