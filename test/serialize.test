@@ -89,9 +89,9 @@ namespace eval ::ral::test {
     }
 
     proc cleanUpNamespace {ns} {
-	relvar constraint delete {*}[relvar constraint names ${ns}::*]
-	relvar unset {*}[relvar names ${ns}::*]
-	namespace delete $ns
+        relvar constraint delete {*}[relvar constraint names ${ns}::*]
+        relvar unset {*}[relvar names ${ns}::*]
+        namespace delete $ns
     }
 
     # example relvar data to use
@@ -170,6 +170,96 @@ namespace eval ::ral::test {
 	namespace eval $dstNs $d
 	cmpRelvars [namespace current] $dstNs
     } -result {1}
+
+    test procedural-1.0 {
+        procedural contraint fails on loadFromSQLite
+    } -setup {
+        namespace eval rvtest {
+            namespace import ::ral::*
+        }
+        relvar create rvtest::RV {
+            Id int
+            Attr string
+        } Id
+        relvar insert rvtest::RV {
+            Id 1
+            Attr foo
+        } {
+            Id 2
+            Attr bar
+        }
+        relvar procedural rvtest::R42 rvtest::RV {
+            return [expr {[relation cardinality [relvar set RV]] > 1}]
+        }
+        storeToSQLite rvtest.sqlite *rvtest::*
+    } -cleanup {
+        cleanUpNamespace [namespace current]::rvtest
+        relvar unset ::proctest::RV
+        namespace delete ::proctest
+        file delete rvtest.sqlite
+    } -body {
+        loadFromSQLite rvtest.sqlite ::proctest
+    } -result {invalid command name "relvar"} -returnCodes error
+
+    test procedural-1.1 {
+        procedural contraint fails on deserialization
+    } -setup {
+        namespace eval rvtest {
+            namespace import ::ral::*
+        }
+        relvar create rvtest::RV {
+            Id int
+            Attr string
+        } Id
+        relvar insert rvtest::RV {
+            Id 1
+            Attr foo
+        } {
+            Id 2
+            Attr bar
+        }
+        relvar procedural rvtest::R42 rvtest::RV {
+            return [expr {[relation cardinality [relvar set RV]] > 1}]
+        }
+        serializeToFile rvtest.ral *rvtest::*
+    } -cleanup {
+        cleanUpNamespace [namespace current]::rvtest
+        relvar unset ::proctest::RV
+        namespace delete ::proctest
+        file delete rvtest.ral
+    } -body {
+        deserializeFromFile rvtest.ral ::proctest
+    } -result {invalid command name "relvar"} -returnCodes error
+
+    test procedural-1.2 {
+        procedural contraint fails on loadFromMk
+    } -setup {
+        namespace eval rvtest {
+            namespace import ::ral::*
+        }
+        relvar create rvtest::RV {
+            Id int
+            Attr string
+        } Id
+        relvar insert rvtest::RV {
+            Id 1
+            Attr foo
+        } {
+            Id 2
+            Attr bar
+        }
+        relvar procedural rvtest::R42 rvtest::RV {
+            return [expr {[relation cardinality [relvar set RV]] > 1}]
+        }
+        storeToMk rvtest.mk *rvtest::*
+    } -cleanup {
+        cleanUpNamespace [namespace current]::rvtest
+        relvar unset ::proctest::RV
+        namespace delete ::proctest
+        file delete rvtest.mk
+    } -body {
+        loadFromMk rvtest.mk ::proctest
+    } -result {invalid command name "relvar"} -returnCodes error
 
 if 0 {
     test -1.0 {

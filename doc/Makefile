@@ -4,12 +4,12 @@ DOCS =\
     tuple\
     relformat\
     serialize\
+    ralutil\
     $(NULL)
 
 SRCS = $(patsubst %,ral/%.man,$(DOCS))
 HTML = $(patsubst %,HTML/files/%,$(DOCS))
 NROFF = $(patsubst %,MAN/files/%.n,$(DOCS))
-PS = $(patsubst %,MAN/files/%.ps,$(DOCS))
 
 .PHONY : all html man
 
@@ -20,3 +20,6 @@ html : $(SRCS)
 
 man : $(SRCS)
 	dtplite -o MAN -ext n nroff ral
+
+zip : 
+	zip -r ral-0.11.4-html.zip HTML

@@ -50,9 +50,9 @@
 # 
 #  *--
 
-package provide ralutil 0.11.3
+package provide ralutil 0.11.4
 
-package require ral 0.11.3
+package require ral 0.11.4
 
 namespace eval ::ralutil {
     namespace export pipe

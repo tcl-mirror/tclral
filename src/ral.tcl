@@ -173,11 +173,9 @@ create table __ral_version (
     Vnum text not null,
     Date timestamp not null,
     constraint __ral_version_id unique (Vnum)) ;
-create unique index __ral_version_id_index on __ral_version (Vnum) ;
 create table __ral_relvar (
     Vname text not null,
     constraint __ral_relvar_id unique (Vname)) ;
-create unique index __ral_relvar_id_index on __ral_relvar (Vname) ;
 create table __ral_attribute (
     Vname text not null,
     Aname text not null,
@@ -186,7 +184,6 @@ create table __ral_attribute (
     constraint __ral_attribute_ref foreign key (Vname) references
         __ral_relvar (Vname) on delete cascade on update cascade
         deferrable initially deferred) ;
-create unique index __ral_attribute_id_index on __ral_attribute (Vname, Aname) ;
 create index __ral_attribute_ref_index on __ral_attribute (Vname) ;
 create table __ral_identifier (
     IdNum integer not null,
@@ -199,8 +196,6 @@ create table __ral_identifier (
     constraint __ral_identifier_ref2 foreign key (Vname, Attr) references
         __ral_attribute(Vname, Aname) on delete cascade on update cascade
         deferrable initially deferred) ;
-create unique index __ral_identifier_id on
-    __ral_identifier (IdNum, Vname, Attr) ;
 create index __ral_identifier_ref_index on __ral_identifier (Vname) ;
 create index __ral_identifier_ref2_index on __ral_identifier (Vname, Attr) ;
 create table __ral_association (
@@ -218,7 +213,6 @@ create table __ral_association (
     constraint __ral_association_other foreign key (RefTo)
         references __ral_relvar (Vname) on delete cascade on update cascade
         deferrable initially deferred) ;
-create unique index __ral_association_id on __ral_association (Cname) ;
 create index __ral_association_oneindex on __ral_association (Referring) ;
 create index __ral_association_otherindex on __ral_association (RefTo) ;
 create table __ral_partition (
@@ -229,7 +223,6 @@ create table __ral_partition (
     constraint __ral_partition_ref foreign key (SuperType)
         references __ral_relvar (Vname) on delete cascade on update cascade
         deferrable initially deferred) ;
-create unique index __ral_partition_id on __ral_partition (Cname) ;
 create index __ral_partition_ref on __ral_partition (SuperType) ;
 create table __ral_subtype (
     Cname text not null,
@@ -239,7 +232,6 @@ create table __ral_subtype (
     constraint __ral_subtype_ref foreign key (SubType)
         references __ral_relvar (Vname) on delete cascade on update cascade
         deferrable initially deferred) ;
-create unique index __ral_subtype_id on __ral_subtype (Cname, SubType) ;
 create index __ral_subtype_refindex on __ral_subtype (SubType) ;
 create table __ral_correlation (
     Cname text not null,
@@ -263,7 +255,6 @@ create table __ral_correlation (
     constraint __ral_correlation_otherref foreign key (OtherRelvar)
         references __ral_relvar (Vname) on delete cascade on update cascade
         deferrable initially deferred) ;
-create unique index __ral_correlation_id on __ral_correlation (Cname) ;
 create index __ral_correlation_assocref on __ral_correlation (AssocRelvar) ;
 create index __ral_correlation_oneref on __ral_correlation (OneRelvar) ;
 create index __ral_correlation_otherref on __ral_correlation (OtherRelvar) ;
@@ -271,7 +262,6 @@ create table __ral_procedural (
     Cname text not null,
     Script text not null,
     constraint __ral_procedural_id unique(Cname)) ;
-create unique index __ral_procedural_id on __ral_procedural (Cname) ;
 create table __ral_proc_participant (
     Cname text not null,
     ParticipantRelvar text not null,
@@ -434,12 +424,9 @@ proc ::ral::serialize {{pattern *}} {
 proc ::ral::serializeToFile {fileName {pattern *}} {
     set pattern [SerializePattern $pattern]
     set chan [::open $fileName w]
-    set gotErr [catch {puts $chan [serialize $pattern]} result]
+    catch {puts $chan [serialize $pattern]} result opts
     ::close $chan
-    if {$gotErr} {
-        error $result
-    }
-    return
+    return -options $opts $result
 }
 
 # Restore the relvar values from a string.
@@ -941,7 +928,7 @@ proc ::ral::storeToSQLite {filename {pattern *}} {
                 set sqlTableName [mapNamesToSQL $Base]
                 set attrNames [relation attributes $relValue]
                 # Map the attribute names to a set of SQLite column names.
-                set sqlCols [mapNamesToSQL $attrNames]
+                set sqlCols [mapNamesToSQL {*}$attrNames]
                 set statement "insert into $sqlTableName ([join $sqlCols {, }])\
                     values ("
                 # Create two lists here, one is used to get "relvar assign" to
@@ -973,7 +960,7 @@ proc ::ral::storeToSQLite {filename {pattern *}} {
     } result opts
 
     sqlitedb close
-    return -options $opts
+    return -options $opts $result
 }
 
 proc ::ral::loadFromSQLite {filename {ns ::}} {
@@ -1058,7 +1045,7 @@ proc ::ral::loadFromSQLite {filename {ns ::}} {
     } result opts
 
     sqlitedb close
-    return -options $opts
+    return -options $opts $result
 }
 # Merge data from a SQLite store of relvars.
 # All relvars that are in the database but not currently defined are created.
@@ -1161,7 +1148,7 @@ proc ::ral::mergeFromSQLite {filename {ns ::}} {
     } result opts
 
     sqlitedb close
-    return -options $opts
+    return -options $opts $result
 }
 
 proc ::ral::createRelvarFromSQLite {db ns relvarName} {
@@ -1183,7 +1170,7 @@ proc ::ral::loadRelvarFromSQLite {db ns relvarName operation} {
     set qualName $ns$relvarName
     set heading [relation heading [relvar set $qualName]]
     set attrNames [relation attributes [relvar set $qualName]]
-    set sqlColNames [mapNamesToSQL $attrNames]
+    set sqlColNames [mapNamesToSQL {*}$attrNames]
     $db eval "select [join $sqlColNames {, }]\
             from $sqlTableName" valArray {
         # Build up the insert tuple
@@ -1299,12 +1286,9 @@ proc ::ral::csv {relValue {sortAttr {}} {noheading 0}} {
     package require csv
 
     set m [relation2matrix $relValue $sortAttr $noheading]
-    set gotErr [catch {::csv::report printmatrix $m} result]
+    catch {::csv::report printmatrix $m} result opts
     $m destroy
-    if {$gotErr} {
-        error $result
-    }
-    return $result
+    return -options $opts $result
 }
 
 proc ::ral::csvToFile {relValue fileName {sortAttr {}} {noheading 0}} {
@@ -1312,13 +1296,10 @@ proc ::ral::csvToFile {relValue fileName {sortAttr {}} {noheading 0}} {
 
     set m [relation2matrix $relValue $sortAttr $noheading]
     set chan [::open $fileName w]
-    set gotErr [catch {::csv::report printmatrix2channel $m $chan} result]
+    catch {::csv::report printmatrix2channel $m $chan} result opts
     $m destroy
     ::close $chan
-    if {$gotErr} {
-        error $result
-    }
-    return
+    return -options $opts $result
 }
 
 # Returns a string that can be fed to SQLite that will create the necessary
@@ -1367,12 +1348,9 @@ proc ::ral::sqlSchema {{pattern *}} {
         # Define identification constraints.
         set idNum 0
         foreach id [relvar identifiers $name] {
-            set id [join [mapNamesToSQL $id] {, }]
-            append result "    constraint ${sqlBaseName}_ID$idNum\
+            set id [join [mapNamesToSQL {*}$id] {, }]
+            append result "    constraint ${sqlBaseName}_ID[incr idNum]\
                     unique ($id),\n"
-            append indices "create unique index ${sqlBaseName}_INDEX$idNum\
-                    on $sqlBaseName ($id) ;\n"
-            incr idNum
         }
         # Define the referential constraints.
         foreach constraint [relvar constraint member $name] {
@@ -1385,11 +1363,11 @@ proc ::ral::sqlSchema {{pattern *}} {
                     set rfering [namespace tail $rfering]
                     set refto [namespace tail $refto]
                     if {$rfering eq $baseName} {
-                        set a1 [join [mapNamesToSQL $a1] {, }]
+                        set a1 [join [mapNamesToSQL {*}$a1] {, }]
                         append result "    constraint ${sqlBaseName}_$cname\
                             foreign key ($a1)\
                             references $refto\
-                                ([join [mapNamesToSQL $a2] {, }])\n"\
+                                ([join [mapNamesToSQL {*}$a2] {, }])\n"\
                             "        on delete [expr {$c2 eq "?" ?\
                                 "set null" : "cascade"}]\
                             on update cascade\
@@ -1409,11 +1387,11 @@ proc ::ral::sqlSchema {{pattern *}} {
                         if {$baseName eq $rfering} {
                             set cname [mapNamesToSQL [namespace tail $cname]]
                             set refto [namespace tail $super]
-                            set subattrs [join [mapNamesToSQL $subattrs] {, }]
+                            set subattrs [join [mapNamesToSQL {*}$subattrs] {, }]
                             append result "    constraint ${sqlBaseName}_$cname\
                                 foreign key ($subattrs)\
                                 references $refto\
-                                    ([join [mapNamesToSQL $sattrs] {, }])\n"\
+                                    ([join [mapNamesToSQL {*}$sattrs] {, }])\n"\
                                 "        on delete cascade on update cascade\
                                 deferrable initially deferred,\n"
                             append indices "create index\
@@ -1432,12 +1410,12 @@ proc ::ral::sqlSchema {{pattern *}} {
                     if {$baseName eq $correl} {
                         set cname [mapNamesToSQL [namespace tail $cname]]
                         set rel1 [namespace tail $rel1]
-                        set ref1Attr [join [mapNamesToSQL $ref1Attr] {, }]
+                        set ref1Attr [join [mapNamesToSQL {*}$ref1Attr] {, }]
                         append result "    constraint\
                                 ${sqlBaseName}_${cname}_${rel1}\
                             foreign key ($ref1Attr)\
                             references $rel1\
-                                ([join [mapNamesToSQL $rel1Attr] {, }])\n"\
+                                ([join [mapNamesToSQL {*}$rel1Attr] {, }])\n"\
                             "        on delete cascade on update cascade\
                             deferrable initially deferred,\n"
                         append indices "create index\
@@ -1445,12 +1423,12 @@ proc ::ral::sqlSchema {{pattern *}} {
                             ($ref1Attr) ;\n"
 
                         set rel2 [namespace tail $rel2]
-                        set ref2Attr [join [mapNamesToSQL $ref2Attr] {, }]
+                        set ref2Attr [join [mapNamesToSQL {*}$ref2Attr] {, }]
                         append result "    constraint\
                                 ${sqlBaseName}_${cname}_${rel2}\
                             foreign key ($ref2Attr)\
                             references $rel2\
-                                ([join [mapNamesToSQL $rel2Attr] {, }])\n"\
+                                ([join [mapNamesToSQL {*}$rel2Attr] {, }])\n"\
                             "        on delete cascade on update cascade\
                             deferrable initially deferred,\n"
                         append indices "create index\
@@ -1544,9 +1522,8 @@ proc ::ral::DeserialNS {ns} {
         set callerns [string trimright [uplevel 2 namespace current] :]
         set ns ${callerns}::$ns
     }
-    set ns [string trimright $ns :]
+    set ns [string trimright $ns :]::
     namespace eval $ns {}
-    set ns ${ns}::
     return $ns
 }
 
@@ -1844,10 +1821,62 @@ proc ::ral::setRelativeConstraintInfo {ns cinfo} {
     return $cinfo
 }
 
-proc ::ral::mapNamesToSQL {names} {
+# Handling SQL names is a pain. We must be prepared to deal with all the
+# keywords and other characters. You might be tempted to use the SQL quoting
+# mechanisms but this interfers with Tcl quoting in strange ways especially
+# with embedded white space. We are luck in the sense that we only have to map
+# the names to something SQL likes and not the inverse. It will make the names
+# in a SQLite database appear different than those in relvars, but they are not
+# so different as to be unrecognizable.
+#
+# So the convention is that SQL keywords have an "_K" append to them and all
+# other names have anything that is _not_ an alphanumber or the underscore
+# changed to an underscore.
+
+namespace eval ::ral {
+    # This list is sorted alphabetically and the "lsearch" invocation below
+    # depends upon that sorting.
+    variable sqlKeywords {
+        ABORT ACTION ADD AFTER ALL ALTER ANALYZE AND AS ASC ATTACH AUTOINCREMENT
+        BEFORE BEGIN BETWEEN BY
+        CASCADE CASE CAST CHECK COLLATE COLUMN COMMIT CONFLICT CONSTRAINT
+            CREATE CROSS CURRENT_DATE CURRENT_TIME CURRENT_TIMESTAMP
+        DATABASE DEFAULT DEFERRABLE DEFERRED DELETE DESC DETACH DISTINCT DROP
+        EACH ELSE END ESCAPE EXCEPT EXCLUSIVE EXISTS EXPLAIN
+        FAIL FOR FOREIGN FROM FULL
+        GLOB GROUP
+        HAVING
+        IF IGNORE IMMEDIATE IN INDEX INDEXED INITIALLY INNER INSERT INSTEAD
+            INTERSECT INTO IS ISNULL
+        JOIN
+        KEY
+        LEFT LIKE LIMIT
+        MATCH
+        NATURAL NO NOT NOTNULL NULL
+        OF OFFSET ON OR ORDER OUTER
+        PLAN PRAGMA PRIMARY
+        QUERY
+        RAISE RECURSIVE REFERENCES REGEXP REINDEX RELEASE RENAME REPLACE
+            RESTRICT RIGHT ROLLBACK ROW
+        SAVEPOINT SELECT SET
+        TABLE TEMP TEMPORARY THEN TO TRANSACTION TRIGGER
+        UNION UNIQUE UPDATE USING
+        VACUUM VALUES VIEW VIRTUAL
+        WHEN WHERE WITH WITHOUT
+    }
+}
+
+proc ::ral::mapNamesToSQL {args} {
+    variable sqlKeywords
     set newNames [list]
-    foreach name $names {
-        lappend newNames [regsub -all -- {[^[:alnum:]_]} $name _]
+    foreach name $args {
+        if {[lsearch -exact -sorted -increasing -ascii -nocase $sqlKeywords\
+                $name] != -1} {
+            set name ${name}_K
+        } else {
+            set name [regsub -all -- {[^[:alnum:]_]} $name _]
+        }
+        lappend newNames $name
     }
     return $newNames
 }
@@ -1858,4 +1887,4 @@ proc ::ral::mapTypeToSQL {type} {
             $sqlTypeMap($type) : "text"}]
 }
 
-package provide ral 0.11.3
+package provide ral 0.11.4
