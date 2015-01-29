@@ -138,6 +138,8 @@ namespace eval ::ral {
     # Maximum width of a column that holds a scalar value.
     # Relation and Tuple values are always shown in their "normal" width.
     variable maxColLen 30
+    # The internal representation of NULL for the benefit of SQLite.
+    variable nullValue {}
 
     # Define a proc to determine if the version of a serialized file
     # is compatible with the library. We use "pkgconfig" if it is
@@ -941,19 +943,45 @@ proc ::ral::storeToSQLite {filename {pattern *}} {
                     lappend assignVars [list $attr $sqlCol]
                     lappend sqlVars :$sqlCol
                 }
-                # This completes the composition of the "insert" statement.  We
-                # just managed to add a list of variable references (i.e.
-                # variable names each of which is preceded by a "$").
-                append statement [join $sqlVars {, }] ") ;"
                 # Finally after all of that, the actual populating of the
                 # SQLite tables is trivial.
+                set condAttrs [FindNullableAttrs $Qualified]
+                variable nullValue
                 relation foreach row $relValue {
                     # "relation assign" for a tuple or relation valued
                     # attribute gives the heading and the body. Later when we
                     # are loading the results, the "relvar insert" command will
                     # want that stripped off.
                     relation assign $row {*}$assignVars
-                    sqlitedb eval $statement
+                    # Here we have to consider the case where an attribute is
+                    # referential and the relationship is condition.  In SQL we
+                    # will represent that by a NULL value. Since there are not
+                    # NULL values in Tcl, we have to specify the value for
+                    # these types of attribute. That is done in the "nullValue"
+                    # variable. So we will pass a NULL value to SQLite only if
+                    # the attribute is referential to a conditional
+                    # relationship and its value matches the contents of the
+                    # "nullValue" variable.
+                    if {[llength $condAttrs] != 0} {
+                        set valueClause {}
+                        foreach attr $attrNames sqlVar $sqlVars {
+                            if {$attr in $condAttrs &&
+                                    [set $attr] eq $nullValue} {
+                                append valueClause NULL ,
+                            } else {
+                                append valueClause $sqlVar ,
+                            }
+                        }
+                        set valueClause [string trimright $valueClause ,]
+                    } else {
+                        # This completes the composition of the "insert"
+                        # statement.  We just managed to add a list of variable
+                        # references (i.e.  variable names each of which is
+                        # preceded by a ":").
+                        set valueClause [join $sqlVars ,]
+                    }
+                    append valueClause ") ;"
+                    sqlitedb eval $statement$valueClause
                 }
             }
         }
@@ -1302,6 +1330,23 @@ proc ::ral::csvToFile {relValue fileName {sortAttr {}} {noheading 0}} {
     return -options $opts $result
 }
 
+proc ::ral::FindNullableAttrs {name} {
+    # Find the attributes of the relvar that participate in
+    # a conditional association. This is the one and only case
+    # where we will allow the attribute to be NULL.
+    set condAttrs [list]
+    foreach constraint [relvar constraint member $name] {
+        set info [lassign [relvar constraint info $constraint] ctype]
+        if {$ctype eq "association"} {
+            lassign $info cname rfering a1 c1 refto a2 c2
+            if {$name eq $rfering && $c2 eq "?"} {
+                lappend condAttrs {*}$a1
+            }
+        }
+    }
+    return $condAttrs
+}
+
 # Returns a string that can be fed to SQLite that will create the necessary
 # tables and contraints for the relvars that match "pattern".
 proc ::ral::sqlSchema {{pattern *}} {
@@ -1320,20 +1365,7 @@ proc ::ral::sqlSchema {{pattern *}} {
         set sqlBaseName [mapNamesToSQL $baseName]
 
         append result "create table $sqlBaseName (\n"
-        # Find the attributes of the relationship that participate in
-        # a conditional association. This is the one and only case
-        # where we will allow the attribute to be NULL.
-        set condAttrs [list]
-        foreach constraint [relvar constraint member $name] {
-            set info [relvar constraint info $constraint]
-            set info [lassign $info ctype]
-            if {$ctype eq "association"} {
-                lassign $info cname rfering a1 c1 refto a2 c2
-                if {$c2 eq "?"} {
-                    lappend condAttrs {*}$a1
-                }
-            }
-        }
+        set condAttrs [FindNullableAttrs $name]
         # Define table attributes.
         foreach {attr type} [relation heading $value] {
             # N.B. need to map type from Tcl type to SQL type
@@ -1887,4 +1919,4 @@ proc ::ral::mapTypeToSQL {type} {
             $sqlTypeMap($type) : "text"}]
 }
 
-package provide ral 0.11.4
+package provide ral 0.11.5

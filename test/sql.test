@@ -141,6 +141,45 @@ namespace eval ::ral::sql::test {
         storeToSQLite pycca_test.sqlite3 ${testns}::*
     } -result {}
  
+    test storeToSQLite-2.1 {
+	store schema with conditional association
+    } -setup {
+        set testns [namespace current]::cond
+        namespace eval $testns {
+            ral relvar create C1 {
+                Id string
+                Ref string
+            } Id
+
+            ral relvar create C2 {
+                Id string
+            } Id
+
+            ral relvar association R1\
+                C1 Ref *\
+                C2 Id ?
+
+            ral relvar eval {
+                ral relvar insert C1 {*}{
+                    {Id A Ref a}
+                    {Id B Ref b}
+                    {Id C Ref {}}
+                }
+
+                ral relvar insert C2 {*}{
+                    {Id a}
+                    {Id b}
+                }
+            }
+        }
+    } -cleanup {
+        rmTestData $testns
+        file delete condassoc.sqlite3
+    } -body {
+        storeToSQLite condassoc.sqlite3 ${testns}::*
+        checkForTable condassoc.sqlite3 C1
+    } -result {1}
+ 
     test loadFromSQLite-2.0 {
 	load schema from SQLite
     } -setup {

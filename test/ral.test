@@ -1566,6 +1566,24 @@ namespace eval ::ral::test {
         }
     } -match relation
 
+    test relation-foreach-6.0 {
+        Sort on an empty string valued attribute
+    } -setup {
+        set relvalue {{A1 string A2 int}\
+            {{A1 foo A2 20} {A1 bar A2 30} {A1 baz A2 {}}}
+        }
+    } -body {
+        set count 0
+        relation foreach t $relvalue -ascending A2 {
+            relation assign $t
+            if {$A2 eq {}} {
+                break
+            }
+            incr count
+        }
+        return $count
+    } -result 0
+
     # relation fromdict subcommand
     test relation-fromdict-1.0 {
         empty dict

@@ -412,21 +412,19 @@ Ral_AttributeValueEqual(
 	break ;
 
     case Tuple_Type:
-	if (Tcl_ConvertToType(NULL, v1, &Ral_TupleObjType) != TCL_OK ||
-	    Tcl_ConvertToType(NULL, v2, &Ral_TupleObjType) != TCL_OK) {
-	    Tcl_Panic("Ral_AttributeValueEqual: cannot convert to tuple") ;
+	if (Tcl_ConvertToType(NULL, v1, &Ral_TupleObjType) == TCL_OK &&
+                Tcl_ConvertToType(NULL, v2, &Ral_TupleObjType) == TCL_OK) {
+            isEqual = Ral_TupleEqualValues(v1->internalRep.otherValuePtr,
+                v2->internalRep.otherValuePtr) ;
 	}
-	isEqual = Ral_TupleEqualValues(v1->internalRep.otherValuePtr,
-	    v2->internalRep.otherValuePtr) ;
 	break ;
 
     case Relation_Type:
-	if (Tcl_ConvertToType(NULL, v1, &Ral_RelationObjType) != TCL_OK ||
-	    Tcl_ConvertToType(NULL, v2, &Ral_RelationObjType) != TCL_OK) {
-	    Tcl_Panic("Ral_AttributeValueEqual: cannot convert to relation") ;
+	if (Tcl_ConvertToType(NULL, v1, &Ral_RelationObjType) == TCL_OK &&
+                Tcl_ConvertToType(NULL, v2, &Ral_RelationObjType) == TCL_OK) {
+            isEqual = Ral_RelationEqual(v1->internalRep.otherValuePtr,
+                v2->internalRep.otherValuePtr) ;
 	}
-	isEqual = Ral_RelationEqual(v1->internalRep.otherValuePtr,
-	    v2->internalRep.otherValuePtr) ;
 	break ;
 
     default:
@@ -453,16 +451,18 @@ Ral_AttributeValueCompare(
 	break ;
 
 	/*
-	 * Relative comparisons of tuple and relations is not possible
-         * since there is not a complete ordering for these types.
-         * Panic here, higher order code should never make the request.
+         * Relative comparisons of tuple and relations does not make a lot of
+         * sense since you can't really place an ordering on relation values.
+         * However, we will resort to string comparison for lack of a better
+         * idea.  Higher order code should never make the request but just in
+         * case.
 	 */
     case Tuple_Type:
-	Tcl_Panic("Ral_AttributeValueCompare: attempt to compare Tuple types") ;
-	break ;
-
+        /*
+         * N.B. Fall through.
+         */
     case Relation_Type:
-	Tcl_Panic("Ral_AttributeValueCompare: attempt to compare Relation types") ;
+	result = stringCompare(v1, v2) ;
 	break ;
 
     default:
@@ -583,11 +583,12 @@ Ral_AttributeNewFromObjs(
 }
 
 /*
- * When an attribute is given a value in a Tuple or Relation, it must
- * be able to be coerced into the appropriate type.
- * N.B. that we always allow the empty string as a "control" value
- * for all types. This is necessary for conditional referential attributes
- * that must never match a value.
+ * When an attribute is given a value in a Tuple or Relation, it must be able
+ * to be coerced into the appropriate type.
+ * N.B. that we always allow the empty string as a "control" value for all
+ * types. This is a special dispensation that allows the cheap hack of using
+ * the empty string to stand for an attribute value when used as a conditional
+ * referential attribute. This ugliness has many ramifications.
  */
 Tcl_Obj *
 Ral_AttributeConvertValueToType(
@@ -833,12 +834,9 @@ booleanCompare(
     int b1 ;
     int b2 ;
 
-    if (Tcl_GetBooleanFromObj(NULL, v1, &b1) == TCL_OK &&
-	    Tcl_GetBooleanFromObj(NULL, v2, &b2) == TCL_OK) {
-	return b1 - b2 ;
-    }
-    Tcl_Panic("booleanCompare: cannot convert values to \"boolean\"") ;
-    return -1 ;
+    return (Tcl_GetBooleanFromObj(NULL, v1, &b1) == TCL_OK &&
+	    Tcl_GetBooleanFromObj(NULL, v2, &b2) == TCL_OK) ?
+            b1 - b2 : -1 ;
 }
 
 static unsigned
@@ -940,12 +938,9 @@ intCompare(
     int int1 ;
     int int2 ;
 
-    if (Tcl_GetIntFromObj(NULL, v1, &int1) == TCL_OK &&
-	    Tcl_GetIntFromObj(NULL, v2, &int2) == TCL_OK) {
-	return int1 - int2 ;
-    }
-    Tcl_Panic("intCompare: cannot convert values to \"int\"") ;
-    return -1 ;
+    return (Tcl_GetIntFromObj(NULL, v1, &int1) == TCL_OK &&
+	    Tcl_GetIntFromObj(NULL, v2, &int2) == TCL_OK) ?
+            int1 - int2 : -1 ;
 }
 
 static unsigned
@@ -989,12 +984,9 @@ longCompare(
     long l1 ;
     long l2 ;
 
-    if (Tcl_GetLongFromObj(NULL, v1, &l1) == TCL_OK &&
-	    Tcl_GetLongFromObj(NULL, v2, &l2) == TCL_OK) {
-	return l1 - l2 ;
-    }
-    Tcl_Panic("longCompare: cannot convert values to \"long\"") ;
-    return -1 ;
+    return (Tcl_GetLongFromObj(NULL, v1, &l1) == TCL_OK &&
+	    Tcl_GetLongFromObj(NULL, v2, &l2) == TCL_OK) ?
+            l1 - l2 : -1 ;
 }
 
 static unsigned
@@ -1048,7 +1040,6 @@ doubleCompare(
 	    return 0 ;
 	}
     }
-    Tcl_Panic("doubleCompare: cannot convert values to \"double\"") ;
     return -1 ;
 }
 
@@ -1105,7 +1096,6 @@ wideIntCompare(
 	    return 0 ;
 	}
     }
-    Tcl_Panic("wideIntCompare: cannot convert values to \"wideInt\"") ;
     return -1 ;
 }
 
