@@ -52,7 +52,7 @@
 
 package provide ralutil 0.11.5
 
-package require ral 0.11.4
+package require ral 0.11.5
 
 namespace eval ::ralutil {
     namespace export pipe
