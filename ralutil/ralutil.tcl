@@ -50,7 +50,7 @@
 # 
 #  *--
 
-package provide ralutil 0.11.5
+package provide ralutil 0.11.6
 
 package require ral 0.11.5
 

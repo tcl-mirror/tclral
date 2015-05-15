@@ -1,4 +1,4 @@
-[manpage_begin relformat n 0.11.5]
+[manpage_begin relformat n 0.11.6]
 [comment {
 # This software is copyrighted 2004 - 2014 by G. Andrew Mangogna.
 # The following terms apply to all files associated with the software unless
@@ -50,8 +50,8 @@
 }]
 [moddesc "Relation formatting"]
 [titledesc "Text formatting for relations"]
-[copyright "2004 - 2014 by G. Andrew Mangogna"]
-[require ral [opt 0.11.5]]
+[copyright "2004 - 2015 by G. Andrew Mangogna"]
+[require ral [opt 0.11.6]]
 [description]
 This manpage describes a set of commands that are used for
 generating text output of relation and tuple values.

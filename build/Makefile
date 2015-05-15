@@ -11,4 +11,5 @@ all :
 		$(MAKE) -C $$dir clean;\
 		cd $$dir && ./runconfig && cd ..;\
 		$(MAKE) -C $$dir;\
+		cd $$dir && teapot-pkg generate . && cd ..;\
 	done

@@ -800,6 +800,14 @@ Ral_RelvarInsertTuple(
     where = Ral_RelationCardinality(relation) - 1 ;
     if (!Ral_RelvarIdIndexTuple(relvar, *(Ral_RelationBegin(relation) + where),
             where, errInfo)) {
+        /*
+         * If we fail the identifying constraints, we must remove the newly
+         * inserted tuple before reporting the failure.  Failure to do so was a
+         * bug in the "relvar uinsert" command since it ignored these failures
+         * in the pursuit of "union" like semantics.
+         */
+        Ral_RelationErase(relation, Ral_RelationEnd(relation) - 1,
+            Ral_RelationEnd(relation)) ;
         return 0 ;
     }
 

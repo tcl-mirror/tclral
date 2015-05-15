@@ -4097,6 +4097,37 @@ in expression "_@_< 20"} -returnCodes error
         }
     } -match relation
 
+    test relation-uinsert-4.0 {
+        relvar with multiple identifiers
+    } -setup {
+        relvar create UIN {
+            id1 string
+            id2 string
+        } id1 id2
+    } -cleanup {
+        relvar unset UIN
+    } -body {
+        relvar uinsert UIN {
+            id1 foo
+            id2 bar
+        } {
+            id1 foo
+            id2 baz
+        } {
+            id1 bar
+            id2 bar
+        } {
+            id1 baz
+            id2 bum
+        }
+    } -result {
+        {id1 string id2 string}
+        {
+            {id1 foo id2 bar}
+            {id1 baz id2 bum}
+        }
+    } -match relation
+
     # relation ungroup subcommand
     test relation-ungroup-1.0 {two attribute relation} -body {
         set r {
