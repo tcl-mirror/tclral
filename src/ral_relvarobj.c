@@ -911,7 +911,13 @@ Ral_RelvarObjCreateAssoc(
      * us to find the constraints that apply to a relvar when it is modified.
      */
     Ral_PtrVectorPushBack(relvar1->constraints, constraint) ;
-    Ral_PtrVectorPushBack(relvar2->constraints, constraint) ;
+    /*
+     * Watch out for reflexive associations. We only want to record the
+     * constraint once.
+     */
+    if (strcmp(relvar1->name, relvar2->name) != 0) {
+        Ral_PtrVectorPushBack(relvar2->constraints, constraint) ;
+    }
     /*
      * Evaluate the newly created constraint to make sure that the
      * current values of the relvar pass the constraint evaluation.
@@ -1404,7 +1410,13 @@ Ral_RelvarObjCreateCorrelation(
      * us to find the constraints that apply to a relvar when it is modified.
      */
     Ral_PtrVectorPushBack(relvar1->constraints, constraint) ;
-    Ral_PtrVectorPushBack(relvar2->constraints, constraint) ;
+    /*
+     * Take account of the reflexive case. We only want the constraint name
+     * to appear once in the constraint membership list.
+     */
+    if (strcmp(relvar1->name, relvar2->name) != 0) {
+        Ral_PtrVectorPushBack(relvar2->constraints, constraint) ;
+    }
     Ral_PtrVectorPushBack(relvarC->constraints, constraint) ;
     /*
      * Evaluate the newly created constraint to make sure that the

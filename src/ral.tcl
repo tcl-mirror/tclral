@@ -1391,11 +1391,11 @@ proc ::ral::sqlSchema {{pattern *}} {
             switch -exact -- $ctype {
                 association {
                     lassign $info cname rfering a1 c1 refto a2 c2
-                    set cname [mapNamesToSQL [namespace tail $cname]]
                     set rfering [namespace tail $rfering]
-                    set refto [namespace tail $refto]
                     if {$rfering eq $baseName} {
                         set a1 [join [mapNamesToSQL {*}$a1] {, }]
+                        set cname [mapNamesToSQL [namespace tail $cname]]
+                        set refto [namespace tail $refto]
                         append result "    constraint ${sqlBaseName}_$cname\
                             foreign key ($a1)\
                             references $refto\
@@ -1919,4 +1919,4 @@ proc ::ral::mapTypeToSQL {type} {
             $sqlTypeMap($type) : "text"}]
 }
 
-package provide ral 0.11.6
+package provide ral 0.11.7
