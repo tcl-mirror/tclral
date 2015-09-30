@@ -1,10 +1,10 @@
-Package ral 0.11.7
+Package ral 0.11.8
 Meta category    Data Structures
 Meta description The {"ral"} package adds two new Tcl data types {"Tuple"}
 Meta description and {"Relation"} and a set of commands for formal and
 Meta description complete relational algebra for the new data types.
 Meta entrykeep   pkgIndex.tcl
-Meta included    pkgIndex.tcl ral.tcl ral0117.dll
+Meta included    pkgIndex.tcl ral.tcl ral0118.dll
 Meta platform    win64-x86_64
 Meta recommend   report
 Meta recommend   Mk4tcl

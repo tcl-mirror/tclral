@@ -317,10 +317,8 @@ Ral_ErrorInfoSetErrorObj(
     Ral_ErrorCode errorCode,
     Tcl_Obj *objPtr)
 {
-    if (info) {
-	info->errorCode = errorCode ;
-	Tcl_DStringInit(&info->param) ;
-	Tcl_DStringAppend(&info->param, Tcl_GetString(objPtr), -1) ;
+    if (objPtr) {
+        Ral_ErrorInfoSetError(info, errorCode, Tcl_GetString(objPtr)) ;
     }
 }
 

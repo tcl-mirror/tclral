@@ -2292,7 +2292,10 @@ Ral_RelvarObjExecSetTraces(
 	    result = Tcl_ConvertToType(interp, relvar->relObj,
 		&Ral_RelationObjType) ;
 	    if (result != TCL_OK) {
-		Tcl_DecrRefCount(relationObj) ;
+                Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_FORMAT_ERR,
+                    Tcl_GetObjResult(interp)) ;
+		Ral_InterpSetError(interp, errInfo) ;
+                Tcl_DecrRefCount(relationObj) ;
 		return NULL ;
 	    }
 	    origRel = relvar->relObj->internalRep.otherValuePtr ;
@@ -2303,10 +2306,13 @@ Ral_RelvarObjExecSetTraces(
 		    headingStr) ;
 		Ral_InterpSetError(interp, errInfo) ;
 		ckfree(headingStr) ;
-		Tcl_DecrRefCount(relationObj) ;
+                Tcl_DecrRefCount(relationObj) ;
 		return NULL ;
 	    }
-	}
+	} else {
+            Ral_ErrorInfoSetError(errInfo, RAL_ERR_FORMAT_ERR, "") ;
+            Ral_InterpSetError(interp, errInfo) ;
+        }
     }
     return relationObj ;
 }

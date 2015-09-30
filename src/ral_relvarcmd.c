@@ -1323,6 +1323,7 @@ RelvarSetCmd(
         }
         relvar->stateFlags = 1 ;
 
+	Tcl_IncrRefCount(valueObj) ;
 	resultObj = Ral_RelvarObjExecSetTraces(interp, relvar, valueObj,
 	    &errInfo) ;
         if (resultObj) {
@@ -1333,6 +1334,7 @@ RelvarSetCmd(
             }
             Tcl_DecrRefCount(resultObj) ;
         }
+        Tcl_DecrRefCount(valueObj) ;
 
         relvar->stateFlags = 0 ;
 	result = Ral_RelvarObjEndCmd(interp, rInfo, result != TCL_OK) ;
