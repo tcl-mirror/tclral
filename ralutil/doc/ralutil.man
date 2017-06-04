@@ -1,6 +1,6 @@
-[manpage_begin ralutil n 0.11.8]
+[manpage_begin ralutil n 0.12.0]
 [comment {
-# This software is copyrighted 2004 - 2014
+# This software is copyrighted 2004 - 2017
 # by G. Andrew Mangogna.
 # The following terms apply to all files associated with the software unless
 # explicitly disclaimed in individual files.
@@ -49,8 +49,8 @@
 }]
 [moddesc "Ralutil Package"]
 [titledesc "Commands for the ralutil package"]
-[copyright "2004 - 2015 by G. Andrew Mangogna"]
-[require ral [opt 0.11.8]]
+[copyright "2004 - 2017 by G. Andrew Mangogna"]
+[require ral [opt 0.12.0]]
 [description]
 This manpage describes the [package ralutil] package.
 The [package ralutil] package is a supplementary package to the

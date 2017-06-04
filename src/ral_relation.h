@@ -202,9 +202,9 @@ extern Ral_Relation Ral_RelationSemiMinus(Ral_Relation, Ral_Relation,
 extern Ral_Relation Ral_RelationDivide(Ral_Relation, Ral_Relation, Ral_Relation,
         Ral_ErrorInfo *) ;
 extern Ral_Relation Ral_RelationTag(Ral_Relation, char const *, Ral_IntVector,
-        Ral_ErrorInfo *) ;
+        int, Ral_ErrorInfo *) ;
 extern Ral_Relation Ral_RelationTagWithin(Ral_Relation, char const *,
-        Ral_IntVector, Ral_IntVector, Ral_ErrorInfo *) ;
+        Ral_IntVector, Ral_IntVector, int, Ral_ErrorInfo *) ;
 extern Ral_Relation Ral_RelationUnwrap(Ral_Relation, char const *,
         Ral_ErrorInfo *) ;
 extern Ral_Relation Ral_RelationTclose(Ral_Relation) ;

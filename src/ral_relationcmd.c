@@ -1,5 +1,5 @@
 /*
-This software is copyrighted 2005 - 2011 by G. Andrew Mangogna.  The following
+This software is copyrighted 2005 - 2017 by G. Andrew Mangogna.  The following
 terms apply to all files associated with the software unless explicitly
 disclaimed in individual files.
 
@@ -2935,14 +2935,15 @@ RelationTableCmd(
 
 /*
  * relation tag relation attrName ?-ascending | -descending sort-attr-list?
- *	?-within {attr-list}?
+ *	?-within {attr-list} -start tag-value?
  *
  * Create a new relation extended by "attrName". "attrName" will be "int" type
- * and will consist of consecutive integers starting at zero. The tuples in
- * "relation" will be extended in the order implied by ascending or descending
- * order of "sort-attr-list" if the option is given. If absent the order is
- * arbitrary.  If the "-within" option is given then "attrName" values will be
- * unique within the attributes in "attr-list".
+ * and will consist of consecutive integers starting at zero or "tag-value" if
+ * the "-start" option is given. The tuples in "relation" will be extended in
+ * the order implied by ascending or descending order of "sort-attr-list" if
+ * the option is given. If absent the order is arbitrary.  If the "-within"
+ * option is given then "attrName" values will be unique within the attributes
+ * in "attr-list".
  */
 static int
 RelationTagCmd(
@@ -2956,12 +2957,16 @@ RelationTagCmd(
     Ral_Relation tagRelation ;
     Ral_IntVector sortMap = NULL ;
     Ral_IntVector withinAttrs = NULL ;
+    int tagStart = 0 ;
     Ral_ErrorInfo errInfo ;
     int result = TCL_ERROR ;
 
-    if (objc < 4 || objc > 8) {
+    static int gotOpt[4] ;
+
+    if (objc < 4 || objc > 10) {
 	Tcl_WrongNumArgs(interp, 2, objv, "relation attrName "
-	    "?-ascending | -descending sort-attr-list? ?-within attr-list?") ;
+	    "?-ascending | -descending sort-attr-list? ?-within attr-list "
+            "-start tag-value?") ;
 	return TCL_ERROR ;
     }
 
@@ -2978,6 +2983,7 @@ RelationTagCmd(
     /*
      * Parse the remaining arguments.
      */
+    memset(gotOpt, 0, sizeof(gotOpt)) ;
     objc -= 4 ;
     objv += 4 ;
     for ( ; objc > 0 ; objc -= 2, objv += 2) {
@@ -2986,14 +2992,17 @@ RelationTagCmd(
 	    enum {
 		TAG_ASCENDING,
 		TAG_DESCENDING,
-		TAG_WITHIN
+		TAG_WITHIN,
+                TAG_START
 	    } opt ;
 	} optTable[] = {
 	    {"-ascending", TAG_ASCENDING},
 	    {"-descending", TAG_DESCENDING},
 	    {"-within", TAG_WITHIN},
-	    {NULL, 0}
+            {"-start", TAG_START},
+	    {NULL}
 	} ;
+
 	Ral_IntVector sortAttrs ;
 	int index ;
 
@@ -3005,12 +3014,7 @@ RelationTagCmd(
 	 * Make sure that duplicated options are not present, e.g. no
 	 * "-ascending a1 -descending b1" or "-within a1 -within b1".
 	 */
-	if ((sortMap && (optTable[index].opt == TAG_ASCENDING ||
-		optTable[index].opt == TAG_DESCENDING))
-                || (withinAttrs && optTable[index].opt == TAG_WITHIN)) {
-	    Tcl_WrongNumArgs(interp, 2, objv, "relation "
-                    "?-ascending | -descending sort-attr-list? "
-                    "?-within attr-list? attrName") ;
+        if (gotOpt[index]) {
             Ral_ErrorInfoSetErrorObj(&errInfo, RAL_ERR_DUPLICATE_OPTION,
                     objv[0]) ;
             Ral_InterpSetError(interp, &errInfo) ;
@@ -3019,6 +3023,7 @@ RelationTagCmd(
 
 	switch (optTable[index].opt) {
 	case TAG_ASCENDING:
+            gotOpt[index] = gotOpt[TAG_DESCENDING] = 1 ;
 	    sortAttrs = Ral_TupleHeadingAttrsFromObj(relation->heading, interp,
                     objv[1]) ;
 	    if (sortAttrs == NULL) {
@@ -3029,6 +3034,7 @@ RelationTagCmd(
 	    break;
 
 	case TAG_DESCENDING:
+            gotOpt[index] = gotOpt[TAG_ASCENDING] = 1 ;
 	    sortAttrs = Ral_TupleHeadingAttrsFromObj(relation->heading, interp,
                     objv[1]) ;
 	    if (sortAttrs == NULL) {
@@ -3039,9 +3045,17 @@ RelationTagCmd(
 	    break ;
 
 	case TAG_WITHIN:
+            gotOpt[index] = 1 ;
 	    withinAttrs = Ral_TupleHeadingAttrsFromObj(relation->heading,
                     interp, objv[1]) ;
             if (withinAttrs == NULL) {
+                goto errorOut ;
+            }
+	    break ;
+
+        case TAG_START:
+            gotOpt[index] = 1 ;
+            if (Tcl_GetIntFromObj(interp, objv[1], &tagStart) != TCL_OK) {
                 goto errorOut ;
             }
 	    break ;
@@ -3060,9 +3074,10 @@ RelationTagCmd(
 	Ral_IntVectorFillConsecutive(sortMap, 0) ;
     }
     tagRelation = withinAttrs == NULL ?
-            Ral_RelationTag(relation, attrName, sortMap, &errInfo) :
+            Ral_RelationTag(relation, attrName, sortMap, tagStart,
+                    &errInfo) :
             Ral_RelationTagWithin(relation, attrName, sortMap, withinAttrs,
-                &errInfo) ;
+                    tagStart, &errInfo) ;
 
     if (tagRelation) {
         Tcl_SetObjResult(interp, Ral_RelationObjNew(tagRelation)) ;

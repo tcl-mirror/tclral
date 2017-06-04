@@ -43,10 +43,6 @@ terms specified in this license.
 MODULE:
 
 ABSTRACT:
-
-$RCSfile: ral_tupleobj.c,v $
-$Revision: 1.16 $
-$Date: 2011/06/05 18:01:10 $
  *--
  */
 
@@ -378,7 +374,6 @@ Ral_TupleSetFromValueList(
         cvtValue = Ral_AttributeConvertValueToType(interp, *hIter++, *elemv++,
             errInfo) ;
         if (cvtValue == NULL) {
-            Ral_ErrorInfoSetErrorObj(errInfo, RAL_ERR_BAD_VALUE, *(elemv - 1)) ;
             return TCL_ERROR ;
         }
         oldValue = *tIter ;

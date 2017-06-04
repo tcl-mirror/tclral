@@ -1,6 +1,6 @@
-[manpage_begin tuple n 0.11.8]
+[manpage_begin tuple n 0.12.0]
 [comment {
-# This software is copyrighted 2004 - 2014 by G. Andrew Mangogna.
+# This software is copyrighted 2004 - 2017 by G. Andrew Mangogna.
 # The following terms apply to all files associated with the software unless
 # explicitly disclaimed in individual files.
 # 
@@ -48,8 +48,8 @@
 }]
 [moddesc "Tuple Operators"]
 [titledesc "Operators for the Tuple data type"]
-[copyright "2004 - 2015 by G. Andrew Mangogna"]
-[require ral [opt 0.11.8]]
+[copyright "2004 - 2017 by G. Andrew Mangogna"]
+[require ral [opt 0.12.0]]
 [description]
 This manpage describes the
 [cmd tuple]
@@ -251,6 +251,8 @@ elements are treated as pairs.
 The first element of a pair is taken to be an attribute name and the second is
 taken as the corresponding value for the attribute.
 This is the same form of list accepted by the [cmd "array set"] command.
+Note also that [arg name-value-list] may also be supplied as a dictionary
+value whose keys are the same as the attributes of the tuple.
 
 When a tuple is created each value is converted to the underlying data
 type specified in the heading of the tuple.
@@ -378,6 +380,24 @@ Fred Jones
 unknown attribute name, "Status"
 }]
 
+[call [cmd "::ral::tuple fromlist"] [opt [arg "attr1 type1 value1 ..."]]]
+
+The [cmd fromlist] subcommand creates a new tuple
+from its arguments.
+Arguments must come in triples
+The first argument in the triple is the name of the attribute,
+the second is the attribute data type and the third is the attribute value.
+The command eases the burden of creating tuples,
+although it is not as general as the [cmd "tuple create"] command.
+
+When a tuple is created each value is converted to the specified
+underlying data type.
+It is an error if the conversion fails.
+
+[example {
+% tuple fromlist Number int 100 Street string Elm Zip string 90214
+}]
+
 [call [cmd "::ral::tuple get"] [arg tupleValue]]
 
 The [cmd get] subcommand returns a list consisting of pairs of elements.
@@ -387,7 +407,8 @@ The form of the list is the same as that returned by the [cmd "array get"]
 command and accepted by the [cmd "array set"] command.
 The [cmd get] subcommand provides a convenient means to move tuple
 values into an array.
-The form of the list returned may also be used directly the [cmd dict] command.
+The form of the list returned may also be used directly as a
+dictionary value for the [cmd dict] command.
 
 [example {
 % set t1 {{Name string Age int} {Name {Fred Jones} Age 27}}

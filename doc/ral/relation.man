@@ -1,6 +1,6 @@
-[manpage_begin relation n 0.11.8]
+[manpage_begin relation n 0.12.0]
 [comment {
-# This software is copyrighted 2004 - 2014 by G. Andrew Mangogna.
+# This software is copyrighted 2004 - 2017 by G. Andrew Mangogna.
 # The following terms apply to all files associated with the software unless
 # explicitly disclaimed in individual files.
 # 
@@ -48,8 +48,8 @@
 }]
 [moddesc "Relation Operators"]
 [titledesc "Operators for Relation Values"]
-[copyright "2004 - 2015 by G. Andrew Mangogna"]
-[require ral [opt 0.11.8]]
+[copyright "2004 - 2017 by G. Andrew Mangogna"]
+[require ral [opt 0.12.0]]
 [description]
 This manpage describes the [cmd relation] command.
 The [cmd relation]
@@ -1226,12 +1226,14 @@ set o [relation table {\
 
 [call [cmd "::ral::relation tag"] [arg relationValue] [arg attrName]\
     [opt [arg "-ascending | -descending sort-attr-list"]]\
-    [opt [arg "-within attr-list"]]]
+    [opt [arg "-within attr-list"]] [opt [arg "-start start-tag"]]]
 
 The [cmd tag] subcommand creates a new relation which has the same heading
 as [arg relationValue] extended by a new attribute named [arg attrName].
 The type of [arg attrName] will be [type int] and will have the values
-between 0 and the cardinality of [arg relationValue] minus one.
+in the range of [arg start-tag]
+and the cardinality of [arg relationValue] minus one.
+If no [arg -start] argument is given, then tag values start at zero.
 The tuples in [arg relationValue] will be extended in either [arg ascending]
 or [arg descending] order of the [arg sort-attr-list].
 If no [arg sort-attr-list] argument is given,

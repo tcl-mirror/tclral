@@ -1,5 +1,5 @@
 #!/bin/bash
 ../../configure\
-    CFLAGS=-DNDEBUG\
+    CPPFLAGS=-DNDEBUG\
     --enable-64bit\
-    --with-tcl=/home/andrewm/local/tcl8.6-linux-glibc2.19-x86_64/lib
+    --with-tcl=/home/andrewm/local/tcl8.6-x86_64-linux-gnu/lib

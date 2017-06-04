@@ -462,6 +462,28 @@ namespace eval ::ral::test {
         tuple extract $t foo
     } -result {unknown attribute name, "foo"} -returnCodes error
 
+    # tuple fromlist subcommand
+    test tuple-fromlist-1.0 {single attribute} -body {
+        tuple fromlist Name string Andrew
+    } -result {{Name string} {Name Andrew}} -match tuple
+
+    test tuple-fromlist-1.1 {multiple attributes} -body {
+        tuple fromlist Name string Andrew Address string {Elm Street}
+    } -result {{Name string Address string} {Name Andrew Address {Elm Street}}}\
+    -match tuple
+
+    test tuple-fromlist-1.2 {bad value} -body {
+        tuple fromlist Age int foo
+    } -result {bad value type for value, "foo"} -returnCodes error
+
+    test tuple-fromlist-1.3 {bad type} -body {
+        tuple fromlist Age foo 8
+    } -result {unknown data type, "foo"} -returnCodes error
+
+    test tuple-fromlist-1.4 {duplicate attribute name} -body {
+        tuple fromlist Age int 8 Age double 9.0
+    } -result {duplicate attribute name, "Age"} -returnCodes error
+
     # tuple get subcommand
     test tuple-get-1.0 {single attribute} -body {
         tuple get {{Name string} {Name Andrew}}
@@ -1196,6 +1218,10 @@ namespace eval ::ral::test {
     test relation-table-1.0 {one attribute - one tuple} -body {
         relation table {A1 string} a1
     } -result {{A1 string} {{A1 a1}}} -match relation
+
+    test relation-table-1.2 {one attribute - missing attribute type} -body {
+        relation table {A1 {}} a1
+    } -result {unknown data type, ""} -returnCodes error
 
     test relation-table-2.0 {one attribute - multiple tuples} -body {
         relation table {A1 string} a1 a2 a3
@@ -3714,6 +3740,18 @@ in expression "_@_< 20"} -returnCodes error
         }
     } -match relation
 
+    test relation-tag-1.1 {relation scope -- ascending, with start} -body {
+        relation tag $S NameOrder -ascending SNAME -start 3
+    } -result {
+        {S# string SNAME string STATUS int CITY string NameOrder int} {
+            {S# S1 SNAME Smith STATUS 20 CITY London NameOrder 7}
+            {S# S2 SNAME Jones STATUS 10 CITY Paris NameOrder 6}
+            {S# S3 SNAME Blake STATUS 30 CITY Paris NameOrder 4}
+            {S# S4 SNAME Clark STATUS 20 CITY London NameOrder 5}
+            {S# S5 SNAME Adams STATUS 30 CITY Athens NameOrder 3}
+        }
+    } -match relation
+
     test relation-tag-2.0 {relation scope -- descending} -body {
         relation tag $S NameOrder -descending SNAME
     } -result {
@@ -3747,6 +3785,26 @@ in expression "_@_< 20"} -returnCodes error
         }
     } -match relation
 
+    test relation-tag-3.0 {within scope, with start} -body {
+        relation tag $SP SOrder -within S# -start 4
+    } -result {
+        {S# string P# string QTY int SOrder int}
+        {
+            {S# S1 P# P1 QTY 300 SOrder 4}
+            {S# S1 P# P2 QTY 200 SOrder 5}
+            {S# S1 P# P3 QTY 400 SOrder 6}
+            {S# S1 P# P4 QTY 200 SOrder 7}
+            {S# S1 P# P5 QTY 100 SOrder 8}
+            {S# S1 P# P6 QTY 100 SOrder 9}
+            {S# S2 P# P1 QTY 300 SOrder 4}
+            {S# S2 P# P2 QTY 400 SOrder 5}
+            {S# S3 P# P2 QTY 200 SOrder 4}
+            {S# S4 P# P2 QTY 200 SOrder 4}
+            {S# S4 P# P4 QTY 300 SOrder 5}
+            {S# S4 P# P5 QTY 400 SOrder 6}
+        }
+    } -match relation
+
     test relation-tag-3.1 {within scope -- descending P#} -body {
         relation tag $SP POrder -descending P# -within S#
     } -result {
@@ -3776,7 +3834,7 @@ in expression "_@_< 20"} -returnCodes error
     test relation-tag-4.2 {
         contradicting sort options
     } -body {
-        relation tag $S SNAME -descending SNAME -ascending SNAME
+        relation tag $S CORDER -descending CITY -ascending CITY
     } -result {duplicate command option, "-ascending"} -returnCodes error
 
     test relation-tag-4.3 {
@@ -3790,6 +3848,12 @@ in expression "_@_< 20"} -returnCodes error
     } -body {
         relation tag $S SNAME -ascending foo
     } -result {unknown attribute name, "foo"} -returnCodes error
+
+    test relation-tag-4.5 {
+        unknown tag option
+    } -body {
+        relation tag $S SNAME -foo foo
+    } -result {bad tag option "-foo": must be -ascending, -descending, -within, or -start} -returnCodes error
 
     # relation tclose subcommand
     test relation-tclose-1.0 {single path} -body {

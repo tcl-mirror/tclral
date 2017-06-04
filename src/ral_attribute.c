@@ -535,48 +535,56 @@ Ral_AttributeNewFromObjs(
     const char *attrName ;
     const char *typeName ;
 
+    attrName = Tcl_GetString(nameObj) ;
     /*
-     * The complication arises when the type is either Tuple or Relation.
-     * So first see if the "type" object is a list that might contain
-     * a Tuple or Relation type specification.
+     * The complication arises when the attribute type is either Tuple or
+     * Relation.  So first see if the "type" object is a list that might
+     * contain a Tuple or Relation type specification.
      */
     if (Tcl_ListObjGetElements(interp, typeObj, &typec, &typev) != TCL_OK) {
 	return NULL ;
     }
-    attrName = Tcl_GetString(nameObj) ;
-    typeName = Tcl_GetString(*typev) ;
-    if (strcmp(ral_tupleTypeName, typeName) == 0) {
-	if (typec == 2) {
-	    Ral_TupleHeading heading =
-		Ral_TupleHeadingNewFromObj(interp, *(typev + 1), errInfo) ;
-	    if (heading) {
-		attribute = Ral_AttributeNewTupleType(attrName, heading) ;
-	    }
-	} else {
-	    Ral_ErrorInfoSetError(errInfo, RAL_ERR_HEADING_ERR, typeName) ;
-	    Ral_InterpSetError(interp, errInfo) ;
-	}
-    } else if (strcmp(ral_relationTypeName, typeName) == 0) {
-	if (typec == 2) {
-	    Ral_TupleHeading heading = Ral_TupleHeadingNewFromObj(interp,
-		*(typev + 1), errInfo) ;
-	    if (heading) {
-		attribute = Ral_AttributeNewRelationType(attrName, heading) ;
-	    }
-	} else {
-	    Ral_ErrorInfoSetError(errInfo, RAL_ERR_HEADING_ERR, typeName) ;
-	    Ral_InterpSetError(interp, errInfo) ;
-	}
-    } else if (typec == 1) {
+    /*
+     * The number of elements in the list determines how we treat the attribute
+     * type.
+     */
+    switch (typec) {
+    case 1:     /* single word attribute type */
+        typeName = Tcl_GetString(*typev) ;
 	attribute = Ral_AttributeNewTclType(attrName, typeName) ;
 
 	if (attribute == NULL) {
 	    Ral_ErrorInfoSetError(errInfo, RAL_ERR_BAD_TYPE, typeName) ;
 	    Ral_InterpSetError(interp, errInfo) ;
 	}
-    } else {
-        Ral_ErrorInfoSetError(errInfo, RAL_ERR_BAD_TYPE, typeName) ;
-	Ral_InterpSetError(interp, errInfo) ;
+        break ;
+
+    case 2:     /* two element list, check for Tuple or Relation type */
+        typeName = Tcl_GetString(*typev) ;
+        if (strcmp(ral_tupleTypeName, typeName) == 0) {
+	    Ral_TupleHeading heading =
+		Ral_TupleHeadingNewFromObj(interp, *(typev + 1), errInfo) ;
+	    if (heading) {
+		attribute = Ral_AttributeNewTupleType(attrName, heading) ;
+	    }
+        } else if (strcmp(ral_relationTypeName, typeName) == 0) {
+	    Ral_TupleHeading heading = Ral_TupleHeadingNewFromObj(interp,
+		*(typev + 1), errInfo) ;
+	    if (heading) {
+		attribute = Ral_AttributeNewRelationType(attrName, heading) ;
+	    }
+        } else {
+	    Ral_ErrorInfoSetError(errInfo, RAL_ERR_HEADING_ERR, typeName) ;
+	    Ral_InterpSetError(interp, errInfo) ;
+        }
+
+        break ;
+
+    default:    /* missing or bad attribute type */
+        Ral_ErrorInfoSetError(errInfo, RAL_ERR_BAD_TYPE,
+                Tcl_GetString(typeObj)) ;
+        Ral_InterpSetError(interp, errInfo) ;
+        break ;
     }
 
     return attribute ;

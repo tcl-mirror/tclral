@@ -1,5 +1,5 @@
 /*
-This software is copyrighted 2005 - 2011 by G. Andrew Mangogna.  The following
+This software is copyrighted 2005 - 2017 by G. Andrew Mangogna.  The following
 terms apply to all files associated with the software unless explicitly
 disclaimed in individual files.
 
@@ -43,10 +43,6 @@ terms specified in this license.
 MODULE:
 
 ABSTRACT:
-
-$RCSfile: ral_tuplecmd.c,v $
-$Revision: 1.23 $
-$Date: 2012/02/26 19:09:04 $
  *--
  */
 
@@ -89,6 +85,7 @@ static int TupleEliminateCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int TupleEqualCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int TupleExtendCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int TupleExtractCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
+static int TupleFromListCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int TupleGetCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int TupleHeadingCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
 static int TupleProjectCmd(Tcl_Interp *, int, Tcl_Obj *const*) ;
@@ -138,6 +135,7 @@ tupleCmd(
 	{"equal", TupleEqualCmd},
 	{"extend", TupleExtendCmd},
 	{"extract", TupleExtractCmd},
+        {"fromlist", TupleFromListCmd},
 	{"get", TupleGetCmd},
 	{"heading", TupleHeadingCmd},
 	{"project", TupleProjectCmd},
@@ -553,6 +551,88 @@ TupleExtractCmd(
 errorOut:
     Tcl_DecrRefCount(resultObj) ;
     return TCL_ERROR ;
+}
+
+/*
+ * tuple fromlist attr type value ...
+ */
+static int
+TupleFromListCmd(
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const*objv)
+{
+    Ral_TupleHeading heading ;
+    Ral_TupleHeadingIter hIter ;
+    Ral_Tuple tuple ;
+    Ral_TupleIter tIter ;
+    Ral_ErrorInfo errInfo ;
+    int obj_count ;
+    Tcl_Obj *const*obj_vect ;
+
+    objc -= 2 ;
+    if (objc % 3 != 0) {
+	Tcl_WrongNumArgs(interp, 2, objv, "attr1 type1 value1 ...") ;
+	return TCL_ERROR ;
+    }
+    objv += 2 ;
+
+    Ral_ErrorInfoSetCmd(&errInfo, Ral_CmdTuple, Ral_OptFromlist) ;
+
+    heading = Ral_TupleHeadingNew(objc / 3) ;
+    /*
+     * Iterate through the arguments adding each element as an attribute to
+     * a newly created Heading.
+     */
+    for (obj_count = objc, obj_vect = objv ; obj_count > 0 ;
+            obj_count -= 3, obj_vect += 3) {
+	Ral_Attribute attr ;
+
+	attr = Ral_AttributeNewFromObjs(interp, *obj_vect, *(obj_vect + 1),
+                &errInfo) ;
+	if (attr == NULL) {
+	    Ral_TupleHeadingDelete(heading) ;
+	    return TCL_ERROR ;
+	}
+	hIter = Ral_TupleHeadingPushBack(heading, attr) ;
+	if (hIter == Ral_TupleHeadingEnd(heading)) {
+	    Ral_ErrorInfoSetError(&errInfo, RAL_ERR_DUPLICATE_ATTR,
+                    attr->name) ;
+	    Ral_InterpSetError(interp, &errInfo) ;
+
+	    Ral_AttributeDelete(attr) ;
+	    Ral_TupleHeadingDelete(heading) ;
+	    return TCL_ERROR ;
+	}
+    }
+    /*
+     * Create the tuple with the heading.
+     */
+    tuple = Ral_TupleNew(heading) ;
+    /*
+     * Go through the arguments again, setting the attribute values.
+     */
+    hIter = Ral_TupleHeadingBegin(heading) ;
+    tIter = Ral_TupleBegin(tuple) ;
+    for (obj_count = objc, obj_vect = objv + 2 ; obj_count > 0 ;
+            obj_count -= 3, obj_vect += 3) {
+        Tcl_Obj *cvtValue ;
+
+        cvtValue = Ral_AttributeConvertValueToType(interp, *hIter, *obj_vect,
+            &errInfo) ;
+        if (cvtValue == NULL) {
+	    Ral_TupleDelete(tuple) ;
+            return TCL_ERROR ;
+        }
+        Tcl_IncrRefCount(cvtValue) ;
+        *tIter = cvtValue ;
+
+        hIter++ ;
+        tIter++ ;
+    }
+
+    Tcl_SetObjResult(interp, Ral_TupleObjNew(tuple)) ;
+    return TCL_OK ;
 }
 
 /* tuple get tupleValue */

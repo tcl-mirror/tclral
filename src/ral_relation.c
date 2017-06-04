@@ -1328,13 +1328,13 @@ Ral_RelationTag(
     Ral_Relation relation,
     char const *attrName,
     Ral_IntVector sortMap,
+    int tagValue,
     Ral_ErrorInfo *errInfo)
 {
     Ral_Attribute tagAttr ;
     Ral_TupleHeading tagHeading ;
     Ral_Relation tagRelation ;
     Ral_IntVectorIter mIter ;
-    int tagValue = 0 ;
     /*
      * Make a new relation, adding the tag attribute.
      */
@@ -1385,6 +1385,7 @@ Ral_RelationTagWithin(
     char const *attrName,
     Ral_IntVector sortMap,
     Ral_IntVector withinAttrs,
+    int tagStart,
     Ral_ErrorInfo *errInfo)
 {
     Ral_Attribute tagAttr ;
@@ -1424,15 +1425,16 @@ Ral_RelationTagWithin(
         int status ;
 
         /*
-         * Put the tuple into the hash table based on the attribute set
-         * we are interested in. We don't really care if a new entry is
-         * created or not. If a new is created, the hash value will be
-         * zero as that is what it is set to by the custom entry allocation
-         * function.
+         * Put the tuple into the hash table based on the attribute set we are
+         * interested in. If we create a new entry, then its hash value must be
+         * set to starting value.
          */
         key.tuple = tuple ;
         key.attrs = withinAttrs ;
         entry = Tcl_CreateHashEntry(&index, (char const *)&key, &newPtr) ;
+        if (newPtr) {
+            Tcl_SetHashValue(entry, (ClientData)tagStart) ;
+        }
         tagValue = (int)Tcl_GetHashValue(entry) ;
         /*
          * Copy the old tuple values over, adding the tag attrbute value.

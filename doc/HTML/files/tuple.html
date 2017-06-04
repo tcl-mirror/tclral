@@ -24,7 +24,7 @@
 	background: 	transparent;
 	text-align:		left;
     }
-    H1.title {
+    H1.doctools_title {
 	text-align: center;
     }
     UL,OL {
@@ -41,11 +41,11 @@
     DT {
 	padding-top: 	1ex;
     }
-    UL.toc,UL.toc UL, UL.toc UL UL {
+    UL.doctools_toc,UL.doctools_toc UL, UL.doctools_toc UL UL {
 	font:		normal 12pt/14pt sans-serif;
 	list-style:	none;
     }
-    LI.section, LI.subsection {
+    LI.doctools_section, LI.doctools_subsection {
 	list-style: 	none;
 	margin-left: 	0em;
 	text-indent:	0em;
@@ -62,18 +62,18 @@
 	padding-right:	1ex;
 	width:		100%;
     }
-    PRE.example {
+    PRE.doctools_example {
 	color: 		black;
 	background: 	#f5dcb3;
 	border:		1px solid black;
     }
-    UL.requirements LI, UL.syntax LI {
+    UL.doctools_requirements LI, UL.doctools_syntax LI {
 	list-style: 	none;
 	margin-left: 	0em;
 	text-indent:	0em;
 	padding:	0em;
     }
-    DIV.synopsis {
+    DIV.doctools_synopsis {
 	color: 		black;
 	background: 	#80ffff;
 	border:		1px solid black;
@@ -81,11 +81,11 @@
 	margin-top: 	1em;
 	margin-bottom: 	1em;
     }
-    UL.syntax {
+    UL.doctools_syntax {
 	margin-top: 	1em;
 	border-top:	1px solid black;
     }
-    UL.requirements {
+    UL.doctools_requirements {
 	margin-bottom: 	1em;
 	border-bottom:	1px solid black;
     }
@@ -93,38 +93,38 @@
 </head>
 <! -- Generated from file 'tuple.man' by tcllib/doctools with format 'html'
    -->
-<! -- Copyright &copy; 2004 - 2015 by G. Andrew Mangogna
+<! -- Copyright &copy; 2004 - 2017 by G. Andrew Mangogna
    -->
-<! -- CVS: $Id$ tuple.n
+<! -- tuple.n
    -->
-<body><div class="doctools">
-<hr> [
+<body><hr> [
    <a href="../toc.html">Table Of Contents</a>
 | <a href="../index.html">Keyword Index</a>
  ] <hr>
-<h1 class="title">tuple(n) 0.11.8 ral &quot;Tuple Operators&quot;</h1>
-<div id="name" class="section"><h2><a name="name">Name</a></h2>
+<div class="doctools">
+<h1 class="doctools_title">tuple(n) 0.12.0 ral &quot;Tuple Operators&quot;</h1>
+<div id="name" class="doctools_section"><h2><a name="name">Name</a></h2>
 <p>tuple - Operators for the Tuple data type</p>
 </div>
-<div id="toc" class="section"><h2><a name="toc">Table Of Contents</a></h2>
-<ul class="toc">
-<li class="section"><a href="#toc">Table Of Contents</a></li>
-<li class="section"><a href="#synopsis">Synopsis</a></li>
-<li class="section"><a href="#section1">Description</a></li>
-<li class="section"><a href="#section2">OVERVIEW</a></li>
-<li class="section"><a href="#section3">STRING REPRESENTATION</a></li>
-<li class="section"><a href="#section4">COMMANDS</a></li>
-<li class="section"><a href="#see-also">See Also</a></li>
-<li class="section"><a href="#keywords">Keywords</a></li>
-<li class="section"><a href="#copyright">Copyright</a></li>
+<div id="toc" class="doctools_section"><h2><a name="toc">Table Of Contents</a></h2>
+<ul class="doctools_toc">
+<li class="doctools_section"><a href="#toc">Table Of Contents</a></li>
+<li class="doctools_section"><a href="#synopsis">Synopsis</a></li>
+<li class="doctools_section"><a href="#section1">Description</a></li>
+<li class="doctools_section"><a href="#section2">OVERVIEW</a></li>
+<li class="doctools_section"><a href="#section3">STRING REPRESENTATION</a></li>
+<li class="doctools_section"><a href="#section4">COMMANDS</a></li>
+<li class="doctools_section"><a href="#see-also">See Also</a></li>
+<li class="doctools_section"><a href="#keywords">Keywords</a></li>
+<li class="doctools_section"><a href="#copyright">Copyright</a></li>
 </ul>
 </div>
-<div id="synopsis" class="section"><h2><a name="synopsis">Synopsis</a></h2>
-<div class="synopsis">
-<ul class="requirements">
-<li>package require <b class="pkgname">ral <span class="opt">?0.11.8?</span></b></li>
+<div id="synopsis" class="doctools_section"><h2><a name="synopsis">Synopsis</a></h2>
+<div class="doctools_synopsis">
+<ul class="doctools_requirements">
+<li>package require <b class="pkgname">ral <span class="opt">?0.12.0?</span></b></li>
 </ul>
-<ul class="syntax">
+<ul class="doctools_syntax">
 <li><a href="#1"><b class="cmd">::ral::tuple assign</b> <i class="arg">tupleValue</i> <span class="opt">?attrName | attr-var-pair ...?</span></a></li>
 <li><a href="#2"><b class="cmd">::ral::tuple attributes</b> <i class="arg">tupleValue</i></a></li>
 <li><a href="#3"><b class="cmd">::ral::tuple create</b> <i class="arg">heading</i> <i class="arg">name-value-list</i></a></li>
@@ -133,18 +133,19 @@
 <li><a href="#6"><b class="cmd">::ral::tuple equal</b> <i class="arg">tuple1</i> <i class="arg">tuple2</i></a></li>
 <li><a href="#7"><b class="cmd">::ral::tuple extend</b> <i class="arg">tupleValue</i> <span class="opt">?<i class="arg">name type value ...</i>?</span></a></li>
 <li><a href="#8"><b class="cmd">::ral::tuple extract</b> <i class="arg">tupleValue</i> <i class="arg">attr</i> <span class="opt">?<i class="arg">attr2 ...</i>?</span></a></li>
-<li><a href="#9"><b class="cmd">::ral::tuple get</b> <i class="arg">tupleValue</i></a></li>
-<li><a href="#10"><b class="cmd">::ral::tuple heading</b> <i class="arg">tupleValue</i></a></li>
-<li><a href="#11"><b class="cmd">::ral::tuple project</b> <i class="arg">tupleValue</i> <span class="opt">?<i class="arg">attr ...</i>?</span></a></li>
-<li><a href="#12"><b class="cmd">::ral::tuple relation</b> <i class="arg">tupleValue</i></a></li>
-<li><a href="#13"><b class="cmd">::ral::tuple rename</b> <i class="arg">tupleValue</i> <span class="opt">?<i class="arg">oldname newname ...</i>?</span></a></li>
-<li><a href="#14"><b class="cmd">::ral::tuple unwrap</b> <i class="arg">tupleValue</i> <i class="arg">attr</i></a></li>
-<li><a href="#15"><b class="cmd">::ral::tuple update</b> <i class="arg">tupleValue</i> <i class="arg"><span class="opt">?attr1 value1 attr2 value2 ...?</span></i></a></li>
-<li><a href="#16"><b class="cmd">::ral::tuple wrap</b> <i class="arg">tupleValue</i> <i class="arg">newAttr</i> <i class="arg"><span class="opt">?attr1 attr2 ...?</span></i></a></li>
+<li><a href="#9"><b class="cmd">::ral::tuple fromlist</b> <span class="opt">?<i class="arg">attr1 type1 value1 ...</i>?</span></a></li>
+<li><a href="#10"><b class="cmd">::ral::tuple get</b> <i class="arg">tupleValue</i></a></li>
+<li><a href="#11"><b class="cmd">::ral::tuple heading</b> <i class="arg">tupleValue</i></a></li>
+<li><a href="#12"><b class="cmd">::ral::tuple project</b> <i class="arg">tupleValue</i> <span class="opt">?<i class="arg">attr ...</i>?</span></a></li>
+<li><a href="#13"><b class="cmd">::ral::tuple relation</b> <i class="arg">tupleValue</i></a></li>
+<li><a href="#14"><b class="cmd">::ral::tuple rename</b> <i class="arg">tupleValue</i> <span class="opt">?<i class="arg">oldname newname ...</i>?</span></a></li>
+<li><a href="#15"><b class="cmd">::ral::tuple unwrap</b> <i class="arg">tupleValue</i> <i class="arg">attr</i></a></li>
+<li><a href="#16"><b class="cmd">::ral::tuple update</b> <i class="arg">tupleValue</i> <i class="arg"><span class="opt">?attr1 value1 attr2 value2 ...?</span></i></a></li>
+<li><a href="#17"><b class="cmd">::ral::tuple wrap</b> <i class="arg">tupleValue</i> <i class="arg">newAttr</i> <i class="arg"><span class="opt">?attr1 attr2 ...?</span></i></a></li>
 </ul>
 </div>
 </div>
-<div id="section1" class="section"><h2><a name="section1">Description</a></h2>
+<div id="section1" class="doctools_section"><h2><a name="section1">Description</a></h2>
 <p>This manpage describes the
 <b class="cmd">tuple</b>
 command.
@@ -155,14 +156,14 @@ The ral package introduces an new Tcl data type called
 <em>Tuple</em>
 and this command provides the operators for the Tuple data type.</p>
 </div>
-<div id="section2" class="section"><h2><a name="section2">OVERVIEW</a></h2>
+<div id="section2" class="doctools_section"><h2><a name="section2">OVERVIEW</a></h2>
 <p>Formally, a tuple is a set of components.
 Each component consists of an attribute name, an attribute data type
 and an attribute value.
 The attribute name may be any Tcl string, although attribute names that
 contain embedded blanks are particularly inconvenient.
 The attribute data type must be one of the types listed below:</p>
-<ul class="itemized">
+<ul class="doctools_itemized">
 <li><p>string</p></li>
 <li><p>int</p></li>
 <li><p>long</p></li>
@@ -200,7 +201,7 @@ However, the tuple type was built to operate specfically in conjunction
 with the Relation type and does have some specific rules that the other
 types do not have.
 Tuples are sets of components and as such have the following rules.</p>
-<ul class="itemized">
+<ul class="doctools_itemized">
 <li><p>All attribute names must be unique.</p></li>
 <li><p>Any attribute value assigned to a particular attribute is coerced into the
 attribute data type for that attribute and it is an error if the value
@@ -219,11 +220,11 @@ of the string representation it wishes as long as the Tuple operators function
 as described.</p></li>
 </ul>
 </div>
-<div id="section3" class="section"><h2><a name="section3">STRING REPRESENTATION</a></h2>
+<div id="section3" class="doctools_section"><h2><a name="section3">STRING REPRESENTATION</a></h2>
 <p>Like any Tcl value, tuples have a string representation.
 The string representation of a tuple is a specially formatted list
 consisting of two elements:</p>
-<ol class="enumerated">
+<ol class="doctools_enumerated">
 <li><p>The tuple heading.</p></li>
 <li><p>The tuple values.</p></li>
 </ol>
@@ -239,17 +240,17 @@ value pairs need not be in the same order as the attribute name / type
 pairs.</p>
 <p>The following is a literal string representation of a tuple with
 three attributes.</p>
-<pre class="example">
+<pre class="doctools_example">
 {Name string Breed string Age int} {Name Fido Breed Terrier Age 2}
 </pre>
 <p>The following is a string representation that is equivalent to the
 same tuple.</p>
-<pre class="example">
+<pre class="doctools_example">
 {Name string Breed string Age int} {Breed Terrier Name Fido Age 2}
 </pre>
 </div>
-<div id="section4" class="section"><h2><a name="section4">COMMANDS</a></h2>
-<dl class="definitions">
+<div id="section4" class="doctools_section"><h2><a name="section4">COMMANDS</a></h2>
+<dl class="doctools_definitions">
 <dt><a name="1"><b class="cmd">::ral::tuple assign</b> <i class="arg">tupleValue</i> <span class="opt">?attrName | attr-var-pair ...?</span></a></dt>
 <dd><p>The <b class="cmd">assign</b> subcommand provides a convenient way to place the values
 of the attributes of a tuple into Tcl variables.
@@ -280,7 +281,7 @@ All variables are created in the local scope.
 The <b class="cmd">assign</b> subcommand returns the number of variables assigned to which
 necessarily is equal to either the degree of the tuple or the number
 of optional arguments given.</p>
-<pre class="example">
+<pre class="doctools_example">
 % tuple assign {{Name string Age int} {Name John Age 25}}
 2
 % set Name
@@ -292,7 +293,7 @@ John
 <dt><a name="2"><b class="cmd">::ral::tuple attributes</b> <i class="arg">tupleValue</i></a></dt>
 <dd><p>The <b class="cmd">attributes</b> subcommand returns a list of the attribute names
 of <i class="arg">tupleValue</i>.</p>
-<pre class="example">
+<pre class="doctools_example">
 % tuple attributes {{Name string Age int} {Name John Age 25}}
 Name Age
 </pre>
@@ -309,12 +310,14 @@ elements are treated as pairs.
 The first element of a pair is taken to be an attribute name and the second is
 taken as the corresponding value for the attribute.
 This is the same form of list accepted by the <b class="cmd">array set</b> command.
+Note also that <i class="arg">name-value-list</i> may also be supplied as a dictionary
+value whose keys are the same as the attributes of the tuple.
 When a tuple is created each value is converted to the underlying data
 type specified in the heading of the tuple.
 It is an error if the conversion fails.
 It is also an error not to supply a value for every attribute or to attempt
 to supply the value of any attribute more than once.</p>
-<pre class="example">
+<pre class="doctools_example">
 % tuple create {Number int Street string Zip string} {Number 100 Zip 90214 Street Elm}
 {Number int Street string Zip string} {Number 100 Street Elm Zip 90214}
 % tuple create {Number int Street string Zip string} {Number hundred Zip 90214 Street Elm}
@@ -330,7 +333,7 @@ wrong number of attributes specified, &quot;Number 100 Zip 90214 Street Elm Emai
 <dt><a name="4"><b class="cmd">::ral::tuple degree</b> <i class="arg">tupleValue</i></a></dt>
 <dd><p>The <b class="cmd">degree</b> subcommand returns the degree of the tuple which is
 the number of attributes the tuple has.</p>
-<pre class="example">
+<pre class="doctools_example">
 % tuple degree {{Name string Age int} {Name John Age 25}}
 2
 % tuple degree {{} {}}
@@ -343,7 +346,7 @@ heading and values as <i class="arg">tupleValue</i> except that those attributes
 in the argument list are not present.
 It is an error to attempt to eliminate attributes that are not part of
 <i class="arg">tupleValue</i>.</p>
-<pre class="example">
+<pre class="doctools_example">
 % set t1 [tuple create {Name string Age int} {Name John Age 25}]
 {Name string Age int} {Name John Age 25}
 % tuple eliminate $t1
@@ -363,7 +366,7 @@ the corresponding attribute values are equal.
 Because there is no inherent order to the attributes of a tuple,
 there are many ways to specify the same tuple.
 For example, the following tuples are equal.</p>
-<pre class="example">
+<pre class="doctools_example">
 % set t1 [tuple create {Name string Status int} {Name Fred Status 20}]
 {Name string Status int} {Name Fred Status 20}
 % set t2 [tuple create {Status int Name string} {Name Fred Status 20}]
@@ -387,7 +390,7 @@ It is an error to attempt to <b class="cmd">extend</b> a tuple with an attribute
 that is already contained in <i class="arg">tupleValue</i>.
 Each new attribute value is converted to the appropriate type and it is
 an error if that conversion fails.</p>
-<pre class="example">
+<pre class="doctools_example">
 % set t1 [tuple create {Name string} {Name Fred}]
 {Name string} {Name Fred}
 % tuple extend $t1 Age int 30 Sex string Male
@@ -406,7 +409,7 @@ If multiple <i class="arg">attr</i> are requested, then a list of attribute valu
 is returned.
 The order of the returned list is the same as the order of the <i class="arg">attr</i>
 arguments.</p>
-<pre class="example">
+<pre class="doctools_example">
 % set t1 [tuple create {Name string Age int} {Name {Fred Jones} Age 27}]
 {Name string Age int} {Name {Fred Jones} Age 27}
 % tuple extract $t1 Name
@@ -417,7 +420,22 @@ Fred Jones
 unknown attribute name, &quot;Status&quot;
 </pre>
 </dd>
-<dt><a name="9"><b class="cmd">::ral::tuple get</b> <i class="arg">tupleValue</i></a></dt>
+<dt><a name="9"><b class="cmd">::ral::tuple fromlist</b> <span class="opt">?<i class="arg">attr1 type1 value1 ...</i>?</span></a></dt>
+<dd><p>The <b class="cmd">fromlist</b> subcommand creates a new tuple
+from its arguments.
+Arguments must come in triples
+The first argument in the triple is the name of the attribute,
+the second is the attribute data type and the third is the attribute value.
+The command eases the burden of creating tuples,
+although it is not as general as the <b class="cmd">tuple create</b> command.
+When a tuple is created each value is converted to the specified
+underlying data type.
+It is an error if the conversion fails.</p>
+<pre class="doctools_example">
+% tuple fromlist Number int 100 Street string Elm Zip string 90214
+</pre>
+</dd>
+<dt><a name="10"><b class="cmd">::ral::tuple get</b> <i class="arg">tupleValue</i></a></dt>
 <dd><p>The <b class="cmd">get</b> subcommand returns a list consisting of pairs of elements.
 The first element of each pair is an attribute name and the second
 is the attribute value.
@@ -425,8 +443,9 @@ The form of the list is the same as that returned by the <b class="cmd">array ge
 command and accepted by the <b class="cmd">array set</b> command.
 The <b class="cmd">get</b> subcommand provides a convenient means to move tuple
 values into an array.
-The form of the list returned may also be used directly the <b class="cmd">dict</b> command.</p>
-<pre class="example">
+The form of the list returned may also be used directly as a
+dictionary value for the <b class="cmd">dict</b> command.</p>
+<pre class="doctools_example">
 % set t1 {{Name string Age int} {Name {Fred Jones} Age 27}}
 {Name string Age int} {Name {Fred Jones} Age 27}
 % set tinfo [tuple get $t1]
@@ -439,26 +458,26 @@ ainfo(Name) = Fred Jones
 Age Name
 </pre>
 </dd>
-<dt><a name="10"><b class="cmd">::ral::tuple heading</b> <i class="arg">tupleValue</i></a></dt>
+<dt><a name="11"><b class="cmd">::ral::tuple heading</b> <i class="arg">tupleValue</i></a></dt>
 <dd><p>The <b class="cmd">heading</b> subcommand returns the heading of the given <i class="arg">tupleValue</i>.
 The heading of a tuple is a list consisting of two elements.
 The first element is the keyword <em>Tuple</em> and the second is list with
 an even number of elements consisting of alternating
 attribute names and attribute data types.</p>
-<pre class="example">
+<pre class="doctools_example">
 % set t {{Name string Age int} {Name {Fred Jones} Age 27}}
 {Name string Age int} {Name {Fred Jones} Age 27}
 % tuple heading $t
 {Name string Age int}
 </pre>
 </dd>
-<dt><a name="11"><b class="cmd">::ral::tuple project</b> <i class="arg">tupleValue</i> <span class="opt">?<i class="arg">attr ...</i>?</span></a></dt>
+<dt><a name="12"><b class="cmd">::ral::tuple project</b> <i class="arg">tupleValue</i> <span class="opt">?<i class="arg">attr ...</i>?</span></a></dt>
 <dd><p>The <b class="cmd">project</b> subcommand returns a new tuple that consists of only the
 attributes given by the <i class="arg">attr</i> arguments
 with the corresponding values taken from <i class="arg">tupleValue</i>.
 It is not an error to project zero attributes (the nullary tuple projection),
 the result being the tuple with no attributes.</p>
-<pre class="example">
+<pre class="doctools_example">
 % set t {{Name string Age int} {Name {Fred Jones} Age 27}}
 {Name string Age int} {Name {Fred Jones} Age 27}
 % tuple project $t Age
@@ -467,13 +486,13 @@ the result being the tuple with no attributes.</p>
 {} {}
 </pre>
 </dd>
-<dt><a name="12"><b class="cmd">::ral::tuple relation</b> <i class="arg">tupleValue</i></a></dt>
+<dt><a name="13"><b class="cmd">::ral::tuple relation</b> <i class="arg">tupleValue</i></a></dt>
 <dd><p>The <b class="cmd"><a href="relation.html">relation</a></b> subcommand returns a new relation value that contains
 <i class="arg">tupleValue</i> as its only tuple.
 The heading of the returned relation value is the same as that of
 <i class="arg">tupleValue</i>.
 This subcommand corresponds to the <b class="cmd">::ral::relation tuple</b> command.</p></dd>
-<dt><a name="13"><b class="cmd">::ral::tuple rename</b> <i class="arg">tupleValue</i> <span class="opt">?<i class="arg">oldname newname ...</i>?</span></a></dt>
+<dt><a name="14"><b class="cmd">::ral::tuple rename</b> <i class="arg">tupleValue</i> <span class="opt">?<i class="arg">oldname newname ...</i>?</span></a></dt>
 <dd><p>The <b class="cmd">rename</b> subcommand returns a new tuple where <i class="arg">oldname</i> is
 replaced by <i class="arg">newname</i>.
 The <i class="arg">tupleValue</i> argument is not modified.
@@ -481,7 +500,7 @@ Many pairs of <i class="arg">oldname</i>/<i class="arg">newname</i> arguments ma
 It is an error to attempt to give an <i class="arg">oldname</i> that is not an attribute
 name in the tuple or to attempt to change the name of an attribute to be
 one that already exists in the tuple.</p>
-<pre class="example">
+<pre class="doctools_example">
 % set t {{Name string Age int} {Name {Fred Jones} Age 27}}
 {Name string Age int} {Name {Fred Jones} Age 27}
 % tuple rename $t Name Person Age Status
@@ -496,7 +515,7 @@ duplicate attribute name, &quot;Age&quot;
 {Name string Age int} {Name {Fred Jones} Age 27}
 </pre>
 </dd>
-<dt><a name="14"><b class="cmd">::ral::tuple unwrap</b> <i class="arg">tupleValue</i> <i class="arg">attr</i></a></dt>
+<dt><a name="15"><b class="cmd">::ral::tuple unwrap</b> <i class="arg">tupleValue</i> <i class="arg">attr</i></a></dt>
 <dd><p>The <b class="cmd">unwrap</b> subcommand creates a new tuple that expands the attributes of
 a tuple valued attribute.
 The <i class="arg">tupleValue</i> argument must be of Tuple type and
@@ -507,7 +526,7 @@ of the <i class="arg">attr</i> attribute itself.
 The <b class="cmd">unwrap</b> subcommand is useful for <em>un-nesting</em> tuples that
 have tuple valued attributes.
 For example, the tuple:</p>
-<pre class="example">
+<pre class="doctools_example">
 % set t {{Name string Address {Tuple {Number int Street string}}} {Name Fred Address {Number 100 Street Elm}}}
 {Name string Address {Tuple {Number int Street string}}} {Name Fred Address {Number 100 Street Elm}}
 % tuple unwrap $t Address
@@ -520,7 +539,7 @@ attribute must be of a Tuple type, &quot;Name&quot;
 duplicate attribute name, &quot;while unwrapping tuple&quot;
 </pre>
 </dd>
-<dt><a name="15"><b class="cmd">::ral::tuple update</b> <i class="arg">tupleValue</i> <i class="arg"><span class="opt">?attr1 value1 attr2 value2 ...?</span></i></a></dt>
+<dt><a name="16"><b class="cmd">::ral::tuple update</b> <i class="arg">tupleValue</i> <i class="arg"><span class="opt">?attr1 value1 attr2 value2 ...?</span></i></a></dt>
 <dd><p>The <b class="cmd">update</b> subcommand returns a new tuple that has the same
 heading as <i class="arg">tupleValue</i> and that is modified by
 replacing the attribute values given by the <i class="arg">attrN</i> arguments
@@ -528,7 +547,7 @@ with their corresponding values as given by the <i class="arg">valueN</i> argume
 modifies the attribute values of a tuple in place.
 It is an error to attempt to update an attribute that does exist,
 <em>i.e.</em> the structure of the tuple may not be changed by this command.</p>
-<pre class="example">
+<pre class="doctools_example">
 % set t {{Name string Age int} {Name {Fred Jones} Age 27}}
 {Name string Age int} {Name {Fred Jones} Age 27}
 % tuple update $t Name {Jane Jones}
@@ -537,7 +556,7 @@ It is an error to attempt to update an attribute that does exist,
 unknown attribute name, &quot;Status&quot;
 </pre>
 </dd>
-<dt><a name="16"><b class="cmd">::ral::tuple wrap</b> <i class="arg">tupleValue</i> <i class="arg">newAttr</i> <i class="arg"><span class="opt">?attr1 attr2 ...?</span></i></a></dt>
+<dt><a name="17"><b class="cmd">::ral::tuple wrap</b> <i class="arg">tupleValue</i> <i class="arg">newAttr</i> <i class="arg"><span class="opt">?attr1 attr2 ...?</span></i></a></dt>
 <dd><p>The <b class="cmd">wrap</b> subcommand creates a new tuple where some of the attributes
 are contained in a Tuple valued attribute.
 This command provides a means to create nested tuples, <em>i.e.</em>
@@ -547,7 +566,7 @@ the new tuple valued attribute will be given.
 The <i class="arg">attrN</i> arguments are the names of attributes that will be placed
 in the new tuple valued attribute.
 Referring to the example from the <b class="cmd">tuple unwrap</b> command above:</p>
-<pre class="example">
+<pre class="doctools_example">
 % set t {{Name string Number int Street string} {Name Fred Number 100 Street Elm}}
 {Name string Number int Street string} {Name Fred Number 100 Street Elm}
 % tuple wrap $t Address Number Street
@@ -556,13 +575,13 @@ Referring to the example from the <b class="cmd">tuple unwrap</b> command above:
 </dd>
 </dl>
 </div>
-<div id="see-also" class="section"><h2><a name="see-also">See Also</a></h2>
+<div id="see-also" class="doctools_section"><h2><a name="see-also">See Also</a></h2>
 <p><a href="relation.html">relation</a>, <a href="relvar.html">relvar</a></p>
 </div>
-<div id="keywords" class="section"><h2><a name="keywords">Keywords</a></h2>
+<div id="keywords" class="doctools_section"><h2><a name="keywords">Keywords</a></h2>
 <p><a href="../index.html#key1">relation</a>, <a href="../index.html#key0">relvar</a>, <a href="../index.html#key2">tuple</a></p>
 </div>
-<div id="copyright" class="section"><h2><a name="copyright">Copyright</a></h2>
-<p>Copyright &copy; 2004 - 2015 by G. Andrew Mangogna</p>
+<div id="copyright" class="doctools_section"><h2><a name="copyright">Copyright</a></h2>
+<p>Copyright &copy; 2004 - 2017 by G. Andrew Mangogna</p>
 </div>
 </div></body></html>

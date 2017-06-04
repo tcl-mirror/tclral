@@ -79,7 +79,11 @@ namespace eval ::ral::test {
     }
 
     proc cleanUpNamespace {ns} {
-        set qualns [namespace current]::${ns}
+        if {[string range $ns 0 1] ne "::"} {
+            set qualns [namespace current]::${ns}
+        } else {
+            set qualns $ns
+        }
 	relvar constraint delete {*}[relvar constraint names ${qualns}::*]
 	relvar unset {*}[relvar names ${qualns}::*]
 	namespace delete $qualns
@@ -148,6 +152,27 @@ namespace eval ::ral::test {
         expr {$subfields == [relation cardinality [relvar set merge3::Field]]\
                 && [string match *Field [lindex $mismatch 0]]}
     } -result {1}
+
+    test merge-4.0 {
+	merge data onto empty namespace
+    } -setup {
+    } -cleanup {
+        cleanUpNamespace merge4
+    } -body {
+        mergeFromFile [file join [testsDirectory] mergetest1.ral]\
+            [namespace current]::merge4
+        llength [relvar names [namespace current]::merge4::*]
+    } -result {6}
+
+    test merge-4.1 {
+	merge data onto empty namespace
+    } -setup {
+    } -cleanup {
+        cleanUpNamespace ::tack::pycca
+    } -body {
+        mergeFromFile [file join [testsDirectory] pycca_test.ral] ::tack::pycca
+        llength [relvar names ::tack::pycca::*]
+    } -result {36}
 
     # Make the test files for SQLite based serialization
     namespace eval testfiles [list source [file join $testdir merge1.tcl]]
