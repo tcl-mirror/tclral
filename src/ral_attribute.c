@@ -102,8 +102,8 @@ typedef int (*CompareFunc)(Tcl_Obj *, Tcl_Obj *) ;
 typedef unsigned (*HashFunc)(Tcl_Obj *) ;
 struct ral_type {
     char const *typeName ;
-    IsATypeFunc isa ;
-    IsEqualFunc isequal ;
+    IsATypeFunc isa ;       /* return TCL_OK or TCL_ERROR */
+    IsEqualFunc isequal ;   /* return 1 ==> equal, 0 ==> not equal */
     CompareFunc compare ;
     HashFunc hash ;
 } ;
@@ -812,13 +812,36 @@ hashBytes(
     return hash ;
 }
 
+/*
+ * The problem here is that Tcl_GetBooleanFromObj will return TCL_OK when the
+ * object refers to any integer. It abides by the "C" convention that zero is
+ * "false" and non-zero is "true". For integers greater than 1, it returns "1"
+ * indicating true. We need to do better than than.  We need to behave like
+ * "string is boolean" and return "false" if passed an integer that is > 1.
+ */
 static int
 isABoolean(
     Tcl_Interp *interp,
     Tcl_Obj *boolObj)
 {
     int b ;
-    return Tcl_GetBooleanFromObj(interp, boolObj, &b) ;
+    int result ;
+
+    result = Tcl_GetIntFromObj(interp, boolObj, &b) ;
+    if (result == TCL_OK) {
+        if (!(b == 0 || b == 1)) {
+            result = TCL_ERROR ;
+            if (interp != NULL) {
+                Tcl_Obj *resultObj = Tcl_ObjPrintf("bad boolean value, \"%s\"",
+                            Tcl_GetStringFromObj(boolObj, NULL)) ;
+                Tcl_SetObjResult(interp, resultObj) ;
+            }
+        }
+    } else {
+        result = Tcl_GetBooleanFromObj(interp, boolObj, &b) ;
+    }
+
+    return result ;
 }
 
 static int

@@ -238,6 +238,24 @@ namespace eval ::ral::test {
             {Name Fred Num 100 City Main}}
     } -result {unknown attribute name, "City"} -returnCodes error
 
+    test tuple-strrep-6.8 {bad format -- bad boolean value} -body {
+        tuple degree {{Name string Has boolean}\
+            {Name Fred Has 2}}
+    } -result {bad value type for value, "2"} -returnCodes error
+
+    test tuple-strrep-6.9 {bad format -- bad boolean value} -body {
+        tuple degree {{Name string Has boolean}\
+            {Name Fred Has foo}}
+    } -result {bad value type for value, "foo"} -returnCodes error
+
+    test tuple-strrep-6.9 {boolean value as integer} -body {
+        tuple degree {{Name string Has boolean} {Name Fred Has 1}}
+    } -result {2}
+
+    test tuple-strrep-6.10 {boolean value as string} -body {
+        tuple degree {{Name string Has boolean} {Name Fred Has false}}
+    } -result {2}
+
     # Tuple Tests
 
     # tuple assign subcommand
