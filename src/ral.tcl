@@ -601,6 +601,9 @@ proc ::ral::merge {value {ns ::}} {
                 if {$relvarName in $matchingRelvars} {
                     relvar uinsert ${ns}$relvarName\
                             {*}[relation body $relvarBody]
+                } elseif {$relvarName in $newRelvars} {
+                    relvar insert ${ns}$relvarName\
+                            {*}[relation body $relvarBody]
                 }
             }
         }
@@ -1101,6 +1104,7 @@ proc ::ral::mergeFromSQLite {filename {ns ::}} {
         set dbrelvars [sqlitedb eval {select Vname from __ral_relvar}]
         set newRelvars [list]
         set sameTypeRelvars [list]
+        set mismatched [list]
         foreach dbrelvar $dbrelvars {
             set qualRelvar ${ns}$dbrelvar
             if {![::ral::relvar exists $qualRelvar]} {
@@ -1173,6 +1177,7 @@ proc ::ral::mergeFromSQLite {filename {ns ::}} {
                 # did not match that of an existing relvar. So it is skipped.
             }
         }
+        set mismatched
     } result opts
 
     sqlitedb close
@@ -1919,4 +1924,4 @@ proc ::ral::mapTypeToSQL {type} {
             $sqlTypeMap($type) : "text"}]
 }
 
-package provide ral 0.12.1
+package provide ral 0.12.2

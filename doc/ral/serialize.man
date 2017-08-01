@@ -1,4 +1,4 @@
-[manpage_begin serialize n 0.12.1]
+[manpage_begin serialize n 0.12.2]
 [comment {
 # This software is copyrighted 2004 - 2017 by G. Andrew Mangogna.
 # The following terms apply to all files associated with the software unless
@@ -49,7 +49,7 @@
 [moddesc "Relation persistence"]
 [titledesc "Persistent storage for relations"]
 [copyright "2004 - 2017 by G. Andrew Mangogna"]
-[require ral [arg [opt 0.12.1]]]
+[require ral [arg [opt 0.12.2]]]
 [description]
 This manpage describes a set of commands that are used for
 saving the values of relvars to external storage.
@@ -121,7 +121,7 @@ If [arg namespace] is given then the merge is into that namespace and
 otherwise the merge is into the global namespace.
 The merge attempts to do a union of the relvars and constraints onto
 those already existing.
-The merge is done strictly be name with no consideration of structure,
+The merge is done strictly by name with no consideration of structure,
 meaning that any relvars or constraints in
 [arg serialization] that do not currently exist are created,
 but existing relvars and constraints whose names match those in

@@ -171,8 +171,11 @@ namespace eval ::ral::test {
         cleanUpNamespace ::tack::pycca
     } -body {
         mergeFromFile [file join [testsDirectory] pycca_test.ral] ::tack::pycca
-        llength [relvar names ::tack::pycca::*]
-    } -result {36}
+        set nrels [llength [relvar names ::tack::pycca::*]]
+        # puts [relformat $::tack::pycca::Attribute Attribute]
+        set card [relation cardinality $::tack::pycca::Attribute]
+        expr {$nrels == 36 && $card == 11}
+    } -result {1}
 
     # Make the test files for SQLite based serialization
     namespace eval testfiles [list source [file join $testdir merge1.tcl]]
